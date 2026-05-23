@@ -11,60 +11,49 @@
         h2 { font-size: 20px; margin-bottom: 6px; color: #3a86ff; }
         p.sub { font-size: 13px; color: #94a3b8; margin-bottom: 24px; }
         label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; margin-top: 16px; }
-        input, textarea { width: 100%; background: #0b1329; border: 1px solid #222e50; border-radius: 8px; padding: 12px; color: #f8fafc; font-size: 15px; outline: none; }
-        input:focus, textarea:focus { border-color: #3a86ff; }
+        input { width: 100%; background: #0b1329; border: 1px solid #222e50; border-radius: 8px; padding: 12px; color: #f8fafc; font-size: 15px; outline: none; }
+        input:focus { border-color: #3a86ff; }
         .btn { width: 100%; margin-top: 24px; padding: 14px; border-radius: 10px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
         .btn-primary { background: #3a86ff; color: white; }
         .btn-secondary { background: #222e50; color: #94a3b8; margin-top: 10px; }
         .btn:active { opacity: 0.8; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .status { margin-top: 20px; padding: 14px; border-radius: 10px; font-size: 14px; display: none; }
-        .status.ok { background: rgba(6, 214, 160, 0.15); border: 1px solid #06d6a0; color: #06d6a0; display: block; }
-        .status.error { background: rgba(255, 0, 127, 0.15); border: 1px solid #ff007f; color: #ff99cc; display: block; }
-        .status.loading { background: rgba(58, 134, 255, 0.15); border: 1px solid #3a86ff; color: #93c5fd; display: block; }
+        .status.ok { background: rgba(6,214,160,0.15); border: 1px solid #06d6a0; color: #06d6a0; display: block; }
+        .status.error { background: rgba(255,0,127,0.15); border: 1px solid #ff007f; color: #ff99cc; display: block; }
+        .status.loading { background: rgba(58,134,255,0.15); border: 1px solid #3a86ff; color: #93c5fd; display: block; }
         .rows { margin-top: 20px; }
         .rows h3 { font-size: 14px; color: #94a3b8; margin-bottom: 10px; }
         .row-item { background: #0b1329; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; border: 1px solid #222e50; }
         .row-item span { color: #94a3b8; }
         .divider { border: none; border-top: 1px solid #222e50; margin: 24px 0; }
-        #login-section { text-align: center; }
-        #login-section p { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
         .user-info { background: rgba(6,214,160,0.1); border: 1px solid #06d6a0; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #06d6a0; margin-bottom: 20px; }
     </style>
 </head>
 <body>
-
 <div class="card">
     <h2>🧪 Prueba Excel — Portal TLC</h2>
     <p class="sub">Escribir y leer filas en tlc-datos.xlsx via Microsoft Graph</p>
 
-    <!-- LOGIN -->
     <div id="login-section">
-        <p>Necesitás iniciar sesión con tu cuenta de TLC para continuar.</p>
-        <button class="btn btn-primary" onclick="login()">Iniciar sesión con Microsoft</button>
+        <p style="color:#94a3b8;font-size:14px;margin-bottom:20px;">Iniciá sesión con tu cuenta de TLC para continuar.</p>
+        <button class="btn btn-primary" id="btn-login">Iniciar sesión con Microsoft</button>
     </div>
 
-    <!-- APP (oculto hasta login) -->
     <div id="app-section" style="display:none">
         <div class="user-info" id="user-info"></div>
 
-        <!-- ESCRIBIR -->
         <label>Nombre</label>
         <input type="text" id="campo-nombre" placeholder="Ej: Cristian">
 
         <label>Mensaje</label>
         <input type="text" id="campo-mensaje" placeholder="Ej: Prueba de conexión">
 
-        <button class="btn btn-primary" id="btn-escribir" onclick="escribirFila()">
-            ➕ Escribir fila en Excel
-        </button>
+        <button class="btn btn-primary" id="btn-escribir">➕ Escribir fila en Excel</button>
 
         <hr class="divider">
 
-        <!-- LEER -->
-        <button class="btn btn-secondary" onclick="leerFilas()">
-            📖 Leer filas del Excel
-        </button>
+        <button class="btn btn-secondary" id="btn-leer">📖 Leer filas del Excel</button>
 
         <div class="status" id="status"></div>
         <div class="rows" id="rows-container" style="display:none">
@@ -74,174 +63,131 @@
     </div>
 </div>
 
-<!-- MSAL (Microsoft Authentication Library) -->
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
-    // ─── CONFIGURACIÓN ───────────────────────────────────────────────
-    const CLIENT_ID  = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
-    const TENANT_ID  = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
-    const SITE_ID    = 'tlcarg.sharepoint.com,/sites/TLCOperaciones';
-    const FILE_ID    = 'ef868e9e-275c-481e-a3d2-89f3ec6fc790';
-    const SHEET_NAME = 'Hoja1';
-    const TABLE_NAME = 'Tabla1'; // nombre de la tabla dentro del Excel
+const CLIENT_ID  = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
+const TENANT_ID  = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
+const SITE_ID    = 'tlcarg.sharepoint.com,/sites/TLCOperaciones';
+const FILE_ID    = 'ef868e9e-275c-481e-a3d2-89f3ec6fc790';
+const TABLE_NAME = 'Tabla1';
+const SCOPES     = ['Files.ReadWrite', 'User.Read'];
 
-    const msalConfig = {
-        auth: {
-            clientId: CLIENT_ID,
-            authority: `https://login.microsoftonline.com/${TENANT_ID}`,
-            redirectUri: window.location.href.split('?')[0]
-        },
-        cache: { cacheLocation: 'sessionStorage' }
-    };
+const msalConfig = {
+    auth: {
+        clientId: CLIENT_ID,
+        authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+        redirectUri: 'https://cahirth.github.io/Portal-TLC/prueba-excel.html'
+    },
+    cache: { cacheLocation: 'sessionStorage' }
+};
 
-    const msalInstance = new msal.PublicClientApplication(msalConfig);
-    const scopes = ['Files.ReadWrite', 'User.Read'];
+let msal_app = null;
 
-    let accessToken = null;
+async function initMsal() {
+    msal_app = new msal.PublicClientApplication(msalConfig);
+    await msal_app.initialize();
 
-    // ─── MANEJAR REDIRECT AL VOLVER DEL LOGIN ────────────────────────
-    window.addEventListener('load', async () => {
-        try {
-            const response = await msalInstance.handleRedirectPromise();
-            if (response) {
-                accessToken = response.accessToken;
-                mostrarApp(response.account);
-            } else {
-                const accounts = msalInstance.getAllAccounts();
-                if (accounts.length > 0) {
-                    const tokenResponse = await msalInstance.acquireTokenSilent({ scopes, account: accounts[0] });
-                    accessToken = tokenResponse.accessToken;
-                    mostrarApp(accounts[0]);
-                }
-            }
-        } catch (e) {
-            console.error('Error al recuperar sesión:', e);
-        }
-    });
-
-    // ─── LOGIN ────────────────────────────────────────────────────────
-    async function login() {
-        await msalInstance.loginRedirect({ scopes });
+    const response = await msal_app.handleRedirectPromise();
+    if (response && response.account) {
+        mostrarApp(response.account);
+        return;
     }
 
-    function mostrarApp(account) {
-        document.getElementById('login-section').style.display = 'none';
-        document.getElementById('app-section').style.display = 'block';
-        document.getElementById('user-info').textContent = `✅ Sesión iniciada como: ${account.name || account.username}`;
+    const accounts = msal_app.getAllAccounts();
+    if (accounts.length > 0) {
+        mostrarApp(accounts[0]);
     }
+}
 
-    // ─── OBTENER TOKEN ────────────────────────────────────────────────
-    async function getToken() {
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length === 0) throw new Error('No hay sesión activa');
-        const response = await msalInstance.acquireTokenSilent({ scopes, account: accounts[0] });
-        return response.accessToken;
+async function getToken() {
+    const accounts = msal_app.getAllAccounts();
+    if (accounts.length === 0) throw new Error('No hay sesión activa');
+    const res = await msal_app.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+    return res.accessToken;
+}
+
+function mostrarApp(account) {
+    document.getElementById('login-section').style.display = 'none';
+    document.getElementById('app-section').style.display = 'block';
+    document.getElementById('user-info').textContent = `✅ ${account.name || account.username}`;
+}
+
+function mostrarStatus(msg, tipo) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = `status ${tipo}`;
+}
+
+async function escribirFila() {
+    const nombre  = document.getElementById('campo-nombre').value.trim();
+    const mensaje = document.getElementById('campo-mensaje').value.trim();
+    if (!nombre || !mensaje) { mostrarStatus('Completá nombre y mensaje.', 'error'); return; }
+
+    mostrarStatus('Guardando en Excel...', 'loading');
+    document.getElementById('btn-escribir').disabled = true;
+
+    try {
+        const token = await getToken();
+        const fecha = new Date().toLocaleString('es-AR');
+        const url = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/drive/items/${FILE_ID}/workbook/tables/${TABLE_NAME}/rows`;
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: [[fecha, nombre, mensaje]] })
+        });
+
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || `Error ${res.status}`); }
+        mostrarStatus('✅ Fila guardada en Excel correctamente.', 'ok');
+        document.getElementById('campo-nombre').value = '';
+        document.getElementById('campo-mensaje').value = '';
+    } catch(e) {
+        mostrarStatus(`❌ ${e.message}`, 'error');
+    } finally {
+        document.getElementById('btn-escribir').disabled = false;
     }
+}
 
-    // ─── ESCRIBIR FILA ────────────────────────────────────────────────
-    async function escribirFila() {
-        const nombre  = document.getElementById('campo-nombre').value.trim();
-        const mensaje = document.getElementById('campo-mensaje').value.trim();
+async function leerFilas() {
+    mostrarStatus('Leyendo Excel...', 'loading');
+    document.getElementById('rows-container').style.display = 'none';
 
-        if (!nombre || !mensaje) {
-            mostrarStatus('Completá nombre y mensaje antes de guardar.', 'error');
-            return;
-        }
+    try {
+        const token = await getToken();
+        const url = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/drive/items/${FILE_ID}/workbook/tables/${TABLE_NAME}/rows`;
 
-        mostrarStatus('Guardando en Excel...', 'loading');
-        document.getElementById('btn-escribir').disabled = true;
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || `Error ${res.status}`); }
 
-        try {
-            const token = await getToken();
-            const fecha = new Date().toLocaleString('es-AR');
+        const data = await res.json();
+        const rows = data.value;
 
-            const url = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/drive/items/${FILE_ID}/workbook/tables/${TABLE_NAME}/rows`;
+        if (!rows || rows.length === 0) { mostrarStatus('El Excel está vacío.', 'ok'); return; }
 
-            const body = {
-                values: [[fecha, nombre, mensaje]]
-            };
+        const lista = document.getElementById('rows-list');
+        lista.innerHTML = '';
+        rows.forEach(row => {
+            const [fecha, nombre, mensaje] = row.values[0];
+            const div = document.createElement('div');
+            div.className = 'row-item';
+            div.innerHTML = `<strong>${nombre}</strong> — ${mensaje}<br><span>${fecha}</span>`;
+            lista.appendChild(div);
+        });
 
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(body)
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error?.message || `Error ${res.status}`);
-            }
-
-            mostrarStatus(`✅ Fila guardada correctamente en Excel.`, 'ok');
-            document.getElementById('campo-nombre').value = '';
-            document.getElementById('campo-mensaje').value = '';
-
-        } catch (e) {
-            mostrarStatus(`❌ Error: ${e.message}`, 'error');
-            console.error(e);
-        } finally {
-            document.getElementById('btn-escribir').disabled = false;
-        }
+        document.getElementById('rows-container').style.display = 'block';
+        mostrarStatus(`✅ ${rows.length} fila(s) encontradas.`, 'ok');
+    } catch(e) {
+        mostrarStatus(`❌ ${e.message}`, 'error');
     }
+}
 
-    // ─── LEER FILAS ───────────────────────────────────────────────────
-    async function leerFilas() {
-        mostrarStatus('Leyendo Excel...', 'loading');
-        document.getElementById('rows-container').style.display = 'none';
+// Eventos
+document.getElementById('btn-login').addEventListener('click', () => msal_app.loginRedirect({ scopes: SCOPES }));
+document.getElementById('btn-escribir').addEventListener('click', escribirFila);
+document.getElementById('btn-leer').addEventListener('click', leerFilas);
 
-        try {
-            const token = await getToken();
-
-            const url = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/drive/items/${FILE_ID}/workbook/tables/${TABLE_NAME}/rows`;
-
-            const res = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error?.message || `Error ${res.status}`);
-            }
-
-            const data = await res.json();
-            const rows = data.value;
-
-            if (!rows || rows.length === 0) {
-                mostrarStatus('El Excel está vacío todavía.', 'ok');
-                return;
-            }
-
-            const lista = document.getElementById('rows-list');
-            lista.innerHTML = '';
-
-            rows.forEach(row => {
-                const [fecha, nombre, mensaje] = row.values[0];
-                const div = document.createElement('div');
-                div.className = 'row-item';
-                div.innerHTML = `<strong>${nombre}</strong> — ${mensaje}<br><span>${fecha}</span>`;
-                lista.appendChild(div);
-            });
-
-            document.getElementById('rows-container').style.display = 'block';
-            mostrarStatus(`✅ ${rows.length} fila(s) encontradas.`, 'ok');
-
-        } catch (e) {
-            mostrarStatus(`❌ Error: ${e.message}`, 'error');
-            console.error(e);
-        }
-    }
-
-    // ─── HELPERS ──────────────────────────────────────────────────────
-    function mostrarStatus(msg, tipo) {
-        const el = document.getElementById('status');
-        el.textContent = msg;
-        el.className = `status ${tipo}`;
-    }
+// Arrancar
+initMsal().catch(console.error);
 </script>
-
 </body>
 </html>
