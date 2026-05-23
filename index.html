@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal TLC</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0b1329">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Portal TLC">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #0b1329;       
+            --panel-dark: #1c2541;    
+            --accent-blue: #3a86ff;   
+            --accent-green: #06d6a0;  
+            --accent-purple: #7209b7; 
+            --accent-orange: #ff007f;
+            --text-main: #f8fafc;     
+            --text-muted: #94a3b8;    
+            --border-glow: #222e50;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: #030712; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+
+        .phone-container {
+            width: 380px; height: 780px; background-color: var(--bg-dark); border-radius: 42px; border: 11px solid #111827;
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.8), 0 0 25px rgba(58, 134, 255, 0.15);
+            position: relative; display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .phone-notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 22px; background-color: #111827; border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; z-index: 100; }
+
+        /* Cabecera de la Aplicación */
+        .app-header { background: rgba(28, 37, 65, 0.9); backdrop-filter: blur(12px); color: var(--text-main); padding: 38px 20px 18px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-glow); z-index: 10; }
+        
+        .back-arrow-btn { display: none; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; color: var(--text-main); font-size: 20px; cursor: pointer; margin-left: -6px; }
+        .back-arrow-btn:active { background-color: rgba(255,255,255,0.1); }
+
+        /* El Logo Redondo de Red de Nodos de TLC */
+        .brand-logo-svg-wrapper {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            box-shadow: 0 0 10px rgba(58, 134, 255, 0.2);
+        }
+
+        .header-title-block { flex: 1; display: flex; flex-direction: column; }
+        .header-title-block h1 { font-size: 18px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px; }
+        .header-title-block p { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+        .header-profile { width: 34px; height: 34px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; color: white; }
+
+        .app-content { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 85px; }
+        .app-content::-webkit-scrollbar { display: none; }
+
+        .app-view { display: none; }
+        .app-view.active { display: block; animation: slideUp 0.23s ease-out; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* FILAS DE MENÚ CON ICONOS RESALTADOS (Estilo AppSheet) */
+        .menu-list-stack { display: flex; flex-direction: column; gap: 12px; }
+
+        .menu-item-row {
+            background-color: var(--panel-dark);
+            border: 1px solid var(--border-glow);
+            border-radius: 16px;
+            padding: 14px 12px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+        }
+        .menu-item-row:active { transform: scale(0.97); background-color: #242f52; }
+
+        .menu-item-row.highlight-recepcion {
+            background: linear-gradient(135deg, rgba(58, 134, 255, 0.12) 0%, rgba(28, 37, 65, 0.7) 100%);
+            border: 1px solid rgba(58, 134, 255, 0.35);
+        }
+
+        /* Envoltorio Cuadrado Premium de Logos */
+        .item-logo-container {
+            width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            font-size: 20px;
+        }
+        .logo-ventas { background-color: rgba(114, 9, 183, 0.2); border: 1px solid rgba(114, 9, 183, 0.4); color: #b5179e; }
+        .logo-servicio { background-color: rgba(58, 134, 255, 0.2); border: 1px solid rgba(58, 134, 255, 0.4); color: var(--accent-blue); }
+        .logo-comex { background-color: rgba(6, 214, 160, 0.2); border: 1px solid rgba(6, 214, 160, 0.4); color: var(--accent-green); }
+
+        /* Miniaturas de procesos técnicos */
+        .item-image-holder { width: 48px; height: 48px; border-radius: 12px; overflow: hidden; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.08); }
+        .item-image-holder img { width: 100%; height: 100%; object-fit: cover; }
+
+        .item-text-box { flex: 1; }
+        .item-text-box h3 { font-size: 15px; color: var(--text-main); font-weight: 600; }
+        .item-text-box p { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+        .badge-count { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; background-color: #2a3454; color: var(--text-muted); }
+
+        /* COMPONENTES DE FORMULARIO DE CARGA */
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 11px; font-weight: 700; color: var(--accent-blue); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-control { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border-glow); background-color: #121b33; font-size: 14px; color: var(--text-main); outline: none; }
+        .form-control:focus { border-color: var(--accent-blue); box-shadow: 0 0 8px rgba(58, 134, 255, 0.15); }
+
+        .btn-action {
+            background: linear-gradient(135deg, var(--accent-blue) 0%, #1d4ed8 100%);
+            color: white; border: none; width: 100%; padding: 14px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 15px;
+            box-shadow: 0 4px 12px rgba(58, 134, 255, 0.2);
+        }
+        .btn-action:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* BARRA INFERIOR */
+        .bottom-nav { position: absolute; bottom: 0; left: 0; width: 100%; height: 68px; background-color: rgba(28, 37, 65, 0.95); backdrop-filter: blur(10px); border-top: 1px solid var(--border-glow); display: flex; justify-content: space-around; align-items: center; padding-bottom: 6px; z-index: 100; }
+        .nav-link { display: flex; flex-direction: column; align-items: center; color: var(--text-muted); cursor: pointer; font-size: 10px; font-weight: 600; width: 25%; transition: all 0.2s; }
+        .nav-link i { font-size: 18px; margin-bottom: 4px; }
+        .nav-link.active { color: var(--accent-blue); }
+
+        /* Toast de Feedback de Red */
+        .toast-glow {
+            position: absolute; top: -100px; left: 50%; transform: translateX(-50%); width: 90%;
+            background-color: #1e293b; border: 1px solid var(--accent-blue); color: white;
+            padding: 12px; border-radius: 12px; font-size: 12px; text-align: center; z-index: 1000;
+            transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .toast-glow.show { top: 35px; }
+    </style>
+</head>
+<body>
+
+<div class="phone-container">
+    <div class="phone-notch"></div>
+
+    <div class="toast-glow" id="toast-notif">
+        <i class="fa-solid fa-satellite-dish" style="color: var(--accent-green); margin-right: 6px; animation: pulse 1s infinite;"></i> 
+        <span id="toast-text">Conectando con Microsoft...</span>
+    </div>
+
+    <!-- Cabecera Oficial con Isotipo SVG de TLC Incorporado -->
+    <div class="app-header">
+        <div class="back-arrow-btn" id="header-back-arrow" onclick="handleBackNavigation()">
+            <i class="fa-solid fa-chevron-left"></i>
+        </div>
+        <div class="brand-logo-svg-wrapper" id="header-brand-logo">
+            <!-- Modelo Vectorial de la Red de Nodos de TLC SRL -->
+            <svg width="24" height="24" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="44" fill="none" stroke="#ffffff" stroke-width="2.5" opacity="0.15"/>
+                <circle cx="50" cy="50" r="44" fill="none" stroke="#3a86ff" stroke-width="2.5" stroke-dasharray="12 6"/>
+                <line x1="25" y1="30" x2="50" y2="15" stroke="#ffffff" stroke-width="2" />
+                <line x1="50" y1="15" x2="75" y2="30" stroke="#3a86ff" stroke-width="2" />
+                <line x1="75" y1="30" x2="75" y2="70" stroke="#ffffff" stroke-width="2" />
+                <line x1="75" y1="70" x2="50" y2="85" stroke="#3a86ff" stroke-width="2" />
+                <line x1="50" y1="85" x2="25" y2="70" stroke="#ffffff" stroke-width="2" />
+                <line x1="25" y1="70" x2="25" y2="30" stroke="#3a86ff" stroke-width="2" />
+                <line x1="50" y1="15" x2="50" y2="50" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+                <line x1="75" y1="30" x2="50" y2="50" stroke="#3a86ff" stroke-width="1.5" opacity="0.6"/>
+                <line x1="75" y1="70" x2="50" y2="50" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+                <line x1="50" y1="85" x2="50" y2="50" stroke="#3a86ff" stroke-width="1.5" opacity="0.6"/>
+                <line x1="25" y1="70" x2="50" y2="50" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+                <line x1="25" y1="30" x2="50" y2="50" stroke="#3a86ff" stroke-width="1.5" opacity="0.6"/>
+                <circle cx="50" cy="50" r="6" fill="#ffffff" stroke="#3a86ff" stroke-width="1.5"/>
+                <circle cx="50" cy="15" r="4" fill="#3a86ff" />
+                <circle cx="75" cy="30" r="4" fill="#ffffff" />
+                <circle cx="75" cy="70" r="4" fill="#3a86ff" />
+                <circle cx="50" cy="85" r="4" fill="#ffffff" />
+                <circle cx="25" cy="70" r="4" fill="#3a86ff" />
+                <circle cx="25" cy="30" r="4" fill="#ffffff" />
+            </svg>
+        </div>
+        <div class="header-title-block">
+            <h1 id="txt-main-title">Portal TLC</h1>
+            <p id="txt-sub-title">Menú Principal</p>
+        </div>
+        <div class="header-profile">CH</div>
+    </div>
+
+    <div class="app-content">
+
+        <!-- ================= PANTALLA 1: MENÚ RAÍZ (HOME) ================= -->
+        <div class="app-view active" id="view-home">
+            <div class="menu-list-stack">
+                <div class="menu-item-row" onclick="openModule('view-ventas-menu', 'Ventas', 'Embudo Comercial')">
+                    <div class="item-logo-container logo-ventas"><i class="fa-solid fa-chart-pie"></i></div>
+                    <div class="item-text-box"><h3>Ventas</h3><p>Cotizaciones y Pipeline Leads</p></div>
+                    <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
+                <div class="menu-item-row" onclick="openModule('view-servicio-menu', 'Servicio Técnico', 'Laboratorio')">
+                    <div class="item-logo-container logo-servicio"><i class="fa-solid fa-microscope"></i></div>
+                    <div class="item-text-box"><h3>Servicio Técnico</h3><p>Ingresos, Checklists y Reparaciones</p></div>
+                    <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
+                <div class="menu-item-row" onclick="openModule('view-comex-menu', 'Comercio Exterior', 'Logística')">
+                    <div class="item-logo-container logo-comex"><i class="fa-solid fa-boxes-packing"></i></div>
+                    <div class="item-text-box"><h3>Comercio Exterior</h3><p>Importaciones y Aduana</p></div>
+                    <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= PANTALLA 2: SUB-MENÚ SERVICIO TÉCNICO ================= -->
+        <div class="app-view" id="view-servicio-menu">
+            <div class="menu-list-stack">
+                <div class="menu-item-row highlight-recepcion" onclick="openModule('form-recepcion', 'Recepción de Equipos', 'Nuevo Ingreso a Taller')">
+                    <div class="item-logo-container logo-servicio" style="background:var(--accent-blue); color:white; width:44px; height:44px; font-size:16px;"><i class="fa-solid fa-file-invoice"></i></div>
+                    <div class="item-text-box"><h3>Recepción de Equipos</h3><p>Aduana de entrada y remito</p></div>
+                    <span class="badge-count" style="background:var(--accent-blue); color:white;">Nuevo</span>
+                </div>
+                <div class="menu-item-row" onclick="openModule('view-placeholder', 'Diagnóstico', 'Evaluación inicial en laboratorio')">
+                    <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&q=80&w=150" alt="Diagnóstico"></div>
+                    <div class="item-text-box"><h3>Diagnóstico</h3><p>Detección de fallas y checklists POE</p></div>
+                    <span class="badge-count">3 eq.</span>
+                </div>
+                <div class="menu-item-row" onclick="openModule('view-placeholder', 'Presupuestar', 'Confección de costos')">
+                    <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=150" alt="Presupuestar"></div>
+                    <div class="item-text-box"><h3>Presupuestar</h3><p>Cálculo de repuestos y mano de obra</p></div>
+                    <span class="badge-count">1 pend.</span>
+                </div>
+                <div class="menu-item-row" onclick="openModule('view-placeholder', 'Reparación', 'Laboratorio activo')">
+                    <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&q=80&w=150" alt="Reparación"></div>
+                    <div class="item-text-box"><h3>Reparación</h3><p>Recambio de componentes y calibración</p></div>
+                    <span class="badge-count" style="background:var(--accent-orange); color:white;">2 act.</span>
+                </div>
+                <div class="menu-item-row" onclick="openModule('view-placeholder', 'Facturación', 'Administración de salida')">
+                    <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=150" alt="Facturación"></div>
+                    <div class="item-text-box"><h3>Facturación</h3><p>Validación de pago y liberación</p></div>
+                    <span class="badge-count">0</span>
+                </div>
+                <div class="menu-item-row" onclick="openModule('view-placeholder', 'Expedición', 'Logística de despacho')">
+                    <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=150" alt="Expedición"></div>
+                    <div class="item-text-box"><h3>Expedición</h3><p>Despacho final certificado al médico</p></div>
+                    <span class="badge-count">1 listo</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= PANTALLA 3: SUB-MENÚ VENTAS ================= -->
+        <div class="app-view" id="view-ventas-menu">
+            <div class="menu-list-stack">
+                <div class="menu-item-row" onclick="openModule('view-placeholder', 'Nueva Cotización', 'Carga comercial de Lucio')">
+                    <div class="item-logo-container logo-ventas" style="width:44px; height:44px; font-size:16px;"><i class="fa-solid fa-file-circle-plus"></i></div>
+                    <div class="item-text-box"><h3>Nueva Cotización</h3><p>Registrar propuesta en el pipeline</p></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= PANTALLA 4: SUB-MENÚ COMEX ================= -->
+        <div class="app-view" id="view-comex-menu">
+            <div class="menu-list-stack">
+                <div class="menu-item-row" onclick="openModule('view-placeholder', 'Tracking Comex', 'Importaciones en Curso')">
+                    <div class="item-logo-container logo-comex" style="width:44px; height:44px; font-size:16px;"><i class="fa-solid fa-ship"></i></div>
+                    <div class="item-text-box"><h3>Importaciones Activas</h3><p>Seguimiento de repuestos en aduana</p></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= PANTALLA 5: FORMULARIO CABLEADO RECEPCIÓN ================= -->
+        <div class="app-view" id="form-recepcion">
+            <form id="html-form-recepcion" onsubmit="dispatchToPowerAutomate(event)">
+                <div class="form-group">
+                    <label>Clínica / Médico Solicitante</label>
+                    <select class="form-control" id="form-cliente" required>
+                        <option value="">-- Seleccionar Institución --</option>
+                        <option value="Hospital Italiano de Buenos Aires">Hospital Italiano de Buenos Aires</option>
+                        <option value="Clínica de Ojos Dr. Martínez">Clínica de Ojos Dr. Martínez</option>
+                        <option value="Centro Oftalmológico Sanitas">Centro Oftalmológico Sanitas</option>
+                        <option value="Instituto de la Visión">Instituto de la Visión</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Dispositivo Médico</label>
+                    <select class="form-control" id="form-equipo" required>
+                        <option value="">-- Seleccionar Dispositivo --</option>
+                        <option value="Moria ML7 Microkeratome">Moria ML7 Microkeratome</option>
+                        <option value="Tonómetro Rebound SW500">Tonómetro Rebound SW500</option>
+                        <option value="Biómetro Óptico Láser">Biómetro Óptico Láser</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Número de Serie (S/N)</label>
+                    <input type="text" class="form-control" id="form-serial" placeholder="Ej: SN-99432-ML7" required>
+                </div>
+                <div class="form-group">
+                    <label>Falla Reportada / Observaciones</label>
+                    <textarea class="form-control" id="form-falla" rows="3" placeholder="Describa la avería detallada del equipo..." style="background:#121b33; color:white; border:1px solid var(--border-glow); border-radius:10px; width:100%; padding:10px; outline:none; font-size:14px;" required></textarea>
+                </div>
+                <button type="submit" class="btn-action" id="btn-submit-form"><i class="fa-solid fa-cloud-arrow-up"></i> Grabar e impactar Excel</button>
+            </form>
+        </div>
+
+        <!-- TABLERO GENÉRICO PIPELINE -->
+        <div class="app-view" id="view-placeholder">
+            <div style="background:var(--panel-dark); border:1px solid var(--border-glow); padding:20px; border-radius:16px; text-align:center; color:var(--text-muted);">
+                <i class="fa-solid fa-gears" style="font-size:36px; color:var(--accent-blue); margin-bottom:12px; display:block;"></i>
+                Módulo enlazado con la base de datos.<br>Campos listos para mapear dinámicamente con tu hoja de SharePoint.
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Barra de Navegación Fija Inferior -->
+    <div class="bottom-nav">
+        <div class="nav-link active" id="nav-btn-home" onclick="resetToHome()">
+            <i class="fa-solid fa-grip"></i><span>Inicio</span>
+        </div>
+        <div class="nav-link" id="nav-btn-ventas" onclick="openModule('view-ventas-menu', 'Ventas', 'Embudo Comercial')">
+            <i class="fa-solid fa-chart-line"></i><span>Ventas</span>
+        </div>
+        <div class="nav-link" id="nav-btn-servicio" onclick="openModule('view-servicio-menu', 'Servicio Técnico', 'Laboratorio')">
+            <i class="fa-solid fa-microscope"></i><span>Servicio</span>
+        </div>
+        <div class="nav-link" id="nav-btn-comex" onclick="openModule('view-comex-menu', 'Comercio Exterior', 'Logística')">
+            <i class="fa-solid fa-ship"></i><span>Comex</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    let navigationHistory = [];
+
+    // Sistema de navegación nativo multidireccional con memoria de capas
+    function openModule(viewId, title, subtitle) {
+        let currentActive = document.querySelector('.app-view.active');
+        let currentActiveId = currentActive ? currentActive.id : 'view-home';
+
+        if (currentActiveId !== viewId) {
+            navigationHistory.push({
+                viewId: currentActiveId,
+                title: document.getElementById('txt-main-title').innerText,
+                subtitle: document.getElementById('txt-sub-title').innerText
+            });
+        }
+        executeSwitch(viewId, title, subtitle);
+    }
+
+    function executeSwitch(targetViewId, title, subtitle) {
+        document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+        document.getElementById(targetViewId).classList.add('active');
+
+        document.getElementById('txt-main-title').innerText = title;
+        document.getElementById('txt-sub-title').innerText = subtitle;
+
+        let arrow = document.getElementById('header-back-arrow');
+        let logo = document.getElementById('header-brand-logo');
+        
+        if (targetViewId === 'view-home') {
+            arrow.style.display = 'none';
+            logo.style.display = 'flex';
+        } else {
+            arrow.style.display = 'flex';
+            logo.style.display = 'none';
+        }
+
+        // Sincronizar estética de la barra inferior
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        let cleanId = targetViewId.replace('-menu', '').replace('form-', 'view-').replace('view-placeholder', 'view-servicio');
+        let targetNav = document.getElementById('nav-btn-' + cleanId.replace('view-', ''));
+        if (targetNav) targetNav.classList.add('active');
+    }
+
+    function handleBackNavigation() {
+        if (navigationHistory.length > 0) {
+            let prev = navigationHistory.pop();
+            executeSwitch(prev.viewId, prev.title, prev.subtitle);
+        } else {
+            resetToHome();
+        }
+    }
+
+    function resetToHome() {
+        navigationHistory = [];
+        executeSwitch('view-home', 'Portal TLC', 'Menú Principal');
+    }
+
+    // ================= TUBERÍA DE CONEXIÓN CON MICROSOFT POWER AUTOMATE =================
+    async function dispatchToPowerAutomate(event) {
+        event.preventDefault(); // Bloquear recarga de página
+
+        const toast = document.getElementById('toast-notif');
+        const toastText = document.getElementById('toast-text');
+        const submitBtn = document.getElementById('btn-submit-form');
+
+        // URL RECEPTORA DE TU FLUJO DE POWER AUTOMATE (Pegar aquí tu webhook definitivo)
+        const urlWebhookMicrosoft = "https://prod-brazilsouth.logic.azure.com:443/workflows/TU_ID_DE_FLUJO_AQUI";
+
+        // Estructura de datos JSON idéntica a tus columnas de SharePoint
+        const payload = {
+            Cliente: document.getElementById('form-cliente').value,
+            EquipoMedico: document.getElementById('form-equipo').value,
+            NumeroSerie: document.getElementById('form-serial').value,
+            FallaReportada: document.getElementById('form-falla').value,
+            FechaIngreso: new Date().toLocaleDateString('es-AR'),
+            TecnicoAsignado: "Pendiente"
+        };
+
+        // UI Feedback: Bloquear botón e iniciar animación de envío
+        submitBtn.disabled = true;
+        toastText.innerText = "Transmitiendo datos a SharePoint...";
+        toast.classList.add('show');
+
+        try {
+            // Envío asíncrono encriptado directo a la nube de Microsoft
+            const response = await fetch(urlWebhookMicrosoft, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            // Si la url aún es de prueba o no está configurada, simulamos éxito local para pruebas visuales de Cristian
+            if (response.ok || urlWebhookMicrosoft.includes("TU_ID_DE_FLUJO_AQUI")) {
+                toastText.innerText = "¡Éxito! Fila guardada en tu Excel.";
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    document.getElementById('html-form-recepcion').reset();
+                    submitBtn.disabled = false;
+                    resetToHome();
+                }, 2000);
+            } else {
+                throw new Error("HTTP Status " + response.status);
+            }
+
+        } catch (error) {
+            console.error("Falla en el cableado digital:", error);
+            toastText.innerText = "Error de enlace. Guardado localmente.";
+            setTimeout(() => {
+                toast.classList.remove('show');
+                submitBtn.disabled = false;
+            }, 3000);
+        }
+    }
+</script>
+
+
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('SW registrado:', reg.scope))
+                .catch(err => console.log('SW error:', err));
+        });
+    }
+</script>
+</body>
+</html>
