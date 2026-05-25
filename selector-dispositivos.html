@@ -380,6 +380,13 @@ function renderLista(items) {
     lista.innerHTML = items.map((d, i) => {
         const nombre   = d['Nombre de Dispositivo'] || '';
         const cat      = d['Categoria'] || '';
+        const descCorta = (() => {
+            const desc = (d['Descripcion'] || '').trim();
+            if (!desc) return cat;
+            // Primera línea o hasta 60 chars
+            const primera = desc.split(/\n/)[0].trim();
+            return primera.length > 60 ? primera.substring(0,57) + '…' : primera;
+        })();
         const oferta   = d['Oferta'] === true || d['Oferta'] === 'TRUE';
         const precio   = d['Precio CONTADO CNO'];
         const foto     = fotoUrl(d['Foto'] || '');
@@ -401,7 +408,7 @@ function renderLista(items) {
                 <div class="card-info">
                     ${oferta ? '<span class="oferta-badge">⭐ OFERTA</span>' : ''}
                     <div class="card-nombre">${nombre}</div>
-                    <div class="card-categoria">${cat}</div>
+                    <div class="card-categoria">${descCorta}</div>
                     <div class="card-precio">${precioStr}</div>
                 </div>
                 <span style="color:#94a3b8;font-size:18px">›</span>
