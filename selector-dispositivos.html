@@ -224,55 +224,16 @@ const msalConfig = {
 };
 
 // Modalidades — el descKey es el GATILLO: si está vacío, no se muestra el botón
+// Orden visual: Contado | Crédito / Dir 6AR | Dir 12AR / Dir 6USD | Dir 12USD / Lea$ | LeaUSD
 const MODALIDADES = [
-    {
-        key: 'CONTADO', label: 'Contado USD',
-        triggerKey: 'Descripcion_USD_CONTADO',
-        precioKey: 'Precio CONTADO CNO', cuotaKey: null,
-        descKey: 'Descripcion_USD_CONTADO', moneda: 'USD'
-    },
-    {
-        key: 'TLC6', label: 'Directo 6c AR$',
-        triggerKey: 'Descripcion_TLC_$_6',
-        precioKey: 'Adelanto_TLC_$_6', cuotaKey: 'CUOTA_TLC_$_6',
-        descKey: 'Descripcion_TLC_$_6', moneda: 'ARS'
-    },
-    {
-        key: 'TLC12', label: 'Directo 12c AR$',
-        triggerKey: 'Descripcion_TLC_$_12',
-        precioKey: 'Adelanto_TLC_$_12', cuotaKey: 'CUOTA_TLC_$_12',
-        descKey: 'Descripcion_TLC_$_12', moneda: 'ARS'
-    },
-    {
-        key: 'TLC6USD', label: 'Directo 6c USD',
-        triggerKey: 'Descripcion_TLC_USD_6',
-        precioKey: 'Adelanto_TLC_USD_6', cuotaKey: 'CUOTA_TLC_USD_6',
-        descKey: 'Descripcion_TLC_USD_6', moneda: 'USD'
-    },
-    {
-        key: 'TLC12USD', label: 'Directo 12c USD',
-        triggerKey: 'Descripcion_TLC_USD_12',
-        precioKey: 'Adelanto_TLC_USD_12', cuotaKey: 'CUOTA_TLC_USD_12',
-        descKey: 'Descripcion_TLC_USD_12', moneda: 'USD'
-    },
-    {
-        key: 'LEASING', label: 'Leasing 36c AR$',
-        triggerKey: 'Descripcion_L$_36',
-        precioKey: 'Adelanto_L$_36', cuotaKey: 'Cuota_L$_36',
-        descKey: 'Descripcion_L$_36', moneda: 'ARS'
-    },
-    {
-        key: 'LEASINGUSD', label: 'Leasing 36c USD',
-        triggerKey: 'Descripcion_L_USD_36',
-        precioKey: 'Adelanto_L_USD_36', cuotaKey: 'Cuota_L_USD_36',
-        descKey: 'Descripcion_L_USD_36', moneda: 'USD'
-    },
-    {
-        key: 'CREDITO', label: 'Crédito',
-        triggerKey: 'Descripcion_$_CREDICOOP_36',
-        precioKey: 'Adelanto_$_CREDICOOP', cuotaKey: 'Cuotas_$_CREDICOOP_36',
-        descKey: 'Descripcion_$_CREDICOOP_36', moneda: 'ARS'
-    },
+    { key: 'CONTADO',   label: 'Contado USD',    triggerKey: 'Descripcion_USD_CONTADO',    precioKey: 'Precio CONTADO CNO',    cuotaKey: null,                    descKey: 'Descripcion_USD_CONTADO',    moneda: 'USD' },
+    { key: 'CREDITO',   label: 'Crédito AR$',     triggerKey: 'Descripcion_$_CREDICOOP_36', precioKey: 'Adelanto_$_CREDICOOP',  cuotaKey: 'Cuotas_$_CREDICOOP_36', descKey: 'Descripcion_$_CREDICOOP_36', moneda: 'ARS' },
+    { key: 'TLC6',      label: 'Directo 6c AR$',  triggerKey: 'Descripcion_TLC_$_6',        precioKey: 'Adelanto_TLC_$_6',      cuotaKey: 'CUOTA_TLC_$_6',         descKey: 'Descripcion_TLC_$_6',        moneda: 'ARS' },
+    { key: 'TLC12',     label: 'Directo 12c AR$', triggerKey: 'Descripcion_TLC_$_12',       precioKey: 'Adelanto_TLC_$_12',     cuotaKey: 'CUOTA_TLC_$_12',        descKey: 'Descripcion_TLC_$_12',       moneda: 'ARS' },
+    { key: 'TLC6USD',   label: 'Directo 6c USD',  triggerKey: 'Descripcion_TLC_USD_6',      precioKey: 'Adelanto_TLC_USD_6',    cuotaKey: 'CUOTA_TLC_USD_6',       descKey: 'Descripcion_TLC_USD_6',      moneda: 'USD' },
+    { key: 'TLC12USD',  label: 'Directo 12c USD', triggerKey: 'Descripcion_TLC_USD_12',     precioKey: 'Adelanto_TLC_USD_12',   cuotaKey: 'CUOTA_TLC_USD_12',      descKey: 'Descripcion_TLC_USD_12',     moneda: 'USD' },
+    { key: 'LEASING',   label: 'Leasing 36c AR$', triggerKey: 'Descripcion_L$_36',          precioKey: 'Adelanto_L$_36',        cuotaKey: 'Cuota_L$_36',           descKey: 'Descripcion_L$_36',          moneda: 'ARS' },
+    { key: 'LEASINGUSD',label: 'Leasing 36c USD', triggerKey: 'Descripcion_L_USD_36',       precioKey: 'Adelanto_L_USD_36',     cuotaKey: 'Cuota_L_USD_36',        descKey: 'Descripcion_L_USD_36',       moneda: 'USD' },
 ];
 
 let msal_app = null;
@@ -362,16 +323,30 @@ function tieneValor(v) {
     return v !== null && v !== undefined && v !== '' && v !== 0 && v !== '0';
 }
 
+function parseNum(n) {
+    if (n === null || n === undefined || n === '') return NaN;
+    if (typeof n === 'number') return n;
+    const s = String(n).trim().replace(/\./g, '').replace(',', '.');
+    return parseFloat(s);
+}
+
 function fmtARS(n) {
-    const num = parseFloat(String(n).replace(/\./g, '').replace(',', '.'));
+    const num = parseNum(n);
     if (isNaN(num)) return null;
     return 'AR$ ' + Math.round(num).toLocaleString('es-AR');
 }
 
 function fmtUSD(n) {
-    const num = parseFloat(String(n).replace(/\./g, '').replace(',', '.'));
+    const num = parseNum(n);
     if (isNaN(num)) return null;
     return 'USD ' + Math.round(num).toLocaleString('es-AR');
+}
+
+function fmtPct(n) {
+    const num = parseNum(n);
+    if (isNaN(num)) return null;
+    const pct = num < 1 ? num * 100 : num;
+    return (Math.round(pct * 100) / 100) + '%';
 }
 
 function fotoUrl(foto) {
@@ -554,13 +529,8 @@ function seleccionarModalidad(key) {
     }
     document.getElementById('precio-principal').textContent = precioStr;
 
-    // Referencia USD para modalidades en ARS
-    const refEl = document.getElementById('precio-usd-ref');
-    if (m.moneda === 'ARS' && tieneValor(precioContado)) {
-        refEl.textContent = `Ref. contado: ${fmtUSD(precioContado)}`;
-    } else {
-        refEl.textContent = '';
-    }
+    // Referencia USD — ocultar siempre
+    document.getElementById('precio-usd-ref').textContent = '';
 
     document.getElementById('precio-desc').textContent = desc;
 
@@ -601,7 +571,7 @@ function abrirFormulario() {
     const comVal = document.getElementById('f-comision-valor');
     if (esExterno && tieneValor(d['COMISIONES'])) {
         comGrp.style.display = 'block';
-        comVal.textContent = `💰 ${d['COMISIONES']}`;
+        comVal.textContent = `💰 ${fmtPct(d['COMISIONES']) || d['COMISIONES']}`;
     } else {
         comGrp.style.display = 'none';
     }
