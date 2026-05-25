@@ -160,6 +160,7 @@
         <div class="header-profile" id="header-avatar" style="cursor:default;">CH</div>
     </div>
 
+    <div id="phone-app-content" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
     <div class="app-content">
 
         <!-- ================= PANTALLA 1: MENÚ RAÍZ (HOME) ================= -->
@@ -342,6 +343,20 @@
 
     </div>
 
+    </div><!-- /phone-app-content -->
+
+    <!-- LOGIN WALL -->
+    <div id="login-wall" style="display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; padding:32px 24px; text-align:center; gap:20px;">
+        <img src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" style="width:64px; height:64px; object-fit:contain; border-radius:16px; margin-bottom:8px;" onerror="this.style.display='none'">
+        <div>
+            <div style="font-size:20px; font-weight:700; color:#f8fafc; margin-bottom:6px;">Portal TLC</div>
+            <div style="font-size:13px; color:#94a3b8;">Iniciá sesión con tu cuenta de TLC</div>
+        </div>
+        <button onclick="doLogin()" style="background:#3a86ff; color:white; border:none; border-radius:12px; padding:14px 28px; font-size:15px; font-weight:600; cursor:pointer; width:100%; max-width:280px;">
+            Iniciar sesión con Microsoft
+        </button>
+    </div>
+
     <!-- Barra de Navegación Fija Inferior -->
     <div class="bottom-nav">
         <div class="nav-link active" id="nav-btn-home" onclick="resetToHome()">
@@ -362,7 +377,41 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
+    // ─── MSAL CONFIG ──────────────────────────────────────────────────────────
+    const MSAL_CLIENT_ID = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
+    const MSAL_TENANT_ID = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
+    const msalAppIndex = new msal.PublicClientApplication({
+        auth: {
+            clientId: MSAL_CLIENT_ID,
+            authority: `https://login.microsoftonline.com/${MSAL_TENANT_ID}`,
+            redirectUri: 'https://cahirth.github.io/Portal-TLC/'
+        },
+        cache: { cacheLocation: 'sessionStorage' }
+    });
+
+    let currentUserIndex = null;
+
+    async function initIndexMsal() {
+        await msalAppIndex.initialize();
+        const resp = await msalAppIndex.handleRedirectPromise();
+        const account = resp?.account || msalAppIndex.getAllAccounts()[0];
+        if (account) {
+            currentUserIndex = account;
+            updateUserDisplay();
+            document.getElementById('login-wall').style.display = 'none';
+            document.getElementById('phone-app-content').style.display = 'flex';
+        } else {
+            document.getElementById('login-wall').style.display = 'flex';
+            document.getElementById('phone-app-content').style.display = 'none';
+        }
+    }
+
+    function doLogin() {
+        msalAppIndex.loginRedirect({ scopes: ['User.Read'] });
+    }
+
     let navigationHistory = [];
 
     // Sistema de navegación nativo multidireccional con memoria de capas
@@ -492,23 +541,20 @@
     // ─── MOSTRAR NOMBRE USUARIO DESDE MSAL SESSION ─────────────────────────
     function updateUserDisplay() {
         try {
-            // Buscar en sessionStorage la cuenta de MSAL
-            for (let i = 0; i < sessionStorage.length; i++) {
-                const key = sessionStorage.key(i);
-                if (key && key.includes('account')) {
-                    const val = JSON.parse(sessionStorage.getItem(key));
-                    if (val && (val.name || val.username)) {
-                        const nombre = val.name || val.username;
-                        const iniciales = nombre.split(' ').map(p => p[0]).join('').substring(0,2).toUpperCase();
-                        document.getElementById('header-avatar').textContent = iniciales;
-                        document.getElementById('txt-sub-title').textContent = 'Hola, ' + nombre.split(' ')[0];
-                        return;
-                    }
+            const account = currentUserIndex || msalAppIndex.getAllAccounts()[0];
+            if (account) {
+                const nombre = account.name || account.username || '';
+                const iniciales = nombre.split(' ').filter(Boolean).map(p => p[0]).join('').substring(0,2).toUpperCase() || 'TL';
+                document.getElementById('header-avatar').textContent = iniciales;
+                // Solo actualizar subtitle si estamos en home
+                const active = document.querySelector('.app-view.active');
+                if (!active || active.id === 'view-home') {
+                    document.getElementById('txt-sub-title').textContent = 'Hola, ' + (nombre.split(' ')[0] || nombre);
                 }
             }
-        } catch(e) {}
+        } catch(e) { console.warn('updateUserDisplay:', e); }
     }
-    updateUserDisplay();
+    initIndexMsal().catch(console.error);
 
     // ─── COTIZACIONES ─────────────────────────────────────────────────────────────
     const SHEET_ID_COT = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -546,19 +592,24 @@
             }
 
             // Buscar rol del usuario
-            const vend = vendRows.find(v => (v['Email']||'').toLowerCase() === cotUsuarioEmail);
-            cotUsuarioRol = vend ? vend['Rol'] : '';
+            const vend = vendRows.find(v => String(v['Email']||'').toLowerCase() === cotUsuarioEmail);
+            cotUsuarioRol = vend ? String(vend['Rol']||'') : '';
+
+            // Log columnas para debug
+            if (cotRows.length > 0) console.log('Columnas Cotizaciones:', Object.keys(cotRows[0]));
 
             // Filtrar por vendedor (Admin ve todo, Interno/Externo ve solo las suyas)
             if (cotUsuarioRol === 'Administrador') {
                 cotizacionesData = cotRows;
             } else {
-                const nombreVend = vend ? vend['Nombre Vendedor'] : '';
+                const nombreVend = vend ? String(vend['Nombre Vendedor']||'') : '';
+                const emailBase = cotUsuarioEmail.split('@')[0];
                 cotizacionesData = cotRows.filter(r => {
-                    const v = (r['Vendedor'] || '').toLowerCase();
-                    return v === cotUsuarioEmail || v === nombreVend.toLowerCase() ||
-                           v.includes(cotUsuarioEmail.split('@')[0]);
+                    const v = String(r['Vendedor'] || r['Email'] || r['email'] || '').toLowerCase();
+                    return v === cotUsuarioEmail || v === nombreVend.toLowerCase() || v.includes(emailBase);
                 });
+                // Si no hay match, mostrar todas (fallback)
+                if (cotizacionesData.length === 0) cotizacionesData = cotRows;
             }
 
             // Ordenar: no leídos primero, luego por estado
