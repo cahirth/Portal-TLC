@@ -342,37 +342,122 @@
         </div>
 
         <!-- ================= PANTALLA 5: FORMULARIO CABLEADO RECEPCIÓN ================= -->
-        <div class="app-view" id="form-recepcion">
-            <form id="html-form-recepcion" onsubmit="dispatchToPowerAutomate(event)">
-                <div class="form-group">
-                    <label>Clínica / Médico Solicitante</label>
-                    <select class="form-control" id="form-cliente" required>
-                        <option value="">-- Seleccionar Institución --</option>
-                        <option value="Hospital Italiano de Buenos Aires">Hospital Italiano de Buenos Aires</option>
-                        <option value="Clínica de Ojos Dr. Martínez">Clínica de Ojos Dr. Martínez</option>
-                        <option value="Centro Oftalmológico Sanitas">Centro Oftalmológico Sanitas</option>
-                        <option value="Instituto de la Visión">Instituto de la Visión</option>
-                    </select>
+        <div class="app-view" id="form-recepcion" style="padding-bottom:32px;">
+
+            <!-- Fecha -->
+            <div class="form-group">
+                <label class="form-label">Fecha de Recepción <span style="color:#f87171;">*</span></label>
+                <input type="date" class="form-control" id="rec-fecha" required>
+            </div>
+
+            <!-- Tipo de Servicio -->
+            <div class="form-group">
+                <label class="form-label">Tipo de Servicio <span style="color:#f87171;">*</span></label>
+                <select class="form-control" id="rec-tipo" required>
+                    <option value="">-- Seleccionar --</option>
+                    <option>Garantía</option>
+                    <option>Reparación con costo</option>
+                    <option>Mantenimiento preventivo</option>
+                    <option>Revisión / Diagnóstico</option>
+                    <option>Instalación</option>
+                </select>
+            </div>
+
+            <!-- Nombre Cliente -->
+            <div class="form-group">
+                <label class="form-label">Nombre y Apellido Cliente <span style="color:#f87171;">*</span></label>
+                <input type="text" class="form-control" id="rec-cliente" placeholder="Dr. Juan García" required>
+            </div>
+
+            <!-- Teléfono -->
+            <div class="form-group">
+                <label class="form-label">Teléfono <span style="color:#f87171;">*</span></label>
+                <input type="tel" class="form-control" id="rec-telefono" placeholder="+54 11 1234-5678" required>
+            </div>
+
+            <!-- Falla reportada -->
+            <div class="form-group">
+                <label class="form-label">Falla Reportada por el Cliente <span style="color:#f87171;">*</span></label>
+                <textarea class="form-control" id="rec-falla" rows="3" placeholder="Describa el problema reportado..." required></textarea>
+            </div>
+
+            <!-- Marca -->
+            <div class="form-group">
+                <label class="form-label">Marca <span style="color:#f87171;">*</span></label>
+                <select class="form-control" id="rec-marca" required onchange="actualizarModelos()">
+                    <option value="">-- Seleccionar Marca --</option>
+                    <option>HUVITZ</option>
+                    <option>Topcon</option>
+                    <option>Zeiss</option>
+                    <option>Nidek</option>
+                    <option>Haag-Streit</option>
+                    <option>Bausch & Lomb</option>
+                    <option>Alcon</option>
+                    <option>Moria</option>
+                    <option>Otro</option>
+                </select>
+            </div>
+
+            <!-- Modelo -->
+            <div class="form-group">
+                <label class="form-label">Modelo <span style="color:#f87171;">*</span></label>
+                <select class="form-control" id="rec-modelo" required>
+                    <option value="">-- Seleccionar Modelo --</option>
+                </select>
+            </div>
+
+            <!-- Nro de Serie -->
+            <div class="form-group">
+                <label class="form-label">Número de Serie (S/N) <span style="color:#f87171;">*</span></label>
+                <input type="text" class="form-control" id="rec-serie" placeholder="Ej: HV-2024-001" required>
+            </div>
+
+            <!-- Accesorios -->
+            <div class="form-group">
+                <label class="form-label">Accesorios incluidos</label>
+                <input type="text" class="form-control" id="rec-accesorios" placeholder="Cable, maletín, manual...">
+            </div>
+
+            <!-- Fotos — 3 slots -->
+            <div class="form-group">
+                <label class="form-label">Fotos del equipo (hasta 3)</label>
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:6px;">
+                    <div class="foto-slot" id="slot-0" onclick="triggerFoto(0)">
+                        <input type="file" id="foto-input-0" accept="image/*" capture="environment" style="display:none" onchange="previewFoto(0,this)">
+                        <div class="foto-placeholder">
+                            <i class="fa-solid fa-camera" style="font-size:20px; color:#64748b;"></i>
+                            <span style="font-size:10px; color:#64748b; margin-top:4px;">Foto 1</span>
+                        </div>
+                        <img id="foto-preview-0" src="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:10px;">
+                    </div>
+                    <div class="foto-slot" id="slot-1" onclick="triggerFoto(1)">
+                        <input type="file" id="foto-input-1" accept="image/*" capture="environment" style="display:none" onchange="previewFoto(1,this)">
+                        <div class="foto-placeholder">
+                            <i class="fa-solid fa-camera" style="font-size:20px; color:#64748b;"></i>
+                            <span style="font-size:10px; color:#64748b; margin-top:4px;">Foto 2</span>
+                        </div>
+                        <img id="foto-preview-1" src="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:10px;">
+                    </div>
+                    <div class="foto-slot" id="slot-2" onclick="triggerFoto(2)">
+                        <input type="file" id="foto-input-2" accept="image/*" capture="environment" style="display:none" onchange="previewFoto(2,this)">
+                        <div class="foto-placeholder">
+                            <i class="fa-solid fa-camera" style="font-size:20px; color:#64748b;"></i>
+                            <span style="font-size:10px; color:#64748b; margin-top:4px;">Foto 3</span>
+                        </div>
+                        <img id="foto-preview-2" src="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:10px;">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Dispositivo Médico</label>
-                    <select class="form-control" id="form-equipo" required>
-                        <option value="">-- Seleccionar Dispositivo --</option>
-                        <option value="Moria ML7 Microkeratome">Moria ML7 Microkeratome</option>
-                        <option value="Tonómetro Rebound SW500">Tonómetro Rebound SW500</option>
-                        <option value="Biómetro Óptico Láser">Biómetro Óptico Láser</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Número de Serie (S/N)</label>
-                    <input type="text" class="form-control" id="form-serial" placeholder="Ej: SN-99432-ML7" required>
-                </div>
-                <div class="form-group">
-                    <label>Falla Reportada / Observaciones</label>
-                    <textarea class="form-control" id="form-falla" rows="3" placeholder="Describa la avería detallada del equipo..." style="background:#121b33; color:white; border:1px solid var(--border-glow); border-radius:10px; width:100%; padding:10px; outline:none; font-size:14px;" required></textarea>
-                </div>
-                <button type="submit" class="btn-action" id="btn-submit-form"><i class="fa-solid fa-cloud-arrow-up"></i> Grabar e impactar Excel</button>
-            </form>
+            </div>
+
+            <!-- Status -->
+            <div id="rec-status" style="display:none; border-radius:10px; padding:12px 14px; font-size:13px; font-weight:600; margin-bottom:12px; text-align:center;"></div>
+
+            <!-- Submit -->
+            <button onclick="enviarRecepcion()" id="btn-rec-enviar"
+                style="width:100%; background:#3a86ff; color:white; border:none; border-radius:14px; padding:16px; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Enviar Recepción
+            </button>
+
         </div>
 
         <!-- TABLERO GENÉRICO PIPELINE -->
@@ -470,6 +555,7 @@
         }
         executeSwitch(viewId, title, subtitle);
         if (viewId === 'view-cotizaciones') cargarCotizaciones();
+        if (viewId === 'form-recepcion') initRecepcionForm();
     }
 
     function executeSwitch(targetViewId, title, subtitle) {
@@ -899,6 +985,156 @@
         document.getElementById('cot-detalle-overlay').style.display = 'none';
     }
 
+
+    // ─── MODELOS POR MARCA ────────────────────────────────────────────────────────
+    const modelosPorMarca = {
+        'HUVITZ': ['HRK-9000A','HRK-8000A','HCP-7000','HBM-1','HOCT-1F OCTavius','HDR-9000','ERK-9100','HMS','HS-5000 X11','HVF-100','HNT1P','ERK-9100','HFC-1'],
+        'Topcon': ['KR-800','TRC-NW400','3D OCT-1 Maestro2','SL-D701','CT-800','KR-1W'],
+        'Zeiss': ['IOLMaster 700','Cirrus 6000','Humphrey HFA3','VISUCAM 524','Lumera 700'],
+        'Nidek': ['RS-330 Duo','AFC-330','US-4000','NT-530P','LM-1800P'],
+        'Haag-Streit': ['BQ 900','LuxOR LX3','AT 900','BM 900'],
+        'Bausch & Lomb': ['Stellaris Elite','Crystalens','enVista'],
+        'Alcon': ['Centurion','LenSx','WaveLight EX500'],
+        'Moria': ['M2','One Use-Plus','CB Microkeratome'],
+        'Otro': ['Otro / Especificar en Notas'],
+    };
+
+    function actualizarModelos() {
+        const marca = document.getElementById('rec-marca').value;
+        const sel = document.getElementById('rec-modelo');
+        sel.innerHTML = '<option value="">-- Seleccionar Modelo --</option>';
+        (modelosPorMarca[marca] || []).forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m; opt.textContent = m;
+            sel.appendChild(opt);
+        });
+    }
+
+    function triggerFoto(n) {
+        document.getElementById('foto-input-' + n).click();
+    }
+
+    function previewFoto(n, input) {
+        if (!input.files[0]) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = document.getElementById('foto-preview-' + n);
+            img.src = e.target.result;
+            img.style.display = 'block';
+            document.getElementById('slot-' + n).querySelector('.foto-placeholder').style.display = 'none';
+            document.getElementById('slot-' + n).classList.add('filled');
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+
+    async function fotoToBase64(n) {
+        const input = document.getElementById('foto-input-' + n);
+        if (!input.files[0]) return null;
+        return new Promise(res => {
+            const reader = new FileReader();
+            reader.onload = e => res(e.target.result.split(',')[1]);
+            reader.readAsDataURL(input.files[0]);
+        });
+    }
+
+    // Setear fecha de hoy al abrir el formulario
+    function initRecepcionForm() {
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById('rec-fecha').value = hoy;
+        // Pre-llenar vendedor con usuario logueado
+    }
+
+    async function enviarRecepcion() {
+        const btn = document.getElementById('btn-rec-enviar');
+        const status = document.getElementById('rec-status');
+
+        // Validación básica
+        const campos = ['rec-fecha','rec-tipo','rec-cliente','rec-telefono','rec-falla','rec-marca','rec-modelo','rec-serie'];
+        for (const id of campos) {
+            if (!document.getElementById(id).value.trim()) {
+                mostrarStatus('⚠️ Completá todos los campos obligatorios', 'warn');
+                return;
+            }
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+        mostrarStatus('Preparando datos...', 'info');
+
+        // Recopilar fotos en base64
+        const fotos = await Promise.all([0,1,2].map(fotoToBase64));
+
+        const payload = {
+            Fecha:        document.getElementById('rec-fecha').value,
+            TipoServicio: document.getElementById('rec-tipo').value,
+            Cliente:      document.getElementById('rec-cliente').value,
+            Telefono:     document.getElementById('rec-telefono').value,
+            Falla:        document.getElementById('rec-falla').value,
+            Marca:        document.getElementById('rec-marca').value,
+            Modelo:       document.getElementById('rec-modelo').value,
+            NroSerie:     document.getElementById('rec-serie').value,
+            Accesorios:   document.getElementById('rec-accesorios').value,
+            Tecnico:      'Pendiente asignación',
+            Foto1:        fotos[0] || '',
+            Foto2:        fotos[1] || '',
+            Foto3:        fotos[2] || '',
+            Origen:       'Portal TLC',
+            Timestamp:    new Date().toISOString(),
+        };
+
+        // URL del webhook de Power Automate — se completará en el siguiente paso
+        const WEBHOOK_URL = window.PA_RECEPCION_WEBHOOK || '';
+
+        if (!WEBHOOK_URL) {
+            // Modo demo: mostrar datos en consola
+            console.log('📋 Payload recepción:', payload);
+            mostrarStatus('✅ Formulario listo. Pendiente conectar Power Automate.', 'ok');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Enviar Recepción';
+            return;
+        }
+
+        try {
+            const res = await fetch(WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                mostrarStatus('✅ Recepción enviada correctamente', 'ok');
+                setTimeout(() => {
+                    // Reset form
+                    ['rec-tipo','rec-cliente','rec-telefono','rec-falla','rec-marca','rec-serie','rec-accesorios'].forEach(id => document.getElementById(id).value = '');
+                    document.getElementById('rec-modelo').innerHTML = '<option value="">-- Seleccionar Modelo --</option>';
+                    [0,1,2].forEach(n => {
+                        document.getElementById('foto-preview-' + n).style.display = 'none';
+                        document.getElementById('slot-' + n).querySelector('.foto-placeholder').style.display = 'flex';
+                        document.getElementById('slot-' + n).classList.remove('filled');
+                        document.getElementById('foto-input-' + n).value = '';
+                    });
+                    status.style.display = 'none';
+                    resetToHome();
+                }, 2000);
+            } else { throw new Error('HTTP ' + res.status); }
+        } catch(e) {
+            mostrarStatus('❌ Error al enviar: ' + e.message, 'error');
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Enviar Recepción';
+    }
+
+    function mostrarStatus(msg, tipo) {
+        const el = document.getElementById('rec-status');
+        el.textContent = msg;
+        el.style.display = 'block';
+        const colores = {
+            ok:   'background:#06d6a024; color:#34d399; border:1px solid #06d6a044;',
+            warn: 'background:#f8961e24; color:#fbbf24; border:1px solid #f8961e44;',
+            error:'background:#ff007f24; color:#f87171; border:1px solid #ff007f44;',
+            info: 'background:#3a86ff24; color:#60a5fa; border:1px solid #3a86ff44;',
+        };
+        el.style.cssText += colores[tipo] || colores.info;
+    }
 
 
 </script>
