@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>TLC — Selector de Dispositivos</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        body { background: #030712; color: #f8fafc; min-height: 100vh; }
+
+        /* HEADER */
+        .header { background: rgba(11,19,41,0.98); backdrop-filter: blur(12px); padding: 16px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #222e50; position: sticky; top: 0; z-index: 100; }
+        .header h1 { font-size: 16px; font-weight: 600; color: #f8fafc; }
+        .header p { font-size: 12px; color: #94a3b8; }
+        .logo { width: 36px; height: 36px; background: #1c2541; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 1px solid #222e50; }
+
+        /* LOGIN */
+        #login-section { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 40px 20px; text-align: center; }
+        #login-section h2 { font-size: 22px; margin-bottom: 8px; }
+        #login-section p { color: #94a3b8; font-size: 14px; margin-bottom: 32px; }
+
+        /* FILTROS */
+        .filtros { padding: 16px 20px; display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid #1c2541; }
+        .filtros::-webkit-scrollbar { display: none; }
+        .filtro-btn { flex-shrink: 0; padding: 8px 16px; border-radius: 20px; border: 1px solid #222e50; background: #1c2541; color: #94a3b8; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .filtro-btn.active { background: #3a86ff; border-color: #3a86ff; color: white; font-weight: 600; }
+
+        /* BUSCADOR */
+        .buscador { padding: 12px 20px; }
+        .buscador input { width: 100%; background: #1c2541; border: 1px solid #222e50; border-radius: 10px; padding: 12px 16px; color: #f8fafc; font-size: 15px; outline: none; }
+        .buscador input::placeholder { color: #94a3b8; }
+        .buscador input:focus { border-color: #3a86ff; }
+
+        /* LISTA DE DISPOSITIVOS */
+        .lista { padding: 0 20px 20px; }
+        .dispositivo-card { background: #1c2541; border-radius: 14px; margin-bottom: 12px; border: 1px solid #222e50; overflow: hidden; cursor: pointer; transition: border-color 0.2s; }
+        .dispositivo-card:active { border-color: #3a86ff; }
+        .dispositivo-card.oferta { border-color: #06d6a0; }
+        
+        .card-header { display: flex; align-items: center; gap: 14px; padding: 14px; }
+        .card-foto { width: 60px; height: 60px; border-radius: 10px; object-fit: contain; background: #0b1329; flex-shrink: 0; }
+        .card-foto-placeholder { width: 60px; height: 60px; border-radius: 10px; background: #0b1329; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+        .card-info { flex: 1; min-width: 0; }
+        .card-nombre { font-size: 14px; font-weight: 600; color: #f8fafc; margin-bottom: 4px; }
+        .card-categoria { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card-precio { font-size: 15px; font-weight: 700; color: #3a86ff; margin-top: 4px; }
+        .oferta-badge { font-size: 10px; background: rgba(6,214,160,0.2); color: #06d6a0; border: 1px solid #06d6a0; border-radius: 4px; padding: 2px 6px; display: inline-block; margin-bottom: 4px; }
+
+        /* DETALLE */
+        .detalle-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; display: none; overflow-y: auto; }
+        .detalle-overlay.open { display: block; }
+        .detalle-card { background: #0b1329; min-height: 100vh; padding-bottom: 40px; }
+        .detalle-header { padding: 16px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #222e50; position: sticky; top: 0; background: #0b1329; z-index: 10; }
+        .btn-back { width: 36px; height: 36px; border-radius: 50%; background: #1c2541; border: none; color: #f8fafc; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .detalle-titulo { font-size: 15px; font-weight: 600; flex: 1; }
+
+        .detalle-foto-wrap { padding: 24px 20px; display: flex; justify-content: center; }
+        .detalle-foto { max-width: 280px; width: 100%; border-radius: 16px; object-fit: contain; background: #1c2541; }
+        .detalle-foto-placeholder { width: 200px; height: 160px; border-radius: 16px; background: #1c2541; display: flex; align-items: center; justify-content: center; font-size: 60px; }
+
+        .detalle-body { padding: 0 20px; }
+        .detalle-nombre { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+        .detalle-desc { font-size: 14px; color: #94a3b8; line-height: 1.6; margin-bottom: 24px; white-space: pre-line; }
+
+        .modalidades-titulo { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+        .modalidades-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .modalidad-btn { padding: 12px; border-radius: 12px; border: 1px solid #222e50; background: #1c2541; color: #f8fafc; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.2s; }
+        .modalidad-btn.active { background: #3a86ff; border-color: #3a86ff; }
+        .modalidad-btn:active { opacity: 0.8; }
+
+        .precio-detalle { background: #1c2541; border-radius: 14px; padding: 16px; margin-bottom: 20px; border: 1px solid #222e50; }
+        .precio-principal { font-size: 28px; font-weight: 800; color: #3a86ff; }
+        .precio-desc { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+        .precio-cuota { font-size: 16px; color: #06d6a0; font-weight: 600; margin-top: 8px; }
+
+        .btn-folleto { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; border-radius: 12px; background: #222e50; border: 1px solid #3a86ff; color: #3a86ff; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; margin-bottom: 12px; }
+        .btn-cotizar { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; border-radius: 12px; background: #3a86ff; border: none; color: white; font-size: 15px; font-weight: 600; cursor: pointer; }
+
+        /* LOADING / STATUS */
+        .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 16px; }
+        .spinner { width: 40px; height: 40px; border: 3px solid #222e50; border-top-color: #3a86ff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading p { color: #94a3b8; font-size: 14px; }
+
+        .btn { padding: 14px 28px; border-radius: 12px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: #3a86ff; color: white; width: 100%; }
+        .btn-secondary { background: #1c2541; color: #94a3b8; border: 1px solid #222e50; }
+
+        .empty { text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 14px; }
+
+        #app-section { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo">🔬</div>
+    <div>
+        <h1>Dispositivos TLC</h1>
+        <p id="user-name">Cargando...</p>
+    </div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-section">
+    <h2>Portal TLC</h2>
+    <p>Iniciá sesión para ver los dispositivos y precios</p>
+    <button class="btn btn-primary" id="btn-login" style="max-width:300px">Iniciar sesión con Microsoft</button>
+</div>
+
+<!-- APP -->
+<div id="app-section">
+    <!-- Filtros por categoría -->
+    <div class="filtros" id="filtros">
+        <button class="filtro-btn active" data-cat="TODOS">Todos</button>
+        <button class="filtro-btn" data-cat="EQUIPOS">Equipos</button>
+        <button class="filtro-btn" data-cat="INSUMOS">Insumos</button>
+    </div>
+
+    <!-- Buscador -->
+    <div class="buscador">
+        <input type="text" id="buscador" placeholder="Buscar dispositivo...">
+    </div>
+
+    <!-- Lista -->
+    <div class="lista" id="lista">
+        <div class="loading"><div class="spinner"></div><p>Cargando dispositivos...</p></div>
+    </div>
+</div>
+
+<!-- DETALLE OVERLAY -->
+<div class="detalle-overlay" id="detalle-overlay">
+    <div class="detalle-card">
+        <div class="detalle-header">
+            <button class="btn-back" id="btn-back">←</button>
+            <div class="detalle-titulo" id="detalle-titulo">Dispositivo</div>
+        </div>
+        <div class="detalle-foto-wrap" id="detalle-foto-wrap"></div>
+        <div class="detalle-body">
+            <div class="detalle-nombre" id="detalle-nombre"></div>
+            <div class="detalle-desc" id="detalle-desc"></div>
+            
+            <div class="modalidades-titulo">Modalidad de Pago</div>
+            <div class="modalidades-grid" id="modalidades-grid"></div>
+
+            <div class="precio-detalle" id="precio-detalle">
+                <div class="precio-principal" id="precio-principal">—</div>
+                <div class="precio-desc" id="precio-desc"></div>
+                <div class="precio-cuota" id="precio-cuota"></div>
+            </div>
+
+            <a class="btn-folleto" id="btn-folleto" target="_blank" style="display:none">📄 Ver Folleto Técnico</a>
+            <button class="btn-cotizar" id="btn-cotizar">✉️ Generar Cotización</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const CLIENT_ID  = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
+const TENANT_ID  = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
+const SCOPES     = ['Files.ReadWrite.All', 'User.Read', 'Sites.Read.All'];
+const SHEET_ID   = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
+const SHEET_NAME = 'Lista_Precios';
+
+const msalConfig = {
+    auth: {
+        clientId: CLIENT_ID,
+        authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+        redirectUri: 'https://cahirth.github.io/Portal-TLC/selector-dispositivos.html'
+    },
+    cache: { cacheLocation: 'sessionStorage' }
+};
+
+let msal_app = null;
+let dispositivos = [];
+let dispositivoActual = null;
+let modalidadActual = 'CONTADO';
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+async function initMsal() {
+    msal_app = new msal.PublicClientApplication(msalConfig);
+    await msal_app.initialize();
+    const response = await msal_app.handleRedirectPromise();
+    if (response && response.account) { mostrarApp(response.account); return; }
+    const accounts = msal_app.getAllAccounts();
+    if (accounts.length > 0) { mostrarApp(accounts[0]); }
+}
+
+async function getToken() {
+    const accounts = msal_app.getAllAccounts();
+    const res = await msal_app.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+    return res.accessToken;
+}
+
+function mostrarApp(account) {
+    document.getElementById('login-section').style.display = 'none';
+    document.getElementById('app-section').style.display = 'block';
+    document.getElementById('user-name').textContent = account.name || account.username;
+    cargarDispositivos();
+}
+
+// ─── CARGAR DATOS DESDE GOOGLE SHEETS (público) ───────────────────────────────
+async function cargarDispositivos() {
+    try {
+        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
+        const res = await fetch(url);
+        const text = await res.text();
+        // Google devuelve JSONP — extraemos el JSON
+        const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+        
+        const cols = json.table.cols.map(c => c.label);
+        dispositivos = json.table.rows.map(row => {
+            const obj = {};
+            cols.forEach((col, i) => {
+                const cell = row.c[i];
+                obj[col] = cell ? (cell.v !== null ? cell.v : '') : '';
+            });
+            return obj;
+        }).filter(d => d['Nombre de Dispositivo'] && d['Nombre de Dispositivo'].toString().trim() !== '');
+
+        renderLista(dispositivos);
+    } catch(e) {
+        document.getElementById('lista').innerHTML = `<div class="empty">❌ Error cargando datos: ${e.message}</div>`;
+    }
+}
+
+// ─── RENDER LISTA ─────────────────────────────────────────────────────────────
+function renderLista(items) {
+    const lista = document.getElementById('lista');
+    if (items.length === 0) { lista.innerHTML = '<div class="empty">No se encontraron dispositivos</div>'; return; }
+
+    lista.innerHTML = items.map((d, i) => {
+        const nombre = d['Nombre de Dispositivo'] || '';
+        const cat = d['Categoria'] || '';
+        const precio = d['Precio CONTADO CNO'];
+        const oferta = d['Oferta'] === true || d['Oferta'] === 'TRUE';
+        const foto = d['Foto'] || '';
+
+        const precioStr = precio ? `USD ${Number(precio).toLocaleString('es-AR')}` : 'Consultar';
+        const fotoEl = foto
+            ? `<img class="card-foto" src="${fotoStr(foto)}" onerror="this.style.display='none'" loading="lazy">`
+            : `<div class="card-foto-placeholder">🔬</div>`;
+
+        return `<div class="dispositivo-card ${oferta ? 'oferta' : ''}" onclick="abrirDetalle(${i})">
+            <div class="card-header">
+                ${fotoEl}
+                <div class="card-info">
+                    ${oferta ? '<span class="oferta-badge">⭐ OFERTA</span>' : ''}
+                    <div class="card-nombre">${nombre}</div>
+                    <div class="card-categoria">${cat}</div>
+                    <div class="card-precio">${precioStr}</div>
+                </div>
+                <span style="color:#94a3b8;font-size:20px">›</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function fotoStr(foto) {
+    if (!foto) return '';
+    // Si ya es URL completa
+    if (foto.startsWith('http')) return foto;
+    // Si es path relativo de Google Drive (ej: Fotos/HVS1.png)
+    // Intentamos construir URL pública de Drive — si tienen carpeta compartida
+    return `https://drive.google.com/uc?export=view&id=${foto}`;
+}
+
+// ─── FILTROS Y BÚSQUEDA ───────────────────────────────────────────────────────
+document.querySelectorAll('.filtro-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filtrar();
+    });
+});
+
+document.getElementById('buscador').addEventListener('input', filtrar);
+
+function filtrar() {
+    const cat = document.querySelector('.filtro-btn.active')?.dataset.cat || 'TODOS';
+    const q = document.getElementById('buscador').value.toLowerCase();
+    const filtrados = dispositivos.filter(d => {
+        const matchCat = cat === 'TODOS' || d['Categoria'] === cat;
+        const matchQ = !q || (d['Nombre de Dispositivo'] || '').toLowerCase().includes(q) || (d['Descripcion'] || '').toLowerCase().includes(q);
+        return matchCat && matchQ;
+    });
+    renderLista(filtrados);
+}
+
+// ─── DETALLE ──────────────────────────────────────────────────────────────────
+const MODALIDADES = [
+    { key: 'CONTADO',    label: 'Contado',      precioKey: 'Precio CONTADO CNO', descKey: 'Descripcion_USD_CONTADO', cuotaKey: null },
+    { key: 'TLC_6',      label: 'Directo 6c',   precioKey: 'Adelanto_TLC_$_6',   descKey: 'Descripcion_TLC_$_6',    cuotaKey: 'CUOTA_TLC_$_6' },
+    { key: 'TLC_12',     label: 'Directo 12c',  precioKey: 'Adelanto_TLC_$_12',  descKey: 'Descripcion_TLC_$_12',   cuotaKey: 'CUOTA_TLC_$_12' },
+    { key: 'LEASING_36', label: 'Leasing 36c',  precioKey: 'Adelanto_L$_36',     descKey: 'Descripcion_L$_36',      cuotaKey: 'Cuota_L$_36' },
+];
+
+function abrirDetalle(idx) {
+    // Buscar el dispositivo en la lista filtrada actual
+    const lista = document.getElementById('lista');
+    const cards = lista.querySelectorAll('.dispositivo-card');
+    
+    // Encontramos el dispositivo por índice visible
+    const cat = document.querySelector('.filtro-btn.active')?.dataset.cat || 'TODOS';
+    const q = document.getElementById('buscador').value.toLowerCase();
+    const filtrados = dispositivos.filter(d => {
+        const matchCat = cat === 'TODOS' || d['Categoria'] === cat;
+        const matchQ = !q || (d['Nombre de Dispositivo'] || '').toLowerCase().includes(q);
+        return matchCat && matchQ;
+    });
+    
+    dispositivoActual = filtrados[idx];
+    if (!dispositivoActual) return;
+
+    const d = dispositivoActual;
+    const nombre = d['Nombre de Dispositivo'] || '';
+    const desc = d['Descripcion'] || '';
+    const foto = d['Foto'] || '';
+    const folleto = d['Link_Folleto'] || '';
+
+    document.getElementById('detalle-titulo').textContent = nombre;
+    document.getElementById('detalle-nombre').textContent = nombre;
+    document.getElementById('detalle-desc').textContent = desc;
+
+    // Foto
+    const fotoWrap = document.getElementById('detalle-foto-wrap');
+    fotoWrap.innerHTML = foto
+        ? `<img class="detalle-foto" src="${fotoStr(foto)}" onerror="this.parentElement.innerHTML='<div class=\\'detalle-foto-placeholder\\'>🔬</div>'">`
+        : `<div class="detalle-foto-placeholder">🔬</div>`;
+
+    // Folleto
+    const btnFolleto = document.getElementById('btn-folleto');
+    if (folleto) { btnFolleto.href = folleto; btnFolleto.style.display = 'flex'; }
+    else { btnFolleto.style.display = 'none'; }
+
+    // Modalidades
+    renderModalidades();
+    seleccionarModalidad('CONTADO');
+
+    document.getElementById('detalle-overlay').classList.add('open');
+    document.getElementById('detalle-overlay').scrollTop = 0;
+}
+
+function renderModalidades() {
+    const d = dispositivoActual;
+    const grid = document.getElementById('modalidades-grid');
+    grid.innerHTML = MODALIDADES.map(m => {
+        const tiene = d[m.precioKey] && d[m.precioKey] !== '';
+        if (!tiene && m.key !== 'CONTADO') return '';
+        return `<button class="modalidad-btn ${m.key === modalidadActual ? 'active' : ''}" onclick="seleccionarModalidad('${m.key}')">${m.label}</button>`;
+    }).join('');
+}
+
+function seleccionarModalidad(key) {
+    modalidadActual = key;
+    document.querySelectorAll('.modalidad-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.modalidad-btn').forEach(b => {
+        if (b.textContent.toLowerCase().includes(MODALIDADES.find(m=>m.key===key)?.label.toLowerCase())) {
+            b.classList.add('active');
+        }
+    });
+
+    const d = dispositivoActual;
+    const m = MODALIDADES.find(x => x.key === key);
+    if (!m) return;
+
+    const precio = d[m.precioKey];
+    const desc = d[m.descKey] || '';
+    const cuota = m.cuotaKey ? d[m.cuotaKey] : null;
+
+    const precioEl = document.getElementById('precio-principal');
+    const descEl = document.getElementById('precio-desc');
+    const cuotaEl = document.getElementById('precio-cuota');
+
+    if (precio) {
+        const moneda = key === 'CONTADO' ? 'USD' : 'AR$';
+        precioEl.textContent = `${moneda} ${Number(precio).toLocaleString('es-AR')}`;
+    } else {
+        precioEl.textContent = 'Consultar';
+    }
+
+    descEl.textContent = desc;
+
+    if (cuota && cuota !== '') {
+        cuotaEl.textContent = `Cuota: AR$ ${Number(cuota).toLocaleString('es-AR')}`;
+        cuotaEl.style.display = 'block';
+    } else {
+        cuotaEl.style.display = 'none';
+    }
+}
+
+document.getElementById('btn-back').addEventListener('click', () => {
+    document.getElementById('detalle-overlay').classList.remove('open');
+});
+
+document.getElementById('btn-cotizar').addEventListener('click', () => {
+    alert(`Próximamente: Generar cotización para ${dispositivoActual?.['Nombre de Dispositivo']}`);
+});
+
+// ─── ARRANCAR ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-login').addEventListener('click', () => msal_app.loginRedirect({ scopes: SCOPES }));
+initMsal().catch(console.error);
+</script>
+</body>
+</html>
