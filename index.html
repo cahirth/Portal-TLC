@@ -236,14 +236,38 @@
         <div class="app-view" id="view-ventas-menu">
             <div class="menu-list-stack">
                 <div class="menu-item-row" onclick="window.location.href='selector-dispositivos.html'">
-                    <div class="item-logo-container logo-ventas" style="width:44px; height:44px; font-size:16px;"><i class="fa-solid fa-tags"></i></div>
+                    <div class="item-logo-container" style="overflow:hidden; padding:0; width:44px; height:44px;">
+                        <img src="https://lh3.googleusercontent.com/d/1ZqgByiuLcmidQ3bHcvt4GZePGna6blXl" style="width:44px; height:44px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-tags\'></i>'; this.parentElement.classList.add('logo-ventas');">
+                    </div>
                     <div class="item-text-box"><h3>Lista de Precios</h3><p>Equipos, insumos y modalidades de pago</p></div>
                 </div>
-                <div class="menu-item-row" onclick="openModule('view-placeholder', 'Nueva Cotización', 'Carga comercial')">
-                    <div class="item-logo-container logo-ventas" style="width:44px; height:44px; font-size:16px;"><i class="fa-solid fa-file-circle-plus"></i></div>
-                    <div class="item-text-box"><h3>Nueva Cotización</h3><p>Registrar propuesta en el pipeline</p></div>
+                <div class="menu-item-row" onclick="openModule('view-cotizaciones', 'Cotizaciones', 'Pipeline de ventas')">
+                    <div class="item-logo-container logo-ventas" style="width:44px; height:44px; font-size:16px;"><i class="fa-solid fa-list-check"></i></div>
+                    <div class="item-text-box"><h3>Cotizaciones</h3><p>Pipeline filtrado por vendedor</p></div>
                 </div>
             </div>
+        </div>
+
+        <!-- ================= COTIZACIONES ================= -->
+        <div class="app-view" id="view-cotizaciones">
+            <div id="cot-loading" style="text-align:center; padding:40px 20px;">
+                <div class="spinner" style="margin:0 auto 16px; width:32px; height:32px; border:3px solid #222e50; border-top-color:#3a86ff; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+                <p style="color:var(--text-muted); font-size:13px;">Cargando cotizaciones...</p>
+            </div>
+            <div id="cot-filtros" style="display:none; margin-bottom:12px;">
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+                    <button class="cot-filtro active" data-estado="TODOS" onclick="filtrarCot(this)">Todos</button>
+                    <button class="cot-filtro" data-estado="Contacto inicial 25%" onclick="filtrarCot(this)">Inicial</button>
+                    <button class="cot-filtro" data-estado="Presupuestado 50%" onclick="filtrarCot(this)">Presup.</button>
+                    <button class="cot-filtro" data-estado="Negociación 75%" onclick="filtrarCot(this)">Negoc.</button>
+                    <button class="cot-filtro" data-estado="Ganado 100%" onclick="filtrarCot(this)">Ganado</button>
+                    <button class="cot-filtro" data-estado="Perdido 0%" onclick="filtrarCot(this)">Perdido</button>
+                </div>
+                <input id="cot-buscar" type="text" placeholder="Buscar cliente o dispositivo..." 
+                    style="width:100%; background:#1c2541; border:1px solid #222e50; border-radius:10px; padding:9px 14px; color:#f8fafc; font-size:13px; outline:none;" 
+                    oninput="renderCotizaciones()">
+            </div>
+            <div id="cot-lista"></div>
         </div>
 
         <!-- ================= ADMINISTRACIÓN ================= -->
@@ -484,6 +508,170 @@
         } catch(e) {}
     }
     updateUserDisplay();
+
+    // ─── COTIZACIONES ─────────────────────────────────────────────────────────────
+    const SHEET_ID_COT = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
+    let cotizacionesData = [];
+    let cotizacionesFiltradas = [];
+    let cotUsuarioEmail = '';
+    let cotUsuarioRol = '';
+
+    async function cargarCotizaciones() {
+        const loading = document.getElementById('cot-loading');
+        const filtrosDiv = document.getElementById('cot-filtros');
+        const lista = document.getElementById('cot-lista');
+        loading.style.display = 'block';
+        filtrosDiv.style.display = 'none';
+        lista.innerHTML = '';
+
+        try {
+            // Cargar cotizaciones y vendedores en paralelo
+            const [cotRows, vendRows] = await Promise.all([
+                fetchSheetCot('Cotizaciones'),
+                fetchSheetCot('Vendedores')
+            ]);
+
+            // Detectar usuario actual desde sessionStorage
+            cotUsuarioEmail = '';
+            cotUsuarioRol = '';
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.includes('account')) {
+                    try {
+                        const val = JSON.parse(sessionStorage.getItem(key));
+                        if (val && val.username) { cotUsuarioEmail = val.username.toLowerCase(); break; }
+                    } catch(e) {}
+                }
+            }
+
+            // Buscar rol del usuario
+            const vend = vendRows.find(v => (v['Email']||'').toLowerCase() === cotUsuarioEmail);
+            cotUsuarioRol = vend ? vend['Rol'] : '';
+
+            // Filtrar por vendedor (Admin ve todo, Interno/Externo ve solo las suyas)
+            if (cotUsuarioRol === 'Administrador') {
+                cotizacionesData = cotRows;
+            } else {
+                const nombreVend = vend ? vend['Nombre Vendedor'] : '';
+                cotizacionesData = cotRows.filter(r => {
+                    const v = (r['Vendedor'] || '').toLowerCase();
+                    return v === cotUsuarioEmail || v === nombreVend.toLowerCase() ||
+                           v.includes(cotUsuarioEmail.split('@')[0]);
+                });
+            }
+
+            // Ordenar: no leídos primero, luego por estado
+            const estadoOrden = { 'Ganado 100%':0, 'Negociación 75%':1, 'Presupuestado 50%':2, 'Contacto inicial 25%':3, 'Perdido 0%':4, '':5 };
+            cotizacionesData.sort((a,b) => {
+                const la = a['Leido'] === true || a['Leido'] === 'TRUE';
+                const lb = b['Leido'] === true || b['Leido'] === 'TRUE';
+                if (la !== lb) return la ? 1 : -1;
+                return (estadoOrden[a['Estado_Lead']||''] || 5) - (estadoOrden[b['Estado_Lead']||''] || 5);
+            });
+
+            cotizacionesFiltradas = [...cotizacionesData];
+            loading.style.display = 'none';
+            filtrosDiv.style.display = 'block';
+            renderCotizaciones();
+
+        } catch(e) {
+            loading.style.display = 'none';
+            lista.innerHTML = `<div style="text-align:center; padding:40px; color:#ff007f;">❌ Error: ${e.message}</div>`;
+        }
+    }
+
+    async function fetchSheetCot(sheetName) {
+        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID_COT}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+        const res = await fetch(url);
+        const text = await res.text();
+        const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+        const cols = json.table.cols.map(c => c.label);
+        return (json.table.rows || [])
+            .filter(row => row?.c?.some(c => c?.v !== null && c?.v !== ''))
+            .map(row => {
+                const obj = {};
+                cols.forEach((col, i) => {
+                    const cell = row.c?.[i];
+                    obj[col] = (cell && cell.v !== null && cell.v !== undefined) ? cell.v : '';
+                });
+                return obj;
+            });
+    }
+
+    function filtrarCot(btn) {
+        document.querySelectorAll('.cot-filtro').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderCotizaciones();
+    }
+
+    function renderCotizaciones() {
+        const estado = document.querySelector('.cot-filtro.active')?.dataset.estado || 'TODOS';
+        const q = (document.getElementById('cot-buscar')?.value || '').toLowerCase().trim();
+
+        const filtradas = cotizacionesData.filter(r => {
+            const matchEstado = estado === 'TODOS' || (r['Estado_Lead'] || '') === estado;
+            const nombre = (r['Nombre y Apellido'] || '').toLowerCase();
+            const disp = (r['Dispositivo'] || '').toLowerCase();
+            const matchQ = !q || nombre.includes(q) || disp.includes(q);
+            return matchEstado && matchQ;
+        });
+
+        const lista = document.getElementById('cot-lista');
+        if (!filtradas.length) {
+            lista.innerHTML = '<div style="text-align:center; padding:40px; color:#64748b; font-size:13px;">Sin resultados</div>';
+            return;
+        }
+
+        const badgeMap = {
+            'Contacto inicial 25%': 'badge-inicial',
+            'Presupuestado 50%': 'badge-presup',
+            'Negociación 75%': 'badge-negoc',
+            'Ganado 100%': 'badge-ganado',
+            'Perdido 0%': 'badge-perdido',
+        };
+
+        lista.innerHTML = filtradas.map(r => {
+            const nombre = r['Nombre y Apellido'] || '—';
+            const disp = r['Dispositivo'] || '—';
+            const estado = r['Estado_Lead'] || '';
+            const leido = r['Leido'] === true || r['Leido'] === 'TRUE';
+            const fecha = r['Fecha_Lead'] || '';
+            const vendedor = r['Vendedor'] || '';
+            const nro = r['Nro_Presupuesto'] || '';
+            const modalidad = r['Modalidad'] || '';
+            const moneda = r['Moneda'] || '';
+            const notas = r['Notas'] || '';
+
+            const badgeClass = badgeMap[estado] || 'badge-sin';
+            const badgeLabel = estado || 'Sin estado';
+            const dotNoLeido = !leido ? '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;display:inline-block;margin-right:4px;flex-shrink:0;"></span>' : '';
+
+            return `<div class="cot-card">
+                <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:4px;">
+                    ${dotNoLeido}
+                    <div style="flex:1; min-width:0;">
+                        <div class="cot-nombre">${nombre}</div>
+                        <div class="cot-disp">${disp}</div>
+                    </div>
+                </div>
+                <div class="cot-meta">
+                    <span class="cot-badge ${badgeClass}">${badgeLabel}</span>
+                    ${modalidad ? `<span style="font-size:10px; color:#94a3b8;">${modalidad} ${moneda}</span>` : ''}
+                    ${fecha ? `<span class="cot-fecha">📅 ${fecha}</span>` : ''}
+                </div>
+                ${notas ? `<div style="font-size:11px; color:#64748b; margin-top:5px; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${notas}</div>` : ''}
+                ${vendedor && cotUsuarioRol === 'Administrador' ? `<div class="cot-vendedor" style="margin-top:4px;">👤 ${vendedor}</div>` : ''}
+            </div>`;
+        }).join('');
+    }
+
+    // Cargar cotizaciones cuando se navega a esa vista
+    const _origOpenModule = openModule;
+    function openModule(viewId, title, subtitle) {
+        _origOpenModule(viewId, title, subtitle);
+        if (viewId === 'view-cotizaciones') cargarCotizaciones();
+    }
+
 </script>
 </body>
 </html>
