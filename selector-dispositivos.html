@@ -257,7 +257,8 @@ async function mostrarApp(account) {
     currentUser = account;
     document.getElementById('login-section').style.display = 'none';
     document.getElementById('app-section').style.display = 'block';
-    const nombre = account.name || account.username;
+    const nombre = account.name || account.idTokenClaims?.name || account.username;
+    console.log('Account info:', JSON.stringify({name: account.name, user: account.username, claims: account.idTokenClaims}));
     document.getElementById('user-greeting').textContent = `Hola, ${nombre}`;
     await cargarTodo();
 }
@@ -441,7 +442,10 @@ function abrirDetalle(idx) {
     const cat = document.querySelector('.filtro-btn.active')?.dataset.cat || 'TODOS';
     const q = document.getElementById('buscador').value.toLowerCase().trim();
     const filtrados = dispositivos.filter(d => {
-        const matchCat = cat === 'TODOS' || d['Categoria'] === cat;
+        const esOferta = d['Oferta'] === true || d['Oferta'] === 'TRUE';
+        const matchCat = cat === 'TODOS' ? true
+            : cat === 'OFERTAS' ? esOferta
+            : d['Categoria'] === cat;
         const nombre = (d['Nombre de Dispositivo'] || '').toLowerCase();
         const desc = (d['Descripcion'] || '').toLowerCase();
         const matchQ = !q || nombre.includes(q) || desc.includes(q);
@@ -492,9 +496,32 @@ function abrirDetalle(idx) {
     if (modalDisp.length > 0) {
         secMod.style.display = 'block';
         precioDetalle.style.display = 'block';
-        grid.innerHTML = modalDisp.map(m =>
-            `<button class="modalidad-btn" data-key="${m.key}" onclick="seleccionarModalidad('${m.key}')">${m.label}</button>`
-        ).join('');
+        // Garantizar que Dir6 y Dir12 (AR$ y USD) queden siempre en la misma fila
+        // Si el total es impar, Contado ocupa fila completa
+        const contado  = modalDisp.filter(m => m.key === 'CONTADO');
+        const credito  = modalDisp.filter(m => m.key === 'CREDITO');
+        const dir6ar   = modalDisp.filter(m => m.key === 'TLC6');
+        const dir12ar  = modalDisp.filter(m => m.key === 'TLC12');
+        const dir6usd  = modalDisp.filter(m => m.key === 'TLC6USD');
+        const dir12usd = modalDisp.filter(m => m.key === 'TLC12USD');
+        const lea      = modalDisp.filter(m => m.key === 'LEASING');
+        const leausd   = modalDisp.filter(m => m.key === 'LEASINGUSD');
+        const ordered  = [...contado, ...credito, ...dir6ar, ...dir12ar, ...dir6usd, ...dir12usd, ...lea, ...leausd];
+        // Si Contado está solo en su fila (impar antes del par), hacerlo full-width
+        let html = '';
+        let i = 0;
+        while (i < ordered.length) {
+            const m = ordered[i];
+            // Contado solo → full width si el resto es par
+            if (m.key === 'CONTADO' && (ordered.length - 1) % 2 === 0) {
+                html += `<button class="modalidad-btn" data-key="${m.key}" onclick="seleccionarModalidad('${m.key}')" style="grid-column:1/-1">${m.label}</button>`;
+                i++;
+            } else {
+                html += `<button class="modalidad-btn" data-key="${m.key}" onclick="seleccionarModalidad('${m.key}')">${m.label}</button>`;
+                i++;
+            }
+        }
+        grid.innerHTML = html;
         seleccionarModalidad(modalDisp[0].key);
     } else {
         secMod.style.display = 'none';
