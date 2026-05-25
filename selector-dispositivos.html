@@ -163,7 +163,10 @@
             <div class="precio-desc" id="precio-desc"></div>
             <div class="precio-cuota" id="precio-cuota"></div>
         </div>
-        <a class="btn-folleto" id="btn-folleto" target="_blank" style="display:none">📄 Ver Folleto Técnico</a>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+            <a class="btn-folleto" id="btn-folleto" target="_blank" style="display:none; flex:1; margin-bottom:0;">📄 Folleto</a>
+            <a class="btn-folleto" id="btn-video" target="_blank" style="display:none; flex:1; margin-bottom:0; border-color:#f87171; color:#f87171;">▶️ Video</a>
+        </div>
         <button class="btn-cotizar" id="btn-cotizar">✉️ Generar Cotización</button>
     </div>
 </div>
@@ -472,6 +475,7 @@ function abrirDetalle(idx) {
     const desc    = d['Descripcion'] || '';
     const foto    = fotoUrl(d['Foto'] || '');
     const folleto = d['Link_Folleto'] || '';
+    const video   = d['Link_Web'] || '';
 
     document.getElementById('detalle-titulo').textContent = nombre;
     document.getElementById('detalle-nombre').textContent = nombre;
@@ -497,6 +501,14 @@ function abrirDetalle(idx) {
     // Folleto
     const btnFolleto = document.getElementById('btn-folleto');
     if (folleto) { btnFolleto.href = folleto; btnFolleto.style.display = 'flex'; }
+    else { btnFolleto.style.display = 'none'; }
+
+    const btnVideo = document.getElementById('btn-video');
+    if (video) { btnVideo.href = video; btnVideo.style.display = 'flex'; }
+    else { btnVideo.style.display = 'none'; }
+
+    // Mostrar la fila de botones solo si alguno está visible
+    btnFolleto.parentElement.style.display = (folleto || video) ? 'flex' : 'none';
     else { btnFolleto.style.display = 'none'; }
 
     // Modalidades disponibles — usar triggerKey (Descripcion) como gatillo

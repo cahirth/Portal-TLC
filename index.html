@@ -404,6 +404,9 @@
                 <select class="form-control" id="rec-modelo" required>
                     <option value="">-- Seleccionar Modelo --</option>
                 </select>
+                <div id="modelo-otro-wrap" style="display:none; margin-top:8px;">
+                    <input type="text" class="form-control" id="rec-modelo-otro" placeholder="Especificar marca y modelo...">
+                </div>
             </div>
 
             <!-- Nro de Serie -->
@@ -1011,12 +1014,37 @@
     function actualizarModelos() {
         const marca = document.getElementById('rec-marca').value;
         const sel = document.getElementById('rec-modelo');
-        sel.innerHTML = '<option value="">-- Seleccionar Modelo --</option>';
-        (modelosPorMarca[marca] || []).forEach(m => {
-            const opt = document.createElement('option');
-            opt.value = m; opt.textContent = m;
-            sel.appendChild(opt);
-        });
+        const modeloOtroWrap = document.getElementById('modelo-otro-wrap');
+
+        if (marca === 'Otro') {
+            sel.style.display = 'none';
+            modeloOtroWrap.style.display = 'block';
+            sel.required = false;
+            document.getElementById('rec-modelo-otro').required = true;
+        } else {
+            sel.style.display = 'block';
+            modeloOtroWrap.style.display = 'none';
+            sel.required = true;
+            document.getElementById('rec-modelo-otro').required = false;
+            sel.innerHTML = '<option value="">-- Seleccionar Modelo --</option>';
+            (modelosPorMarca[marca] || []).forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m; opt.textContent = m;
+                sel.appendChild(opt);
+            });
+            // Si hay "Otro" en los modelos, también permitir texto libre
+            const hasOtro = (modelosPorMarca[marca] || []).includes('Otro / Especificar en Notas');
+        }
+    }
+
+    function getModeloValue() {
+        const marca = document.getElementById('rec-marca').value;
+        if (marca === 'Otro') return document.getElementById('rec-modelo-otro').value.trim();
+        const sel = document.getElementById('rec-modelo');
+        if (sel.value === 'Otro / Especificar en Notas') {
+            return document.getElementById('rec-modelo-otro').value.trim() || 'Otro';
+        }
+        return sel.value;
     }
 
     function triggerFoto(n) {
@@ -1080,7 +1108,7 @@
             Telefono:     document.getElementById('rec-telefono').value,
             Falla:        document.getElementById('rec-falla').value,
             Marca:        document.getElementById('rec-marca').value,
-            Modelo:       document.getElementById('rec-modelo').value,
+            Modelo:       getModeloValue(),
             NroSerie:     document.getElementById('rec-serie').value,
             Accesorios:   document.getElementById('rec-accesorios').value,
             Tecnico:      'Pendiente asignación',
