@@ -422,16 +422,20 @@ document.querySelectorAll('.filtro-btn').forEach(btn => {
 
 document.getElementById('buscador').addEventListener('input', filtrar);
 
+function sinAcentos(s) {
+    return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 function filtrar() {
     const cat = document.querySelector('.filtro-btn.active')?.dataset.cat || 'TODOS';
-    const q = document.getElementById('buscador').value.toLowerCase().trim();
+    const q = sinAcentos(document.getElementById('buscador').value.trim());
     const filtrados = dispositivos.filter(d => {
         const esOferta = d['Oferta'] === true || d['Oferta'] === 'TRUE';
         const matchCat = cat === 'TODOS' || cat === 'OFERTAS'
             ? (cat === 'OFERTAS' ? esOferta : true)
             : d['Categoria'] === cat;
-        const nombre = (d['Nombre de Dispositivo'] || '').toLowerCase();
-        const desc = (d['Descripcion'] || '').toLowerCase();
+        const nombre = sinAcentos(d['Nombre de Dispositivo']);
+        const desc   = sinAcentos(d['Descripcion']);
         const matchQ = !q || nombre.includes(q) || desc.includes(q);
         return matchCat && matchQ;
     });
@@ -441,14 +445,14 @@ function filtrar() {
 // ─── DETALLE ─────────────────────────────────────────────────────────────────
 function abrirDetalle(idx) {
     const cat = document.querySelector('.filtro-btn.active')?.dataset.cat || 'TODOS';
-    const q = document.getElementById('buscador').value.toLowerCase().trim();
+    const q = sinAcentos(document.getElementById('buscador').value.trim());
     const filtrados = dispositivos.filter(d => {
         const esOferta = d['Oferta'] === true || d['Oferta'] === 'TRUE';
         const matchCat = cat === 'TODOS' ? true
             : cat === 'OFERTAS' ? esOferta
             : d['Categoria'] === cat;
-        const nombre = (d['Nombre de Dispositivo'] || '').toLowerCase();
-        const desc = (d['Descripcion'] || '').toLowerCase();
+        const nombre = sinAcentos(d['Nombre de Dispositivo']);
+        const desc   = sinAcentos(d['Descripcion']);
         const matchQ = !q || nombre.includes(q) || desc.includes(q);
         return matchCat && matchQ;
     });
@@ -469,7 +473,7 @@ function abrirDetalle(idx) {
     // Foto
     const wrap = document.getElementById('detalle-foto-wrap');
     wrap.innerHTML = foto
-        ? `<img class="detalle-foto" src="${foto}" onerror="this.outerHTML='<div class=\\'detalle-foto-placeholder\\'>🔬</div>'">`
+        ? `<img class="detalle-foto" src="${foto}" onclick="abrirLightbox('${foto}')" style="cursor:zoom-in;" title="Tocar para ampliar" onerror="this.outerHTML='<div class=\\'detalle-foto-placeholder\\'>🔬</div>'">`
         : `<div class="detalle-foto-placeholder">🔬</div>`;
 
     // Precio Lista (siempre mostrar si tiene valor)
@@ -651,6 +655,23 @@ function mostrarFormStatus(msg, tipo) {
 // ─── ARRANCAR ─────────────────────────────────────────────────────────────────
 document.getElementById('btn-login').addEventListener('click', () => msal_app.loginRedirect({ scopes: SCOPES }));
 initMsal().catch(console.error);
+    function abrirLightbox(src) {
+        const lb = document.getElementById('lightbox');
+        document.getElementById('lightbox-img').src = src;
+        lb.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+    function cerrarLightbox() {
+        document.getElementById('lightbox').style.display = 'none';
+        document.body.style.overflow = '';
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarLightbox(); });
+
 </script>
+
+<div id="lightbox" onclick="cerrarLightbox()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:9999; align-items:center; justify-content:center; cursor:zoom-out;">
+    <img id="lightbox-img" src="" style="max-width:95vw; max-height:95vh; object-fit:contain; border-radius:8px; box-shadow:0 0 40px rgba(0,0,0,0.8);">
+    <button onclick="cerrarLightbox()" style="position:absolute; top:16px; right:20px; background:rgba(255,255,255,0.15); border:none; color:white; font-size:24px; width:40px; height:40px; border-radius:50%; cursor:pointer; line-height:1;">×</button>
+</div>
 </body>
 </html>
