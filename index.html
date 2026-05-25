@@ -957,7 +957,16 @@
             ['Moneda', r['Moneda']],
             ['Plazo', r['Plazo'] ? r['Plazo'] + (r['Moneda'] ? ' cuotas' : '') : ''],
             ['Aporte Inicial', r['Aporte Inicial']],
-            ['Comisión', r['Comisiones_Ext']],
+            ['Comisión', (() => {
+                const c = r['Comisiones_Ext'];
+                if (!c) return '';
+                const n = parseFloat(String(c).replace(',','.').replace('%',''));
+                if (isNaN(n)) return c;
+                const pct = n < 1 ? n * 100 : n;
+                return Math.round(pct * 10) / 10 + '%';
+            })()],"
+
+
         ];
         const condFiltradas = condCampos.filter(([, v]) => v);
         if (condFiltradas.length) {
