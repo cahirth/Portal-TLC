@@ -698,21 +698,21 @@
             const badgeLabel = estado || 'Sin estado';
             const dotNoLeido = !leido ? '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;display:inline-block;margin-right:4px;flex-shrink:0;"></span>' : '';
 
-            return `<div class="cot-card">
-                <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:4px;">
+            return `<div style="background:#1c2541; border-radius:12px; padding:12px 14px; margin-bottom:8px; border:1px solid #2d3f6e;">
+                <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:6px;">
                     ${dotNoLeido}
                     <div style="flex:1; min-width:0;">
-                        <div class="cot-nombre">${nombre}</div>
-                        <div class="cot-disp">${disp}</div>
+                        <div style="font-size:14px; font-weight:700; color:#f1f5f9; margin-bottom:2px;">${nombre}</div>
+                        <div style="font-size:12px; color:#60a5fa; font-weight:600;">${disp}</div>
                     </div>
                 </div>
-                <div class="cot-meta">
+                <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:${notas ? '5px' : '0'};">
                     <span class="cot-badge ${badgeClass}">${badgeLabel}</span>
-                    ${modalidad ? `<span class="cot-modal">${modalidad} ${moneda}</span>` : ''}
-                    ${fecha ? `<span class="cot-fecha">📅 ${fecha}</span>` : ''}
+                    ${modalidad ? `<span style="font-size:10px; color:#94a3b8;">${modalidad} ${moneda}</span>` : ''}
+                    ${fecha ? `<span style="font-size:10px; color:#94a3b8;">📅 ${fecha}</span>` : ''}
                 </div>
-                ${notas ? `<div class="cot-notas">${notas}</div>` : ''}
-                ${vendedor && cotUsuarioRol === 'Administrador' ? `<div class="cot-vendedor" style="margin-top:4px;">👤 ${vendedor}</div>` : ''}
+                ${notas ? `<div style="font-size:11px; color:#94a3b8; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${notas}</div>` : ''}
+                ${vendedor && cotUsuarioRol === 'Administrador' ? `<div style="font-size:10px; color:#94a3b8; margin-top:4px;">👤 ${vendedor}</div>` : ''}
             </div>`;
         }).join('');
     }
