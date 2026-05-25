@@ -630,11 +630,19 @@
 
         try {
             // Cargar cotizaciones y vendedores en paralelo
-            const [cotRows, vendRows] = await Promise.all([
+            const [cotRows, vendRows, preciosRows] = await Promise.all([
                 fetchSheetCot('Cotizaciones'),
                 fetchSheetCot('Vendedores'),
-                cargarFotoMapIdx()
+                fetchSheetCot('Lista_Precios')
             ]);
+            await cargarFotoMapIdx();
+
+            // Construir mapa dispositivo → foto desde Lista_Precios
+            window.cotFotoMapDisp = {};
+            preciosRows.forEach(p => {
+                const nombre = (p['Nombre de Dispositivo'] || '').trim().toLowerCase();
+                if (nombre && p['Foto']) window.cotFotoMapDisp[nombre] = p['Foto'];
+            });
 
             // Detectar usuario actual desde sessionStorage
             cotUsuarioEmail = '';
@@ -792,27 +800,25 @@
         document.getElementById('cot-det-titulo').textContent = r['Nombre y Apellido'] || '—';
         document.getElementById('cot-det-subtitulo').textContent = r['Dispositivo'] || '';
 
-        // Foto — buscar en lista de precios por nombre de dispositivo
         const disp = r['Dispositivo'] || '';
-        // Intentar mapear desde fotoMapIdx buscando coincidencia parcial
-        let fotoSrc = '';
-        const fotoKeys = Object.keys(fotoMapIdx);
-        // No tenemos la foto directa en cotizaciones, mostramos placeholder
-        // Si hay foto en cotizaciones la usamos
-        if (r['Foto']) {
-            fotoSrc = fotoUrlIdx(r['Foto']);
+        // Buscar foto en lista de precios por nombre de dispositivo
+        const dispKey = disp.trim().toLowerCase();
+        const fotoRaw = (window.cotFotoMapDisp || {})[dispKey] || '';
+        let fotoSrc = fotoUrlIdx(fotoRaw);
+
+        // Si no hay match exacto, buscar por coincidencia parcial
+        if (!fotoSrc && window.cotFotoMapDisp) {
+            const keys = Object.keys(window.cotFotoMapDisp);
+            const partial = keys.find(k => k.includes(dispKey.substring(0,8)) || dispKey.includes(k.substring(0,8)));
+            if (partial) fotoSrc = fotoUrlIdx(window.cotFotoMapDisp[partial]);
         }
+
         const fotoEl = document.getElementById('cot-det-foto');
         const fotoWrap = document.getElementById('cot-det-foto-wrap');
+        fotoWrap.style.background = '#1c2541';
         if (fotoSrc) {
-            fotoEl.src = fotoSrc;
-            fotoWrap.style.display = 'flex';
+            fotoWrap.innerHTML = `<img src="${fotoSrc}" style="max-width:100%; max-height:200px; object-fit:contain;" onerror="this.parentElement.innerHTML='<div style=\'text-align:center;padding:20px\'><div style=\'font-size:32px\'>🔬</div><div style=\'font-size:13px;color:#60a5fa\'>${disp}</div></div>'">`;
         } else {
-            // Mostrar nombre del equipo como placeholder
-            fotoWrap.style.display = 'flex';
-            fotoWrap.style.background = '#1c2541';
-            fotoEl.src = '';
-            fotoEl.style.display = 'none';
             fotoWrap.innerHTML = `<div style="text-align:center; padding:20px;"><div style="font-size:32px; margin-bottom:8px;">🔬</div><div style="font-size:13px; color:#60a5fa; font-weight:600;">${disp}</div></div>`;
         }
 
