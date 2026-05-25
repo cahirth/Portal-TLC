@@ -271,6 +271,42 @@
             <div id="cot-lista"></div>
         </div>
 
+        <!-- DETALLE COTIZACION OVERLAY -->
+        <div id="cot-detalle-overlay" style="display:none; position:absolute; inset:0; background:#0d1526; z-index:100; overflow-y:auto; flex-direction:column;">
+            <div style="display:flex; align-items:center; gap:12px; padding:16px; border-bottom:1px solid #222e50;">
+                <button onclick="cerrarDetalleCot()" style="background:none; border:none; color:#94a3b8; font-size:22px; cursor:pointer; padding:0 8px 0 0; line-height:1;">←</button>
+                <div>
+                    <div id="cot-det-titulo" style="font-size:15px; font-weight:700; color:#f1f5f9;"></div>
+                    <div id="cot-det-subtitulo" style="font-size:11px; color:#64748b;"></div>
+                </div>
+            </div>
+            <!-- Foto equipo -->
+            <div id="cot-det-foto-wrap" style="width:100%; height:200px; background:#1c2541; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                <img id="cot-det-foto" src="" style="max-width:100%; max-height:200px; object-fit:contain;" onerror="this.parentElement.style.display='none'">
+            </div>
+            <div style="padding:16px; display:flex; flex-direction:column; gap:14px;">
+                <!-- Estado -->
+                <div id="cot-det-estado-wrap"></div>
+                <!-- Cliente -->
+                <div style="background:#1c2541; border-radius:12px; padding:14px; border:1px solid #222e50;">
+                    <div style="font-size:11px; font-weight:700; color:#60a5fa; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Cliente</div>
+                    <div id="cot-det-cliente"></div>
+                </div>
+                <!-- Condiciones -->
+                <div id="cot-det-condiciones-wrap" style="background:#1c2541; border-radius:12px; padding:14px; border:1px solid #222e50; display:none;">
+                    <div style="font-size:11px; font-weight:700; color:#60a5fa; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Condiciones Comerciales</div>
+                    <div id="cot-det-condiciones"></div>
+                </div>
+                <!-- Notas -->
+                <div id="cot-det-notas-wrap" style="background:#1c2541; border-radius:12px; padding:14px; border:1px solid #222e50; display:none;">
+                    <div style="font-size:11px; font-weight:700; color:#f8961e; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Notas</div>
+                    <div id="cot-det-notas" style="font-size:13px; color:#f1f5f9; line-height:1.5;"></div>
+                </div>
+                <!-- PDFs -->
+                <div id="cot-det-pdfs-wrap" style="display:none; flex-direction:column; gap:8px;"></div>
+            </div>
+        </div>
+
         <!-- ================= ADMINISTRACIÓN ================= -->
         <div class="app-view" id="view-admin-menu">
             <div class="menu-list-stack">
@@ -558,6 +594,27 @@
 
     // ─── COTIZACIONES ─────────────────────────────────────────────────────────────
     const SHEET_ID_COT = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
+    const FOTO_MAP_URL_IDX = 'https://script.google.com/macros/s/AKfycbxD37pl_gc0wADzn0d2NgQ1on6wx1LZGQoP861rdrQXZqJxqx1OEaRYvK06GHQBlaYw/exec';
+    let fotoMapIdx = {};
+
+    async function cargarFotoMapIdx() {
+        if (Object.keys(fotoMapIdx).length > 0) return; // ya cargado
+        try {
+            const res = await fetch(FOTO_MAP_URL_IDX, { redirect: 'follow' });
+            fotoMapIdx = await res.json();
+        } catch(e) { console.warn('fotoMapIdx error:', e.message); }
+    }
+
+    function fotoUrlIdx(foto) {
+        if (!foto) return '';
+        const s = String(foto).trim();
+        if (s.includes('lh3.googleusercontent.com')) return s;
+        const mDrive = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (mDrive) return `https://lh3.googleusercontent.com/d/${mDrive[1]}`;
+        const mFotos = s.match(/^Fotos\/(.+)$/i);
+        if (mFotos) return fotoMapIdx[mFotos[1].toLowerCase()] || '';
+        return '';
+    }
     let cotizacionesData = [];
     let cotizacionesFiltradas = [];
     let cotUsuarioEmail = '';
@@ -575,7 +632,8 @@
             // Cargar cotizaciones y vendedores en paralelo
             const [cotRows, vendRows] = await Promise.all([
                 fetchSheetCot('Cotizaciones'),
-                fetchSheetCot('Vendedores')
+                fetchSheetCot('Vendedores'),
+                cargarFotoMapIdx()
             ]);
 
             // Detectar usuario actual desde sessionStorage
@@ -660,7 +718,7 @@
         const estado = document.querySelector('.cot-filtro.active')?.dataset.estado || 'TODOS';
         const q = (document.getElementById('cot-buscar')?.value || '').toLowerCase().trim();
 
-        const filtradas = cotizacionesData.filter(r => {
+        cotizacionesFiltradas = cotizacionesData.filter(r => {
             const matchEstado = estado === 'TODOS' || (r['Estado_Lead'] || '') === estado;
             const nombre = (r['Nombre y Apellido'] || '').toLowerCase();
             const disp = (r['Dispositivo'] || '').toLowerCase();
@@ -669,7 +727,7 @@
         });
 
         const lista = document.getElementById('cot-lista');
-        if (!filtradas.length) {
+        if (!cotizacionesFiltradas.length) {
             lista.innerHTML = '<div style="text-align:center; padding:40px; color:#64748b; font-size:13px;">Sin resultados</div>';
             return;
         }
@@ -682,7 +740,7 @@
             'Perdido 0%': 'badge-perdido',
         };
 
-        lista.innerHTML = filtradas.map(r => {
+        lista.innerHTML = cotizacionesFiltradas.map((r, i) => {
             const nombre = r['Nombre y Apellido'] || '—';
             const disp = r['Dispositivo'] || '—';
             const estado = r['Estado_Lead'] || '';
@@ -698,13 +756,14 @@
             const badgeLabel = estado || 'Sin estado';
             const dotNoLeido = !leido ? '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;display:inline-block;margin-right:4px;flex-shrink:0;"></span>' : '';
 
-            return `<div style="background:#1c2541; border-radius:12px; padding:12px 14px; margin-bottom:8px; border:1px solid #2d3f6e;">
+            return `<div onclick="abrirDetalleCot(${i})" style="background:#1c2541; border-radius:12px; padding:12px 14px; margin-bottom:8px; border:1px solid #2d3f6e; cursor:pointer; active:opacity:0.8;">
                 <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:6px;">
                     ${dotNoLeido}
                     <div style="flex:1; min-width:0;">
                         <div style="font-size:14px; font-weight:700; color:#f1f5f9; margin-bottom:2px;">${nombre}</div>
                         <div style="font-size:12px; color:#60a5fa; font-weight:600;">${disp}</div>
                     </div>
+                    <span style="color:#64748b; font-size:16px; margin-left:4px;">›</span>
                 </div>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:${notas ? '5px' : '0'};">
                     <span class="cot-badge ${badgeClass}">${badgeLabel}</span>
@@ -715,6 +774,130 @@
                 ${vendedor && cotUsuarioRol === 'Administrador' ? `<div style="font-size:10px; color:#94a3b8; margin-top:4px;">👤 ${vendedor}</div>` : ''}
             </div>`;
         }).join('');
+    }
+
+
+    function abrirDetalleCot(idx) {
+        const r = cotizacionesFiltradas[idx];
+        if (!r) return;
+
+        const overlay = document.getElementById('cot-detalle-overlay');
+        overlay.style.display = 'flex';
+        overlay.style.flexDirection = 'column';
+
+        // Scroll al top
+        overlay.scrollTop = 0;
+
+        // Título
+        document.getElementById('cot-det-titulo').textContent = r['Nombre y Apellido'] || '—';
+        document.getElementById('cot-det-subtitulo').textContent = r['Dispositivo'] || '';
+
+        // Foto — buscar en lista de precios por nombre de dispositivo
+        const disp = r['Dispositivo'] || '';
+        // Intentar mapear desde fotoMapIdx buscando coincidencia parcial
+        let fotoSrc = '';
+        const fotoKeys = Object.keys(fotoMapIdx);
+        // No tenemos la foto directa en cotizaciones, mostramos placeholder
+        // Si hay foto en cotizaciones la usamos
+        if (r['Foto']) {
+            fotoSrc = fotoUrlIdx(r['Foto']);
+        }
+        const fotoEl = document.getElementById('cot-det-foto');
+        const fotoWrap = document.getElementById('cot-det-foto-wrap');
+        if (fotoSrc) {
+            fotoEl.src = fotoSrc;
+            fotoWrap.style.display = 'flex';
+        } else {
+            // Mostrar nombre del equipo como placeholder
+            fotoWrap.style.display = 'flex';
+            fotoWrap.style.background = '#1c2541';
+            fotoEl.src = '';
+            fotoEl.style.display = 'none';
+            fotoWrap.innerHTML = `<div style="text-align:center; padding:20px;"><div style="font-size:32px; margin-bottom:8px;">🔬</div><div style="font-size:13px; color:#60a5fa; font-weight:600;">${disp}</div></div>`;
+        }
+
+        // Estado badge
+        const badgeMap = {
+            'Contacto inicial 25%': ['badge-inicial','Contacto inicial'],
+            'Presupuestado 50%':    ['badge-presup','Presupuestado'],
+            'Negociación 75%':      ['badge-negoc','Negociación'],
+            'Ganado 100%':          ['badge-ganado','Ganado ✓'],
+            'Perdido 0%':           ['badge-perdido','Perdido'],
+        };
+        const estado = r['Estado_Lead'] || '';
+        const [bClass, bLabel] = badgeMap[estado] || ['badge-sin', 'Sin estado'];
+        const leido = r['Leido'] === true || r['Leido'] === 'TRUE';
+        document.getElementById('cot-det-estado-wrap').innerHTML =
+            `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <span class="cot-badge ${bClass}" style="font-size:12px; padding:4px 10px;">${bLabel}</span>
+                ${r['Nro_Presupuesto'] ? `<span style="font-size:11px; color:#64748b;">${r['Nro_Presupuesto']}</span>` : ''}
+                ${r['Fecha_Lead'] ? `<span style="font-size:11px; color:#64748b;">📅 ${r['Fecha_Lead']}</span>` : ''}
+                ${!leido ? '<span style="font-size:11px; color:#3a86ff;">● No leído</span>' : ''}
+            </div>`;
+
+        // Cliente
+        const campos = [
+            ['Nombre', r['Nombre y Apellido']],
+            ['Razón Social', r['Razón Social']],
+            ['CUIT', r['Cuit']],
+            ['Teléfono', r['Teléfono']],
+            ['Email', r['Email']],
+            ['Vendedor', r['Vendedor']],
+        ];
+        document.getElementById('cot-det-cliente').innerHTML = campos
+            .filter(([, v]) => v)
+            .map(([k, v]) => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #222e50;">
+                <span style="font-size:12px; color:#64748b;">${k}</span>
+                <span style="font-size:12px; color:#f1f5f9; font-weight:500; text-align:right; max-width:60%;">${v}</span>
+            </div>`).join('');
+
+        // Condiciones
+        const condWrap = document.getElementById('cot-det-condiciones-wrap');
+        const condEl = document.getElementById('cot-det-condiciones');
+        const condCampos = [
+            ['Modalidad', r['Modalidad']],
+            ['Moneda', r['Moneda']],
+            ['Plazo', r['Plazo'] ? r['Plazo'] + (r['Moneda'] ? ' cuotas' : '') : ''],
+            ['Aporte Inicial', r['Aporte Inicial']],
+            ['Comisión', r['Comisiones_Ext']],
+        ];
+        const condFiltradas = condCampos.filter(([, v]) => v);
+        if (condFiltradas.length) {
+            condEl.innerHTML = condFiltradas.map(([k, v]) =>
+                `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #222e50;">
+                    <span style="font-size:12px; color:#64748b;">${k}</span>
+                    <span style="font-size:12px; color:#f1f5f9; font-weight:500;">${v}</span>
+                </div>`).join('');
+            condWrap.style.display = 'block';
+        } else { condWrap.style.display = 'none'; }
+
+        // Notas
+        const notasWrap = document.getElementById('cot-det-notas-wrap');
+        const notasEl = document.getElementById('cot-det-notas');
+        if (r['Notas']) {
+            notasEl.textContent = r['Notas'];
+            notasWrap.style.display = 'block';
+        } else { notasWrap.style.display = 'none'; }
+
+        // PDFs
+        const pdfsWrap = document.getElementById('cot-det-pdfs-wrap');
+        const pdfLinks = [
+            ['📄 Presupuesto', r['File']],
+            ['📋 Directo TLC', r['Template Directo TLC']],
+            ['🏢 Leasing', r['Template Leasing']],
+            ['💳 Crédito', r['Template Credito']],
+        ].filter(([, v]) => v);
+        if (pdfLinks.length) {
+            pdfsWrap.style.display = 'flex';
+            pdfsWrap.innerHTML = pdfLinks.map(([label, path]) => {
+                const url = path.startsWith('http') ? path : `https://drive.google.com/file/d/${path}`;
+                return `<a href="${url}" target="_blank" style="display:block; background:#1c2541; border:1px solid #2d3f6e; border-radius:10px; padding:12px 14px; color:#60a5fa; font-size:13px; font-weight:600; text-decoration:none;">${label}</a>`;
+            }).join('');
+        } else { pdfsWrap.style.display = 'none'; }
+    }
+
+    function cerrarDetalleCot() {
+        document.getElementById('cot-detalle-overlay').style.display = 'none';
     }
 
 
