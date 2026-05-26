@@ -103,6 +103,29 @@
         .btn-primary { background: #3a86ff; color: white; width: 100%; max-width: 300px; padding: 14px 28px; border-radius: 12px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; }
         #app-section { display: none; }
         .divider { border: none; border-top: 1px solid #222e50; margin: 20px 0; }
+
+        /* CARRITO EMPTY STATE */
+        .carrito-empty { text-align:center; padding:50px 20px; color:#64748b; }
+        .carrito-empty svg { display:block; margin:0 auto 16px; opacity:0.3; }
+        /* CARRITO ITEM */
+        .carrito-item { background:#1c2541; border-radius:14px; border:1px solid #222e50; padding:14px; margin-bottom:10px; }
+        .carrito-item-nombre { font-size:14px; font-weight:700; color:#f1f5f9; margin-bottom:4px; }
+        .carrito-item-mod { font-size:11px; color:#60a5fa; margin-bottom:8px; }
+        .carrito-item-precio { font-size:16px; font-weight:800; color:#3a86ff; }
+        .carrito-item-cuota { font-size:11px; color:#06d6a0; margin-top:2px; }
+        .btn-quitar { background:rgba(255,0,127,0.12); border:1px solid rgba(255,0,127,0.3); border-radius:8px; padding:5px 10px; font-size:11px; color:#ff007f; cursor:pointer; font-weight:600; float:right; margin-top:-2px; }
+        /* TOTALES */
+        .carrito-totales { background:#0f1a30; border-radius:12px; padding:14px 16px; margin:12px 0; border:1px solid #222e50; }
+        .total-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+        .total-row:last-child { margin-bottom:0; border-top:1px solid #222e50; padding-top:8px; margin-top:8px; }
+        .total-label { font-size:12px; color:#94a3b8; }
+        .total-valor { font-size:13px; font-weight:600; color:#f1f5f9; }
+        .total-row:last-child .total-valor { font-size:17px; font-weight:800; color:#3a86ff; }
+        .total-row:last-child .total-label { font-size:13px; font-weight:700; color:#f1f5f9; }
+        /* BOTONES CARRITO */
+        .btn-confirmar { width:100%; padding:14px; border-radius:10px; background:linear-gradient(135deg,#3a86ff,#1d4ed8); border:none; color:white; font-size:15px; font-weight:700; cursor:pointer; margin-top:6px; display:flex; align-items:center; justify-content:center; gap:8px; }
+        .btn-seguir { width:100%; padding:13px; border-radius:10px; background:#1c2541; border:1px solid #3a86ff; color:#3a86ff; font-size:14px; font-weight:600; cursor:pointer; margin-top:8px; }
+        .aviso-mixto { background:rgba(248,150,30,0.1); border:1px solid rgba(248,150,30,0.3); border-radius:10px; padding:10px 12px; font-size:11px; color:#f8961e; line-height:1.5; margin-bottom:10px; display:none; }
     </style>
 </head>
 <body>
@@ -115,6 +138,10 @@
         <h1>Dispositivos TLC</h1>
         <p id="user-greeting">Iniciando sesión...</p>
     </div>
+    <button onclick="abrirCarrito()" id="btn-carrito" style="display:none; position:relative; background:#1c2541; border:1px solid #222e50; border-radius:12px; width:44px; height:44px; align-items:center; justify-content:center; cursor:pointer; margin-left:auto; flex-shrink:0;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f8fafc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span id="carrito-badge" style="display:none; position:absolute; top:-6px; right:-6px; background:#ff007f; color:white; font-size:10px; font-weight:800; min-width:18px; height:18px; border-radius:9px; align-items:center; justify-content:center; padding:0 4px; border:2px solid #030712; line-height:1;">0</span>
+    </button>
 </div>
 
 <!-- LOGIN -->
@@ -167,11 +194,58 @@
             <a class="btn-folleto" id="btn-folleto" target="_blank" style="display:none; flex:1; margin-bottom:0;">📄 Folleto</a>
             <a class="btn-folleto" id="btn-video" target="_blank" style="display:none; flex:1; margin-bottom:0; border-color:#f87171; color:#f87171;">▶️ Video</a>
         </div>
-        <button class="btn-cotizar" id="btn-cotizar">✉️ Generar Cotización</button>
+        <button class="btn-cotizar" id="btn-cotizar" style="background:linear-gradient(135deg,#ff007f,#c0006b);">🛒 Agregar al Carrito</button>
     </div>
 </div>
 
-<!-- FORMULARIO -->
+
+<!-- CARRITO OVERLAY -->
+<div class="form-overlay" id="carrito-overlay">
+    <div class="form-header">
+        <button class="btn-back" onclick="cerrarCarrito()">←</button>
+        <div class="form-titulo">🛒 Carrito de Cotización</div>
+    </div>
+    <div class="form-body" id="carrito-body">
+        <!-- renderizado dinámicamente -->
+    </div>
+</div>
+
+<!-- CHECKOUT OVERLAY -->
+<div class="form-overlay" id="checkout-overlay">
+    <div class="form-header">
+        <button class="btn-back" id="btn-checkout-back">←</button>
+        <div class="form-titulo">Nueva Cotización</div>
+    </div>
+    <div class="form-body">
+        <div class="form-dispositivo" id="checkout-resumen"></div>
+
+        <div class="form-group">
+            <label class="form-label">Nombre y Apellido *</label>
+            <input type="text" class="form-input" id="co-nombre" placeholder="Ej: Juan García">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Teléfono (sin 0 ni 15)</label>
+            <input type="tel" class="form-input" id="co-telefono" placeholder="Ej: 11 4567 8901">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Notas</label>
+            <textarea class="form-input" id="co-notas" placeholder="Observaciones, intereses, seguimiento..."></textarea>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Vendedor</label>
+            <input type="text" class="form-input" id="co-vendedor" readonly>
+        </div>
+        <div class="form-group" id="co-comision-group" style="display:none">
+            <label class="form-label">Tu Comisión estimada</label>
+            <div class="comision-badge" id="co-comision-valor">—</div>
+        </div>
+
+        <button class="btn-enviar" id="btn-co-enviar">Confirmar Cotización</button>
+        <div class="form-status" id="co-status"></div>
+    </div>
+</div>
+
+<!-- FORMULARIO LEGACY (mantenido por compatibilidad) -->
 <div class="form-overlay" id="form-overlay">
     <div class="form-header">
         <button class="btn-back" id="btn-form-back">←</button>
@@ -264,6 +338,7 @@ async function mostrarApp(account) {
     const nombre = account.name || account.idTokenClaims?.name || account.username;
     console.log('Account info:', JSON.stringify({name: account.name, user: account.username, claims: account.idTokenClaims}));
     document.getElementById('user-greeting').textContent = `Hola, ${nombre}`;
+    document.getElementById('btn-carrito').style.display = 'flex';
     await cargarTodo();
 }
 
@@ -599,7 +674,222 @@ document.getElementById('btn-back').addEventListener('click', () => {
 });
 
 // ─── FORMULARIO ───────────────────────────────────────────────────────────────
-document.getElementById('btn-cotizar').addEventListener('click', abrirFormulario);
+document.getElementById('btn-cotizar').addEventListener('click', agregarAlCarrito);
+
+// ─── CARRITO ──────────────────────────────────────────────────────────────────
+let carrito = []; // [{dispositivo, modalidad, label, precio, moneda, cuota, cuotaStr}]
+
+function actualizarBadge() {
+    const badge = document.getElementById('carrito-badge');
+    const btnCarrito = document.getElementById('btn-carrito');
+    if (carrito.length === 0) {
+        badge.style.display = 'none';
+    } else {
+        badge.style.display = 'flex';
+        badge.textContent = carrito.length;
+    }
+    // Mostrar botón carrito siempre que esté logueado
+    btnCarrito.style.display = 'flex';
+}
+
+function agregarAlCarrito() {
+    const d = dispositivoActual;
+    if (!d) return;
+    const m = MODALIDADES.find(x => x.key === modalidadActual);
+
+    const precio = m ? parseNum(d[m.precioKey]) : NaN;
+    const cuota  = m?.cuotaKey ? parseNum(d[m.cuotaKey]) : NaN;
+    const moneda = m?.moneda || 'USD';
+
+    const precioStr = (!isNaN(precio) && precio > 0)
+        ? (moneda === 'USD' ? fmtUSD(precio) : fmtARS(precio))
+        : 'Consultar';
+    const cuotaStr = (!isNaN(cuota) && cuota > 0)
+        ? (moneda === 'USD' ? fmtUSD(cuota) : fmtARS(cuota))
+        : '';
+
+    carrito.push({
+        nombre:    d['Nombre de Dispositivo'] || '',
+        modalidad: modalidadActual,
+        label:     m?.label || 'Contado USD',
+        precio:    isNaN(precio) ? 0 : precio,
+        precioStr: precioStr,
+        moneda:    moneda,
+        cuota:     isNaN(cuota) ? 0 : cuota,
+        cuotaStr:  cuotaStr,
+        comision:  d['COMISIONES'] || '',
+        foto:      fotoUrl(d['Foto'] || ''),
+    });
+    actualizarBadge();
+
+    // Feedback visual en el botón
+    const btn = document.getElementById('btn-cotizar');
+    const prev = btn.innerHTML;
+    btn.innerHTML = '✅ Agregado';
+    btn.style.background = 'linear-gradient(135deg,#06d6a0,#059669)';
+    setTimeout(() => {
+        btn.innerHTML = '🛒 Agregar al Carrito';
+        btn.style.background = 'linear-gradient(135deg,#ff007f,#c0006b)';
+    }, 1200);
+}
+
+function quitarDelCarrito(idx) {
+    carrito.splice(idx, 1);
+    actualizarBadge();
+    renderCarrito();
+}
+
+function abrirCarrito() {
+    renderCarrito();
+    document.getElementById('carrito-overlay').classList.add('open');
+    document.getElementById('carrito-overlay').scrollTop = 0;
+}
+
+function cerrarCarrito() {
+    document.getElementById('carrito-overlay').classList.remove('open');
+}
+
+function renderCarrito() {
+    const body = document.getElementById('carrito-body');
+    if (carrito.length === 0) {
+        body.innerHTML = `
+            <div class="carrito-empty">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <div style="font-size:15px; font-weight:600; color:#94a3b8; margin-bottom:8px;">Carrito vacío</div>
+                <div style="font-size:13px; color:#64748b;">Agregá equipos desde la lista de dispositivos</div>
+                <button class="btn-seguir" style="margin-top:20px; max-width:260px; margin-left:auto; margin-right:auto;" onclick="cerrarCarrito()">Seguir navegando</button>
+            </div>`;
+        return;
+    }
+
+    // Agrupar totales por moneda
+    let totalUSD = 0, totalARS = 0;
+    const hasMix = carrito.some(i => i.moneda !== carrito[0].moneda);
+
+    let itemsHtml = carrito.map((item, idx) => `
+        <div class="carrito-item">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                <div style="flex:1; min-width:0;">
+                    <div class="carrito-item-nombre">${item.nombre}</div>
+                    <div class="carrito-item-mod">${item.label}</div>
+                    <div class="carrito-item-precio">${item.precioStr}</div>
+                    ${item.cuotaStr ? `<div class="carrito-item-cuota">Cuota: ${item.cuotaStr}</div>` : ''}
+                </div>
+                ${item.foto ? `<img src="${item.foto}" style="width:52px; height:52px; border-radius:8px; object-fit:contain; background:#0f1a30; flex-shrink:0;" onerror="this.style.display='none'">` : ''}
+            </div>
+            <div style="margin-top:10px; text-align:right;">
+                <button class="btn-quitar" onclick="quitarDelCarrito(${idx})">✕ Quitar</button>
+            </div>
+        </div>`).join('');
+
+    // Calcular totales
+    carrito.forEach(i => {
+        if (i.moneda === 'USD') totalUSD += i.precio;
+        else totalARS += i.precio;
+    });
+
+    let totalesHtml = '<div class="carrito-totales">';
+    if (totalUSD > 0) totalesHtml += `
+        <div class="total-row">
+            <span class="total-label">Subtotal USD</span>
+            <span class="total-valor">${fmtUSD(totalUSD)}</span>
+        </div>`;
+    if (totalARS > 0) totalesHtml += `
+        <div class="total-row">
+            <span class="total-label">Subtotal AR$</span>
+            <span class="total-valor">${fmtARS(totalARS)}</span>
+        </div>`;
+    // Total final — si es moneda única mostrar suma
+    if (!hasMix) {
+        const totalStr = totalUSD > 0 ? fmtUSD(totalUSD) : fmtARS(totalARS);
+        totalesHtml += `<div class="total-row"><span class="total-label">TOTAL (${carrito.length} ítem${carrito.length > 1 ? 's' : ''})</span><span class="total-valor">${totalStr}</span></div>`;
+    } else {
+        totalesHtml += `<div class="total-row"><span class="total-label">TOTAL (${carrito.length} ítems, monedas mixtas)</span><span class="total-valor">Ver arriba</span></div>`;
+    }
+    totalesHtml += '</div>';
+
+    const avisoMixto = hasMix
+        ? `<div class="aviso-mixto" style="display:block;">⚠️ El carrito tiene ítems en USD y AR$. Al confirmar se generará una cotización que incluye ambas monedas.</div>`
+        : '';
+
+    body.innerHTML = itemsHtml + avisoMixto + totalesHtml + `
+        <button class="btn-confirmar" onclick="abrirCheckout()">
+            ✉️ Confirmar y cargar datos del cliente
+        </button>
+        <button class="btn-seguir" onclick="cerrarCarrito()">← Seguir navegando</button>
+        <button onclick="carrito=[]; actualizarBadge(); renderCarrito();" style="width:100%; background:none; border:none; color:#64748b; font-size:12px; padding:12px; cursor:pointer; margin-top:4px;">Vaciar carrito</button>
+    `;
+}
+
+function abrirCheckout() {
+    // Resumen de ítems en el checkout
+    const resumen = carrito.map(i => `${i.nombre} — ${i.label}: ${i.precioStr}`).join('\n');
+    document.getElementById('checkout-resumen').textContent = resumen;
+
+    // Vendedor
+    document.getElementById('co-vendedor').value = currentUser?.name || currentUser?.username || '';
+
+    // Comisión — si todos los ítems del carrito del mismo vendedor externo
+    const esExterno = currentUserRol === 'Vend_Externo';
+    const comGrp = document.getElementById('co-comision-group');
+    const comVal = document.getElementById('co-comision-valor');
+    if (esExterno && carrito.length > 0 && carrito[0].comision) {
+        comGrp.style.display = 'block';
+        const pct = fmtPct(carrito[0].comision) || carrito[0].comision;
+        comVal.textContent = `💰 ${pct}`;
+    } else {
+        comGrp.style.display = 'none';
+    }
+
+    // Limpiar
+    ['co-nombre','co-telefono','co-notas'].forEach(id => document.getElementById(id).value = '');
+    const st = document.getElementById('co-status');
+    st.className = 'form-status';
+    st.style.display = 'none';
+
+    cerrarCarrito();
+    document.getElementById('checkout-overlay').classList.add('open');
+    document.getElementById('checkout-overlay').scrollTop = 0;
+}
+
+document.getElementById('btn-checkout-back').addEventListener('click', () => {
+    document.getElementById('checkout-overlay').classList.remove('open');
+    abrirCarrito();
+});
+
+document.getElementById('btn-co-enviar').addEventListener('click', async () => {
+    const nombre = document.getElementById('co-nombre').value.trim();
+    const telefono = document.getElementById('co-telefono').value.trim();
+    const notas = document.getElementById('co-notas').value.trim();
+    const vendedor = document.getElementById('co-vendedor').value.trim();
+    if (!nombre) { mostrarCoStatus('Completá el nombre y apellido.', 'error'); return; }
+
+    const btn = document.getElementById('btn-co-enviar');
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+
+    const items = carrito.map(i => `${i.nombre} (${i.label}): ${i.precioStr}`).join(' | ');
+    console.log('Cotización carrito:', { fecha: new Date().toLocaleString('es-AR'), nombre, telefono, notas, vendedor, items });
+
+    // Simula éxito — próximo paso: conectar al Google Sheets / Power Automate
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = 'Confirmar Cotización';
+        mostrarCoStatus(`✅ Cotización guardada para ${nombre} (${carrito.length} ítem${carrito.length > 1 ? 's' : ''})`, 'ok');
+        ['co-nombre','co-telefono','co-notas'].forEach(id => document.getElementById(id).value = '');
+        carrito = [];
+        actualizarBadge();
+    }, 700);
+});
+
+function mostrarCoStatus(msg, tipo) {
+    const el = document.getElementById('co-status');
+    el.textContent = msg;
+    el.className = `form-status${tipo ? ' ' + tipo : ''}`;
+    el.style.display = 'block';
+}
+
+
 document.getElementById('btn-form-back').addEventListener('click', () => {
     document.getElementById('form-overlay').classList.remove('open');
 });
