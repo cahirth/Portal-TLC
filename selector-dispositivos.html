@@ -201,22 +201,36 @@
             <div class="precio-desc" id="precio-desc"></div>
             <div class="precio-cuota" id="precio-cuota"></div>
         </div>
+        <!-- CANTIDAD + PREVIEW TOTAL + BOTÓN — siempre visible -->
+        <div style="background:#1c2541; border-radius:12px; padding:14px 16px; margin-bottom:12px; border:1px solid #222e50;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                <span style="font-size:12px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Cantidad</span>
+                <div class="qty-wrap" style="margin-bottom:0;">
+                    <button class="qty-btn" onclick="cambiarCantidad(-1)">▼</button>
+                    <span class="qty-num" id="qty-display">1</span>
+                    <button class="qty-btn" onclick="cambiarCantidad(1)">▲</button>
+                </div>
+            </div>
+            <div id="preview-subtotal" style="display:none; border-top:1px solid #222e50; padding-top:10px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-size:12px; color:#94a3b8;">Subtotal</span>
+                    <span style="font-size:13px; font-weight:600; color:#f1f5f9;" id="preview-neto">—</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-size:12px; color:#94a3b8;">IVA 10,5%</span>
+                    <span style="font-size:13px; color:#f8961e;" id="preview-iva">—</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:6px; padding-top:6px; border-top:1px solid #222e50;">
+                    <span style="font-size:13px; font-weight:700; color:#f1f5f9;">Total con IVA</span>
+                    <span style="font-size:15px; font-weight:800; color:#3a86ff;" id="preview-total">—</span>
+                </div>
+            </div>
+        </div>
+        <button class="btn-cotizar" id="btn-cotizar" style="background:linear-gradient(135deg,#ff007f,#c0006b); margin-bottom:10px;">🛒 Agregar al Carrito</button>
         <div style="display:flex; gap:8px; margin-bottom:10px;">
             <a class="btn-folleto" id="btn-folleto" target="_blank" style="display:none; flex:1; margin-bottom:0;">📄 Folleto</a>
             <a class="btn-folleto" id="btn-video" target="_blank" style="display:none; flex:1; margin-bottom:0; border-color:#f87171; color:#f87171;">▶️ Video</a>
         </div>
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-            <span style="font-size:12px; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Cantidad</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-            <div class="qty-wrap">
-                <button class="qty-btn" onclick="cambiarCantidad(-1)">−</button>
-                <span class="qty-num" id="qty-display">1</span>
-                <button class="qty-btn" onclick="cambiarCantidad(1)">+</button>
-            </div>
-            <span style="font-size:12px; color:#64748b;">unidad(es)</span>
-        </div>
-        <button class="btn-cotizar" id="btn-cotizar" style="background:linear-gradient(135deg,#ff007f,#c0006b);">🛒 Agregar al Carrito</button>
     </div>
 </div>
 
@@ -656,6 +670,7 @@ function abrirDetalle(idx) {
     if (qdEl) qdEl.textContent = '1';
     document.getElementById('detalle-overlay').classList.add('open');
     document.getElementById('detalle-overlay').scrollTop = 0;
+    actualizarPreviewSubtotal();
 }
 
 function seleccionarModalidad(key) {
@@ -693,6 +708,9 @@ function seleccionarModalidad(key) {
     } else {
         cuotaEl.textContent = '';
     }
+
+    // Actualizar preview subtotal/IVA
+    actualizarPreviewSubtotal();
 }
 
 document.getElementById('btn-back').addEventListener('click', () => {
@@ -723,6 +741,36 @@ function cambiarCantidad(delta) {
     cantidadActual = Math.max(1, cantidadActual + delta);
     const el = document.getElementById('qty-display');
     if (el) el.textContent = cantidadActual;
+    actualizarPreviewSubtotal();
+}
+
+function actualizarPreviewSubtotal() {
+    if (!dispositivoActual || !modalidadActual) return;
+    const d = dispositivoActual;
+    const m = MODALIDADES.find(x => x.key === modalidadActual);
+    if (!m) return;
+
+    // Precio: contado usa Precio CONTADO CNO, resto usa Precio LISTA
+    const esContado = modalidadActual === 'CONTADO';
+    const precioBase = esContado ? d['Precio CONTADO CNO'] : d['Precio LISTA'];
+    const precioNum = parseNum(precioBase);
+    const moneda = m.moneda;
+
+    const prevEl = document.getElementById('preview-subtotal');
+    if (!tieneValor(precioBase) || isNaN(precioNum) || precioNum <= 0) {
+        if (prevEl) prevEl.style.display = 'none';
+        return;
+    }
+
+    const neto  = precioNum * cantidadActual;
+    const iva   = neto * 0.105;
+    const total = neto + iva;
+    const fmt   = v => moneda === 'USD' ? fmtUSD(v) : fmtARS(v);
+
+    document.getElementById('preview-neto').textContent  = fmt(neto);
+    document.getElementById('preview-iva').textContent   = fmt(iva);
+    document.getElementById('preview-total').textContent = fmt(total);
+    if (prevEl) prevEl.style.display = 'block';
 }
 
 function agregarAlCarrito() {
@@ -730,7 +778,10 @@ function agregarAlCarrito() {
     if (!d) return;
     const m = MODALIDADES.find(x => x.key === modalidadActual);
 
-    const precio = m ? parseNum(d[m.precioKey]) : NaN;
+    const esContado = modalidadActual === 'CONTADO';
+    // Contado → precio contado, cualquier otra modalidad → precio lista
+    const precioBase = esContado ? d['Precio CONTADO CNO'] : d['Precio LISTA'];
+    const precio = m ? parseNum(precioBase) : NaN;
     const cuota  = m?.cuotaKey ? parseNum(d[m.cuotaKey]) : NaN;
     const moneda = m?.moneda || 'USD';
 
@@ -844,24 +895,44 @@ function renderCarrito() {
     });
     const totalItems = carrito.reduce((s,i) => s + (i.cantidad||1), 0);
 
+    const ivaUSD = totalUSD * 0.105;
+    const ivaARS = totalARS * 0.105;
+    const totalUSDconIVA = totalUSD + ivaUSD;
+    const totalARSconIVA = totalARS + ivaARS;
+
     let totalesHtml = '<div class="carrito-totales">';
-    if (totalUSD > 0) totalesHtml += `
+    if (totalUSD > 0) {
+        totalesHtml += `
         <div class="total-row">
-            <span class="total-label">Subtotal USD</span>
+            <span class="total-label">Neto USD</span>
             <span class="total-valor">${fmtUSD(totalUSD)}</span>
-        </div>`;
-    if (totalARS > 0) totalesHtml += `
+        </div>
         <div class="total-row">
-            <span class="total-label">Subtotal AR$</span>
-            <span class="total-valor">${fmtARS(totalARS)}</span>
+            <span class="total-label">IVA 10,5% USD</span>
+            <span class="total-valor" style="color:#f8961e;">${fmtUSD(ivaUSD)}</span>
+        </div>
+        <div class="total-row">
+            <span class="total-label" style="font-weight:700; color:#f1f5f9;">Total USD c/IVA</span>
+            <span class="total-valor" style="font-size:18px; color:#3a86ff;">${fmtUSD(totalUSDconIVA)}</span>
         </div>`;
-    // Total final — si es moneda única mostrar suma
-    if (!hasMix) {
-        const totalStr = totalUSD > 0 ? fmtUSD(totalUSD) : fmtARS(totalARS);
-        totalesHtml += `<div class="total-row"><span class="total-label">TOTAL (${totalItems} unidad${totalItems > 1 ? 'es' : ''})</span><span class="total-valor">${totalStr}</span></div>`;
-    } else {
-        totalesHtml += `<div class="total-row"><span class="total-label">TOTAL (${totalItems} unidades, monedas mixtas)</span><span class="total-valor">Ver arriba</span></div>`;
     }
+    if (totalARS > 0) {
+        if (totalUSD > 0) totalesHtml += `<div style="border-top:1px solid #222e50; margin:8px 0;"></div>`;
+        totalesHtml += `
+        <div class="total-row">
+            <span class="total-label">Neto AR$</span>
+            <span class="total-valor">${fmtARS(totalARS)}</span>
+        </div>
+        <div class="total-row">
+            <span class="total-label">IVA 10,5% AR$</span>
+            <span class="total-valor" style="color:#f8961e;">${fmtARS(ivaARS)}</span>
+        </div>
+        <div class="total-row">
+            <span class="total-label" style="font-weight:700; color:#f1f5f9;">Total AR$ c/IVA</span>
+            <span class="total-valor" style="font-size:18px; color:#3a86ff;">${fmtARS(totalARSconIVA)}</span>
+        </div>`;
+    }
+    totalesHtml += `<div style="margin-top:8px; padding-top:8px; border-top:1px solid #222e50; font-size:10px; color:#64748b; text-align:center;">${totalItems} unidad${totalItems>1?'es':''} · IVA 10,5% incluido</div>`;
     totalesHtml += '</div>';
 
     const avisoMixto = hasMix
@@ -879,8 +950,14 @@ function renderCarrito() {
 
 function abrirCheckout() {
     // Resumen de ítems en el checkout
-    const resumen = carrito.map(i => `${i.nombre} — ${i.label}: ${i.precioStr}`).join('\n');
-    document.getElementById('checkout-resumen').textContent = resumen;
+    let coTotalUSD = 0, coTotalARS = 0;
+    carrito.forEach(i => { const qty = i.cantidad||1; if(i.moneda==='USD') coTotalUSD += (i.precio||0)*qty; else coTotalARS += (i.precio||0)*qty; });
+    const coIvaUSD = coTotalUSD * 0.105, coIvaARS = coTotalARS * 0.105;
+    const itemLines = carrito.map(i => { const qty = i.cantidad||1; const tot = (i.precio||0)*qty; const totStr = i.moneda==='USD' ? fmtUSD(tot) : fmtARS(tot); return `${qty > 1 ? qty+'x ' : ''}${i.nombre} — ${i.label}: ${totStr}`; }).join('\n');
+    let totLines = '';
+    if (coTotalUSD > 0) totLines += `\nTotal USD c/IVA 10,5%: ${fmtUSD(coTotalUSD + coIvaUSD)}`;
+    if (coTotalARS > 0) totLines += `\nTotal AR$ c/IVA 10,5%: ${fmtARS(coTotalARS + coIvaARS)}`;
+    document.getElementById('checkout-resumen').textContent = itemLines + totLines;
 
     // Vendedor
     document.getElementById('co-vendedor').value = currentUser?.name || currentUser?.username || '';
