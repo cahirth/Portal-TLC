@@ -765,11 +765,10 @@ function actualizarPreviewSubtotal() {
     const neto  = precioNum * cantidadActual;
     const iva   = neto * 0.105;
     const total = neto + iva;
-    const fmt   = v => moneda === 'USD' ? fmtUSD(v) : fmtARS(v);
 
-    document.getElementById('preview-neto').textContent  = fmt(neto);
-    document.getElementById('preview-iva').textContent   = fmt(iva);
-    document.getElementById('preview-total').textContent = fmt(total);
+    document.getElementById('preview-neto').textContent  = fmtUSD(neto);
+    document.getElementById('preview-iva').textContent   = fmtUSD(iva);
+    document.getElementById('preview-total').textContent = fmtUSD(total);
     if (prevEl) prevEl.style.display = 'block';
 }
 
@@ -778,19 +777,14 @@ function agregarAlCarrito() {
     if (!d) return;
     const m = MODALIDADES.find(x => x.key === modalidadActual);
 
+    // Precio siempre en USD: contado → Precio CONTADO CNO, resto → Precio LISTA
     const esContado = modalidadActual === 'CONTADO';
-    // Contado → precio contado, cualquier otra modalidad → precio lista
     const precioBase = esContado ? d['Precio CONTADO CNO'] : d['Precio LISTA'];
-    const precio = m ? parseNum(precioBase) : NaN;
-    const cuota  = m?.cuotaKey ? parseNum(d[m.cuotaKey]) : NaN;
-    const moneda = m?.moneda || 'USD';
+    const precio = parseNum(precioBase);
+    const moneda = 'USD'; // siempre USD en el carrito
 
-    const precioStr = (!isNaN(precio) && precio > 0)
-        ? (moneda === 'USD' ? fmtUSD(precio) : fmtARS(precio))
-        : 'Consultar';
-    const cuotaStr = (!isNaN(cuota) && cuota > 0)
-        ? (moneda === 'USD' ? fmtUSD(cuota) : fmtARS(cuota))
-        : '';
+    const precioStr = (!isNaN(precio) && precio > 0) ? fmtUSD(precio) : 'Consultar';
+    const cuotaStr = ''; // cuotas se trabajan luego
 
     carrito.push({
         nombre:    d['Nombre de Dispositivo'] || '',
@@ -852,18 +846,14 @@ function renderCarrito() {
 
     // Agrupar totales por moneda (con cantidad)
     let totalUSD = 0, totalARS = 0;
-    const hasMix = carrito.some(i => i.moneda !== carrito[0].moneda);
+    const hasMix = false; // siempre USD
 
     let itemsHtml = carrito.map((item, idx) => {
         const qty = item.cantidad || 1;
         const precioUnitNum = item.precio || 0;
         const precioTotalNum = precioUnitNum * qty;
-        const precioTotalStr = precioTotalNum > 0
-            ? (item.moneda === 'USD' ? fmtUSD(precioTotalNum) : fmtARS(precioTotalNum))
-            : item.precioStr;
-        const precioUnitStr = qty > 1
-            ? (item.moneda === 'USD' ? fmtUSD(precioUnitNum) : fmtARS(precioUnitNum)) + ' c/u'
-            : '';
+        const precioTotalStr = precioTotalNum > 0 ? fmtUSD(precioTotalNum) : item.precioStr;
+        const precioUnitStr = qty > 1 ? fmtUSD(precioUnitNum) + ' c/u' : '';
         return `
         <div class="carrito-item">
             <div style="display:flex; align-items:flex-start; gap:10px;">
@@ -890,54 +880,32 @@ function renderCarrito() {
     // Calcular totales
     carrito.forEach(i => {
         const qty = i.cantidad || 1;
-        if (i.moneda === 'USD') totalUSD += (i.precio || 0) * qty;
-        else totalARS += (i.precio || 0) * qty;
+        totalUSD += (i.precio || 0) * qty; // siempre USD
     });
     const totalItems = carrito.reduce((s,i) => s + (i.cantidad||1), 0);
 
-    const ivaUSD = totalUSD * 0.105;
-    const ivaARS = totalARS * 0.105;
-    const totalUSDconIVA = totalUSD + ivaUSD;
-    const totalARSconIVA = totalARS + ivaARS;
+    // Siempre USD
+    const netoUSD = totalUSD;
+    const ivaUSD  = netoUSD * 0.105;
+    const totalConIVA = netoUSD + ivaUSD;
 
-    let totalesHtml = '<div class="carrito-totales">';
-    if (totalUSD > 0) {
-        totalesHtml += `
+    let totalesHtml = `<div class="carrito-totales">
         <div class="total-row">
             <span class="total-label">Neto USD</span>
-            <span class="total-valor">${fmtUSD(totalUSD)}</span>
+            <span class="total-valor">${fmtUSD(netoUSD)}</span>
         </div>
         <div class="total-row">
-            <span class="total-label">IVA 10,5% USD</span>
+            <span class="total-label" style="color:#f8961e;">IVA 10,5%</span>
             <span class="total-valor" style="color:#f8961e;">${fmtUSD(ivaUSD)}</span>
         </div>
-        <div class="total-row">
-            <span class="total-label" style="font-weight:700; color:#f1f5f9;">Total USD c/IVA</span>
-            <span class="total-valor" style="font-size:18px; color:#3a86ff;">${fmtUSD(totalUSDconIVA)}</span>
-        </div>`;
-    }
-    if (totalARS > 0) {
-        if (totalUSD > 0) totalesHtml += `<div style="border-top:1px solid #222e50; margin:8px 0;"></div>`;
-        totalesHtml += `
-        <div class="total-row">
-            <span class="total-label">Neto AR$</span>
-            <span class="total-valor">${fmtARS(totalARS)}</span>
+        <div class="total-row" style="border-top:1px solid #3a86ff33; padding-top:10px; margin-top:4px;">
+            <span class="total-label" style="font-size:14px; font-weight:700; color:#f1f5f9;">TOTAL USD c/IVA</span>
+            <span class="total-valor" style="font-size:20px; color:#3a86ff;">${fmtUSD(totalConIVA)}</span>
         </div>
-        <div class="total-row">
-            <span class="total-label">IVA 10,5% AR$</span>
-            <span class="total-valor" style="color:#f8961e;">${fmtARS(ivaARS)}</span>
-        </div>
-        <div class="total-row">
-            <span class="total-label" style="font-weight:700; color:#f1f5f9;">Total AR$ c/IVA</span>
-            <span class="total-valor" style="font-size:18px; color:#3a86ff;">${fmtARS(totalARSconIVA)}</span>
-        </div>`;
-    }
-    totalesHtml += `<div style="margin-top:8px; padding-top:8px; border-top:1px solid #222e50; font-size:10px; color:#64748b; text-align:center;">${totalItems} unidad${totalItems>1?'es':''} · IVA 10,5% incluido</div>`;
-    totalesHtml += '</div>';
+        <div style="margin-top:8px; font-size:10px; color:#64748b; text-align:center;">${totalItems} unidad${totalItems>1?'es':''} · precios en USD · IVA 10,5% discriminado</div>
+    </div>`;
 
-    const avisoMixto = hasMix
-        ? `<div class="aviso-mixto" style="display:block;">⚠️ El carrito tiene ítems en USD y AR$. Al confirmar se generará una cotización que incluye ambas monedas.</div>`
-        : '';
+    const avisoMixto = '';
 
     body.innerHTML = itemsHtml + avisoMixto + totalesHtml + `
         <button class="btn-confirmar" onclick="abrirCheckout()">
@@ -950,14 +918,16 @@ function renderCarrito() {
 
 function abrirCheckout() {
     // Resumen de ítems en el checkout
-    let coTotalUSD = 0, coTotalARS = 0;
-    carrito.forEach(i => { const qty = i.cantidad||1; if(i.moneda==='USD') coTotalUSD += (i.precio||0)*qty; else coTotalARS += (i.precio||0)*qty; });
-    const coIvaUSD = coTotalUSD * 0.105, coIvaARS = coTotalARS * 0.105;
-    const itemLines = carrito.map(i => { const qty = i.cantidad||1; const tot = (i.precio||0)*qty; const totStr = i.moneda==='USD' ? fmtUSD(tot) : fmtARS(tot); return `${qty > 1 ? qty+'x ' : ''}${i.nombre} — ${i.label}: ${totStr}`; }).join('\n');
-    let totLines = '';
-    if (coTotalUSD > 0) totLines += `\nTotal USD c/IVA 10,5%: ${fmtUSD(coTotalUSD + coIvaUSD)}`;
-    if (coTotalARS > 0) totLines += `\nTotal AR$ c/IVA 10,5%: ${fmtARS(coTotalARS + coIvaARS)}`;
-    document.getElementById('checkout-resumen').textContent = itemLines + totLines;
+    let coNeto = 0;
+    carrito.forEach(i => { coNeto += (i.precio||0) * (i.cantidad||1); });
+    const coIva = coNeto * 0.105;
+    const itemLines = carrito.map(i => {
+        const qty = i.cantidad||1;
+        const tot = (i.precio||0)*qty;
+        return `${qty > 1 ? qty+'x ' : ''}${i.nombre} — ${i.label}: ${fmtUSD(tot)}`;
+    }).join('\n');
+    document.getElementById('checkout-resumen').textContent =
+        itemLines + `\n──────────────────\nNeto USD: ${fmtUSD(coNeto)}\nIVA 10,5%: ${fmtUSD(coIva)}\nTOTAL USD: ${fmtUSD(coNeto + coIva)}`;
 
     // Vendedor
     document.getElementById('co-vendedor').value = currentUser?.name || currentUser?.username || '';
