@@ -348,7 +348,7 @@ const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 const SCOPES       = ['User.Read'];
 
 // Mapa nombre_archivo → URL lh3 (cargado desde Apps Script)
-const FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbzSlDDsjsA7VQjapeV-Bwxw1rSrcGpLTM-UtdW2d597EztQ2b8-Hseo6limp5p_hLOm/exec';
+const FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 let fotoMap = {};
 
 const msalConfig = {
@@ -1045,43 +1045,17 @@ Cualquier consulta estoy a disposición.`
 });
 
 
-// ── Subir a Apps Script via JSONP (evita CORS completamente) ─────────────────
-function subirPresupuestoConFormulario(payload) {
-    return new Promise((resolve, reject) => {
-        const cbName = 'tlcCb_' + Date.now();
-        const script = document.createElement('script');
-
-        // Timeout 15 segundos
-        const timer = setTimeout(() => {
-            delete window[cbName];
-            document.body.removeChild(script);
-            reject(new Error('Timeout al conectar con Drive'));
-        }, 15000);
-
-        // Callback que Apps Script va a llamar
-        window[cbName] = function(result) {
-            clearTimeout(timer);
-            delete window[cbName];
-            document.body.removeChild(script);
-            resolve(result);
-        };
-
-        // Construir URL con parámetros (GET con callback = JSONP)
-        const params = new URLSearchParams({
-            callback: cbName,
-            accion:   'guardarPresupuesto',
-            cliente:  payload.cliente || '',
-            html:     payload.html    || '',
-        });
-
-        script.src = FOTO_MAP_URL + '?' + params.toString();
-        script.onerror = () => {
-            clearTimeout(timer);
-            delete window[cbName];
-            reject(new Error('Error de red al conectar con Apps Script'));
-        };
-        document.body.appendChild(script);
+// ── Subir a Apps Script via fetch con text/plain (evita preflight CORS) ────────
+// Apps Script acepta POST con Content-Type: text/plain sin preflight.
+// El cuerpo sigue siendo JSON válido — Apps Script lo parsea igual.
+async function subirPresupuestoConFormulario(payload) {
+    const resp = await fetch(FOTO_MAP_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body:    JSON.stringify(payload),
     });
+    const result = await resp.json();
+    return result;
 }
 
 function nuevoPresupuesto() {
