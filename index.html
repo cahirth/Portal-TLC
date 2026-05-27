@@ -189,33 +189,33 @@
         <!-- ================= PANTALLA 1: MENÚ RAÍZ (HOME) ================= -->
         <div class="app-view active" id="view-home">
             <div class="menu-list-stack">
-                <div class="menu-item-row" onclick="openModule('view-ventas-menu', 'Ventas', 'Embudo Comercial')">
+                <div class="menu-item-row" id="menu-ventas" onclick="abrirModuloConPermiso('view-ventas-menu', 'Ventas', 'Embudo Comercial', 'ventas')">
                     <div class="item-logo-container" style="overflow:hidden; padding:0;">
                         <img src="https://lh3.googleusercontent.com/d/1ghU497CVOlvAWDoyBFRc4g1HeMOLyuxR" style="width:48px; height:48px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-chart-pie\'></i>'; this.parentElement.classList.add('logo-ventas');">
                     </div>
                     <div class="item-text-box"><h3>Ventas</h3><p>Cotizaciones y Pipeline Leads</p></div>
-                    <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:11px;"></i>
+                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
-                <div class="menu-item-row" onclick="openModule('view-servicio-menu', 'Servicio Técnico', 'Laboratorio')">
+                <div class="menu-item-row" id="menu-servicio" onclick="abrirModuloConPermiso('view-servicio-menu', 'Servicio Técnico', 'Laboratorio', 'servicio')">
                     <div class="item-logo-container" style="overflow:hidden; padding:0;">
                         <img src="https://lh3.googleusercontent.com/d/1HdFljwTWje8_7Yv3Muc2soSbZjKXy8_N" style="width:48px; height:48px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-microscope\'></i>'; this.parentElement.classList.add('logo-servicio');">
                     </div>
                     <div class="item-text-box"><h3>Servicio Técnico</h3><p>Ingresos, Checklists y Reparaciones</p></div>
-                    <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:11px;"></i>
+                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
-                <div class="menu-item-row" onclick="openModule('view-comex-menu', 'Comercio Exterior', 'Logística')">
+                <div class="menu-item-row" id="menu-comex" onclick="abrirModuloConPermiso('view-comex-menu', 'Comercio Exterior', 'Logística', 'comex')">
                     <div class="item-logo-container" style="overflow:hidden; padding:0;">
                         <img src="https://lh3.googleusercontent.com/d/1jQH8p95CDIasQdtU-A7wN2r8h4jkA1L-" style="width:48px; height:48px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-ship\'></i>'; this.parentElement.classList.add('logo-comex');">
                     </div>
                     <div class="item-text-box"><h3>Comercio Exterior</h3><p>Importaciones y Aduana</p></div>
-                    <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:11px;"></i>
+                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
-                <div class="menu-item-row" onclick="openModule('view-admin-menu', 'Administración', 'Gestión interna')">
+                <div class="menu-item-row" id="menu-admin" onclick="abrirModuloConPermiso('view-admin-menu', 'Administración', 'Gestión interna', 'admin')">
                     <div class="item-logo-container" style="overflow:hidden; padding:0;">
                         <img src="https://lh3.googleusercontent.com/d/1O0oBR3D8skpxWHWRuUx323B-AdQVZTCb" style="width:48px; height:48px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-building\' style=\'color:#f8961e\'></i>'; this.parentElement.style.background='rgba(248,150,30,0.15)'; this.parentElement.style.border='1px solid rgba(248,150,30,0.4)';">
                     </div>
                     <div class="item-text-box"><h3>Administración</h3><p>Gestión interna y reportes</p></div>
-                    <i class="fa-solid fa-chevron-right" style="color:var(--text-muted); font-size:11px;"></i>
+                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
             </div>
         </div>
@@ -750,10 +750,103 @@
             updateUserDisplay();
             document.getElementById('login-wall').style.display = 'none';
             document.getElementById('phone-app-content').style.display = 'flex';
+            await cargarPermisosUsuario(account.username);
         } else {
             document.getElementById('login-wall').style.display = 'flex';
             document.getElementById('phone-app-content').style.display = 'none';
         }
+    }
+
+    // ─── PERMISOS ─────────────────────────────────────────────────────────────
+    const SHEET_ID_PERMISOS = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
+    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, rol: 'Administrador' };
+
+    async function cargarPermisosUsuario(email) {
+        try {
+            const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID_PERMISOS}/gviz/tq?tqx=out:json&sheet=Vendedores`;
+            const res = await fetch(url);
+            const text = await res.text();
+            const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+            const rows = json.table.rows;
+            const cols = json.table.cols.map(c => c.label);
+
+            const emailIdx   = cols.indexOf('Email');
+            const rolIdx     = cols.indexOf('Rol');
+            const ventasIdx  = cols.indexOf('Ventas');
+            const servicioIdx= cols.indexOf('Servicio Tecnico');
+            const comexIdx   = cols.indexOf('Comercio Exterior');
+            const adminIdx   = cols.indexOf('Administracion');
+
+            const fila = rows.find(r => {
+                const v = r.c[emailIdx]?.v || '';
+                return v.toLowerCase().trim() === email.toLowerCase().trim();
+            });
+
+            if (fila) {
+                const bool = (idx) => {
+                    const v = fila.c[idx]?.v;
+                    return v === true || v === 'TRUE' || v === 'true' || v === 1;
+                };
+                userPermisos = {
+                    rol:      fila.c[rolIdx]?.v || 'Vend_Externo',
+                    ventas:   bool(ventasIdx),
+                    servicio: bool(servicioIdx),
+                    comex:    bool(comexIdx),
+                    admin:    bool(adminIdx),
+                };
+            } else {
+                // Email no encontrado → acceso mínimo
+                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false };
+            }
+        } catch(e) {
+            console.warn('Error cargando permisos:', e);
+            // Si falla la carga, mantener acceso completo para no bloquear
+        }
+        aplicarPermisosMenu();
+    }
+
+    function aplicarPermisosMenu() {
+        const secciones = [
+            { id: 'menu-ventas',   permiso: userPermisos.ventas },
+            { id: 'menu-servicio', permiso: userPermisos.servicio },
+            { id: 'menu-comex',    permiso: userPermisos.comex },
+            { id: 'menu-admin',    permiso: userPermisos.admin },
+        ];
+        secciones.forEach(({ id, permiso }) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (!permiso) {
+                el.style.opacity = '0.35';
+                el.style.filter = 'grayscale(100%)';
+                el.style.pointerEvents = 'auto'; // dejamos el click para mostrar toast
+                el.dataset.bloqueado = 'true';
+                // Cambiar chevron por candado
+                const chevron = el.querySelector('.menu-chevron');
+                if (chevron) chevron.className = 'fa-solid fa-lock menu-chevron' ;
+            } else {
+                el.style.opacity = '1';
+                el.style.filter = 'none';
+                el.dataset.bloqueado = 'false';
+            }
+        });
+    }
+
+    function abrirModuloConPermiso(viewId, title, subtitle, seccion) {
+        const el = document.getElementById('menu-' + seccion);
+        if (el && el.dataset.bloqueado === 'true') {
+            mostrarToast('🔒 Sin acceso a ' + title);
+            return;
+        }
+        openModule(viewId, title, subtitle);
+    }
+
+    function mostrarToast(msg) {
+        const t = document.getElementById('toast-bar');
+        const txt = document.getElementById('toast-text');
+        if (!t || !txt) return;
+        txt.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2500);
     }
 
     function doLogin() {
