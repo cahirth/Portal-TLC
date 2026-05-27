@@ -278,6 +278,29 @@
 
         <button class="btn-enviar" id="btn-co-enviar">Confirmar Cotización</button>
         <div class="form-status" id="co-status"></div>
+
+        <!-- RESULTADO: link + botones (aparece después de confirmar) -->
+        <div id="co-resultado" style="display:none; margin-top:16px;">
+            <div style="background:#0f1a30; border:1px solid rgba(6,214,160,0.3); border-radius:14px; padding:16px;">
+                <div style="font-size:11px; color:#06d6a0; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">✅ Presupuesto generado</div>
+                <div style="font-size:12px; color:#94a3b8; margin-bottom:12px;" id="co-nombre-resultado"></div>
+                <a id="co-link-preview" href="#" target="_blank" style="display:flex; align-items:center; gap:8px; background:#1c2541; border:1px solid #222e50; border-radius:10px; padding:12px 14px; text-decoration:none; margin-bottom:10px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:13px; font-weight:600; color:#f1f5f9;">Ver presupuesto</div>
+                        <div style="font-size:11px; color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" id="co-link-text">Generando link...</div>
+                    </div>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>
+                <button id="co-btn-wsp" style="width:100%; padding:13px; border-radius:10px; background:linear-gradient(135deg,#25d366,#128c7e); border:none; color:white; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:8px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                    Enviar por WhatsApp
+                </button>
+                <button onclick="nuevoPresupuesto()" style="width:100%; padding:11px; border-radius:10px; background:#1c2541; border:1px solid #222e50; color:#94a3b8; font-size:13px; cursor:pointer;">
+                    + Nuevo presupuesto
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -961,29 +984,238 @@ document.getElementById('btn-checkout-back').addEventListener('click', () => {
 });
 
 document.getElementById('btn-co-enviar').addEventListener('click', async () => {
-    const nombre = document.getElementById('co-nombre').value.trim();
+    const nombre   = document.getElementById('co-nombre').value.trim();
     const telefono = document.getElementById('co-telefono').value.trim();
-    const notas = document.getElementById('co-notas').value.trim();
+    const notas    = document.getElementById('co-notas').value.trim();
     const vendedor = document.getElementById('co-vendedor').value.trim();
     if (!nombre) { mostrarCoStatus('Completá el nombre y apellido.', 'error'); return; }
 
     const btn = document.getElementById('btn-co-enviar');
     btn.disabled = true;
-    btn.textContent = 'Guardando...';
+    btn.textContent = '⏳ Generando presupuesto...';
+    mostrarCoStatus('', '');
 
-    const items = carrito.map(i => `${i.nombre} (${i.label}): ${i.precioStr}`).join(' | ');
-    console.log('Cotización carrito:', { fecha: new Date().toLocaleString('es-AR'), nombre, telefono, notas, vendedor, items });
+    try {
+        // 1 — Generar HTML del presupuesto
+        const htmlPresup = generarHTMLPresupuesto({ nombre, telefono, notas, vendedor });
 
-    // Simula éxito — próximo paso: conectar al Google Sheets / Power Automate
-    setTimeout(() => {
-        btn.disabled = false;
-        btn.textContent = 'Confirmar Cotización';
-        mostrarCoStatus(`✅ Cotización guardada para ${nombre} (${carrito.length} ítem${carrito.length > 1 ? 's' : ''})`, 'ok');
-        ['co-nombre','co-telefono','co-notas'].forEach(id => document.getElementById(id).value = '');
+        // 2 — Subir a Drive vía Apps Script
+        const resp = await fetch(FOTO_MAP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                accion:  'guardarPresupuesto',
+                html:    htmlPresup,
+                cliente: nombre,
+            })
+        });
+        const result = await resp.json();
+
+        if (!result.ok) throw new Error(result.error || 'Error desconocido');
+
+        // 3 — Mostrar resultado
+        const link = result.link;
+        document.getElementById('co-nombre-resultado').textContent =
+            `${nombre}${telefono ? ' · ' + telefono : ''} · ${carrito.length} ítem${carrito.length > 1 ? 's' : ''}`;
+        document.getElementById('co-link-preview').href = link;
+        document.getElementById('co-link-text').textContent = link.replace('https://', '');
+
+        // Botón WhatsApp
+        const msgWsp = encodeURIComponent(
+            `Hola ${nombre.split(' ')[0]}! 👋
+Te comparto el presupuesto de TLC:
+${link}
+
+Cualquier consulta estoy a disposición.`
+        );
+        const telLimpio = telefono.replace(/\D/g, '');
+        const linkWsp = telLimpio
+            ? `https://wa.me/549${telLimpio}?text=${msgWsp}`
+            : `https://wa.me/?text=${msgWsp}`;
+        document.getElementById('co-btn-wsp').onclick = () => window.open(linkWsp, '_blank');
+
+        // Mostrar panel resultado, ocultar botón confirmar
+        document.getElementById('co-resultado').style.display = 'block';
+        btn.style.display = 'none';
+
+        // Limpiar carrito
         carrito = [];
         actualizarBadge();
-    }, 700);
+
+    } catch (err) {
+        mostrarCoStatus('❌ Error: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Confirmar Cotización';
+    }
 });
+
+function nuevoPresupuesto() {
+    // Reset checkout para nueva cotización
+    document.getElementById('co-resultado').style.display = 'none';
+    const btn = document.getElementById('btn-co-enviar');
+    btn.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Confirmar Cotización';
+    ['co-nombre','co-telefono','co-notas'].forEach(id => document.getElementById(id).value = '');
+    const st = document.getElementById('co-status');
+    st.style.display = 'none';
+    document.getElementById('checkout-overlay').classList.remove('open');
+}
+
+function generarHTMLPresupuesto({ nombre, telefono, notas, vendedor }) {
+    const fecha = new Date().toLocaleDateString('es-AR', {
+        day: '2-digit', month: 'long', year: 'numeric'
+    });
+    const nroRef = 'TLC-' + Date.now().toString(36).toUpperCase();
+
+    // Calcular totales
+    let neto = 0;
+    carrito.forEach(i => { neto += (i.precio || 0) * (i.cantidad || 1); });
+    const iva   = neto * 0.105;
+    const total = neto + iva;
+
+    // Filas de ítems
+    const filasItems = carrito.map(i => {
+        const qty      = i.cantidad || 1;
+        const subtotal = (i.precio || 0) * qty;
+        return `
+        <tr>
+            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; color:#1e293b; font-weight:500;">${i.nombre}</td>
+            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#64748b; text-align:center;">${i.label}</td>
+            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#1e293b; text-align:center;">${qty}</td>
+            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#1e293b; text-align:right;">${fmtUSD(i.precio || 0)}</td>
+            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; font-weight:700; color:#0f172a; text-align:right;">${fmtUSD(subtotal)}</td>
+        </tr>`;
+    }).join('');
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Presupuesto TLC - ${nombre}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; }
+  .page { max-width: 720px; margin: 0 auto; background: white; min-height: 100vh; }
+  .header { background: linear-gradient(135deg, #0f1a30 0%, #1c2541 100%); padding: 32px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .logo { width: 64px; height: 64px; object-fit: contain; }
+  .header-info { text-align: right; }
+  .header-title { font-size: 22px; font-weight: 800; color: white; letter-spacing: -0.5px; }
+  .header-sub { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+  .ref-badge { display: inline-block; background: rgba(58,134,255,0.2); color: #60a5fa; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-top: 8px; }
+  .section { padding: 28px 40px; }
+  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 16px; }
+  .client-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; }
+  .client-name { font-size: 18px; font-weight: 700; color: #0f172a; }
+  .client-detail { font-size: 14px; color: #64748b; margin-top: 6px; }
+  .divider { border: none; border-top: 1px solid #e2e8f0; margin: 0 40px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: #f8fafc; }
+  thead th { padding: 10px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; text-align: left; }
+  thead th:nth-child(3), thead th:nth-child(4), thead th:nth-child(5) { text-align: right; }
+  thead th:nth-child(3) { text-align: center; }
+  .totales-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; }
+  .tot-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 14px; color: #64748b; }
+  .tot-row.final { border-top: 2px solid #0f172a; margin-top: 8px; padding-top: 14px; }
+  .tot-row.final .tot-label { font-size: 16px; font-weight: 800; color: #0f172a; }
+  .tot-row.final .tot-val { font-size: 20px; font-weight: 800; color: #2563eb; }
+  .iva-row .tot-val { color: #ea580c; }
+  .notas-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px 18px; font-size: 14px; color: #92400e; line-height: 1.6; }
+  .footer { background: #0f1a30; padding: 24px 40px; text-align: center; }
+  .footer p { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+  .footer a { color: #60a5fa; text-decoration: none; }
+  .validity { background: rgba(6,214,160,0.1); border: 1px solid rgba(6,214,160,0.3); border-radius: 8px; padding: 8px 16px; display: inline-block; margin-top: 12px; font-size: 12px; color: #06d6a0; font-weight: 600; }
+  @media (max-width: 600px) {
+    .header { padding: 20px; flex-direction: column; align-items: flex-start; }
+    .header-info { text-align: left; }
+    .section { padding: 20px; }
+    .divider { margin: 0 20px; }
+    .footer { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <img class="logo" src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" alt="TLC" onerror="this.style.display='none'">
+    <div class="header-info">
+      <div class="header-title">Presupuesto</div>
+      <div class="header-sub">Tecnología Láser Corneal SRL</div>
+      <div class="ref-badge">${nroRef}</div>
+    </div>
+  </div>
+
+  <!-- CLIENTE -->
+  <div class="section">
+    <div class="section-title">Cliente</div>
+    <div class="client-card">
+      <div class="client-name">${nombre}</div>
+      <div class="client-detail">
+        ${telefono ? `📱 ${telefono}` : ''}
+        <span style="margin-left: 12px; color:#94a3b8;">📅 ${fecha}</span>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ÍTEMS -->
+  <div class="section">
+    <div class="section-title">Detalle de productos</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Modalidad</th>
+          <th style="text-align:center;">Cant.</th>
+          <th style="text-align:right;">Precio u.</th>
+          <th style="text-align:right;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>${filasItems}</tbody>
+    </table>
+  </div>
+
+  <hr class="divider">
+
+  <!-- TOTALES -->
+  <div class="section">
+    <div class="totales-box">
+      <div class="tot-row">
+        <span class="tot-label">Neto USD</span>
+        <span class="tot-val">${fmtUSD(neto)}</span>
+      </div>
+      <div class="tot-row iva-row">
+        <span class="tot-label">IVA 10,5%</span>
+        <span class="tot-val">${fmtUSD(iva)}</span>
+      </div>
+      <div class="tot-row final">
+        <span class="tot-label">TOTAL USD</span>
+        <span class="tot-val">${fmtUSD(total)}</span>
+      </div>
+    </div>
+    <div style="text-align:center; margin-top:12px;">
+      <div class="validity">✓ Válido por 15 días hábiles a partir del ${fecha}</div>
+    </div>
+  </div>
+
+  ${notas ? `<hr class="divider"><div class="section"><div class="section-title">Notas</div><div class="notas-box">${notas}</div></div>` : ''}
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <p><strong style="color:#94a3b8;">Tecnología Láser Corneal SRL</strong></p>
+    <p>Del Carmen 716, CABA · Argentina</p>
+    <p style="margin-top:8px;">Asesor: ${vendedor || 'TLC'}</p>
+    <p style="margin-top:6px;"><a href="https://www.tlcsrl.com.ar">www.tlcsrl.com.ar</a></p>
+  </div>
+
+</div>
+</body>
+</html>`;
+}
 
 function mostrarCoStatus(msg, tipo) {
     const el = document.getElementById('co-status');
