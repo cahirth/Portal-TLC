@@ -168,7 +168,19 @@
             <h1 id="txt-main-title">Portal TLC</h1>
             <p id="txt-sub-title" style="font-size:11px; color:var(--text-muted);">Menú Principal</p>
         </div>
-        <div class="header-profile" id="header-avatar" style="cursor:default;">CH</div>
+        <div style="position:relative;" id="avatar-wrap-idx">
+            <div class="header-profile" id="header-avatar" style="cursor:pointer;" onclick="toggleAvatarMenuIdx()">CH</div>
+            <div id="avatar-menu-idx" style="display:none; position:absolute; top:44px; right:0; background:#1c2541; border:1px solid #222e50; border-radius:12px; min-width:210px; z-index:500; box-shadow:0 8px 32px rgba(0,0,0,0.4); overflow:hidden;">
+                <div style="padding:12px 16px; border-bottom:1px solid #222e50;">
+                    <div style="font-size:13px; font-weight:700; color:#f1f5f9;" id="avatar-nombre-idx">—</div>
+                    <div style="font-size:11px; color:#64748b; margin-top:2px;" id="avatar-email-idx">—</div>
+                </div>
+                <button onclick="cerrarSesionIdx()" style="width:100%; padding:12px 16px; background:none; border:none; color:#f87171; font-size:14px; font-weight:600; cursor:pointer; text-align:left; display:flex; align-items:center; gap:8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Cerrar sesión
+                </button>
+            </div>
+        </div>
     </div>
 
     <div id="phone-app-content" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
@@ -889,6 +901,8 @@
                 const nombre = account.name || account.username || '';
                 const iniciales = nombre.split(' ').filter(Boolean).map(p => p[0]).join('').substring(0,2).toUpperCase() || 'TL';
                 document.getElementById('header-avatar').textContent = iniciales;
+                document.getElementById('avatar-nombre-idx').textContent = nombre;
+                document.getElementById('avatar-email-idx').textContent = account.username || '';
                 // Solo actualizar subtitle si estamos en home
                 const active = document.querySelector('.app-view.active');
                 if (!active || active.id === 'view-home') {
@@ -897,6 +911,23 @@
             }
         } catch(e) { console.warn('updateUserDisplay:', e); }
     }
+
+    function toggleAvatarMenuIdx() {
+        const menu = document.getElementById('avatar-menu-idx');
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function cerrarSesionIdx() {
+        msalAppIndex.logoutRedirect({ postLogoutRedirectUri: 'https://cahirth.github.io/Portal-TLC/' });
+    }
+
+    document.addEventListener('click', (e) => {
+        const wrap = document.getElementById('avatar-wrap-idx');
+        if (wrap && !wrap.contains(e.target)) {
+            const menu = document.getElementById('avatar-menu-idx');
+            if (menu) menu.style.display = 'none';
+        }
+    });
     initIndexMsal().catch(console.error);
 
     // ─── COTIZACIONES ─────────────────────────────────────────────────────────────
