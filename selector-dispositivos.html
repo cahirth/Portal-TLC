@@ -149,10 +149,28 @@
         <h1>Dispositivos TLC</h1>
         <p id="user-greeting">Iniciando sesión...</p>
     </div>
-    <button onclick="abrirCarrito()" id="btn-carrito" style="display:none; position:relative; background:#1c2541; border:1px solid #222e50; border-radius:12px; width:44px; height:44px; align-items:center; justify-content:center; cursor:pointer; margin-left:auto; flex-shrink:0;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f8fafc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-        <span id="carrito-badge" style="display:none; position:absolute; top:-6px; right:-6px; background:#ff007f; color:white; font-size:10px; font-weight:800; min-width:18px; height:18px; border-radius:9px; align-items:center; justify-content:center; padding:0 4px; border:2px solid #030712; line-height:1;">0</span>
-    </button>
+    <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
+        <button onclick="abrirCarrito()" id="btn-carrito" style="display:none; position:relative; background:#1c2541; border:1px solid #222e50; border-radius:12px; width:44px; height:44px; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f8fafc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            <span id="carrito-badge" style="display:none; position:absolute; top:-6px; right:-6px; background:#ff007f; color:white; font-size:10px; font-weight:800; min-width:18px; height:18px; border-radius:9px; align-items:center; justify-content:center; padding:0 4px; border:2px solid #030712; line-height:1;">0</span>
+        </button>
+        <!-- AVATAR -->
+        <div style="position:relative;" id="avatar-wrap">
+            <button id="btn-avatar" onclick="toggleAvatarMenu()" style="display:none; background:#1c2541; border:1px solid #222e50; border-radius:50%; width:44px; height:44px; align-items:center; justify-content:center; cursor:pointer; font-size:13px; font-weight:800; color:#3a86ff; flex-shrink:0;">
+                <span id="avatar-initials">?</span>
+            </button>
+            <div id="avatar-menu" style="display:none; position:absolute; top:52px; right:0; background:#1c2541; border:1px solid #222e50; border-radius:12px; min-width:200px; z-index:500; box-shadow:0 8px 32px rgba(0,0,0,0.4); overflow:hidden;">
+                <div style="padding:12px 16px; border-bottom:1px solid #222e50;">
+                    <div style="font-size:13px; font-weight:700; color:#f1f5f9;" id="avatar-nombre-menu">—</div>
+                    <div style="font-size:11px; color:#64748b; margin-top:2px;" id="avatar-email-menu">—</div>
+                </div>
+                <button onclick="cerrarSesion()" style="width:100%; padding:12px 16px; background:none; border:none; color:#f87171; font-size:14px; font-weight:600; cursor:pointer; text-align:left; display:flex; align-items:center; gap:8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Cerrar sesión
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- LOGIN -->
@@ -399,8 +417,34 @@ async function mostrarApp(account) {
     console.log('Account info:', JSON.stringify({name: account.name, user: account.username, claims: account.idTokenClaims}));
     document.getElementById('user-greeting').textContent = `Hola, ${nombre}`;
     document.getElementById('btn-carrito').style.display = 'flex';
+    // Avatar
+    const partes = nombre.trim().split(' ');
+    const iniciales = partes.length >= 2
+        ? (partes[0][0] + partes[partes.length-1][0]).toUpperCase()
+        : nombre.substring(0,2).toUpperCase();
+    document.getElementById('avatar-initials').textContent = iniciales;
+    document.getElementById('avatar-nombre-menu').textContent = nombre;
+    document.getElementById('avatar-email-menu').textContent = account.username || '';
+    document.getElementById('btn-avatar').style.display = 'flex';
     await cargarTodo();
 }
+
+function toggleAvatarMenu() {
+    const menu = document.getElementById('avatar-menu');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function cerrarSesion() {
+    msal_app.logoutRedirect({ postLogoutRedirectUri: 'https://cahirth.github.io/Portal-TLC/selector-dispositivos.html' });
+}
+
+document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('avatar-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+        const menu = document.getElementById('avatar-menu');
+        if (menu) menu.style.display = 'none';
+    }
+});
 
 // ─── MAPA DE FOTOS DESDE APPS SCRIPT ──────────────────────────────────────────
 async function cargarFotoMap() {
@@ -654,31 +698,31 @@ function abrirDetalle(idx) {
     if (modalDisp.length > 0) {
         secMod.style.display = 'block';
         precioDetalle.style.display = 'block';
-        // Garantizar que Dir6 y Dir12 (AR$ y USD) queden siempre en la misma fila
-        // Si el total es impar, Contado ocupa fila completa
-        const contado  = modalDisp.filter(m => m.key === 'CONTADO');
-        const credito  = modalDisp.filter(m => m.key === 'CREDITO');
-        const dir6ar   = modalDisp.filter(m => m.key === 'TLC6');
-        const dir12ar  = modalDisp.filter(m => m.key === 'TLC12');
-        const dir6usd  = modalDisp.filter(m => m.key === 'TLC6USD');
-        const dir12usd = modalDisp.filter(m => m.key === 'TLC12USD');
-        const lea      = modalDisp.filter(m => m.key === 'LEASING');
-        const leausd   = modalDisp.filter(m => m.key === 'LEASINGUSD');
-        const ordered  = [...contado, ...credito, ...dir6ar, ...dir12ar, ...dir6usd, ...dir12usd, ...lea, ...leausd];
-        // Si Contado está solo en su fila (impar antes del par), hacerlo full-width
-        let html = '';
-        let i = 0;
-        while (i < ordered.length) {
-            const m = ordered[i];
-            // Contado solo → full width si el resto es par
-            if (m.key === 'CONTADO' && (ordered.length - 1) % 2 === 0) {
-                html += `<button class="modalidad-btn" data-key="${m.key}" onclick="seleccionarModalidad('${m.key}')" style="grid-column:1/-1">${m.label}</button>`;
-                i++;
-            } else {
-                html += `<button class="modalidad-btn" data-key="${m.key}" onclick="seleccionarModalidad('${m.key}')">${m.label}</button>`;
-                i++;
-            }
+
+        const tieneContado = modalDisp.some(m => m.key === 'CONTADO');
+        const financiadas  = modalDisp.filter(m => m.key !== 'CONTADO');
+
+        let html = '<div style="display:flex; gap:8px; align-items:stretch;">';
+
+        // Botón Contado
+        if (tieneContado) {
+            html += `<button class="modalidad-btn" data-key="CONTADO" onclick="seleccionarModalidad('CONTADO')" style="flex:1;">Contado USD</button>`;
         }
+
+        // Dropdown Financiado
+        if (financiadas.length > 0) {
+            html += `<div style="position:relative; flex:1;" id="fin-wrap">
+                <button id="btn-financiado" onclick="toggleFinanciado()" style="width:100%; padding:11px 8px; border-radius:10px; border:1px solid #222e50; background:#1c2541; color:#f8fafc; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:all 0.2s;" data-key="FIN">
+                    Financiado <span id="fin-arrow" style="font-size:10px;">▼</span>
+                </button>
+                <div id="fin-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; background:#1c2541; border:1px solid #3a86ff; border-radius:10px; z-index:50; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+                    ${financiadas.map(m => `
+                    <button onclick="seleccionarModalidad('${m.key}')" data-key="${m.key}" style="width:100%; padding:11px 14px; background:none; border:none; border-bottom:1px solid #222e50; color:#f8fafc; font-size:13px; font-weight:600; cursor:pointer; text-align:left; transition:background 0.15s;" onmouseover="this.style.background='#222e50'" onmouseout="this.style.background='none'">${m.label}</button>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        html += '</div>';
         grid.innerHTML = html;
         seleccionarModalidad(modalDisp[0].key);
     } else {
@@ -696,11 +740,45 @@ function abrirDetalle(idx) {
     actualizarPreviewSubtotal();
 }
 
+function toggleFinanciado() {
+    const dd = document.getElementById('fin-dropdown');
+    const arrow = document.getElementById('fin-arrow');
+    if (!dd) return;
+    const open = dd.style.display !== 'none';
+    dd.style.display = open ? 'none' : 'block';
+    if (arrow) arrow.textContent = open ? '▼' : '▲';
+    const btn = document.getElementById('btn-financiado');
+    if (btn) btn.style.borderColor = open ? '#222e50' : '#3a86ff';
+}
+
 function seleccionarModalidad(key) {
     modalidadActual = key;
+
+    // Resaltar botón Contado
     document.querySelectorAll('.modalidad-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.key === key);
     });
+
+    // Si es financiado: actualizar label del botón dropdown y cerrarlo
+    const dd = document.getElementById('fin-dropdown');
+    const btnFin = document.getElementById('btn-financiado');
+    const arrow = document.getElementById('fin-arrow');
+    if (key !== 'CONTADO' && btnFin) {
+        const m2 = MODALIDADES.find(x => x.key === key);
+        btnFin.childNodes[0].textContent = m2?.label || 'Financiado';
+        btnFin.style.background = '#3a86ff';
+        btnFin.style.borderColor = '#3a86ff';
+        btnFin.dataset.key = key;
+        if (dd) dd.style.display = 'none';
+        if (arrow) arrow.textContent = '▼';
+        // Desactivar botón Contado visualmente
+        document.querySelectorAll('.modalidad-btn[data-key="CONTADO"]').forEach(b => b.classList.remove('active'));
+    } else if (key === 'CONTADO' && btnFin) {
+        // Resetear dropdown
+        btnFin.childNodes[0].textContent = 'Financiado';
+        btnFin.style.background = '#1c2541';
+        btnFin.style.borderColor = '#222e50';
+    }
 
     const d = dispositivoActual;
     const m = MODALIDADES.find(x => x.key === key);
@@ -709,7 +787,6 @@ function seleccionarModalidad(key) {
     const precio = d[m.precioKey];
     const cuota  = m.cuotaKey ? d[m.cuotaKey] : null;
     const desc   = d[m.descKey] || '';
-    const precioContado = d['Precio CONTADO CNO'];
 
     // Precio principal
     let precioStr = 'Consultar';
@@ -717,13 +794,9 @@ function seleccionarModalidad(key) {
         precioStr = m.moneda === 'USD' ? fmtUSD(precio) : fmtARS(precio);
     }
     document.getElementById('precio-principal').textContent = precioStr;
-
-    // Referencia USD — ocultar siempre
     document.getElementById('precio-usd-ref').textContent = '';
-
     document.getElementById('precio-desc').textContent = desc;
 
-    // Cuota
     const cuotaEl = document.getElementById('precio-cuota');
     if (tieneValor(cuota)) {
         const cuotaStr = m.moneda === 'USD' ? fmtUSD(cuota) : fmtARS(cuota);
@@ -732,7 +805,6 @@ function seleccionarModalidad(key) {
         cuotaEl.textContent = '';
     }
 
-    // Actualizar preview subtotal/IVA
     actualizarPreviewSubtotal();
 }
 
@@ -773,9 +845,9 @@ function actualizarPreviewSubtotal() {
     const m = MODALIDADES.find(x => x.key === modalidadActual);
     if (!m) return;
 
-    // Precio: contado usa Precio CONTADO CNO, resto usa Precio LISTA
-    const esContado = modalidadActual === 'CONTADO';
-    const precioBase = esContado ? d['Precio CONTADO CNO'] : d['Precio LISTA'];
+    // Precio: contado y leasing → Precio CONTADO CNO, resto → Precio LISTA
+    const usaContadoCNO = modalidadActual === 'CONTADO' || modalidadActual === 'LEASING' || modalidadActual === 'LEASINGUSD';
+    const precioBase = usaContadoCNO ? d['Precio CONTADO CNO'] : d['Precio LISTA'];
     const precioNum = parseNum(precioBase);
     const moneda = m.moneda;
 
@@ -800,9 +872,9 @@ function agregarAlCarrito() {
     if (!d) return;
     const m = MODALIDADES.find(x => x.key === modalidadActual);
 
-    // Precio siempre en USD: contado → Precio CONTADO CNO, resto → Precio LISTA
-    const esContado = modalidadActual === 'CONTADO';
-    const precioBase = esContado ? d['Precio CONTADO CNO'] : d['Precio LISTA'];
+    // Precio: contado y leasing → Precio CONTADO CNO, resto → Precio LISTA
+    const usaContadoCNO = modalidadActual === 'CONTADO' || modalidadActual === 'LEASING' || modalidadActual === 'LEASINGUSD';
+    const precioBase = usaContadoCNO ? d['Precio CONTADO CNO'] : d['Precio LISTA'];
     const precio = parseNum(precioBase);
     const moneda = 'USD'; // siempre USD en el carrito
 
