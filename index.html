@@ -169,7 +169,7 @@
             <p id="txt-sub-title" style="font-size:11px; color:var(--text-muted);">Menú Principal</p>
         </div>
         <div style="position:relative;" id="avatar-wrap-idx">
-            <div class="header-profile" id="header-avatar" style="cursor:pointer;" onclick="toggleAvatarMenuIdx()">CH</div>
+            <div class="header-profile" id="header-avatar" style="cursor:pointer;" onclick="toggleAvatarMenuIdx(event)">CH</div>
             <div id="avatar-menu-idx" style="display:none; position:absolute; top:44px; right:0; background:#1c2541; border:1px solid #222e50; border-radius:12px; min-width:210px; z-index:500; box-shadow:0 8px 32px rgba(0,0,0,0.4); overflow:hidden;">
                 <div style="padding:12px 16px; border-bottom:1px solid #222e50;">
                     <div style="font-size:13px; font-weight:700; color:#f1f5f9;" id="avatar-nombre-idx">—</div>
@@ -912,7 +912,8 @@
         } catch(e) { console.warn('updateUserDisplay:', e); }
     }
 
-    function toggleAvatarMenuIdx() {
+    function toggleAvatarMenuIdx(e) {
+        if (e) e.stopPropagation();
         const menu = document.getElementById('avatar-menu-idx');
         menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
     }
