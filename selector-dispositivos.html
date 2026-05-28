@@ -954,34 +954,70 @@ document.getElementById('btn-cotizar').addEventListener('click', agregarAlCarrit
 
 let carrito = [];
 
-// ─── Opciones de financiación global ──────────────────────────────
-const FINANCIACION_OPTS = [
-    { key: 'LISTA',   label: 'Precio de Lista (Base)',    coef: 1.000, descuento: false, usaCNO: false },
-    { key: 'CONTADO', label: 'Pago Contado (−10%)',       coef: 0.900, descuento: true,  usaCNO: true  },
-    { key: 'C6',      label: '6 Cuotas Fijas (+12%)',     coef: 1.120, descuento: false, usaCNO: false },
-    { key: 'C12',     label: '12 Cuotas Fijas (+25%)',    coef: 1.250, descuento: false, usaCNO: false },
+// ─── Modalidades completas con columnas del JSON ──────────────────
+const MODAL_CARRITO = [
+    { key:'CONTADO',    label:'Contado USD',     adelantoKey:null,                     cuotaKey:null,                    cuotas:0,  moneda:'USD', usaCNO:true  },
+    { key:'TLC6',       label:'Directo 6c AR$',  adelantoKey:'Adelanto_TLC_$_6',       cuotaKey:'CUOTA_TLC_$_6',         cuotas:6,  moneda:'ARS', usaCNO:false },
+    { key:'TLC12',      label:'Directo 12c AR$', adelantoKey:'Adelanto_TLC_$_12',      cuotaKey:'CUOTA_TLC_$_12',        cuotas:12, moneda:'ARS', usaCNO:false },
+    { key:'TLC6USD',    label:'Directo 6c USD',  adelantoKey:'Adelanto_TLC_USD_6',     cuotaKey:'CUOTA_TLC_USD_6',       cuotas:6,  moneda:'USD', usaCNO:false },
+    { key:'TLC12USD',   label:'Directo 12c USD', adelantoKey:'Adelanto_TLC_USD_12',    cuotaKey:'CUOTA_TLC_USD_12',      cuotas:12, moneda:'USD', usaCNO:false },
+    { key:'LEASING',    label:'Leasing 36c AR$', adelantoKey:'Adelanto_L$_36',         cuotaKey:'Cuota_L$_36',           cuotas:36, moneda:'ARS', usaCNO:false },
+    { key:'LEASINGUSD', label:'Leasing 36c USD', adelantoKey:'Adelanto_L_USD_36',      cuotaKey:'Cuota_L_USD_36',        cuotas:36, moneda:'USD', usaCNO:true  },
+    { key:'CREDITO',    label:'Crédito AR$',     adelantoKey:'Adelanto_$_CREDICOOP',   cuotaKey:'Cuotas_$_CREDICOOP_36', cuotas:36, moneda:'ARS', usaCNO:false },
 ];
-let financiacionKey = 'LISTA'; // opción por defecto
 
-function getFinOpt(key) {
-    return FINANCIACION_OPTS.find(o => o.key === key) || FINANCIACION_OPTS[0];
+let modalidadCarrito = 'LEASING'; // Leasing 36c AR$ por defecto → todos a Precio LISTA
+
+// ─── Modalidades disponibles de un ítem ──────────────────────────
+function modalidadesDeItem(d) {
+    // Contado siempre disponible si tiene Precio CONTADO CNO
+    return MODAL_CARRITO.filter(m => {
+        if (m.key === 'CONTADO') return tieneValor(d['Precio CONTADO CNO']);
+        return tieneValor(d[m.adelantoKey]);
+    }).map(m => m.key);
+}
+
+// ─── Intersección de modalidades de todo el carrito ──────────────
+function modalidadesCompatibles() {
+    if (carrito.length === 0) return MODAL_CARRITO.map(m => m.key);
+    let sets = carrito.map(item => new Set(item._mods || []));
+    return MODAL_CARRITO
+        .filter(m => sets.every(s => s.has(m.key)))
+        .map(m => m.key);
 }
 
 // ─── Calcular totales del carrito ─────────────────────────────────
 function calcularCarrito() {
-    const opt     = getFinOpt(financiacionKey);
-    let netoLista = 0;
+    const mod = MODAL_CARRITO.find(m => m.key === modalidadCarrito) || MODAL_CARRITO.find(m => m.key === 'LEASING');
+    let netoBase = 0, adelantoTotal = 0, cuotaTotal = 0;
+    let todosCalculados = true;
 
     carrito.forEach(item => {
-        const base = item.precioLista || 0;
-        netoLista += base * (item.cantidad || 1);
+        const qty  = item.cantidad || 1;
+        const d    = item._data || {};
+        const base = mod.usaCNO ? (item.precioCNO || item.precioLista) : item.precioLista;
+        netoBase += (base || 0) * qty;
+
+        if (mod.adelantoKey) {
+            const adelanto = parseNum(d[mod.adelantoKey]);
+            const cuota    = parseNum(d[mod.cuotaKey]);
+            if (!isNaN(adelanto) && adelanto > 0) {
+                adelantoTotal += adelanto * qty;
+                cuotaTotal    += cuota    * qty;
+            } else {
+                todosCalculados = false;
+            }
+        }
     });
 
-    const netoCondicionado = netoLista * opt.coef;
-    const iva              = netoCondicionado * 0.105;
-    const total            = netoCondicionado + iva;
+    const iva   = netoBase * 0.105;
+    const total = netoBase + iva;
+    return { mod, netoBase, iva, total, adelantoTotal, cuotaTotal, todosCalculados };
+}
 
-    return { opt, netoLista, netoCondicionado, iva, total };
+// ─── getFinOpt alias ──────────────────────────────────────────────
+function getFinOpt(key) {
+    return MODAL_CARRITO.find(m => m.key === key) || MODAL_CARRITO.find(m => m.key === 'LEASING');
 }
 
 // ─── Badge ────────────────────────────────────────────────────────
@@ -998,15 +1034,16 @@ function actualizarBadge() {
     btnCarrito.style.display = 'flex';
 }
 
-// ─── Agregar al carrito (siempre Precio LISTA) ───────────────────
+// ─── Agregar al carrito con chequeo de compatibilidad ────────────
 function agregarAlCarrito() {
     const d = dispositivoActual;
     if (!d) return;
 
     const precioLista = parseNum(d['Precio LISTA']);
     const precioCNO   = parseNum(d['Precio CONTADO CNO']);
+    const modsNuevo   = modalidadesDeItem(d);
 
-    carrito.push({
+    const nuevoItem = {
         nombre:      d['Nombre de Dispositivo'] || '',
         precioLista: isNaN(precioLista) ? 0 : precioLista,
         precioCNO:   isNaN(precioCNO)   ? 0 : precioCNO,
@@ -1014,12 +1051,95 @@ function agregarAlCarrito() {
         foto:        fotoUrl(d['Foto'] || ''),
         cantidad:    cantidadActual,
         _data:       d,
-    });
+        _mods:       modsNuevo,
+    };
 
+    // Primer ítem → entra directo
+    if (carrito.length === 0) {
+        _agregarItem(nuevoItem);
+        return;
+    }
+
+    // Calcular intersección con lo que ya hay en el carrito
+    const modsActuales = new Set(modalidadesCompatibles());
+    const interseccion = modsNuevo.filter(k => modsActuales.has(k));
+    const perdidas     = [...modsActuales].filter(k => !modsNuevo.includes(k));
+
+    // Compatibilidad total → entra directo
+    if (interseccion.length === modsActuales.size && perdidas.length === 0) {
+        _agregarItem(nuevoItem);
+        return;
+    }
+
+    // Hay pérdida de opciones → mostrar popup de confirmación
+    const perdidasLabels = perdidas
+        .map(k => MODAL_CARRITO.find(m => m.key === k)?.label || k)
+        .join(', ');
+
+    const msg = interseccion.length === 0
+        ? '⚠️ Este equipo no comparte ninguna forma de pago con los ítems del carrito.\n\n¿Agregarlo igual? Solo quedará disponible "Contado USD".'
+        : '⚠️ Al agregar este equipo se eliminarán las siguientes opciones de pago:\n\n' +
+          perdidasLabels + '\n\n¿Agregarlo igual?';
+
+    mostrarPopupCompatibilidad(msg, () => {
+        // Si la modalidad actual ya no es compatible, resetear a LEASING o CONTADO
+        if (interseccion.length > 0 && !interseccion.includes(modalidadCarrito)) {
+            modalidadCarrito = interseccion.includes('LEASING') ? 'LEASING' : interseccion[0];
+        } else if (interseccion.length === 0) {
+            modalidadCarrito = 'CONTADO';
+        }
+        _agregarItem(nuevoItem);
+    });
+}
+
+function _agregarItem(item) {
+    carrito.push(item);
     actualizarBadge();
     document.getElementById('detalle-overlay').classList.remove('open');
     cantidadActual = 1;
     abrirCarrito();
+}
+
+// ─── Popup de compatibilidad ──────────────────────────────────────
+function mostrarPopupCompatibilidad(msg, onAceptar) {
+    // Crear overlay del popup
+    const overlay = document.createElement('div');
+    overlay.id = 'popup-compat';
+    overlay.style.cssText = `
+        position:fixed; inset:0; z-index:600;
+        background:rgba(3,7,18,0.85); backdrop-filter:blur(4px);
+        display:flex; align-items:center; justify-content:center; padding:20px;
+    `;
+
+    overlay.innerHTML = `
+        <div style="background:#0d1520; border:1px solid #f8961e; border-radius:20px;
+                    max-width:360px; width:100%; padding:24px; box-shadow:0 24px 64px rgba(0,0,0,0.6);">
+            <div style="font-size:24px; text-align:center; margin-bottom:12px;">⚠️</div>
+            <div style="font-size:14px; color:#e2e8f0; line-height:1.6; margin-bottom:20px;
+                        white-space:pre-line; text-align:center;">${msg}</div>
+            <div style="display:flex; gap:10px;">
+                <button id="popup-no"
+                    style="flex:1; padding:12px; border-radius:10px; background:transparent;
+                           border:1px solid #1e3050; color:#94a3b8; font-size:14px; font-weight:600; cursor:pointer;">
+                    No agregar
+                </button>
+                <button id="popup-si"
+                    style="flex:1; padding:12px; border-radius:10px; background:#f8961e;
+                           border:none; color:white; font-size:14px; font-weight:700; cursor:pointer;">
+                    Sí, agregar
+                </button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('popup-si').onclick = () => {
+        overlay.remove();
+        onAceptar();
+    };
+    document.getElementById('popup-no').onclick = () => {
+        overlay.remove();
+    };
 }
 
 // ─── Operaciones del carrito ──────────────────────────────────────
@@ -1088,16 +1208,29 @@ function renderCarrito() {
         </div>`;
     }).join('');
 
-    // Selector de financiación
+    // Selector de financiación — solo modalidades compatibles con todos los ítems
+    const modsComp = modalidadesCompatibles();
+    // Asegurar que modalidadCarrito sea compatible, sino resetear
+    if (!modsComp.includes(modalidadCarrito)) {
+        modalidadCarrito = modsComp.includes('LEASING') ? 'LEASING' : modsComp[0] || 'CONTADO';
+    }
+    const optsHtml = modsComp.map(key => {
+        const m = MODAL_CARRITO.find(x => x.key === key);
+        return `<option value="${m.key}" ${modalidadCarrito===m.key?'selected':''}>${m.label}</option>`;
+    }).join('');
+
     const selectorHtml = `
     <div style="background:#0f1a30; border-radius:14px; padding:16px; margin:12px 0;">
-        <div style="font-size:12px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Forma de pago</div>
+        <div style="font-size:12px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">
+            Forma de pago
+            ${modsComp.length < MODAL_CARRITO.length ? `<span style="color:#f8961e; font-weight:400; font-size:11px; margin-left:6px;">· ${MODAL_CARRITO.length - modsComp.length} opciones no disponibles para esta combinación</span>` : ''}
+        </div>
         <div style="position:relative;">
             <select id="sel-financiacion" onchange="cambiarFinanciacion(this.value)"
                 style="width:100%; padding:12px 40px 12px 14px; border-radius:10px; border:1px solid #3a86ff;
                        background:#1c2541; color:#f8fafc; font-size:14px; font-weight:600;
                        cursor:pointer; appearance:none; -webkit-appearance:none; outline:none;">
-                ${FINANCIACION_OPTS.map(o => `<option value="${o.key}" ${financiacionKey===o.key?'selected':''}>${o.label}</option>`).join('')}
+                ${optsHtml}
             </select>
             <div style="position:absolute; right:14px; top:50%; transform:translateY(-50%); pointer-events:none; color:#3a86ff; font-size:12px;">▼</div>
         </div>
@@ -1105,38 +1238,42 @@ function renderCarrito() {
 
     // Totales
     const c   = calcularCarrito();
-    const opt = c.opt;
-    const totalItems = carrito.reduce((s, i) => s + (i.cantidad || 1), 0);
+    const mod = c.mod;
+    const monedaFmt = mod.moneda === 'ARS' ? fmtARS : fmtUSD;
+    const totalItems = carrito.reduce((s,i) => s+(i.cantidad||1), 0);
 
-    const totalesHtml = `
-    <div class="carrito-totales">
+    let totalesHtml = `<div class="carrito-totales">
         <div class="total-row">
             <span class="total-label">Neto Lista Base</span>
-            <span class="total-valor">${fmtUSD(c.netoLista)}</span>
+            <span class="total-valor">${fmtUSD(c.netoBase)}</span>
         </div>
-        ${opt.coef !== 1 ? `
-        <div class="total-row">
-            <span class="total-label" style="color:${opt.descuento?'#06d6a0':'#f8961e'};">
-                ${opt.descuento ? '− Descuento contado' : '+ Financiación'} (×${opt.coef})
-            </span>
-            <span class="total-valor" style="color:${opt.descuento?'#06d6a0':'#f8961e'};">
-                ${opt.descuento ? '−' : '+'}${fmtUSD(Math.abs(c.netoCondicionado - c.netoLista))}
-            </span>
-        </div>
-        <div class="total-row">
-            <span class="total-label">Neto ${opt.descuento?'con descuento':'financiado'}</span>
-            <span class="total-valor">${fmtUSD(c.netoCondicionado)}</span>
-        </div>` : ''}
         <div class="total-row">
             <span class="total-label" style="color:#f8961e;">IVA 10,5%</span>
             <span class="total-valor" style="color:#f8961e;">${fmtUSD(c.iva)}</span>
         </div>
         <div class="total-row" style="border-top:1px solid #3a86ff33; padding-top:10px; margin-top:4px;">
-            <span class="total-label" style="font-size:14px; font-weight:700; color:#f1f5f9;">TOTAL USD c/IVA</span>
+            <span class="total-label" style="font-size:14px; font-weight:700; color:#f1f5f9;">TOTAL c/IVA</span>
             <span class="total-valor" style="font-size:20px; color:#3a86ff;">${fmtUSD(c.total)}</span>
-        </div>
-        <div style="margin-top:8px; font-size:10px; color:#64748b; text-align:center;">${totalItems} unidad${totalItems>1?'es':''} · IVA 10,5% discriminado</div>
-    </div>`;
+        </div>`;
+
+    if (c.todosCalculados && c.adelantoTotal > 0 && mod.cuotas > 0) {
+        totalesHtml += `
+        <div style="margin-top:12px; background:#0a1628; border-radius:10px; padding:12px; border:1px solid #1e3050;">
+            <div style="font-size:11px; color:#64748b; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px;">Estructura — ${mod.label}</div>
+            <div class="total-row">
+                <span class="total-label">Adelanto inicial</span>
+                <span class="total-valor" style="color:#06d6a0;">${monedaFmt(c.adelantoTotal)}</span>
+            </div>
+            <div class="total-row">
+                <span class="total-label">Cuota mensual × ${mod.cuotas}</span>
+                <span class="total-valor" style="color:#06d6a0;">${monedaFmt(c.cuotaTotal)}</span>
+            </div>
+        </div>`;
+    } else if (mod.adelantoKey && !c.todosCalculados) {
+        totalesHtml += `<div style="font-size:11px; color:#f8961e; margin-top:8px; text-align:center;">⚠️ Algunos ítems no tienen valores para esta modalidad</div>`;
+    }
+
+    totalesHtml += `<div style="margin-top:8px; font-size:10px; color:#64748b; text-align:center;">${totalItems} unidad${totalItems>1?'es':''} · IVA 10,5% discriminado</div></div>`;
 
     body.innerHTML = itemsHtml + selectorHtml + totalesHtml + `
         <button class="btn-confirmar" onclick="abrirModalResumen()">✉️ Confirmar y enviar cotización</button>
@@ -1146,7 +1283,7 @@ function renderCarrito() {
 }
 
 function cambiarFinanciacion(key) {
-    financiacionKey = key;
+    modalidadCarrito = key;
     renderCarrito();
 }
 
@@ -1197,8 +1334,9 @@ let _idCotActual   = null;
 
 function abrirModalResumen() {
     const modal = document.getElementById('modal-resumen');
-    const c     = calcularCarrito();
-    const opt   = c.opt;
+    const c   = calcularCarrito();
+    const opt = c.mod;
+    const monedaFmt = opt.moneda === 'ARS' ? fmtARS : fmtUSD;
 
     // Resetear estado
     document.getElementById('mr-resultado').style.display = 'none';
@@ -1218,16 +1356,20 @@ function abrirModalResumen() {
         </div>`;
     }).join('');
 
-    const descuentoHtml = opt.coef !== 1 ? `
-    <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:12px; color:${opt.descuento?'#06d6a0':'#f8961e'};">
-        <span>${opt.label}</span>
-        <span>${opt.descuento?'−':'+'}${fmtUSD(Math.abs(c.netoCondicionado - c.netoLista))}</span>
+    const estructuraHtml = (c.todosCalculados && c.adelantoTotal > 0 && opt.cuotas > 0) ? `
+    <div style="background:#0a1628; border-radius:8px; padding:10px 12px; margin-top:8px; border:1px solid #1e3050;">
+        <div style="font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">${opt.label}</div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; padding:3px 0;">
+            <span style="color:#64748b;">Adelanto</span><span style="color:#06d6a0; font-weight:700;">${monedaFmt(c.adelantoTotal)}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; padding:3px 0;">
+            <span style="color:#64748b;">Cuota × ${opt.cuotas}</span><span style="color:#06d6a0; font-weight:700;">${monedaFmt(c.cuotaTotal)}</span>
+        </div>
     </div>` : '';
 
     document.getElementById('mr-resumen-items').innerHTML = `
         ${filasItems}
         <div style="margin-top:10px; padding-top:6px;">
-            ${descuentoHtml}
             <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; color:#64748b;">
                 <span>IVA 10,5%</span><span style="color:#f8961e;">${fmtUSD(c.iva)}</span>
             </div>
@@ -1236,6 +1378,7 @@ function abrirModalResumen() {
                 <span style="color:#3a86ff;">${fmtUSD(c.total)}</span>
             </div>
             <div style="font-size:10px; color:#64748b; margin-top:4px; text-align:right;">${totalItems} unidad${totalItems>1?'es':''} · ${opt.label}</div>
+            ${estructuraHtml}
         </div>`;
 
     cerrarCarrito();
@@ -1342,7 +1485,8 @@ function generarHTMLPresupuesto({ nombre, razon, telefono, vendedor, idCot }) {
     const nroRef = idCot || generarIdCotizacion();
 
     const c   = calcularCarrito();
-    const opt = c.opt;
+    const opt = c.mod;
+    const monedaFmt2 = opt.moneda === 'ARS' ? fmtARS : fmtUSD;
 
     // Filas de ítems
     const filasItems = carrito.map(i => {
@@ -1361,12 +1505,19 @@ function generarHTMLPresupuesto({ nombre, razon, telefono, vendedor, idCot }) {
     }).join('');
 
     // Bloque financiación
-    const descuentoRow = opt.coef !== 1 ? [
+    const financiacionRow = (c.todosCalculados && c.adelantoTotal > 0 && opt.cuotas > 0) ? [
+        '<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">',
+        '<div style="padding:28px 40px;">',
+        '<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:16px;">Estructura — ' + opt.label + '</div>',
+        '<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:16px 20px;">',
         '<div style="display:flex; justify-content:space-between; padding:6px 0; font-size:14px;">',
-        '<span style="color:' + (opt.descuento ? '#16a34a' : '#ea580c') + ';">' + opt.label + '</span>',
-        '<span style="font-weight:700; color:' + (opt.descuento ? '#16a34a' : '#ea580c') + ';">' +
-            (opt.descuento ? '−' : '+') + fmtUSD(Math.abs(c.netoCondicionado - c.netoLista)) + '</span>',
-        '</div>'
+        '<span style="color:#64748b;">Adelanto inicial</span>',
+        '<span style="font-weight:700; color:#16a34a;">' + monedaFmt2(c.adelantoTotal) + '</span>',
+        '</div>',
+        '<div style="display:flex; justify-content:space-between; padding:6px 0; font-size:14px; border-top:1px solid #dcfce7;">',
+        '<span style="color:#64748b;">Cuota mensual × ' + opt.cuotas + '</span>',
+        '<span style="font-weight:700; color:#16a34a;">' + monedaFmt2(c.cuotaTotal) + '</span>',
+        '</div></div></div>'
     ].join('') : '';
 
     return [
@@ -1440,7 +1591,7 @@ function generarHTMLPresupuesto({ nombre, razon, telefono, vendedor, idCot }) {
         '<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">',
         '<div class="section"><div class="totales-box">',
         '<div class="tot-row"><span class="tot-label">Neto Lista Base</span><span class="tot-val">' + fmtUSD(c.netoLista) + '</span></div>',
-        descuentoRow ? '<div class="tot-row">' + descuentoRow + '</div>' : '',
+        financiacionRow,
         '<div class="tot-row iva-row"><span class="tot-label">IVA 10,5%</span><span class="tot-val">' + fmtUSD(c.iva) + '</span></div>',
         '<div class="tot-row final"><span class="tot-label">TOTAL USD</span><span class="tot-val">' + fmtUSD(c.total) + '</span></div>',
         '</div>',
