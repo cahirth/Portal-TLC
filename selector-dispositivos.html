@@ -1023,7 +1023,7 @@ function cerrarCarrito() {
 }
 
 // ─── MODALIDAD GLOBAL DEL CARRITO ─────────────────────────────────────────────
-let modalidadCarrito = 'LISTA'; // LISTA | CONTADO | TLC6 | TLC12 | TLC6USD | TLC12USD | LEASING | LEASINGUSD | CREDITO
+let modalidadCarrito = 'CONTADO'; // CONTADO por defecto
 
 const MODAL_CARRITO = [
     { key: 'CONTADO',   label: 'Contado USD',      adelantoKey: null,              cuotaKey: null,                 cuotas: 0,  moneda: 'USD', usaCNO: true  },
@@ -1107,19 +1107,18 @@ function renderCarrito() {
         </div>`;
     }).join('');
 
-    // Selector de modalidad global
+    // Selector dropdown de modalidad
     const modSelectorHtml = `
     <div style="background:#0f1a30; border-radius:14px; padding:16px; margin:12px 0;">
         <div style="font-size:12px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Forma de pago</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-            ${MODAL_CARRITO.map(m => `
-            <button onclick="cambiarModalidadCarrito('${m.key}')" id="mcbtn-${m.key}"
-                style="padding:8px 6px; border-radius:8px; border:1px solid ${modalidadCarrito===m.key?'#3a86ff':'#1e3050'};
-                       background:${modalidadCarrito===m.key?'rgba(58,134,255,0.15)':'transparent'};
-                       color:${modalidadCarrito===m.key?'#3a86ff':'#94a3b8'};
-                       font-size:11px; font-weight:600; cursor:pointer; transition:all 0.15s; text-align:center;">
-                ${m.label}
-            </button>`).join('')}
+        <div style="position:relative;">
+            <select id="select-modalidad-carrito" onchange="cambiarModalidadCarrito(this.value)"
+                style="width:100%; padding:12px 40px 12px 14px; border-radius:10px; border:1px solid #3a86ff;
+                       background:#1c2541; color:#f8fafc; font-size:14px; font-weight:600;
+                       cursor:pointer; appearance:none; -webkit-appearance:none; outline:none;">
+                ${MODAL_CARRITO.map(m => `<option value="${m.key}" ${modalidadCarrito===m.key?'selected':''}>${m.label}</option>`).join('')}
+            </select>
+            <div style="position:absolute; right:14px; top:50%; transform:translateY(-50%); pointer-events:none; color:#3a86ff; font-size:12px;">▼</div>
         </div>
     </div>`;
 
@@ -1243,41 +1242,38 @@ document.getElementById('btn-co-enviar').addEventListener('click', async () => {
         // 1 — Generar HTML del presupuesto
         const htmlPresup = generarHTMLPresupuesto({ nombre, telefono, notas, vendedor });
 
-        // 2 — Subir a Drive vía Apps Script (usando form submit para evitar CORS)
-        const result = await subirPresupuestoConFormulario({
-            accion:  'guardarPresupuesto',
-            html:    htmlPresup,
-            cliente: nombre,
-        });
+        // 2 — Abrir en nueva pestaña (renderiza correctamente, permite imprimir/PDF)
+        const blob = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        const ventana = window.open(blobUrl, '_blank');
 
-        if (!result.ok) throw new Error(result.error || 'Error al guardar');
+        // Limpiar la URL del blob después de 60 segundos
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
 
-        // 3 — Mostrar resultado
-        const link = result.link;
-        document.getElementById('co-nombre-resultado').textContent =
-            `${nombre}${telefono ? ' · ' + telefono : ''} · ${carrito.length} ítem${carrito.length > 1 ? 's' : ''}`;
-        document.getElementById('co-link-preview').href = link;
-        document.getElementById('co-link-text').textContent = 'Ver carpeta Cotizaciones TLC en Drive';
-
-        // Botón WhatsApp
+        // 3 — Mostrar resultado con botón WhatsApp
+        const telLimpio = telefono.replace(/\D/g, '').replace(/^0/, '').replace(/^54/, '');
         const msgWsp = encodeURIComponent(
-            `Hola ${nombre.split(' ')[0]}! 👋
-Te comparto el presupuesto de TLC:
-${link}
-
-Cualquier consulta estoy a disposición.`
+`Hola ${nombre.split(' ')[0]}! 👋
+Te comparto el presupuesto de TLC para los equipos que vimos.
+Ante cualquier consulta estoy a disposición.
+Saludos, ${vendedor || 'TLC'}`
         );
-        const telLimpio = telefono.replace(/\D/g, '');
         const linkWsp = telLimpio
             ? `https://wa.me/549${telLimpio}?text=${msgWsp}`
             : `https://wa.me/?text=${msgWsp}`;
+
+        document.getElementById('co-nombre-resultado').textContent =
+            `${nombre}${telefono ? ' · ' + telefono : ''} · ${carrito.length} ítem${carrito.length > 1 ? 's' : ''}`;
+        document.getElementById('co-link-preview').href = blobUrl;
+        document.getElementById('co-link-preview').onclick = (e) => {
+            e.preventDefault();
+            window.open(blobUrl, '_blank');
+        };
+        document.getElementById('co-link-text').textContent = 'Ver presupuesto generado';
         document.getElementById('co-btn-wsp').onclick = () => window.open(linkWsp, '_blank');
 
-        // Mostrar panel resultado, ocultar botón confirmar
-        document.getElementById('co-resultado').style.display = 'block';
+        // Limpiar carrito y ocultar botón
         btn.style.display = 'none';
-
-        // Limpiar carrito
         carrito = [];
         actualizarBadge();
 
@@ -1319,27 +1315,54 @@ function generarHTMLPresupuesto({ nombre, telefono, notas, vendedor }) {
     const fecha = new Date().toLocaleDateString('es-AR', {
         day: '2-digit', month: 'long', year: 'numeric'
     });
-    const nroRef = 'TLC-' + Date.now().toString(36).toUpperCase();
+    const nroRef = 'TLC-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Date.now().toString(36).slice(-4).toUpperCase();
 
-    // Calcular totales
+    const calc = calcularTotalesCarrito(modalidadCarrito);
+    const mod  = calc?.mod;
+    const monedaFmt = mod?.moneda === 'ARS' ? fmtARS : fmtUSD;
+
     let neto = 0;
-    carrito.forEach(i => { neto += (i.precio || 0) * (i.cantidad || 1); });
+    carrito.forEach(i => {
+        const base = mod?.usaCNO ? (i.precioCNO || i.precio) : i.precio;
+        neto += (base || 0) * (i.cantidad || 1);
+    });
     const iva   = neto * 0.105;
     const total = neto + iva;
 
     // Filas de ítems
     const filasItems = carrito.map(i => {
         const qty      = i.cantidad || 1;
-        const subtotal = (i.precio || 0) * qty;
+        const base     = mod?.usaCNO ? (i.precioCNO || i.precio) : i.precio;
+        const subtotal = (base || 0) * qty;
         return `
         <tr>
             <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; color:#1e293b; font-weight:500;">${i.nombre}</td>
-            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#64748b; text-align:center;">${i.label}</td>
+            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#64748b; text-align:center;">${mod?.label || ''}</td>
             <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#1e293b; text-align:center;">${qty}</td>
-            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#1e293b; text-align:right;">${fmtUSD(i.precio || 0)}</td>
+            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#1e293b; text-align:right;">${fmtUSD(base || 0)}</td>
             <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; font-weight:700; color:#0f172a; text-align:right;">${fmtUSD(subtotal)}</td>
         </tr>`;
     }).join('');
+
+    // Bloque de financiación (si aplica)
+    let financiacionHtml = '';
+    if (calc?.todosCalculados && calc.adelantoTotal > 0 && mod?.cuotas > 0) {
+        financiacionHtml = `
+  <hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">
+  <div style="padding:28px 40px;">
+    <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#94a3b8; margin-bottom:16px;">Estructura de Financiación — ${mod.label}</div>
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:16px 20px;">
+      <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:14px;">
+        <span style="color:#64748b;">Adelanto inicial</span>
+        <span style="font-weight:700; color:#16a34a;">${monedaFmt(calc.adelantoTotal)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:14px; border-top:1px solid #dcfce7;">
+        <span style="color:#64748b;">Cuota mensual × ${mod.cuotas}</span>
+        <span style="font-weight:700; color:#16a34a;">${monedaFmt(calc.cuotaTotal)}</span>
+      </div>
+    </div>
+  </div>`;
+    }
 
     return `<!DOCTYPE html>
 <html lang="es">
@@ -1362,7 +1385,6 @@ function generarHTMLPresupuesto({ nombre, telefono, notas, vendedor }) {
   .client-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; }
   .client-name { font-size: 18px; font-weight: 700; color: #0f172a; }
   .client-detail { font-size: 14px; color: #64748b; margin-top: 6px; }
-  .divider { border: none; border-top: 1px solid #e2e8f0; margin: 0 40px; }
   table { width: 100%; border-collapse: collapse; }
   thead tr { background: #f8fafc; }
   thead th { padding: 10px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; text-align: left; }
@@ -1379,19 +1401,20 @@ function generarHTMLPresupuesto({ nombre, telefono, notas, vendedor }) {
   .footer p { font-size: 12px; color: #64748b; margin-bottom: 4px; }
   .footer a { color: #60a5fa; text-decoration: none; }
   .validity { background: rgba(6,214,160,0.1); border: 1px solid rgba(6,214,160,0.3); border-radius: 8px; padding: 8px 16px; display: inline-block; margin-top: 12px; font-size: 12px; color: #06d6a0; font-weight: 600; }
+  @media print {
+    body { background: white; }
+    .page { max-width: 100%; }
+  }
   @media (max-width: 600px) {
     .header { padding: 20px; flex-direction: column; align-items: flex-start; }
     .header-info { text-align: left; }
     .section { padding: 20px; }
-    .divider { margin: 0 20px; }
     .footer { padding: 20px; }
   }
 </style>
 </head>
 <body>
 <div class="page">
-
-  <!-- HEADER -->
   <div class="header">
     <img class="logo" src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" alt="TLC" onerror="this.style.display='none'">
     <div class="header-info">
@@ -1401,28 +1424,26 @@ function generarHTMLPresupuesto({ nombre, telefono, notas, vendedor }) {
     </div>
   </div>
 
-  <!-- CLIENTE -->
   <div class="section">
     <div class="section-title">Cliente</div>
     <div class="client-card">
       <div class="client-name">${nombre}</div>
       <div class="client-detail">
         ${telefono ? `📱 ${telefono}` : ''}
-        <span style="margin-left: 12px; color:#94a3b8;">📅 ${fecha}</span>
+        <span style="margin-left:12px; color:#94a3b8;">📅 ${fecha}</span>
+        <span style="margin-left:12px; color:#3a86ff; font-weight:600;">💳 ${mod?.label || 'Contado'}</span>
       </div>
     </div>
   </div>
 
-  <hr class="divider">
+  <hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">
 
-  <!-- ÍTEMS -->
   <div class="section">
     <div class="section-title">Detalle de productos</div>
     <table>
       <thead>
         <tr>
-          <th>Producto</th>
-          <th>Modalidad</th>
+          <th>Producto</th><th>Modalidad</th>
           <th style="text-align:center;">Cant.</th>
           <th style="text-align:right;">Precio u.</th>
           <th style="text-align:right;">Subtotal</th>
@@ -1432,43 +1453,32 @@ function generarHTMLPresupuesto({ nombre, telefono, notas, vendedor }) {
     </table>
   </div>
 
-  <hr class="divider">
+  <hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">
 
-  <!-- TOTALES -->
   <div class="section">
     <div class="totales-box">
-      <div class="tot-row">
-        <span class="tot-label">Neto USD</span>
-        <span class="tot-val">${fmtUSD(neto)}</span>
-      </div>
-      <div class="tot-row iva-row">
-        <span class="tot-label">IVA 10,5%</span>
-        <span class="tot-val">${fmtUSD(iva)}</span>
-      </div>
-      <div class="tot-row final">
-        <span class="tot-label">TOTAL USD</span>
-        <span class="tot-val">${fmtUSD(total)}</span>
-      </div>
+      <div class="tot-row"><span class="tot-label">Neto USD</span><span class="tot-val">${fmtUSD(neto)}</span></div>
+      <div class="tot-row iva-row"><span class="tot-label">IVA 10,5%</span><span class="tot-val">${fmtUSD(iva)}</span></div>
+      <div class="tot-row final"><span class="tot-label">TOTAL USD</span><span class="tot-val">${fmtUSD(total)}</span></div>
     </div>
     <div style="text-align:center; margin-top:12px;">
       <div class="validity">✓ Válido por 15 días hábiles a partir del ${fecha}</div>
     </div>
   </div>
 
-  ${notas ? `<hr class="divider"><div class="section"><div class="section-title">Notas</div><div class="notas-box">${notas}</div></div>` : ''}
+  ${financiacionHtml}
 
-  <!-- FOOTER -->
+  ${notas ? `<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;"><div class="section"><div class="section-title">Notas</div><div class="notas-box">${notas}</div></div>` : ''}
+
   <div class="footer">
     <p><strong style="color:#94a3b8;">Tecnología Láser Corneal SRL</strong></p>
     <p>Del Carmen 716, CABA · Argentina</p>
     <p style="margin-top:8px;">Asesor: ${vendedor || 'TLC'}</p>
     <p style="margin-top:6px;"><a href="https://www.tlcsrl.com.ar">www.tlcsrl.com.ar</a></p>
   </div>
-
 </div>
 </body>
 </html>`;
-}
 
 function mostrarCoStatus(msg, tipo) {
     const el = document.getElementById('co-status');
