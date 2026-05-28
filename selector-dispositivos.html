@@ -1252,11 +1252,10 @@ document.getElementById('btn-co-enviar').addEventListener('click', async () => {
 
         // 3 — Mostrar resultado con botón WhatsApp
         const telLimpio = telefono.replace(/\D/g, '').replace(/^0/, '').replace(/^54/, '');
+        const nombreCorto = nombre.split(' ')[0];
         const msgWsp = encodeURIComponent(
-`Hola ${nombre.split(' ')[0]}! 👋
-Te comparto el presupuesto de TLC para los equipos que vimos.
-Ante cualquier consulta estoy a disposición.
-Saludos, ${vendedor || 'TLC'}`
+            'Hola ' + nombreCorto + '! Te comparto el presupuesto de TLC para los equipos que vimos. ' +
+            'Ante cualquier consulta estoy a disposicion. Saludos, ' + (vendedor || 'TLC')
         );
         const linkWsp = telLimpio
             ? `https://wa.me/549${telLimpio}?text=${msgWsp}`
@@ -1364,121 +1363,94 @@ function generarHTMLPresupuesto({ nombre, telefono, notas, vendedor }) {
   </div>`;
     }
 
-    return `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Presupuesto TLC - ${nombre}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; }
-  .page { max-width: 720px; margin: 0 auto; background: white; min-height: 100vh; }
-  .header { background: linear-gradient(135deg, #0f1a30 0%, #1c2541 100%); padding: 32px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-  .logo { width: 64px; height: 64px; object-fit: contain; }
-  .header-info { text-align: right; }
-  .header-title { font-size: 22px; font-weight: 800; color: white; letter-spacing: -0.5px; }
-  .header-sub { font-size: 13px; color: #94a3b8; margin-top: 4px; }
-  .ref-badge { display: inline-block; background: rgba(58,134,255,0.2); color: #60a5fa; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-top: 8px; }
-  .section { padding: 28px 40px; }
-  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 16px; }
-  .client-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; }
-  .client-name { font-size: 18px; font-weight: 700; color: #0f172a; }
-  .client-detail { font-size: 14px; color: #64748b; margin-top: 6px; }
-  table { width: 100%; border-collapse: collapse; }
-  thead tr { background: #f8fafc; }
-  thead th { padding: 10px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; text-align: left; }
-  thead th:nth-child(3), thead th:nth-child(4), thead th:nth-child(5) { text-align: right; }
-  thead th:nth-child(3) { text-align: center; }
-  .totales-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; }
-  .tot-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 14px; color: #64748b; }
-  .tot-row.final { border-top: 2px solid #0f172a; margin-top: 8px; padding-top: 14px; }
-  .tot-row.final .tot-label { font-size: 16px; font-weight: 800; color: #0f172a; }
-  .tot-row.final .tot-val { font-size: 20px; font-weight: 800; color: #2563eb; }
-  .iva-row .tot-val { color: #ea580c; }
-  .notas-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px 18px; font-size: 14px; color: #92400e; line-height: 1.6; }
-  .footer { background: #0f1a30; padding: 24px 40px; text-align: center; }
-  .footer p { font-size: 12px; color: #64748b; margin-bottom: 4px; }
-  .footer a { color: #60a5fa; text-decoration: none; }
-  .validity { background: rgba(6,214,160,0.1); border: 1px solid rgba(6,214,160,0.3); border-radius: 8px; padding: 8px 16px; display: inline-block; margin-top: 12px; font-size: 12px; color: #06d6a0; font-weight: 600; }
-  @media print {
-    body { background: white; }
-    .page { max-width: 100%; }
-  }
-  @media (max-width: 600px) {
-    .header { padding: 20px; flex-direction: column; align-items: flex-start; }
-    .header-info { text-align: left; }
-    .section { padding: 20px; }
-    .footer { padding: 20px; }
-  }
-</style>
-</head>
-<body>
-<div class="page">
-  <div class="header">
-    <img class="logo" src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" alt="TLC" onerror="this.style.display='none'">
-    <div class="header-info">
-      <div class="header-title">Presupuesto</div>
-      <div class="header-sub">Tecnología Láser Corneal SRL</div>
-      <div class="ref-badge">${nroRef}</div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Cliente</div>
-    <div class="client-card">
-      <div class="client-name">${nombre}</div>
-      <div class="client-detail">
-        ${telefono ? `📱 ${telefono}` : ''}
-        <span style="margin-left:12px; color:#94a3b8;">📅 ${fecha}</span>
-        <span style="margin-left:12px; color:#3a86ff; font-weight:600;">💳 ${mod?.label || 'Contado'}</span>
-      </div>
-    </div>
-  </div>
-
-  <hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">
-
-  <div class="section">
-    <div class="section-title">Detalle de productos</div>
-    <table>
-      <thead>
-        <tr>
-          <th>Producto</th><th>Modalidad</th>
-          <th style="text-align:center;">Cant.</th>
-          <th style="text-align:right;">Precio u.</th>
-          <th style="text-align:right;">Subtotal</th>
-        </tr>
-      </thead>
-      <tbody>${filasItems}</tbody>
-    </table>
-  </div>
-
-  <hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">
-
-  <div class="section">
-    <div class="totales-box">
-      <div class="tot-row"><span class="tot-label">Neto USD</span><span class="tot-val">${fmtUSD(neto)}</span></div>
-      <div class="tot-row iva-row"><span class="tot-label">IVA 10,5%</span><span class="tot-val">${fmtUSD(iva)}</span></div>
-      <div class="tot-row final"><span class="tot-label">TOTAL USD</span><span class="tot-val">${fmtUSD(total)}</span></div>
-    </div>
-    <div style="text-align:center; margin-top:12px;">
-      <div class="validity">✓ Válido por 15 días hábiles a partir del ${fecha}</div>
-    </div>
-  </div>
-
-  ${financiacionHtml}
-
-  ${notas ? `<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;"><div class="section"><div class="section-title">Notas</div><div class="notas-box">${notas}</div></div>` : ''}
-
-  <div class="footer">
-    <p><strong style="color:#94a3b8;">Tecnología Láser Corneal SRL</strong></p>
-    <p>Del Carmen 716, CABA · Argentina</p>
-    <p style="margin-top:8px;">Asesor: ${vendedor || 'TLC'}</p>
-    <p style="margin-top:6px;"><a href="https://www.tlcsrl.com.ar">www.tlcsrl.com.ar</a></p>
-  </div>
-</div>
-</body>
-</html>`;
+    return [
+        '<!DOCTYPE html>',
+        '<html lang="es">',
+        '<head>',
+        '<meta charset="UTF-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+        '<title>Presupuesto TLC - ' + nombre + '</title>',
+        '<style>',
+        '* { box-sizing: border-box; margin: 0; padding: 0; }',
+        'body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; background: #f8fafc; color: #1e293b; }',
+        '.page { max-width: 720px; margin: 0 auto; background: white; min-height: 100vh; }',
+        '.header { background: linear-gradient(135deg, #0f1a30 0%, #1c2541 100%); padding: 32px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }',
+        '.logo { width: 64px; height: 64px; object-fit: contain; }',
+        '.header-info { text-align: right; }',
+        '.header-title { font-size: 22px; font-weight: 800; color: white; letter-spacing: -0.5px; }',
+        '.header-sub { font-size: 13px; color: #94a3b8; margin-top: 4px; }',
+        '.ref-badge { display: inline-block; background: rgba(58,134,255,0.2); color: #60a5fa; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-top: 8px; }',
+        '.section { padding: 28px 40px; }',
+        '.section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 16px; }',
+        '.client-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; }',
+        '.client-name { font-size: 18px; font-weight: 700; color: #0f172a; }',
+        '.client-detail { font-size: 14px; color: #64748b; margin-top: 6px; }',
+        'table { width: 100%; border-collapse: collapse; }',
+        'thead tr { background: #f8fafc; }',
+        'thead th { padding: 10px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; text-align: left; }',
+        'thead th:nth-child(3), thead th:nth-child(4), thead th:nth-child(5) { text-align: right; }',
+        'thead th:nth-child(3) { text-align: center; }',
+        '.totales-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; }',
+        '.tot-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 14px; color: #64748b; }',
+        '.tot-row.final { border-top: 2px solid #0f172a; margin-top: 8px; padding-top: 14px; }',
+        '.tot-row.final .tot-label { font-size: 16px; font-weight: 800; color: #0f172a; }',
+        '.tot-row.final .tot-val { font-size: 20px; font-weight: 800; color: #2563eb; }',
+        '.iva-row .tot-val { color: #ea580c; }',
+        '.notas-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px 18px; font-size: 14px; color: #92400e; line-height: 1.6; }',
+        '.footer { background: #0f1a30; padding: 24px 40px; text-align: center; }',
+        '.footer p { font-size: 12px; color: #64748b; margin-bottom: 4px; }',
+        '.footer a { color: #60a5fa; text-decoration: none; }',
+        '.validity { background: rgba(6,214,160,0.1); border: 1px solid rgba(6,214,160,0.3); border-radius: 8px; padding: 8px 16px; display: inline-block; margin-top: 12px; font-size: 12px; color: #06d6a0; font-weight: 600; }',
+        '@media print { body { background: white; } .page { max-width: 100%; } }',
+        '@media (max-width: 600px) { .header { padding: 20px; flex-direction: column; align-items: flex-start; } .header-info { text-align: left; } .section { padding: 20px; } .footer { padding: 20px; } }',
+        '<' + '/style>',
+        '<' + '/head>',
+        '<body>',
+        '<div class="page">',
+        '<div class="header">',
+        '<img class="logo" src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" alt="TLC" onerror="this.style.display=\'none\'">',
+        '<div class="header-info">',
+        '<div class="header-title">Presupuesto</div>',
+        '<div class="header-sub">Tecnología Láser Corneal SRL</div>',
+        '<div class="ref-badge">' + nroRef + '</div>',
+        '</div></div>',
+        '<div class="section"><div class="section-title">Cliente</div>',
+        '<div class="client-card">',
+        '<div class="client-name">' + nombre + '</div>',
+        '<div class="client-detail">',
+        (telefono ? '📱 ' + telefono : ''),
+        '<span style="margin-left:12px; color:#94a3b8;">📅 ' + fecha + '</span>',
+        '<span style="margin-left:12px; color:#3a86ff; font-weight:600;">💳 ' + (mod?.label || 'Contado') + '</span>',
+        '</div></div></div>',
+        '<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">',
+        '<div class="section"><div class="section-title">Detalle de productos</div>',
+        '<table><thead><tr>',
+        '<th>Producto</th><th>Modalidad</th>',
+        '<th style="text-align:center;">Cant.</th>',
+        '<th style="text-align:right;">Precio u.</th>',
+        '<th style="text-align:right;">Subtotal</th>',
+        '</tr></thead><tbody>' + filasItems + '</tbody></table></div>',
+        '<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">',
+        '<div class="section"><div class="totales-box">',
+        '<div class="tot-row"><span class="tot-label">Neto USD</span><span class="tot-val">' + fmtUSD(neto) + '</span></div>',
+        '<div class="tot-row iva-row"><span class="tot-label">IVA 10,5%</span><span class="tot-val">' + fmtUSD(iva) + '</span></div>',
+        '<div class="tot-row final"><span class="tot-label">TOTAL USD</span><span class="tot-val">' + fmtUSD(total) + '</span></div>',
+        '</div>',
+        '<div style="text-align:center; margin-top:12px;"><div class="validity">✓ Válido por 15 días hábiles a partir del ' + fecha + '</div></div>',
+        '</div>',
+        financiacionHtml,
+        notas ? '<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;"><div class="section"><div class="section-title">Notas</div><div class="notas-box">' + notas + '</div></div>' : '',
+        '<div class="footer">',
+        '<p><strong style="color:#94a3b8;">Tecnología Láser Corneal SRL</strong></p>',
+        '<p>Del Carmen 716, CABA · Argentina</p>',
+        '<p style="margin-top:8px;">Asesor: ' + (vendedor || 'TLC') + '</p>',
+        '<p style="margin-top:6px;"><a href="https://www.tlcsrl.com.ar">www.tlcsrl.com.ar</a></p>',
+        '</div></div>',
+        // Nota: las etiquetas de cierre están partidas para evitar que el parser HTML las interprete
+        '<' + '/body>',
+        '<' + '/html>'
+    ].join('\n');
+}
 
 function mostrarCoStatus(msg, tipo) {
     const el = document.getElementById('co-status');
