@@ -1209,12 +1209,14 @@ function abrirCheckout() {
     document.getElementById('checkout-resumen').textContent = resumen;
     document.getElementById('co-vendedor').value = currentUser?.name || currentUser?.username || '';
 
-    const esExterno = currentUserRol === 'Vend_Externo';
+    const esExterno = currentUserRol?.toLowerCase().includes('externo');
     const comGrp = document.getElementById('co-comision-group');
     const comVal = document.getElementById('co-comision-valor');
-    if (esExterno && carrito.length > 0 && carrito[0].comision) {
+    // Buscar comisión en cualquier ítem del carrito
+    const itemConComision = carrito.find(i => i.comision && String(i.comision).trim() !== '');
+    if (esExterno && itemConComision) {
         comGrp.style.display = 'block';
-        comVal.textContent = `💰 ${fmtPct(carrito[0].comision) || carrito[0].comision}`;
+        comVal.textContent = `💰 ${fmtPct(itemConComision.comision) || itemConComision.comision}`;
     } else {
         comGrp.style.display = 'none';
     }
