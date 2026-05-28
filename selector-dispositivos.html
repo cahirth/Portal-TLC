@@ -1252,13 +1252,12 @@ document.getElementById('btn-co-enviar').addEventListener('click', async () => {
         // 1 — Generar HTML del presupuesto
         const htmlPresup = generarHTMLPresupuesto({ nombre, telefono, notas, vendedor });
 
-        // 2 — Abrir en nueva pestaña (renderiza correctamente, permite imprimir/PDF)
+        // 2 — Generar blob URL (se abre solo cuando el usuario hace click)
         const blob = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
-        const ventana = window.open(blobUrl, '_blank');
 
-        // Limpiar la URL del blob después de 60 segundos
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+        // Limpiar la URL del blob después de 5 minutos
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 300000);
 
         // 3 — Mostrar resultado con botón WhatsApp
         const telLimpio = telefono.replace(/\D/g, '').replace(/^0/, '').replace(/^54/, '');
