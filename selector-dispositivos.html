@@ -460,10 +460,48 @@ async function cargarFotoMap() {
     }
 }
 
-// ─── CARGAR DATOS ─────────────────────────────────────────────────────────────
-async function fetchSheet(sheetName) {
+// ════════════════════════════════════════════════════════════
+// CARGA INSTANTÁNEA DE PRECIOS
+// Prioridad: sessionStorage (0ms) → precios.json estático (~50ms) → Sheets (~1500ms)
+// ════════════════════════════════════════════════════════════
+
+const PRECIOS_CACHE_KEY     = 'tlc_precios_v1';
+const PRECIOS_CACHE_VERSION = '1';
+const PRECIOS_STATIC_URL    = './precios.json';
+
+// ─── SessionStorage ───────────────────────────────────────
+
+function _guardarCachePrecios(data) {
+    try {
+        sessionStorage.setItem(PRECIOS_CACHE_KEY, JSON.stringify({
+            v: PRECIOS_CACHE_VERSION,
+            ts: Date.now(),
+            data
+        }));
+    } catch(e) { /* sessionStorage lleno → silencioso */ }
+}
+
+function _leerCachePrecios() {
+    try {
+        const raw = sessionStorage.getItem(PRECIOS_CACHE_KEY);
+        if (!raw) return null;
+        const p = JSON.parse(raw);
+        if (p.v !== PRECIOS_CACHE_VERSION) { sessionStorage.removeItem(PRECIOS_CACHE_KEY); return null; }
+        if (!Array.isArray(p.data) || !p.data.length) { sessionStorage.removeItem(PRECIOS_CACHE_KEY); return null; }
+        return p.data;
+    } catch(e) { sessionStorage.removeItem(PRECIOS_CACHE_KEY); return null; }
+}
+
+function invalidarCachePrecios() {
+    sessionStorage.removeItem(PRECIOS_CACHE_KEY);
+    console.log('[Precios] Cache invalidado');
+}
+
+// ─── Carga desde Sheets (fallback) ───────────────────────
+
+async function _fetchSheetDirecto(sheetName) {
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
-    const res = await fetch(url);
+    const res  = await fetch(url);
     const text = await res.text();
     const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
     const cols = json.table.cols.map(c => c.label);
@@ -479,26 +517,93 @@ async function fetchSheet(sheetName) {
         });
 }
 
-async function cargarTodo() {
-    try {
-        // Cargar fotoMap primero, luego los sheets en paralelo
-        await cargarFotoMap();
+// ─── Carga principal con prioridad ────────────────────────
 
+async function cargarPreciosInstantaneo() {
+    // 1. sessionStorage — 0ms
+    const cached = _leerCachePrecios();
+    if (cached) {
+        console.log(`[Precios] ✅ sessionStorage (0ms) — ${cached.length} items`);
+        return cached;
+    }
+
+    // 2. precios.json estático — ~50ms
+    try {
+        const t0   = performance.now();
+        const resp = await fetch(PRECIOS_STATIC_URL, { cache: 'default' });
+        if (resp.ok) {
+            const data = await resp.json();
+            const ms   = Math.round(performance.now() - t0);
+            console.log(`[Precios] ✅ precios.json (${ms}ms) — ${data.length} items`);
+            _guardarCachePrecios(data);
+            return data;
+        }
+        console.warn(`[Precios] ⚠️ precios.json → HTTP ${resp.status}`);
+    } catch(err) {
+        console.warn('[Precios] ⚠️ precios.json no disponible:', err.message);
+    }
+
+    // 3. Fallback: Google Sheets directo — ~1500ms
+    console.warn('[Precios] ⚠️ Fallback a Google Sheets directo');
+    const t0   = performance.now();
+    const data = await _fetchSheetDirecto('Lista_Precios');
+    const ms   = Math.round(performance.now() - t0);
+    console.log(`[Precios] ⚠️ Sheets directo (${ms}ms) — ${data.length} items`);
+    _guardarCachePrecios(data);
+    return data;
+}
+
+// ─── Skeleton mientras carga (solo primera vez) ──────────
+
+function _mostrarSkeleton() {
+    if (_leerCachePrecios()) return; // tiene cache → no skeleton
+    const lista = document.getElementById('lista');
+    if (!lista) return;
+    lista.innerHTML = Array(6).fill(0).map(() => `
+        <div style="
+            background:linear-gradient(90deg,#1c2541 25%,#222e50 50%,#1c2541 75%);
+            background-size:200% 100%;
+            animation:_shimmer 1.2s infinite;
+            border-radius:16px; height:160px;">
+        </div>`).join('');
+    if (!document.getElementById('_shimmer-style')) {
+        const s = document.createElement('style');
+        s.id = '_shimmer-style';
+        s.textContent = '@keyframes _shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}';
+        document.head.appendChild(s);
+    }
+}
+
+// ─── cargarTodo — función principal ──────────────────────
+
+async function cargarTodo() {
+    _mostrarSkeleton();
+    try {
+        // FotoMap y Vendedores en paralelo con Precios
         const [dispRows, vendRows] = await Promise.all([
-            fetchSheet('Lista_Precios'),
-            fetchSheet('Vendedores')
+            cargarPreciosInstantaneo(),
+            _fetchSheetDirecto('Vendedores')
         ]);
+
+        // FotoMap se carga en paralelo pero no bloquea el render
+        cargarFotoMap(); // fire-and-forget, fotoMap se actualiza cuando llega
 
         dispositivos = dispRows.filter(d => d['Nombre de Dispositivo']?.toString().trim());
 
         // Determinar rol del usuario logueado
-        const email = currentUser?.username?.toLowerCase() || '';
+        const email    = currentUser?.username?.toLowerCase() || '';
         const vendedor = vendRows.find(v => v['Email']?.toLowerCase() === email);
         currentUserRol = vendedor?.['Rol'] || 'Vend_Externo';
 
         renderLista(dispositivos);
     } catch(e) {
-        document.getElementById('lista').innerHTML = `<div class="empty">❌ Error cargando datos: ${e.message}</div>`;
+        document.getElementById('lista').innerHTML =
+            `<div class="empty">❌ Error cargando datos: ${e.message}
+             <br><button onclick="invalidarCachePrecios();cargarTodo();"
+               style="margin-top:12px;padding:8px 20px;background:#3a86ff;border:none;
+                      border-radius:8px;color:white;cursor:pointer;font-size:13px;">
+               Reintentar
+             </button></div>`;
     }
 }
 
