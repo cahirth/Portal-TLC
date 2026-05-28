@@ -38,7 +38,9 @@
         .dispositivo-card.oferta { border-color: #06d6a0; }
         .card-header { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
         .card-foto { width: 56px; height: 56px; border-radius: 8px; object-fit: contain; background: #0b1329; flex-shrink: 0; }
+        .card-foto.foto-pending { background: linear-gradient(90deg,#0b1329 25%,#1c2541 50%,#0b1329 75%); background-size:200% 100%; animation:_shimmer 1.2s infinite; }
         .card-foto-placeholder { width: 56px; height: 56px; border-radius: 8px; background: #0b1329; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; color: #94a3b8; }
+        @keyframes _shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
         .card-info { flex: 1; min-width: 0; }
         .card-nombre { font-size: 13px; font-weight: 600; color: #f8fafc; margin-bottom: 3px; line-height: 1.3; }
         .card-categoria { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -615,12 +617,16 @@ async function cargarTodo() {
         // Renderizar INMEDIATAMENTE con las fotos que ya haya en fotoMap
         renderLista(dispositivos);
 
-        // FotoMap en background — cuando llega, re-renderiza las fotos sin bloquear
+        // FotoMap en background — cuando llega actualiza las imágenes sin re-renderizar
         cargarFotoMap().then(() => {
-            // Actualizar solo las imágenes ya renderizadas sin re-renderizar todo
             document.querySelectorAll('[data-foto-key]').forEach(img => {
                 const key = img.dataset.fotoKey;
-                if (fotoMap[key]) img.src = fotoMap[key];
+                const url = fotoMap[key];
+                if (url) {
+                    img.src = url;
+                    img.classList.remove('foto-pending');
+                    img.onerror = null;
+                }
             });
         });
 
@@ -713,9 +719,16 @@ function renderLista(items) {
             .map(m => `<span class="card-pill">${m.label}</span>`)
             .join('');
 
+        // Extraer key para actualización posterior cuando llega FotoMap
+        const fotoRaw = (d['Foto'] || '').toString().trim();
+        const fotoKeyMatch = fotoRaw.match(/^Fotos\/(.+)$/i);
+        const fotoKey = fotoKeyMatch ? fotoKeyMatch[1].toLowerCase() : '';
+
         const fotoEl = foto
-            ? `<img class="card-foto" src="${foto}" loading="lazy" onerror="this.outerHTML='<div class=\\'card-foto-placeholder\\'>🔬</div>'">`
-            : `<div class="card-foto-placeholder">🔬</div>`;
+            ? `<img class="card-foto" src="${foto}" loading="lazy" ${fotoKey ? `data-foto-key="${fotoKey}"` : ''} onerror="this.src=''; this.classList.add('foto-pending');">`
+            : fotoKey
+                ? `<img class="card-foto foto-pending" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-foto-key="${fotoKey}" loading="lazy">`
+                : `<div class="card-foto-placeholder">🔬</div>`;
 
         return `<div class="dispositivo-card ${oferta ? 'oferta' : ''}" onclick="abrirDetalle(${i})">
             <div class="card-header">
