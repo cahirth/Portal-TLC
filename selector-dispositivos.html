@@ -37,9 +37,24 @@
         .dispositivo-card:active { opacity: 0.85; transform: scale(0.99); }
         .dispositivo-card.oferta { border-color: #06d6a0; }
         .card-header { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
-        .card-foto { width: 56px; height: 56px; border-radius: 8px; object-fit: contain; background: #0b1329; flex-shrink: 0; }
-        .card-foto.foto-pending { background: linear-gradient(90deg,#0b1329 25%,#1c2541 50%,#0b1329 75%); background-size:200% 100%; animation:_shimmer 1.2s infinite; }
-        .card-foto-placeholder { width: 56px; height: 56px; border-radius: 8px; background: #0b1329; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; color: #94a3b8; }
+        .card-foto {
+            width: 56px; height: 56px;
+            border-radius: 8px; object-fit: contain;
+            background: #0b1329; flex-shrink: 0;
+            aspect-ratio: 1 / 1;          /* evita layout shift */
+            contain: layout style paint;   /* aísla el repintado */
+        }
+        .card-foto.foto-pending {
+            background: linear-gradient(90deg,#0b1329 25%,#1c2541 50%,#0b1329 75%);
+            background-size: 200% 100%;
+            animation: _shimmer 1.2s infinite;
+        }
+        .card-foto-placeholder {
+            width: 56px; height: 56px; aspect-ratio: 1 / 1;
+            border-radius: 8px; background: #0b1329;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; flex-shrink: 0; color: #94a3b8;
+        }
         @keyframes _shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
         .card-info { flex: 1; min-width: 0; }
         .card-nombre { font-size: 13px; font-weight: 600; color: #f8fafc; margin-bottom: 3px; line-height: 1.3; }
@@ -500,6 +515,22 @@ const PRECIOS_CACHE_KEY     = 'tlc_precios_v1';
 const PRECIOS_CACHE_VERSION = '1';
 const PRECIOS_STATIC_URL    = './precios.json';
 
+// ─── IntersectionObserver para lazy loading en browsers sin soporte nativo ────
+const _lazyObserver = ('IntersectionObserver' in window)
+    ? new IntersectionObserver((entries, obs) => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            const img = entry.target;
+            if (img.dataset.src) {
+                img.src = img.dataset.src;
+                delete img.dataset.src;
+                img.classList.remove('foto-pending');
+            }
+            obs.unobserve(img);
+        });
+    }, { rootMargin: '200px 0px' }) // pre-carga 200px antes de entrar al viewport
+    : null;
+
 // ─── SessionStorage ───────────────────────────────────────
 
 function _guardarCachePrecios(data) {
@@ -625,11 +656,13 @@ async function cargarTodo() {
         // Renderizar INMEDIATAMENTE con las fotos que ya haya en fotoMap
         renderLista(dispositivos);
 
-        // FotoMap en background — cuando llega actualiza las imágenes sin re-renderizar
+        // FotoMap en background — actualiza imágenes sin re-renderizar
+        // Prueba la key WebP primero, luego la original como fallback
         cargarFotoMap().then(() => {
             document.querySelectorAll('[data-foto-key]').forEach(img => {
-                const key = img.dataset.fotoKey;
-                const url = fotoMap[key];
+                const keyWebP    = img.dataset.fotoKey;
+                const keyFallback = img.dataset.fotoKeyFallback || keyWebP?.replace(/\.webp$/i, '.png') || '';
+                const url = fotoMap[keyWebP] || fotoMap[keyFallback];
                 if (url) {
                     img.src = url;
                     img.classList.remove('foto-pending');
@@ -692,13 +725,25 @@ function fotoUrl(foto) {
     if (mDrive) return `https://lh3.googleusercontent.com/d/${mDrive[1]}`;
 
     // Ruta relativa tipo "Fotos/HVS1.png"  →  buscar en fotoMap
+    // Intentar primero la versión WebP (si ya migraste las fotos)
     const mFotos = s.match(/^Fotos\/(.+)$/i);
     if (mFotos) {
-        const nombre = mFotos[1].toLowerCase();
-        return fotoMap[nombre] || '';
+        const nombre    = mFotos[1].toLowerCase();
+        const nombreWebP = nombre.replace(/\.(png|jpg|jpeg)$/i, '.webp');
+        return fotoMap[nombreWebP] || fotoMap[nombre] || '';
     }
 
     return '';
+}
+
+// ─── WebP key para data-foto-key (busca WebP primero, luego original) ─────────
+function fotoKeyFromRaw(fotoRaw) {
+    const m = fotoRaw.match(/^Fotos\/(.+)$/i);
+    if (!m) return '';
+    const nombre    = m[1].toLowerCase();
+    const nombreWebP = nombre.replace(/\.(png|jpg|jpeg)$/i, '.webp');
+    // Devolver ambas versiones como array para probar en orden
+    return { original: nombre, webp: nombreWebP };
 }
 
 // ─── RENDER LISTA ─────────────────────────────────────────────────────────────
@@ -727,15 +772,22 @@ function renderLista(items) {
             .map(m => `<span class="card-pill">${m.label}</span>`)
             .join('');
 
-        // Extraer key para actualización posterior cuando llega FotoMap
+        // ── Imagen con lazy loading + WebP + layout shift prevention ──────
         const fotoRaw = (d['Foto'] || '').toString().trim();
-        const fotoKeyMatch = fotoRaw.match(/^Fotos\/(.+)$/i);
-        const fotoKey = fotoKeyMatch ? fotoKeyMatch[1].toLowerCase() : '';
+        const fotoKeys = fotoKeyFromRaw(fotoRaw);
+        // data-foto-key acepta WebP primero, original como fallback
+        const fotoKeyAttr = fotoKeys.webp
+            ? `data-foto-key="${fotoKeys.webp}" data-foto-key-fallback="${fotoKeys.original}"`
+            : '';
+
+        // Las primeras 6 fotos cargan eager (above the fold), el resto lazy
+        const isAboveFold = idx < 6;
+        const loadingAttr = isAboveFold ? 'loading="eager" fetchpriority="high"' : 'loading="lazy" fetchpriority="low"';
 
         const fotoEl = foto
-            ? `<img class="card-foto" src="${foto}" loading="lazy" ${fotoKey ? `data-foto-key="${fotoKey}"` : ''} onerror="this.src=''; this.classList.add('foto-pending');">`
-            : fotoKey
-                ? `<img class="card-foto foto-pending" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-foto-key="${fotoKey}" loading="lazy">`
+            ? `<img class="card-foto" src="${foto}" alt="${d['Nombre de Dispositivo'] || ''}" ${loadingAttr} ${fotoKeyAttr} onerror="this.src=''; this.classList.add('foto-pending');">`
+            : (fotoKeys.original || fotoKeys.webp)
+                ? `<img class="card-foto foto-pending" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="${d['Nombre de Dispositivo'] || ''}" ${loadingAttr} ${fotoKeyAttr}>`
                 : `<div class="card-foto-placeholder">🔬</div>`;
 
         return `<div class="dispositivo-card ${oferta ? 'oferta' : ''}" onclick="abrirDetalle(${i})">
