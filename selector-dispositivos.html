@@ -270,11 +270,11 @@
 <div class="form-overlay" id="modal-resumen" style="display:none; position:fixed; inset:0; z-index:300; background:rgba(3,7,18,0.85); backdrop-filter:blur(4px); overflow-y:auto; padding:16px;">
     <div id="modal-resumen-box" style="background:#0d1520; border:1px solid #1e3050; border-radius:20px; max-width:480px; margin:20px auto; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.6);">
 
-        <!-- Header modal -->
+        <!-- Header modal con ID de cotización -->
         <div style="background:linear-gradient(135deg,#0f1a30,#1c2541); padding:20px 24px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #1e3050;">
             <div>
                 <div style="font-size:16px; font-weight:800; color:#f1f5f9;">Nueva Cotización</div>
-                <div style="font-size:11px; color:#64748b; margin-top:2px;">Completá los datos del cliente</div>
+                <div id="mr-id-display" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#3a86ff; margin-top:4px; letter-spacing:0.5px;">—</div>
             </div>
             <button onclick="cerrarModalResumen()" style="background:#1c2541; border:1px solid #222e50; border-radius:50%; width:36px; height:36px; color:#94a3b8; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">×</button>
         </div>
@@ -296,8 +296,16 @@
                 <input type="text" class="form-input" id="mr-razon" placeholder="Ej: Clínica Oftalmológica SRL">
             </div>
             <div class="form-group">
+                <label class="form-label">CUIT</label>
+                <input type="text" class="form-input" id="mr-cuit" placeholder="Ej: 20-12345678-9">
+            </div>
+            <div class="form-group">
                 <label class="form-label">Teléfono de contacto *</label>
                 <input type="tel" class="form-input" id="mr-telefono" placeholder="Ej: 11 4567 8901 (sin 0 ni 15)">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notas</label>
+                <textarea class="form-input" id="mr-notas" placeholder="Observaciones, intereses, seguimiento..." style="min-height:72px; resize:vertical;"></textarea>
             </div>
             <div class="form-group">
                 <label class="form-label">Vendedor</label>
@@ -1351,24 +1359,32 @@ function abrirModalResumen() {
     const opt = c.mod;
     const monedaFmt = opt.moneda === 'ARS' ? fmtARS : fmtUSD;
 
+    // Generar ID al abrir el modal
+    _idCotActual = generarIdCotizacion();
+    document.getElementById('mr-id-display').textContent = _idCotActual;
+
     // Resetear estado
     document.getElementById('mr-resultado').style.display = 'none';
     document.getElementById('btn-mr-wsp').style.display = 'flex';
     document.getElementById('mr-status').style.display = 'none';
-    ['mr-nombre','mr-razon','mr-telefono'].forEach(id => document.getElementById(id).value = '');
+    ['mr-nombre','mr-razon','mr-cuit','mr-telefono','mr-notas'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
     document.getElementById('mr-vendedor').value = currentUser?.name || currentUser?.username || '';
 
-    // Construir resumen de ítems
+    // Construir filas de ítems con Neto parcial
     const totalItems = carrito.reduce((s,i) => s+(i.cantidad||1), 0);
     const filasItems = carrito.map(i => {
-        const qty = i.cantidad||1;
-        const base = i.precioLista||0;
+        const qty  = i.cantidad || 1;
+        const base = i.precioLista || 0;
         return `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #1e3050; font-size:13px;">
             <span style="color:#e2e8f0; flex:1;">${qty>1?qty+'× ':''}${i.nombre}</span>
             <span style="color:#3a86ff; font-weight:700; margin-left:12px;">${fmtUSD(base*qty)}</span>
         </div>`;
     }).join('');
 
+    // Estructura de pago (si aplica)
     const estructuraHtml = (c.todosCalculados && c.adelantoTotal > 0 && opt.cuotas > 0) ? `
     <div style="background:#0a1628; border-radius:8px; padding:10px 12px; margin-top:8px; border:1px solid #1e3050;">
         <div style="font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">${opt.label}</div>
@@ -1380,9 +1396,19 @@ function abrirModalResumen() {
         </div>
     </div>` : '';
 
+    // CONDICIONES COMERCIALES según modalidad
+    const condiciones = opt.key === 'CONTADO'
+        ? 'Precio contado USD. Anticipado 100% + IVA 10,5%.'
+        : opt.cuotas > 0
+            ? `${opt.label}. Precio de lista + IVA 10,5%. Adelanto + ${opt.cuotas} cuotas.`
+            : `${opt.label}. Precio de lista + IVA 10,5%.`;
+
     document.getElementById('mr-resumen-items').innerHTML = `
         ${filasItems}
         <div style="margin-top:10px; padding-top:6px;">
+            <div style="display:flex; justify-content:space-between; padding:5px 0; font-size:12px; color:#94a3b8; border-top:1px solid #1e3050;">
+                <span>Neto USD</span><span>${fmtUSD(c.netoBase)}</span>
+            </div>
             <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; color:#64748b;">
                 <span>IVA 10,5%</span><span style="color:#f8961e;">${fmtUSD(c.iva)}</span>
             </div>
@@ -1390,8 +1416,12 @@ function abrirModalResumen() {
                 <span style="color:#f1f5f9;">TOTAL USD c/IVA</span>
                 <span style="color:#3a86ff;">${fmtUSD(c.total)}</span>
             </div>
-            <div style="font-size:10px; color:#64748b; margin-top:4px; text-align:right;">${totalItems} unidad${totalItems>1?'es':''} · ${opt.label}</div>
+            <div style="font-size:10px; color:#64748b; margin-top:4px; text-align:right;">${totalItems} unidad${totalItems>1?'es':''}</div>
             ${estructuraHtml}
+            <div style="margin-top:10px; background:#0a1628; border-radius:8px; padding:10px 12px; border:1px solid #1e3050;">
+                <div style="font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Condiciones comerciales</div>
+                <div style="font-size:12px; color:#94a3b8; line-height:1.5;">${condiciones}</div>
+            </div>
         </div>`;
 
     cerrarCarrito();
@@ -1411,7 +1441,9 @@ document.getElementById('modal-resumen').addEventListener('click', function(e) {
 async function confirmarYEnviarWsp() {
     const nombre   = document.getElementById('mr-nombre').value.trim();
     const razon    = document.getElementById('mr-razon').value.trim();
+    const cuit     = document.getElementById('mr-cuit').value.trim();
     const telefono = document.getElementById('mr-telefono').value.trim();
+    const notas    = document.getElementById('mr-notas').value.trim();
     const vendedor = document.getElementById('mr-vendedor').value.trim();
 
     if (!nombre)   { mostrarMrStatus('Completá el nombre del médico.', 'error'); return; }
@@ -1420,27 +1452,44 @@ async function confirmarYEnviarWsp() {
     const btn = document.getElementById('btn-mr-wsp');
     btn.style.opacity = '0.6';
     btn.style.pointerEvents = 'none';
-    mostrarMrStatus('⏳ Generando propuesta...', '');
+    mostrarMrStatus('⏳ Subiendo presupuesto...', '');
 
     try {
-        // Generar ID dinámico
-        _idCotActual = generarIdCotizacion();
+        // ID ya fue generado al abrir el modal — lo reutilizamos
+        const htmlPresup = generarHTMLPresupuesto({ nombre, razon, cuit, telefono, notas, vendedor, idCot: _idCotActual });
 
-        // Generar HTML del presupuesto
-        const htmlPresup = generarHTMLPresupuesto({ nombre, razon, telefono, vendedor, idCot: _idCotActual });
-        const blob    = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
-        _blobUrlActual = URL.createObjectURL(blob);
-        setTimeout(() => URL.revokeObjectURL(_blobUrlActual), 600000); // 10 min
+        // 2 — Subir a GitHub vía Apps Script
+        mostrarMrStatus('⏳ Publicando en GitHub Pages...', '');
+        const resp = await fetch(FOTO_MAP_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    JSON.stringify({
+                accion: 'subirCotizacion',
+                idCot:  _idCotActual,
+                html:   htmlPresup,
+            })
+        });
+        const result = await resp.json();
 
-        // Link del portal interactivo (futuro)
-        const linkPortal = 'https://cahirth.github.io/Portal-TLC/cotizacion.html?id=' + _idCotActual;
+        let linkFinal;
+        if (result.ok) {
+            // Link permanente en GitHub Pages
+            linkFinal = result.link;
+            _blobUrlActual = null;
+        } else {
+            // Fallback a blob local si GitHub falla
+            console.warn('GitHub upload falló, usando blob local:', result.error);
+            const blob = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
+            _blobUrlActual = URL.createObjectURL(blob);
+            setTimeout(() => URL.revokeObjectURL(_blobUrlActual), 600000);
+            linkFinal = _blobUrlActual;
+        }
 
-        // Mensaje WhatsApp ejecutivo
+        // 3 — Mensaje WhatsApp con link permanente
         const nombreCorto = nombre.replace(/^Dr\.?\s*/i, '').split(' ')[0];
         const msgWsp = encodeURIComponent(
-            'Hola Dr. ' + nombreCorto + ', le comparto el presupuesto interactivo de TLC SRL ' +
-            'para los equipos solicitados. Puede ver el detalle, simular los pagos y elegir su ' +
-            'opcion preferida desde su portal seguro: ' + linkPortal +
+            'Hola Dr. ' + nombreCorto + ', le comparto el presupuesto de TLC SRL ' +
+            'para los equipos solicitados: ' + linkFinal +
             ' | Ref: ' + _idCotActual
         );
         const telLimpio = telefono.replace(/\D/g,'').replace(/^0/,'').replace(/^54/,'');
@@ -1448,25 +1497,25 @@ async function confirmarYEnviarWsp() {
             ? 'https://wa.me/549' + telLimpio + '?text=' + msgWsp
             : 'https://wa.me/?text=' + msgWsp;
 
-        // Configurar panel resultado
+        // 4 — Configurar panel resultado
         document.getElementById('mr-nombre-resultado').textContent =
             nombre + (razon ? ' · ' + razon : '') + ' · ' + _idCotActual;
-        document.getElementById('mr-link-preview').href = _blobUrlActual;
+        document.getElementById('mr-link-preview').href = linkFinal;
         document.getElementById('mr-link-preview').onclick = (e) => {
             e.preventDefault();
-            window.open(_blobUrlActual, '_blank');
+            window.open(linkFinal, '_blank');
         };
         document.getElementById('mr-btn-wsp2').onclick = () => window.open(_linkWspActual, '_blank');
 
-        // Abrir WhatsApp automáticamente
+        // 5 — Abrir WhatsApp automáticamente
         window.open(_linkWspActual, '_blank');
 
-        // Mostrar panel resultado
+        // 6 — Mostrar resultado
         btn.style.display = 'none';
         document.getElementById('mr-status').style.display = 'none';
         document.getElementById('mr-resultado').style.display = 'block';
 
-        // Vaciar carrito
+        // 7 — Vaciar carrito
         carrito = [];
         actualizarBadge();
 
@@ -1493,7 +1542,7 @@ function abrirCheckout() { abrirModalResumen(); }
 function nuevoPresupuesto() { nuevaCotizacion(); }
 function mostrarCoStatus(msg, tipo) { mostrarMrStatus(msg, tipo); }
 
-function generarHTMLPresupuesto({ nombre, razon, telefono, vendedor, idCot }) {
+function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, notas, vendedor, idCot }) {
     const fecha = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'long', year:'numeric' });
     const nroRef = idCot || generarIdCotizacion();
 
@@ -1588,7 +1637,8 @@ function generarHTMLPresupuesto({ nombre, razon, telefono, vendedor, idCot }) {
         '<div class="client-card">',
         '<div class="client-name">' + nombre + '</div>',
         '<div class="client-detail">',
-        (razon    ? '<span>🏥 ' + razon + '</span><br>' : ''),
+        (razon ? '<span>🏥 ' + razon + '</span><br>' : ''),
+        (cuit  ? '<span style="color:#64748b;">CUIT: ' + cuit + '</span><br>' : ''),
         (telefono ? '<span>📱 ' + telefono + '</span>' : ''),
         '<span style="margin-left:12px; color:#94a3b8;">📅 ' + fecha + '</span>',
         '<span style="margin-left:12px; color:#3a86ff; font-weight:600;">💳 ' + opt.label + '</span>',
@@ -1605,6 +1655,20 @@ function generarHTMLPresupuesto({ nombre, razon, telefono, vendedor, idCot }) {
         '<div class="section"><div class="totales-box">',
         '<div class="tot-row"><span class="tot-label">Neto Lista Base</span><span class="tot-val">' + fmtUSD(c.netoLista) + '</span></div>',
         financiacionRow,
+        notas ? [
+            '<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">',
+            '<div style="padding:24px 40px;">',
+            '<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#94a3b8; margin-bottom:10px;">Notas</div>',
+            '<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 18px; font-size:14px; color:#92400e; line-height:1.6;">' + notas + '</div>',
+            '</div>'
+        ].join('') : '',
+        '<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">',
+        '<div style="padding:20px 40px;">',
+        '<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#94a3b8; margin-bottom:10px;">Condiciones Comerciales</div>',
+        '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 18px; font-size:13px; color:#64748b; line-height:1.6;">',
+        '<strong style="color:#0f172a;">' + opt.label + '</strong> · IVA 10,5% discriminado · Precios en USD · Válido 15 días hábiles desde ' + fecha + '.',
+        opt.cuotas > 0 ? ' Financiación sujeta a aprobación crediticia.' : ' Pago anticipado al cierre de la operación.',
+        '</div></div>',
         '<div class="tot-row iva-row"><span class="tot-label">IVA 10,5%</span><span class="tot-val">' + fmtUSD(c.iva) + '</span></div>',
         '<div class="tot-row final"><span class="tot-label">TOTAL USD</span><span class="tot-val">' + fmtUSD(c.total) + '</span></div>',
         '</div>',
