@@ -38,7 +38,6 @@
         .dispositivo-card.oferta { border-color: #06d6a0; }
         .card-header { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
         .card-foto { width: 56px; height: 56px; border-radius: 8px; object-fit: contain; background: #0b1329; flex-shrink: 0; }
-        .card-foto.foto-pending { background: linear-gradient(90deg,#0b1329 25%,#1c2541 50%,#0b1329 75%); background-size:200% 100%; animation:_shimmer 1.2s infinite; }
         .card-foto-placeholder { width: 56px; height: 56px; border-radius: 8px; background: #0b1329; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; color: #94a3b8; }
         .card-info { flex: 1; min-width: 0; }
         .card-nombre { font-size: 13px; font-weight: 600; color: #f8fafc; margin-bottom: 3px; line-height: 1.3; }
@@ -265,59 +264,80 @@
     </div>
 </div>
 
-<!-- CHECKOUT OVERLAY -->
-<div class="form-overlay" id="checkout-overlay">
-    <div class="form-header">
-        <button class="btn-back" id="btn-checkout-back">←</button>
-        <div class="form-titulo">Nueva Cotización</div>
-    </div>
-    <div class="form-body">
-        <div class="form-dispositivo" id="checkout-resumen"></div>
+<!-- MODAL RESUMEN COMERCIAL -->
+<div class="form-overlay" id="modal-resumen" style="display:none; position:fixed; inset:0; z-index:300; background:rgba(3,7,18,0.85); backdrop-filter:blur(4px); overflow-y:auto; padding:16px;">
+    <div id="modal-resumen-box" style="background:#0d1520; border:1px solid #1e3050; border-radius:20px; max-width:480px; margin:20px auto; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.6);">
 
-        <div class="form-group">
-            <label class="form-label">Nombre y Apellido *</label>
-            <input type="text" class="form-input" id="co-nombre" placeholder="Ej: Juan García">
-        </div>
-        <div class="form-group">
-            <label class="form-label">Teléfono (sin 0 ni 15)</label>
-            <input type="tel" class="form-input" id="co-telefono" placeholder="Ej: 11 4567 8901">
-        </div>
-        <div class="form-group">
-            <label class="form-label">Notas</label>
-            <textarea class="form-input" id="co-notas" placeholder="Observaciones, intereses, seguimiento..."></textarea>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Vendedor</label>
-            <input type="text" class="form-input" id="co-vendedor" readonly>
-        </div>
-        <div class="form-group" id="co-comision-group" style="display:none">
-            <label class="form-label">Tu Comisión estimada</label>
-            <div class="comision-badge" id="co-comision-valor">—</div>
+        <!-- Header modal -->
+        <div style="background:linear-gradient(135deg,#0f1a30,#1c2541); padding:20px 24px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #1e3050;">
+            <div>
+                <div style="font-size:16px; font-weight:800; color:#f1f5f9;">Nueva Cotización</div>
+                <div style="font-size:11px; color:#64748b; margin-top:2px;">Completá los datos del cliente</div>
+            </div>
+            <button onclick="cerrarModalResumen()" style="background:#1c2541; border:1px solid #222e50; border-radius:50%; width:36px; height:36px; color:#94a3b8; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">×</button>
         </div>
 
-        <button class="btn-enviar" id="btn-co-enviar">Confirmar Cotización</button>
-        <div class="form-status" id="co-status"></div>
+        <div style="padding:20px 24px;">
 
-        <!-- RESULTADO: link + botones (aparece después de confirmar) -->
-        <div id="co-resultado" style="display:none; margin-top:16px;">
-            <div style="background:#0f1a30; border:1px solid rgba(6,214,160,0.3); border-radius:14px; padding:16px;">
-                <div style="font-size:11px; color:#06d6a0; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">✅ Presupuesto generado</div>
-                <div style="font-size:12px; color:#94a3b8; margin-bottom:12px;" id="co-nombre-resultado"></div>
-                <a id="co-link-preview" href="#" target="_blank" style="display:flex; align-items:center; gap:8px; background:#1c2541; border:1px solid #222e50; border-radius:10px; padding:12px 14px; text-decoration:none; margin-bottom:10px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
-                    <div style="flex:1; min-width:0;">
-                        <div style="font-size:13px; font-weight:600; color:#f1f5f9;">Ver presupuesto</div>
-                        <div style="font-size:11px; color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" id="co-link-text">Generando link...</div>
-                    </div>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                </a>
-                <button id="co-btn-wsp" style="width:100%; padding:13px; border-radius:10px; background:linear-gradient(135deg,#25d366,#128c7e); border:none; color:white; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:8px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                    Enviar por WhatsApp
+            <!-- Resumen de ítems -->
+            <div id="mr-resumen-items" style="background:#080d14; border-radius:12px; padding:14px; margin-bottom:16px; border:1px solid #1e3050;"></div>
+
+            <!-- Formulario cliente -->
+            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Datos del cliente</div>
+
+            <div class="form-group">
+                <label class="form-label">Nombre y Apellido del médico *</label>
+                <input type="text" class="form-input" id="mr-nombre" placeholder="Ej: Dr. Juan García">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Razón Social / Institución</label>
+                <input type="text" class="form-input" id="mr-razon" placeholder="Ej: Clínica Oftalmológica SRL">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Teléfono de contacto *</label>
+                <input type="tel" class="form-input" id="mr-telefono" placeholder="Ej: 11 4567 8901 (sin 0 ni 15)">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Vendedor</label>
+                <input type="text" class="form-input" id="mr-vendedor" readonly style="opacity:.6;">
+            </div>
+
+            <div id="mr-status" class="form-status" style="display:none;"></div>
+
+            <!-- Botones de acción -->
+            <div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
+                <button id="btn-mr-wsp" onclick="confirmarYEnviarWsp()"
+                    style="width:100%; padding:14px; border-radius:12px; background:linear-gradient(135deg,#25d366,#128c7e); border:none; color:white; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                    Generar propuesta y enviar por WhatsApp
                 </button>
-                <button onclick="nuevoPresupuesto()" style="width:100%; padding:11px; border-radius:10px; background:#1c2541; border:1px solid #222e50; color:#94a3b8; font-size:13px; cursor:pointer;">
-                    + Nuevo presupuesto
+                <button onclick="cerrarModalResumen()"
+                    style="width:100%; padding:12px; border-radius:12px; background:transparent; border:1px solid #1e3050; color:#64748b; font-size:14px; cursor:pointer;">
+                    Cancelar
                 </button>
+            </div>
+
+            <!-- Panel resultado post-envío -->
+            <div id="mr-resultado" style="display:none; margin-top:16px;">
+                <div style="background:#0f1a30; border:1px solid rgba(6,214,160,0.3); border-radius:14px; padding:16px;">
+                    <div style="font-size:11px; color:#06d6a0; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">✅ Propuesta generada</div>
+                    <div style="font-size:12px; color:#94a3b8; margin-bottom:12px;" id="mr-nombre-resultado"></div>
+                    <a id="mr-link-preview" href="#" target="_blank" style="display:flex; align-items:center; gap:8px; background:#1c2541; border:1px solid #222e50; border-radius:10px; padding:12px 14px; text-decoration:none; margin-bottom:10px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                        <div style="flex:1;">
+                            <div style="font-size:13px; font-weight:600; color:#f1f5f9;">Ver presupuesto</div>
+                            <div style="font-size:11px; color:#64748b;">Abrir en nueva pestaña</div>
+                        </div>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </a>
+                    <button id="mr-btn-wsp2" style="width:100%; padding:13px; border-radius:10px; background:linear-gradient(135deg,#25d366,#128c7e); border:none; color:white; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:8px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                        Reenviar por WhatsApp
+                    </button>
+                    <button onclick="nuevaCotizacion()" style="width:100%; padding:11px; border-radius:10px; background:#1c2541; border:1px solid #222e50; color:#94a3b8; font-size:13px; cursor:pointer;">
+                        + Nueva cotización
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -597,16 +617,11 @@ async function cargarTodo() {
 
         // FotoMap en background — cuando llega, re-renderiza las fotos sin bloquear
         cargarFotoMap().then(() => {
-        // Actualizar todas las imágenes con data-foto-key
-        document.querySelectorAll('[data-foto-key]').forEach(img => {
-            const key = img.dataset.fotoKey;
-            const url = fotoMap[key];
-            if (url) {
-                img.src = url;
-                img.classList.remove('foto-pending');
-                img.onerror = null; // quitar el onerror una vez que tiene URL válida
-            }
-        });
+            // Actualizar solo las imágenes ya renderizadas sin re-renderizar todo
+            document.querySelectorAll('[data-foto-key]').forEach(img => {
+                const key = img.dataset.fotoKey;
+                if (fotoMap[key]) img.src = fotoMap[key];
+            });
         });
 
     } catch(e) {
@@ -698,16 +713,9 @@ function renderLista(items) {
             .map(m => `<span class="card-pill">${m.label}</span>`)
             .join('');
 
-        // Extraer key para data-foto-key (actualización posterior cuando llega fotoMap)
-        const fotoRaw = (d['Foto'] || '').toString().trim();
-        const fotoKeyMatch = fotoRaw.match(/^Fotos\/(.+)$/i);
-        const fotoKey = fotoKeyMatch ? fotoKeyMatch[1].toLowerCase() : '';
-
         const fotoEl = foto
-            ? `<img class="card-foto" src="${foto}" loading="lazy" ${fotoKey ? `data-foto-key="${fotoKey}"` : ''} onerror="this.src=''; this.classList.add('foto-pending');">`
-            : fotoKey
-                ? `<img class="card-foto foto-pending" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-foto-key="${fotoKey}" loading="lazy">`
-                : `<div class="card-foto-placeholder">🔬</div>`;
+            ? `<img class="card-foto" src="${foto}" loading="lazy" onerror="this.outerHTML='<div class=\\'card-foto-placeholder\\'>🔬</div>'">`
+            : `<div class="card-foto-placeholder">🔬</div>`;
 
         return `<div class="dispositivo-card ${oferta ? 'oferta' : ''}" onclick="abrirDetalle(${i})">
             <div class="card-header">
@@ -940,85 +948,81 @@ document.getElementById('btn-back').addEventListener('click', () => {
 // ─── FORMULARIO ───────────────────────────────────────────────────────────────
 document.getElementById('btn-cotizar').addEventListener('click', agregarAlCarrito);
 
-// ─── CARRITO ──────────────────────────────────────────────────────────────────
-let carrito = []; // [{dispositivo, modalidad, label, precio, moneda, cuota, cuotaStr}]
+// ══════════════════════════════════════════════════════════════════
+// MÓDULO CARRITO — Estado unificado
+// ══════════════════════════════════════════════════════════════════
 
+let carrito = [];
+
+// ─── Opciones de financiación global ──────────────────────────────
+const FINANCIACION_OPTS = [
+    { key: 'LISTA',   label: 'Precio de Lista (Base)',    coef: 1.000, descuento: false, usaCNO: false },
+    { key: 'CONTADO', label: 'Pago Contado (−10%)',       coef: 0.900, descuento: true,  usaCNO: true  },
+    { key: 'C6',      label: '6 Cuotas Fijas (+12%)',     coef: 1.120, descuento: false, usaCNO: false },
+    { key: 'C12',     label: '12 Cuotas Fijas (+25%)',    coef: 1.250, descuento: false, usaCNO: false },
+];
+let financiacionKey = 'LISTA'; // opción por defecto
+
+function getFinOpt(key) {
+    return FINANCIACION_OPTS.find(o => o.key === key) || FINANCIACION_OPTS[0];
+}
+
+// ─── Calcular totales del carrito ─────────────────────────────────
+function calcularCarrito() {
+    const opt     = getFinOpt(financiacionKey);
+    let netoLista = 0;
+
+    carrito.forEach(item => {
+        const base = item.precioLista || 0;
+        netoLista += base * (item.cantidad || 1);
+    });
+
+    const netoCondicionado = netoLista * opt.coef;
+    const iva              = netoCondicionado * 0.105;
+    const total            = netoCondicionado + iva;
+
+    return { opt, netoLista, netoCondicionado, iva, total };
+}
+
+// ─── Badge ────────────────────────────────────────────────────────
 function actualizarBadge() {
-    const badge = document.getElementById('carrito-badge');
+    const badge     = document.getElementById('carrito-badge');
     const btnCarrito = document.getElementById('btn-carrito');
-    const totalUnits = carrito.reduce((s,i) => s + (i.cantidad||1), 0);
+    const totalUnits = carrito.reduce((s, i) => s + (i.cantidad || 1), 0);
     if (totalUnits === 0) {
         badge.style.display = 'none';
     } else {
         badge.style.display = 'flex';
         badge.textContent = totalUnits;
     }
-    // Mostrar botón carrito siempre que esté logueado
     btnCarrito.style.display = 'flex';
 }
 
-function cambiarCantidad(delta) {
-    cantidadActual = Math.max(1, cantidadActual + delta);
-    const el = document.getElementById('qty-display');
-    if (el) el.textContent = cantidadActual;
-    actualizarPreviewSubtotal();
-}
-
-function actualizarPreviewSubtotal() {
-    if (!dispositivoActual || !modalidadActual) return;
-    const d = dispositivoActual;
-    const m = MODALIDADES.find(x => x.key === modalidadActual);
-    if (!m) return;
-
-    // Precio: contado y leasing → Precio CONTADO CNO, resto → Precio LISTA
-    const usaContadoCNO = modalidadActual === 'CONTADO' || modalidadActual === 'LEASING' || modalidadActual === 'LEASINGUSD';
-    const precioBase = usaContadoCNO ? d['Precio CONTADO CNO'] : d['Precio LISTA'];
-    const precioNum = parseNum(precioBase);
-    const moneda = m.moneda;
-
-    const prevEl = document.getElementById('preview-subtotal');
-    if (!tieneValor(precioBase) || isNaN(precioNum) || precioNum <= 0) {
-        if (prevEl) prevEl.style.display = 'none';
-        return;
-    }
-
-    const neto  = precioNum * cantidadActual;
-    const iva   = neto * 0.105;
-    const total = neto + iva;
-
-    document.getElementById('preview-neto').textContent  = fmtUSD(neto);
-    document.getElementById('preview-iva').textContent   = fmtUSD(iva);
-    document.getElementById('preview-total').textContent = fmtUSD(total);
-    if (prevEl) prevEl.style.display = 'block';
-}
-
+// ─── Agregar al carrito (siempre Precio LISTA) ───────────────────
 function agregarAlCarrito() {
     const d = dispositivoActual;
     if (!d) return;
-    const m = MODALIDADES.find(x => x.key === modalidadActual);
 
-    // En el carrito siempre Precio LISTA (la modalidad se elige globalmente en el carrito)
     const precioLista = parseNum(d['Precio LISTA']);
     const precioCNO   = parseNum(d['Precio CONTADO CNO']);
 
     carrito.push({
         nombre:      d['Nombre de Dispositivo'] || '',
-        precio:      isNaN(precioLista) ? 0 : precioLista,   // Precio LISTA siempre
-        precioCNO:   isNaN(precioCNO)   ? 0 : precioCNO,     // Precio CONTADO CNO guardado
-        precioStr:   fmtUSD(precioLista),
-        moneda:      'USD',
+        precioLista: isNaN(precioLista) ? 0 : precioLista,
+        precioCNO:   isNaN(precioCNO)   ? 0 : precioCNO,
         comision:    d['COMISIONES'] || '',
         foto:        fotoUrl(d['Foto'] || ''),
         cantidad:    cantidadActual,
-        // Guardar todas las columnas de financiación del dispositivo
         _data:       d,
     });
+
     actualizarBadge();
     document.getElementById('detalle-overlay').classList.remove('open');
     cantidadActual = 1;
     abrirCarrito();
 }
 
+// ─── Operaciones del carrito ──────────────────────────────────────
 function quitarDelCarrito(idx) {
     carrito.splice(idx, 1);
     actualizarBadge();
@@ -1027,8 +1031,7 @@ function quitarDelCarrito(idx) {
 
 function cambiarCantidadCarrito(idx, delta) {
     if (!carrito[idx]) return;
-    const nuevaCant = Math.max(1, (carrito[idx].cantidad || 1) + delta);
-    carrito[idx].cantidad = nuevaCant;
+    carrito[idx].cantidad = Math.max(1, (carrito[idx].cantidad || 1) + delta);
     actualizarBadge();
     renderCarrito();
 }
@@ -1043,351 +1046,328 @@ function cerrarCarrito() {
     document.getElementById('carrito-overlay').classList.remove('open');
 }
 
-// ─── MODALIDAD GLOBAL DEL CARRITO ─────────────────────────────────────────────
-let modalidadCarrito = 'CONTADO'; // CONTADO por defecto
-
-const MODAL_CARRITO = [
-    { key: 'CONTADO',   label: 'Contado USD',      adelantoKey: null,              cuotaKey: null,                 cuotas: 0,  moneda: 'USD', usaCNO: true  },
-    { key: 'TLC6',      label: 'Directo 6c AR$',   adelantoKey: 'Adelanto_TLC_$_6',  cuotaKey: 'CUOTA_TLC_$_6',    cuotas: 6,  moneda: 'ARS', usaCNO: false },
-    { key: 'TLC12',     label: 'Directo 12c AR$',  adelantoKey: 'Adelanto_TLC_$_12', cuotaKey: 'CUOTA_TLC_$_12',   cuotas: 12, moneda: 'ARS', usaCNO: false },
-    { key: 'TLC6USD',   label: 'Directo 6c USD',   adelantoKey: 'Adelanto_TLC_USD_6',cuotaKey: 'CUOTA_TLC_USD_6',  cuotas: 6,  moneda: 'USD', usaCNO: false },
-    { key: 'TLC12USD',  label: 'Directo 12c USD',  adelantoKey: 'Adelanto_TLC_USD_12',cuotaKey: 'CUOTA_TLC_USD_12',cuotas: 12, moneda: 'USD', usaCNO: false },
-    { key: 'LEASING',   label: 'Leasing 36c AR$',  adelantoKey: 'Adelanto_L$_36',    cuotaKey: 'Cuota_L$_36',      cuotas: 36, moneda: 'ARS', usaCNO: false },
-    { key: 'LEASINGUSD',label: 'Leasing 36c USD',  adelantoKey: 'Adelanto_L_USD_36', cuotaKey: 'Cuota_L_USD_36',   cuotas: 36, moneda: 'USD', usaCNO: true  },
-    { key: 'CREDITO',   label: 'Crédito AR$',      adelantoKey: 'Adelanto_$_CREDICOOP', cuotaKey: 'Cuotas_$_CREDICOOP_36', cuotas: 36, moneda: 'ARS', usaCNO: false },
-];
-
-function calcularTotalesCarrito(modKey) {
-    const mod = MODAL_CARRITO.find(m => m.key === modKey);
-    if (!mod) return null;
-
-    let netoBase = 0, adelantoTotal = 0, cuotaTotal = 0;
-    let todosCalculados = true;
-
-    carrito.forEach(item => {
-        const qty  = item.cantidad || 1;
-        const d    = item._data || {};
-        const base = mod.usaCNO ? (item.precioCNO || item.precio) : item.precio;
-        netoBase += base * qty;
-
-        if (mod.adelantoKey) {
-            const adelanto = parseNum(d[mod.adelantoKey]);
-            const cuota    = parseNum(d[mod.cuotaKey]);
-            if (!isNaN(adelanto) && adelanto > 0) {
-                adelantoTotal += adelanto * qty;
-                cuotaTotal    += cuota    * qty;
-            } else {
-                todosCalculados = false;
-            }
-        }
-    });
-
-    const iva   = netoBase * 0.105;
-    const total = netoBase + iva;
-
-    return { mod, netoBase, iva, total, adelantoTotal, cuotaTotal, todosCalculados };
-}
-
+// ─── Render carrito ───────────────────────────────────────────────
 function renderCarrito() {
     const body = document.getElementById('carrito-body');
+
     if (carrito.length === 0) {
         body.innerHTML = `
-            <div class="carrito-empty">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-                <div style="font-size:15px; font-weight:600; color:#94a3b8; margin-bottom:8px;">Carrito vacío</div>
-                <div style="font-size:13px; color:#64748b;">Agregá equipos desde la lista de dispositivos</div>
-                <button class="btn-seguir" style="margin-top:20px; max-width:260px; margin-left:auto; margin-right:auto;" onclick="cerrarCarrito()">Seguir navegando</button>
-            </div>`;
+        <div class="carrito-empty">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            <div style="font-size:15px; font-weight:600; color:#94a3b8; margin-bottom:8px;">Carrito vacío</div>
+            <div style="font-size:13px; color:#64748b;">Agregá equipos desde el catálogo</div>
+            <button class="btn-seguir" style="margin-top:20px;" onclick="cerrarCarrito()">← Seguir navegando</button>
+        </div>`;
         return;
     }
 
-    // Items — siempre muestran Precio LISTA
-    let itemsHtml = carrito.map((item, idx) => {
-        const qty          = item.cantidad || 1;
-        const precioUnit   = item.precio || 0;
-        const precioTotal  = precioUnit * qty;
+    // Items
+    const itemsHtml = carrito.map((item, idx) => {
+        const qty   = item.cantidad || 1;
+        const base  = item.precioLista || 0;
+        const total = base * qty;
         return `
         <div class="carrito-item">
             <div style="display:flex; align-items:flex-start; gap:10px;">
-                ${item.foto ? `<img src="${item.foto}" style="width:52px; height:52px; border-radius:8px; object-fit:contain; background:#0f1a30; flex-shrink:0;" onerror="this.style.display='none'">` : ''}
+                ${item.foto ? `<img src="${item.foto}" style="width:52px;height:52px;border-radius:8px;object-fit:contain;background:#0f1a30;flex-shrink:0;" onerror="this.style.display='none'">` : ''}
                 <div style="flex:1; min-width:0;">
                     <div class="carrito-item-nombre">${item.nombre}</div>
-                    <div class="carrito-item-mod" style="color:#64748b; font-size:11px;">Precio Lista</div>
-                    ${qty > 1 ? `<div style="font-size:11px; color:#64748b;">${fmtUSD(precioUnit)} c/u</div>` : ''}
-                    <div class="carrito-item-precio">${fmtUSD(precioTotal)}</div>
+                    <div style="font-size:11px; color:#64748b; margin-bottom:4px;">Precio Lista Base</div>
+                    ${qty > 1 ? `<div style="font-size:11px; color:#64748b;">${fmtUSD(base)} c/u</div>` : ''}
+                    <div class="carrito-item-precio">${fmtUSD(total)}</div>
                 </div>
             </div>
             <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px;">
                 <div class="item-qty-ctrl">
-                    <button class="item-qty-btn" onclick="cambiarCantidadCarrito(${idx}, -1)">−</button>
+                    <button class="item-qty-btn" onclick="cambiarCantidadCarrito(${idx},-1)">−</button>
                     <span class="item-qty-num">${qty}</span>
-                    <button class="item-qty-btn" onclick="cambiarCantidadCarrito(${idx}, 1)">+</button>
+                    <button class="item-qty-btn" onclick="cambiarCantidadCarrito(${idx},1)">+</button>
                 </div>
                 <button class="btn-quitar" onclick="quitarDelCarrito(${idx})">✕ Quitar</button>
             </div>
         </div>`;
     }).join('');
 
-    // Selector dropdown de modalidad
-    const modSelectorHtml = `
+    // Selector de financiación
+    const selectorHtml = `
     <div style="background:#0f1a30; border-radius:14px; padding:16px; margin:12px 0;">
         <div style="font-size:12px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Forma de pago</div>
         <div style="position:relative;">
-            <select id="select-modalidad-carrito" onchange="cambiarModalidadCarrito(this.value)"
+            <select id="sel-financiacion" onchange="cambiarFinanciacion(this.value)"
                 style="width:100%; padding:12px 40px 12px 14px; border-radius:10px; border:1px solid #3a86ff;
                        background:#1c2541; color:#f8fafc; font-size:14px; font-weight:600;
                        cursor:pointer; appearance:none; -webkit-appearance:none; outline:none;">
-                ${MODAL_CARRITO.map(m => `<option value="${m.key}" ${modalidadCarrito===m.key?'selected':''}>${m.label}</option>`).join('')}
+                ${FINANCIACION_OPTS.map(o => `<option value="${o.key}" ${financiacionKey===o.key?'selected':''}>${o.label}</option>`).join('')}
             </select>
             <div style="position:absolute; right:14px; top:50%; transform:translateY(-50%); pointer-events:none; color:#3a86ff; font-size:12px;">▼</div>
         </div>
     </div>`;
 
-    // Totales según modalidad
-    const calc = calcularTotalesCarrito(modalidadCarrito);
-    const mod  = calc?.mod;
-    const totalItems = carrito.reduce((s,i) => s + (i.cantidad||1), 0);
+    // Totales
+    const c   = calcularCarrito();
+    const opt = c.opt;
+    const totalItems = carrito.reduce((s, i) => s + (i.cantidad || 1), 0);
 
-    let totalesHtml = `<div class="carrito-totales">`;
-
-    if (modalidadCarrito === 'CONTADO') {
-        const netoUSD = calc.netoBase;
-        const ivaUSD  = netoUSD * 0.105;
-        totalesHtml += `
-        <div class="total-row"><span class="total-label">Neto USD (Contado)</span><span class="total-valor">${fmtUSD(netoUSD)}</span></div>
-        <div class="total-row"><span class="total-label" style="color:#f8961e;">IVA 10,5%</span><span class="total-valor" style="color:#f8961e;">${fmtUSD(ivaUSD)}</span></div>
+    const totalesHtml = `
+    <div class="carrito-totales">
+        <div class="total-row">
+            <span class="total-label">Neto Lista Base</span>
+            <span class="total-valor">${fmtUSD(c.netoLista)}</span>
+        </div>
+        ${opt.coef !== 1 ? `
+        <div class="total-row">
+            <span class="total-label" style="color:${opt.descuento?'#06d6a0':'#f8961e'};">
+                ${opt.descuento ? '− Descuento contado' : '+ Financiación'} (×${opt.coef})
+            </span>
+            <span class="total-valor" style="color:${opt.descuento?'#06d6a0':'#f8961e'};">
+                ${opt.descuento ? '−' : '+'}${fmtUSD(Math.abs(c.netoCondicionado - c.netoLista))}
+            </span>
+        </div>
+        <div class="total-row">
+            <span class="total-label">Neto ${opt.descuento?'con descuento':'financiado'}</span>
+            <span class="total-valor">${fmtUSD(c.netoCondicionado)}</span>
+        </div>` : ''}
+        <div class="total-row">
+            <span class="total-label" style="color:#f8961e;">IVA 10,5%</span>
+            <span class="total-valor" style="color:#f8961e;">${fmtUSD(c.iva)}</span>
+        </div>
         <div class="total-row" style="border-top:1px solid #3a86ff33; padding-top:10px; margin-top:4px;">
             <span class="total-label" style="font-size:14px; font-weight:700; color:#f1f5f9;">TOTAL USD c/IVA</span>
-            <span class="total-valor" style="font-size:20px; color:#3a86ff;">${fmtUSD(netoUSD + ivaUSD)}</span>
-        </div>`;
-    } else if (calc && mod.adelantoKey) {
-        const monedaFmt = mod.moneda === 'ARS' ? fmtARS : fmtUSD;
-        const netoLista = calc.netoBase;
-        const ivaLista  = netoLista * 0.105;
-        totalesHtml += `
-        <div class="total-row"><span class="total-label">Neto Lista USD</span><span class="total-valor">${fmtUSD(netoLista)}</span></div>
-        <div class="total-row"><span class="total-label" style="color:#f8961e;">IVA 10,5%</span><span class="total-valor" style="color:#f8961e;">${fmtUSD(ivaLista)}</span></div>
-        <div class="total-row" style="border-top:1px solid #3a86ff33; padding-top:10px; margin-top:4px;">
-            <span class="total-label" style="font-size:13px; font-weight:700; color:#f1f5f9;">Total c/IVA USD</span>
-            <span class="total-valor" style="font-size:18px; color:#3a86ff;">${fmtUSD(netoLista + ivaLista)}</span>
-        </div>`;
-        if (calc.todosCalculados && calc.adelantoTotal > 0) {
-            totalesHtml += `
-        <div style="margin-top:12px; background:#0f1a30; border-radius:10px; padding:12px;">
-            <div style="font-size:11px; color:#64748b; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px;">Estructura de pago — ${mod.label}</div>
-            <div class="total-row"><span class="total-label">Adelanto inicial</span><span class="total-valor" style="color:#06d6a0;">${monedaFmt(calc.adelantoTotal)}</span></div>
-            <div class="total-row"><span class="total-label">Cuota mensual × ${mod.cuotas}</span><span class="total-valor" style="color:#06d6a0;">${monedaFmt(calc.cuotaTotal)}</span></div>
-        </div>`;
-        } else if (!calc.todosCalculados) {
-            totalesHtml += `<div style="font-size:11px; color:#f8961e; margin-top:8px; text-align:center;">⚠️ Algunos ítems no tienen valores para esta modalidad</div>`;
-        }
-    }
+            <span class="total-valor" style="font-size:20px; color:#3a86ff;">${fmtUSD(c.total)}</span>
+        </div>
+        <div style="margin-top:8px; font-size:10px; color:#64748b; text-align:center;">${totalItems} unidad${totalItems>1?'es':''} · IVA 10,5% discriminado</div>
+    </div>`;
 
-    totalesHtml += `<div style="margin-top:8px; font-size:10px; color:#64748b; text-align:center;">${totalItems} unidad${totalItems>1?'es':''} · IVA 10,5% discriminado</div></div>`;
-
-    body.innerHTML = itemsHtml + modSelectorHtml + totalesHtml + `
-        <button class="btn-confirmar" onclick="abrirCheckout()">✉️ Confirmar y cargar datos del cliente</button>
+    body.innerHTML = itemsHtml + selectorHtml + totalesHtml + `
+        <button class="btn-confirmar" onclick="abrirModalResumen()">✉️ Confirmar y enviar cotización</button>
         <button class="btn-seguir" onclick="cerrarCarrito()">← Seguir navegando</button>
-        <button onclick="carrito=[]; actualizarBadge(); renderCarrito();" style="width:100%; background:none; border:none; color:#64748b; font-size:12px; padding:12px; cursor:pointer; margin-top:4px;">Vaciar carrito</button>
+        <button onclick="carrito=[];actualizarBadge();renderCarrito();" style="width:100%;background:none;border:none;color:#64748b;font-size:12px;padding:12px;cursor:pointer;margin-top:4px;">Vaciar carrito</button>
     `;
 }
 
-function cambiarModalidadCarrito(key) {
-    modalidadCarrito = key;
+function cambiarFinanciacion(key) {
+    financiacionKey = key;
     renderCarrito();
 }
 
-function abrirCheckout() {
-    const calc = calcularTotalesCarrito(modalidadCarrito);
-    const mod  = calc?.mod;
-
-    let coNeto = 0;
-    carrito.forEach(i => { coNeto += (mod?.usaCNO ? (i.precioCNO||i.precio) : i.precio) * (i.cantidad||1); });
-    const coIva = coNeto * 0.105;
-
-    const monedaFmt = mod?.moneda === 'ARS' ? fmtARS : fmtUSD;
-
-    const itemLines = carrito.map(i => {
-        const qty = i.cantidad||1;
-        const base = mod?.usaCNO ? (i.precioCNO||i.precio) : i.precio;
-        return `${qty > 1 ? qty+'x ' : ''}${i.nombre} — ${fmtUSD(base * qty)}`;
-    }).join('\n');
-
-    let resumen = itemLines + `\n──────────────────\nModalidad: ${mod?.label || 'Lista'}\nNeto: ${fmtUSD(coNeto)}\nIVA 10,5%: ${fmtUSD(coIva)}\nTOTAL c/IVA: ${fmtUSD(coNeto + coIva)}`;
-
-    if (calc?.todosCalculados && calc.adelantoTotal > 0) {
-        resumen += `\n──────────────────\nAdelanto: ${monedaFmt(calc.adelantoTotal)}\nCuota × ${mod.cuotas}: ${monedaFmt(calc.cuotaTotal)}`;
-    }
-
-    document.getElementById('checkout-resumen').textContent = resumen;
-    document.getElementById('co-vendedor').value = currentUser?.name || currentUser?.username || '';
-
-    const esExterno = currentUserRol?.toLowerCase().includes('externo');
-    const comGrp = document.getElementById('co-comision-group');
-    const comVal = document.getElementById('co-comision-valor');
-    // Buscar comisión en cualquier ítem del carrito
-    const itemConComision = carrito.find(i => i.comision && String(i.comision).trim() !== '');
-    if (esExterno && itemConComision) {
-        comGrp.style.display = 'block';
-        comVal.textContent = `💰 ${fmtPct(itemConComision.comision) || itemConComision.comision}`;
-    } else {
-        comGrp.style.display = 'none';
-    }
-
-    ['co-nombre','co-telefono','co-notas'].forEach(id => document.getElementById(id).value = '');
-    const st = document.getElementById('co-status');
-    st.className = 'form-status';
-    st.style.display = 'none';
-
-    cerrarCarrito();
-    document.getElementById('checkout-overlay').classList.add('open');
-    document.getElementById('checkout-overlay').scrollTop = 0;
+function cambiarCantidad(delta) {
+    cantidadActual = Math.max(1, cantidadActual + delta);
+    const el = document.getElementById('qty-display');
+    if (el) el.textContent = cantidadActual;
+    actualizarPreviewSubtotal();
 }
 
-document.getElementById('btn-checkout-back').addEventListener('click', () => {
-    document.getElementById('checkout-overlay').classList.remove('open');
-    abrirCarrito();
+function actualizarPreviewSubtotal() {
+    if (!dispositivoActual || !modalidadActual) return;
+    const d = dispositivoActual;
+    const usaContadoCNO = modalidadActual === 'CONTADO' || modalidadActual === 'LEASING' || modalidadActual === 'LEASINGUSD';
+    const precioBase = usaContadoCNO ? d['Precio CONTADO CNO'] : d['Precio LISTA'];
+    const precioNum = parseNum(precioBase);
+    const prevEl = document.getElementById('preview-subtotal');
+    if (!tieneValor(precioBase) || isNaN(precioNum) || precioNum <= 0) {
+        if (prevEl) prevEl.style.display = 'none';
+        return;
+    }
+    const neto  = precioNum * cantidadActual;
+    const iva   = neto * 0.105;
+    const total = neto + iva;
+    document.getElementById('preview-neto').textContent  = fmtUSD(neto);
+    document.getElementById('preview-iva').textContent   = fmtUSD(iva);
+    document.getElementById('preview-total').textContent = fmtUSD(total);
+    if (prevEl) prevEl.style.display = 'block';
+}
+
+// (funciones de carrito definidas en el módulo CARRITO arriba)
+
+// (renderCarrito, calcularCarrito, cambiarFinanciacion definidos en módulo CARRITO arriba)
+
+// ══════════════════════════════════════════════════════════════════
+// MÓDULO MODAL RESUMEN COMERCIAL
+// ══════════════════════════════════════════════════════════════════
+
+function generarIdCotizacion() {
+    const fecha = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    const rand  = Math.random().toString(36).slice(2,6).toUpperCase();
+    return 'TLC-' + fecha + '-' + rand;
+}
+
+let _blobUrlActual = null;
+let _linkWspActual = null;
+let _idCotActual   = null;
+
+function abrirModalResumen() {
+    const modal = document.getElementById('modal-resumen');
+    const c     = calcularCarrito();
+    const opt   = c.opt;
+
+    // Resetear estado
+    document.getElementById('mr-resultado').style.display = 'none';
+    document.getElementById('btn-mr-wsp').style.display = 'flex';
+    document.getElementById('mr-status').style.display = 'none';
+    ['mr-nombre','mr-razon','mr-telefono'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('mr-vendedor').value = currentUser?.name || currentUser?.username || '';
+
+    // Construir resumen de ítems
+    const totalItems = carrito.reduce((s,i) => s+(i.cantidad||1), 0);
+    const filasItems = carrito.map(i => {
+        const qty = i.cantidad||1;
+        const base = i.precioLista||0;
+        return `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #1e3050; font-size:13px;">
+            <span style="color:#e2e8f0; flex:1;">${qty>1?qty+'× ':''}${i.nombre}</span>
+            <span style="color:#3a86ff; font-weight:700; margin-left:12px;">${fmtUSD(base*qty)}</span>
+        </div>`;
+    }).join('');
+
+    const descuentoHtml = opt.coef !== 1 ? `
+    <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:12px; color:${opt.descuento?'#06d6a0':'#f8961e'};">
+        <span>${opt.label}</span>
+        <span>${opt.descuento?'−':'+'}${fmtUSD(Math.abs(c.netoCondicionado - c.netoLista))}</span>
+    </div>` : '';
+
+    document.getElementById('mr-resumen-items').innerHTML = `
+        ${filasItems}
+        <div style="margin-top:10px; padding-top:6px;">
+            ${descuentoHtml}
+            <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; color:#64748b;">
+                <span>IVA 10,5%</span><span style="color:#f8961e;">${fmtUSD(c.iva)}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0 0; font-size:15px; font-weight:800; border-top:1px solid #1e3050; margin-top:4px;">
+                <span style="color:#f1f5f9;">TOTAL USD c/IVA</span>
+                <span style="color:#3a86ff;">${fmtUSD(c.total)}</span>
+            </div>
+            <div style="font-size:10px; color:#64748b; margin-top:4px; text-align:right;">${totalItems} unidad${totalItems>1?'es':''} · ${opt.label}</div>
+        </div>`;
+
+    cerrarCarrito();
+    modal.style.display = 'block';
+    setTimeout(() => document.getElementById('modal-resumen-box').style.transform = 'none', 10);
+}
+
+function cerrarModalResumen() {
+    document.getElementById('modal-resumen').style.display = 'none';
+}
+
+// Cerrar al click fuera del box
+document.getElementById('modal-resumen').addEventListener('click', function(e) {
+    if (e.target === this) cerrarModalResumen();
 });
 
-document.getElementById('btn-co-enviar').addEventListener('click', async () => {
-    const nombre   = document.getElementById('co-nombre').value.trim();
-    const telefono = document.getElementById('co-telefono').value.trim();
-    const notas    = document.getElementById('co-notas').value.trim();
-    const vendedor = document.getElementById('co-vendedor').value.trim();
-    if (!nombre) { mostrarCoStatus('Completá el nombre y apellido.', 'error'); return; }
+async function confirmarYEnviarWsp() {
+    const nombre   = document.getElementById('mr-nombre').value.trim();
+    const razon    = document.getElementById('mr-razon').value.trim();
+    const telefono = document.getElementById('mr-telefono').value.trim();
+    const vendedor = document.getElementById('mr-vendedor').value.trim();
 
-    const btn = document.getElementById('btn-co-enviar');
-    btn.disabled = true;
-    btn.textContent = '⏳ Generando presupuesto...';
-    mostrarCoStatus('', '');
+    if (!nombre)   { mostrarMrStatus('Completá el nombre del médico.', 'error'); return; }
+    if (!telefono) { mostrarMrStatus('Completá el teléfono de contacto.', 'error'); return; }
+
+    const btn = document.getElementById('btn-mr-wsp');
+    btn.style.opacity = '0.6';
+    btn.style.pointerEvents = 'none';
+    mostrarMrStatus('⏳ Generando propuesta...', '');
 
     try {
-        // 1 — Generar HTML del presupuesto
-        const htmlPresup = generarHTMLPresupuesto({ nombre, telefono, notas, vendedor });
+        // Generar ID dinámico
+        _idCotActual = generarIdCotizacion();
 
-        // 2 — Generar blob URL (se abre solo cuando el usuario hace click)
-        const blob = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
-        const blobUrl = URL.createObjectURL(blob);
+        // Generar HTML del presupuesto
+        const htmlPresup = generarHTMLPresupuesto({ nombre, razon, telefono, vendedor, idCot: _idCotActual });
+        const blob    = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
+        _blobUrlActual = URL.createObjectURL(blob);
+        setTimeout(() => URL.revokeObjectURL(_blobUrlActual), 600000); // 10 min
 
-        // Limpiar la URL del blob después de 5 minutos
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 300000);
+        // Link del portal interactivo (futuro)
+        const linkPortal = 'https://cahirth.github.io/Portal-TLC/cotizacion.html?id=' + _idCotActual;
 
-        // 3 — Mostrar resultado con botón WhatsApp
-        const telLimpio = telefono.replace(/\D/g, '').replace(/^0/, '').replace(/^54/, '');
-        const nombreCorto = nombre.split(' ')[0];
+        // Mensaje WhatsApp ejecutivo
+        const nombreCorto = nombre.replace(/^Dr\.?\s*/i, '').split(' ')[0];
         const msgWsp = encodeURIComponent(
-            'Hola ' + nombreCorto + '! Te comparto el presupuesto de TLC para los equipos que vimos. ' +
-            'Ante cualquier consulta estoy a disposicion. Saludos, ' + (vendedor || 'TLC')
+            'Hola Dr. ' + nombreCorto + ', le comparto el presupuesto interactivo de TLC SRL ' +
+            'para los equipos solicitados. Puede ver el detalle, simular los pagos y elegir su ' +
+            'opcion preferida desde su portal seguro: ' + linkPortal +
+            ' | Ref: ' + _idCotActual
         );
-        const linkWsp = telLimpio
-            ? `https://wa.me/549${telLimpio}?text=${msgWsp}`
-            : `https://wa.me/?text=${msgWsp}`;
+        const telLimpio = telefono.replace(/\D/g,'').replace(/^0/,'').replace(/^54/,'');
+        _linkWspActual = telLimpio
+            ? 'https://wa.me/549' + telLimpio + '?text=' + msgWsp
+            : 'https://wa.me/?text=' + msgWsp;
 
-        const cantItems = carrito.length;
-        document.getElementById('co-nombre-resultado').textContent =
-            `${nombre}${telefono ? ' · ' + telefono : ''} · ${cantItems} ítem${cantItems > 1 ? 's' : ''}`;
-        document.getElementById('co-link-preview').href = blobUrl;
-        document.getElementById('co-link-preview').onclick = (e) => {
+        // Configurar panel resultado
+        document.getElementById('mr-nombre-resultado').textContent =
+            nombre + (razon ? ' · ' + razon : '') + ' · ' + _idCotActual;
+        document.getElementById('mr-link-preview').href = _blobUrlActual;
+        document.getElementById('mr-link-preview').onclick = (e) => {
             e.preventDefault();
-            window.open(blobUrl, '_blank');
+            window.open(_blobUrlActual, '_blank');
         };
-        document.getElementById('co-link-text').textContent = 'Ver presupuesto generado';
-        document.getElementById('co-btn-wsp').onclick = () => window.open(linkWsp, '_blank');
+        document.getElementById('mr-btn-wsp2').onclick = () => window.open(_linkWspActual, '_blank');
 
-        // Mostrar resultado, ocultar botón confirmar
-        document.getElementById('co-resultado').style.display = 'block';
+        // Abrir WhatsApp automáticamente
+        window.open(_linkWspActual, '_blank');
+
+        // Mostrar panel resultado
         btn.style.display = 'none';
+        document.getElementById('mr-status').style.display = 'none';
+        document.getElementById('mr-resultado').style.display = 'block';
 
-        // Limpiar carrito
+        // Vaciar carrito
         carrito = [];
         actualizarBadge();
 
-    } catch (err) {
-        mostrarCoStatus('❌ Error: ' + err.message, 'error');
-        btn.disabled = false;
-        btn.textContent = 'Confirmar Cotización';
+    } catch(err) {
+        mostrarMrStatus('❌ Error: ' + err.message, 'error');
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
     }
-});
-
-
-// ── Subir a Apps Script via fetch con text/plain (evita preflight CORS) ────────
-// Apps Script acepta POST con Content-Type: text/plain sin preflight.
-// El cuerpo sigue siendo JSON válido — Apps Script lo parsea igual.
-async function subirPresupuestoConFormulario(payload) {
-    const resp = await fetch(FOTO_MAP_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body:    JSON.stringify(payload),
-    });
-    const result = await resp.json();
-    return result;
 }
 
-function nuevoPresupuesto() {
-    // Reset checkout para nueva cotización
-    document.getElementById('co-resultado').style.display = 'none';
-    const btn = document.getElementById('btn-co-enviar');
-    btn.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Confirmar Cotización';
-    ['co-nombre','co-telefono','co-notas'].forEach(id => document.getElementById(id).value = '');
-    const st = document.getElementById('co-status');
-    st.style.display = 'none';
-    document.getElementById('checkout-overlay').classList.remove('open');
+function mostrarMrStatus(msg, tipo) {
+    const el = document.getElementById('mr-status');
+    el.textContent = msg;
+    el.className = 'form-status' + (tipo ? ' ' + tipo : '');
+    el.style.display = msg ? 'block' : 'none';
 }
 
-function generarHTMLPresupuesto({ nombre, telefono, notas, vendedor }) {
-    const fecha = new Date().toLocaleDateString('es-AR', {
-        day: '2-digit', month: 'long', year: 'numeric'
-    });
-    const nroRef = 'TLC-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Date.now().toString(36).slice(-4).toUpperCase();
+function nuevaCotizacion() {
+    cerrarModalResumen();
+}
 
-    const calc = calcularTotalesCarrito(modalidadCarrito);
-    const mod  = calc?.mod;
-    const monedaFmt = mod?.moneda === 'ARS' ? fmtARS : fmtUSD;
+// ─── Función pública abrirCheckout (alias para compatibilidad) ────
+function abrirCheckout() { abrirModalResumen(); }
+function nuevoPresupuesto() { nuevaCotizacion(); }
+function mostrarCoStatus(msg, tipo) { mostrarMrStatus(msg, tipo); }
 
-    let neto = 0;
-    carrito.forEach(i => {
-        const base = mod?.usaCNO ? (i.precioCNO || i.precio) : i.precio;
-        neto += (base || 0) * (i.cantidad || 1);
-    });
-    const iva   = neto * 0.105;
-    const total = neto + iva;
+function generarHTMLPresupuesto({ nombre, razon, telefono, vendedor, idCot }) {
+    const fecha = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'long', year:'numeric' });
+    const nroRef = idCot || generarIdCotizacion();
+
+    const c   = calcularCarrito();
+    const opt = c.opt;
 
     // Filas de ítems
     const filasItems = carrito.map(i => {
         const qty      = i.cantidad || 1;
-        const base     = mod?.usaCNO ? (i.precioCNO || i.precio) : i.precio;
-        const subtotal = (base || 0) * qty;
-        return `
-        <tr>
-            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; color:#1e293b; font-weight:500;">${i.nombre}</td>
-            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#64748b; text-align:center;">${mod?.label || ''}</td>
-            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#1e293b; text-align:center;">${qty}</td>
-            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#1e293b; text-align:right;">${fmtUSD(base || 0)}</td>
-            <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; font-weight:700; color:#0f172a; text-align:right;">${fmtUSD(subtotal)}</td>
-        </tr>`;
+        const base     = i.precioLista || 0;
+        const subtotal = base * qty;
+        return [
+            '<tr>',
+            '<td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; color:#1e293b; font-weight:500;">' + i.nombre + '</td>',
+            '<td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#64748b; text-align:center;">' + opt.label + '</td>',
+            '<td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#1e293b; text-align:center;">' + qty + '</td>',
+            '<td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:13px; color:#1e293b; text-align:right;">' + fmtUSD(base) + '</td>',
+            '<td style="padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:14px; font-weight:700; color:#0f172a; text-align:right;">' + fmtUSD(subtotal) + '</td>',
+            '</tr>'
+        ].join('');
     }).join('');
 
-    // Bloque de financiación (si aplica)
-    let financiacionHtml = '';
-    if (calc?.todosCalculados && calc.adelantoTotal > 0 && mod?.cuotas > 0) {
-        financiacionHtml = `
-  <hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">
-  <div style="padding:28px 40px;">
-    <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#94a3b8; margin-bottom:16px;">Estructura de Financiación — ${mod.label}</div>
-    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:16px 20px;">
-      <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:14px;">
-        <span style="color:#64748b;">Adelanto inicial</span>
-        <span style="font-weight:700; color:#16a34a;">${monedaFmt(calc.adelantoTotal)}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:14px; border-top:1px solid #dcfce7;">
-        <span style="color:#64748b;">Cuota mensual × ${mod.cuotas}</span>
-        <span style="font-weight:700; color:#16a34a;">${monedaFmt(calc.cuotaTotal)}</span>
-      </div>
-    </div>
-  </div>`;
-    }
+    // Bloque financiación
+    const descuentoRow = opt.coef !== 1 ? [
+        '<div style="display:flex; justify-content:space-between; padding:6px 0; font-size:14px;">',
+        '<span style="color:' + (opt.descuento ? '#16a34a' : '#ea580c') + ';">' + opt.label + '</span>',
+        '<span style="font-weight:700; color:' + (opt.descuento ? '#16a34a' : '#ea580c') + ';">' +
+            (opt.descuento ? '−' : '+') + fmtUSD(Math.abs(c.netoCondicionado - c.netoLista)) + '</span>',
+        '</div>'
+    ].join('') : '';
 
     return [
         '<!DOCTYPE html>',
@@ -1397,40 +1377,39 @@ function generarHTMLPresupuesto({ nombre, telefono, notas, vendedor }) {
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
         '<title>Presupuesto TLC - ' + nombre + '</title>',
         '<style>',
-        '* { box-sizing: border-box; margin: 0; padding: 0; }',
-        'body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; background: #f8fafc; color: #1e293b; }',
-        '.page { max-width: 720px; margin: 0 auto; background: white; min-height: 100vh; }',
-        '.header { background: linear-gradient(135deg, #0f1a30 0%, #1c2541 100%); padding: 32px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }',
-        '.logo { width: 64px; height: 64px; object-fit: contain; }',
-        '.header-info { text-align: right; }',
-        '.header-title { font-size: 22px; font-weight: 800; color: white; letter-spacing: -0.5px; }',
-        '.header-sub { font-size: 13px; color: #94a3b8; margin-top: 4px; }',
-        '.ref-badge { display: inline-block; background: rgba(58,134,255,0.2); color: #60a5fa; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-top: 8px; }',
-        '.section { padding: 28px 40px; }',
-        '.section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 16px; }',
-        '.client-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; }',
-        '.client-name { font-size: 18px; font-weight: 700; color: #0f172a; }',
-        '.client-detail { font-size: 14px; color: #64748b; margin-top: 6px; }',
-        'table { width: 100%; border-collapse: collapse; }',
-        'thead tr { background: #f8fafc; }',
-        'thead th { padding: 10px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; text-align: left; }',
-        'thead th:nth-child(3), thead th:nth-child(4), thead th:nth-child(5) { text-align: right; }',
-        'thead th:nth-child(3) { text-align: center; }',
-        '.totales-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; }',
-        '.tot-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 14px; color: #64748b; }',
-        '.tot-row.final { border-top: 2px solid #0f172a; margin-top: 8px; padding-top: 14px; }',
-        '.tot-row.final .tot-label { font-size: 16px; font-weight: 800; color: #0f172a; }',
-        '.tot-row.final .tot-val { font-size: 20px; font-weight: 800; color: #2563eb; }',
-        '.iva-row .tot-val { color: #ea580c; }',
-        '.notas-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px 18px; font-size: 14px; color: #92400e; line-height: 1.6; }',
-        '.footer { background: #0f1a30; padding: 24px 40px; text-align: center; }',
-        '.footer p { font-size: 12px; color: #64748b; margin-bottom: 4px; }',
-        '.footer a { color: #60a5fa; text-decoration: none; }',
-        '.validity { background: rgba(6,214,160,0.1); border: 1px solid rgba(6,214,160,0.3); border-radius: 8px; padding: 8px 16px; display: inline-block; margin-top: 12px; font-size: 12px; color: #06d6a0; font-weight: 600; }',
-        '@media print { body { background: white; } .page { max-width: 100%; } }',
-        '@media (max-width: 600px) { .header { padding: 20px; flex-direction: column; align-items: flex-start; } .header-info { text-align: left; } .section { padding: 20px; } .footer { padding: 20px; } }',
-        '<' + '/style>',
-        '<' + '/head>',
+        '* { box-sizing:border-box; margin:0; padding:0; }',
+        'body { font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif; background:#f8fafc; color:#1e293b; }',
+        '.page { max-width:720px; margin:0 auto; background:white; min-height:100vh; }',
+        '.header { background:linear-gradient(135deg,#0f1a30 0%,#1c2541 100%); padding:32px 40px; display:flex; align-items:center; justify-content:space-between; gap:16px; }',
+        '.logo { width:64px; height:64px; object-fit:contain; }',
+        '.header-info { text-align:right; }',
+        '.header-title { font-size:22px; font-weight:800; color:white; letter-spacing:-0.5px; }',
+        '.header-sub { font-size:13px; color:#94a3b8; margin-top:4px; }',
+        '.ref-badge { display:inline-block; background:rgba(58,134,255,0.2); color:#60a5fa; padding:4px 12px; border-radius:20px; font-size:11px; font-weight:700; margin-top:8px; }',
+        '.section { padding:28px 40px; }',
+        '.section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#94a3b8; margin-bottom:16px; }',
+        '.client-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 20px; }',
+        '.client-name { font-size:18px; font-weight:700; color:#0f172a; }',
+        '.client-detail { font-size:14px; color:#64748b; margin-top:6px; }',
+        'table { width:100%; border-collapse:collapse; }',
+        'thead tr { background:#f8fafc; }',
+        'thead th { padding:10px 16px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#64748b; text-align:left; }',
+        'thead th:nth-child(3),thead th:nth-child(4),thead th:nth-child(5) { text-align:right; }',
+        'thead th:nth-child(3) { text-align:center; }',
+        '.totales-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 20px; }',
+        '.tot-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; font-size:14px; color:#64748b; }',
+        '.tot-row.final { border-top:2px solid #0f172a; margin-top:8px; padding-top:14px; }',
+        '.tot-row.final .tot-label { font-size:16px; font-weight:800; color:#0f172a; }',
+        '.tot-row.final .tot-val { font-size:20px; font-weight:800; color:#2563eb; }',
+        '.iva-row .tot-val { color:#ea580c; }',
+        '.footer { background:#0f1a30; padding:24px 40px; text-align:center; }',
+        '.footer p { font-size:12px; color:#64748b; margin-bottom:4px; }',
+        '.footer a { color:#60a5fa; text-decoration:none; }',
+        '.validity { background:rgba(6,214,160,0.1); border:1px solid rgba(6,214,160,0.3); border-radius:8px; padding:8px 16px; display:inline-block; margin-top:12px; font-size:12px; color:#06d6a0; font-weight:600; }',
+        '@media print { body { background:white; } .page { max-width:100%; } }',
+        '@media (max-width:600px) { .header { padding:20px; flex-direction:column; align-items:flex-start; } .header-info { text-align:left; } .section { padding:20px; } .footer { padding:20px; } }',
+        '</' + 'style>',
+        '</' + 'head>',
         '<body>',
         '<div class="page">',
         '<div class="header">',
@@ -1440,50 +1419,46 @@ function generarHTMLPresupuesto({ nombre, telefono, notas, vendedor }) {
         '<div class="header-sub">Tecnología Láser Corneal SRL</div>',
         '<div class="ref-badge">' + nroRef + '</div>',
         '</div></div>',
-        '<div class="section"><div class="section-title">Cliente</div>',
+        '<div class="section">',
+        '<div class="section-title">Cliente</div>',
         '<div class="client-card">',
         '<div class="client-name">' + nombre + '</div>',
         '<div class="client-detail">',
-        (telefono ? '📱 ' + telefono : ''),
+        (razon    ? '<span>🏥 ' + razon + '</span><br>' : ''),
+        (telefono ? '<span>📱 ' + telefono + '</span>' : ''),
         '<span style="margin-left:12px; color:#94a3b8;">📅 ' + fecha + '</span>',
-        '<span style="margin-left:12px; color:#3a86ff; font-weight:600;">💳 ' + (mod?.label || 'Contado') + '</span>',
+        '<span style="margin-left:12px; color:#3a86ff; font-weight:600;">💳 ' + opt.label + '</span>',
         '</div></div></div>',
         '<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">',
-        '<div class="section"><div class="section-title">Detalle de productos</div>',
+        '<div class="section">',
+        '<div class="section-title">Detalle de productos</div>',
         '<table><thead><tr>',
-        '<th>Producto</th><th>Modalidad</th>',
-        '<th style="text-align:center;">Cant.</th>',
-        '<th style="text-align:right;">Precio u.</th>',
-        '<th style="text-align:right;">Subtotal</th>',
-        '</tr></thead><tbody>' + filasItems + '</tbody></table></div>',
+        '<th>Producto</th><th>Modalidad</th><th style="text-align:center;">Cant.</th>',
+        '<th style="text-align:right;">Lista u.</th><th style="text-align:right;">Subtotal</th>',
+        '</tr></thead><tbody>' + filasItems + '</tbody></table>',
+        '</div>',
         '<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;">',
         '<div class="section"><div class="totales-box">',
-        '<div class="tot-row"><span class="tot-label">Neto USD</span><span class="tot-val">' + fmtUSD(neto) + '</span></div>',
-        '<div class="tot-row iva-row"><span class="tot-label">IVA 10,5%</span><span class="tot-val">' + fmtUSD(iva) + '</span></div>',
-        '<div class="tot-row final"><span class="tot-label">TOTAL USD</span><span class="tot-val">' + fmtUSD(total) + '</span></div>',
+        '<div class="tot-row"><span class="tot-label">Neto Lista Base</span><span class="tot-val">' + fmtUSD(c.netoLista) + '</span></div>',
+        descuentoRow ? '<div class="tot-row">' + descuentoRow + '</div>' : '',
+        '<div class="tot-row iva-row"><span class="tot-label">IVA 10,5%</span><span class="tot-val">' + fmtUSD(c.iva) + '</span></div>',
+        '<div class="tot-row final"><span class="tot-label">TOTAL USD</span><span class="tot-val">' + fmtUSD(c.total) + '</span></div>',
         '</div>',
-        '<div style="text-align:center; margin-top:12px;"><div class="validity">✓ Válido por 15 días hábiles a partir del ' + fecha + '</div></div>',
+        '<div style="text-align:center; margin-top:12px;"><div class="validity">✓ Válido 15 días hábiles · ' + fecha + '</div></div>',
         '</div>',
-        financiacionHtml,
-        notas ? '<hr style="border:none; border-top:1px solid #e2e8f0; margin:0 40px;"><div class="section"><div class="section-title">Notas</div><div class="notas-box">' + notas + '</div></div>' : '',
         '<div class="footer">',
         '<p><strong style="color:#94a3b8;">Tecnología Láser Corneal SRL</strong></p>',
         '<p>Del Carmen 716, CABA · Argentina</p>',
         '<p style="margin-top:8px;">Asesor: ' + (vendedor || 'TLC') + '</p>',
         '<p style="margin-top:6px;"><a href="https://www.tlcsrl.com.ar">www.tlcsrl.com.ar</a></p>',
         '</div></div>',
-        // Nota: las etiquetas de cierre están partidas para evitar que el parser HTML las interprete
-        '<' + '/body>',
-        '<' + '/html>'
+        '</' + 'body>',
+        '</' + 'html>'
     ].join('\n');
 }
 
-function mostrarCoStatus(msg, tipo) {
-    const el = document.getElementById('co-status');
-    el.textContent = msg;
-    el.className = `form-status${tipo ? ' ' + tipo : ''}`;
-    el.style.display = 'block';
-}
+
+// (mostrarCoStatus, nuevoPresupuesto definidos en módulo MODAL arriba)
 
 
 document.getElementById('btn-form-back').addEventListener('click', () => {
