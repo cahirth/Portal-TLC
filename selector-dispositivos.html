@@ -596,11 +596,14 @@ async function cargarTodo() {
 
         // FotoMap en background — cuando llega, re-renderiza las fotos sin bloquear
         cargarFotoMap().then(() => {
-            // Actualizar solo las imágenes ya renderizadas sin re-renderizar todo
-            document.querySelectorAll('[data-foto-key]').forEach(img => {
-                const key = img.dataset.fotoKey;
-                if (fotoMap[key]) img.src = fotoMap[key];
-            });
+        // Actualizar todas las imágenes con data-foto-key (tengan src o no)
+        document.querySelectorAll('[data-foto-key]').forEach(img => {
+            const key = img.dataset.fotoKey;
+            const url = fotoMap[key];
+            if (url && img.src !== url) {
+                img.src = url;
+            }
+        });
         });
 
     } catch(e) {
@@ -692,9 +695,16 @@ function renderLista(items) {
             .map(m => `<span class="card-pill">${m.label}</span>`)
             .join('');
 
+        // Extraer key para data-foto-key (actualización posterior cuando llega fotoMap)
+        const fotoRaw = (d['Foto'] || '').toString().trim();
+        const fotoKeyMatch = fotoRaw.match(/^Fotos\/(.+)$/i);
+        const fotoKey = fotoKeyMatch ? fotoKeyMatch[1].toLowerCase() : '';
+
         const fotoEl = foto
-            ? `<img class="card-foto" src="${foto}" loading="lazy" onerror="this.outerHTML='<div class=\\'card-foto-placeholder\\'>🔬</div>'">`
-            : `<div class="card-foto-placeholder">🔬</div>`;
+            ? `<img class="card-foto" src="${foto}" loading="lazy" ${fotoKey ? `data-foto-key="${fotoKey}"` : ''} onerror="this.outerHTML='<div class=\\'card-foto-placeholder\\'>🔬</div>'">`
+            : fotoKey
+                ? `<img class="card-foto" src="" data-foto-key="${fotoKey}" loading="lazy" onerror="this.outerHTML='<div class=\\'card-foto-placeholder\\'>🔬</div>'">`
+                : `<div class="card-foto-placeholder">🔬</div>`;
 
         return `<div class="dispositivo-card ${oferta ? 'oferta' : ''}" onclick="abrirDetalle(${i})">
             <div class="card-header">
