@@ -579,22 +579,30 @@ function _mostrarSkeleton() {
 async function cargarTodo() {
     _mostrarSkeleton();
     try {
-        // FotoMap y Vendedores en paralelo con Precios
-        // Cargar FotoMap en paralelo con los precios
+        // Precios y Vendedores en paralelo → renderizar inmediato
         const [dispRows, vendRows] = await Promise.all([
             cargarPreciosInstantaneo(),
             _fetchSheetDirecto('Vendedores'),
-            cargarFotoMap()  // incluido en el Promise.all → espera antes de renderizar
         ]);
 
         dispositivos = dispRows.filter(d => d['Nombre de Dispositivo']?.toString().trim());
 
-        // Determinar rol del usuario logueado
         const email    = currentUser?.username?.toLowerCase() || '';
         const vendedor = vendRows.find(v => v['Email']?.toLowerCase() === email);
         currentUserRol = vendedor?.['Rol'] || 'Vend_Externo';
 
+        // Renderizar INMEDIATAMENTE con las fotos que ya haya en fotoMap
         renderLista(dispositivos);
+
+        // FotoMap en background — cuando llega, re-renderiza las fotos sin bloquear
+        cargarFotoMap().then(() => {
+            // Actualizar solo las imágenes ya renderizadas sin re-renderizar todo
+            document.querySelectorAll('[data-foto-key]').forEach(img => {
+                const key = img.dataset.fotoKey;
+                if (fotoMap[key]) img.src = fotoMap[key];
+            });
+        });
+
     } catch(e) {
         document.getElementById('lista').innerHTML =
             `<div class="empty">❌ Error cargando datos: ${e.message}
@@ -1261,8 +1269,9 @@ document.getElementById('btn-co-enviar').addEventListener('click', async () => {
             ? `https://wa.me/549${telLimpio}?text=${msgWsp}`
             : `https://wa.me/?text=${msgWsp}`;
 
+        const cantItems = carrito.length;
         document.getElementById('co-nombre-resultado').textContent =
-            `${nombre}${telefono ? ' · ' + telefono : ''} · ${carrito.length} ítem${carrito.length > 1 ? 's' : ''}`;
+            `${nombre}${telefono ? ' · ' + telefono : ''} · ${cantItems} ítem${cantItems > 1 ? 's' : ''}`;
         document.getElementById('co-link-preview').href = blobUrl;
         document.getElementById('co-link-preview').onclick = (e) => {
             e.preventDefault();
@@ -1271,8 +1280,11 @@ document.getElementById('btn-co-enviar').addEventListener('click', async () => {
         document.getElementById('co-link-text').textContent = 'Ver presupuesto generado';
         document.getElementById('co-btn-wsp').onclick = () => window.open(linkWsp, '_blank');
 
-        // Limpiar carrito y ocultar botón
+        // Mostrar resultado, ocultar botón confirmar
+        document.getElementById('co-resultado').style.display = 'block';
         btn.style.display = 'none';
+
+        // Limpiar carrito
         carrito = [];
         actualizarBadge();
 
