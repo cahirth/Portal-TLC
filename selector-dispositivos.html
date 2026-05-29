@@ -1510,9 +1510,9 @@ async function confirmarYEnviarWsp() {
         // ID ya fue generado al abrir el modal — lo reutilizamos
         const htmlPresup = generarHTMLPresupuesto({ nombre, razon, cuit, telefono, notas, vendedor, idCot: _idCotActual });
 
-        // 2 — Subir a GitHub vía Apps Script
-        mostrarMrStatus('⏳ Publicando en GitHub Pages...', '');
-        const resp = await fetch(FOTO_MAP_URL, {
+        // 2 — Subir HTML a GitHub Pages vía Apps Script
+        mostrarMrStatus('⏳ Publicando presupuesto...', '');
+        const respGitHub = await fetch(FOTO_MAP_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({
@@ -1521,23 +1521,64 @@ async function confirmarYEnviarWsp() {
                 html:   htmlPresup,
             })
         });
-        const result = await resp.json();
+        const resultGitHub = await respGitHub.json();
 
         let linkFinal;
-        if (result.ok) {
-            // Link permanente en GitHub Pages
-            linkFinal = result.link;
+        if (resultGitHub.ok) {
+            linkFinal      = resultGitHub.link;
             _blobUrlActual = null;
         } else {
-            // Fallback a blob local si GitHub falla
-            console.warn('GitHub upload falló, usando blob local:', result.error);
+            // Fallback blob local si GitHub falla
+            console.warn('GitHub upload falló, usando blob local:', resultGitHub.error);
             const blob = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
             _blobUrlActual = URL.createObjectURL(blob);
             setTimeout(() => URL.revokeObjectURL(_blobUrlActual), 600000);
             linkFinal = _blobUrlActual;
         }
 
-        // 3 — Mensaje WhatsApp con link permanente
+        // 3 — Registrar cotización en Google Sheets (fire-and-forget, no bloquea el flujo)
+        const c   = calcularCarrito();
+        const mod = c.mod;
+        const equiposStr = carrito.map(i => {
+            const qty = i.cantidad || 1;
+            return (qty > 1 ? qty + '× ' : '') + i.nombre;
+        }).join(' | ');
+        const detalleFinanciacion = (c.todosCalculados && c.adelantoTotal > 0 && mod.cuotas > 0)
+            ? 'Adelanto ' + mod.moneda + ' ' + c.adelantoTotal.toLocaleString('es-AR') +
+              ' / Cuota x' + mod.cuotas + ' ' + mod.moneda + ' ' + c.cuotaTotal.toLocaleString('es-AR')
+            : mod.label;
+        const condicionesComerciales = mod.key === 'CONTADO'
+            ? 'Precio contado USD. Anticipado 100% + IVA 10,5%.'
+            : mod.label + '. Precio de lista + IVA 10,5%.' + (mod.cuotas > 0 ? ' Financiación sujeta a aprobación crediticia.' : '');
+
+        fetch(FOTO_MAP_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    JSON.stringify({
+                accion:                 'registrarCotizacion',
+                idCotizacion:           _idCotActual,
+                equipoModelo:           equiposStr,
+                precioEquipo:           c.netoBase,
+                modalidadFinanciacion:  mod.label,
+                detalleFinanciacion:    detalleFinanciacion,
+                condicionesComerciales: condicionesComerciales,
+                nombreMedico:           nombre,
+                razonSocial:            razon,
+                cuit:                   cuit,
+                telefono:               telefono,
+                notas:                  notas,
+                vendedor:               vendedor,
+                linkPdf:                linkFinal,
+            })
+        }).then(r => r.json()).then(reg => {
+            if (reg.status === 'SUCCESS') {
+                console.log('✅ Cotización registrada en Sheets:', reg.id, '— fila', reg.fila);
+            } else {
+                console.warn('⚠️ Error registrando en Sheets:', reg.message);
+            }
+        }).catch(err => console.warn('⚠️ Error Sheets:', err));
+
+        // 4 — Mensaje WhatsApp con link permanente
         const nombreCorto = nombre.replace(/^Dr\.?\s*/i, '').split(' ')[0];
         const msgWsp = encodeURIComponent(
             'Hola Dr. ' + nombreCorto + ', le comparto el presupuesto de TLC SRL ' +
@@ -1549,7 +1590,7 @@ async function confirmarYEnviarWsp() {
             ? 'https://wa.me/549' + telLimpio + '?text=' + msgWsp
             : 'https://wa.me/?text=' + msgWsp;
 
-        // 4 — Configurar panel resultado
+        // 5 — Configurar panel resultado
         document.getElementById('mr-nombre-resultado').textContent =
             nombre + (razon ? ' · ' + razon : '') + ' · ' + _idCotActual;
         document.getElementById('mr-link-preview').href = linkFinal;
@@ -1559,15 +1600,15 @@ async function confirmarYEnviarWsp() {
         };
         document.getElementById('mr-btn-wsp2').onclick = () => window.open(_linkWspActual, '_blank');
 
-        // 5 — Abrir WhatsApp automáticamente
+        // 6 — Abrir WhatsApp automáticamente
         window.open(_linkWspActual, '_blank');
 
-        // 6 — Mostrar resultado
+        // 7 — Mostrar resultado
         btn.style.display = 'none';
         document.getElementById('mr-status').style.display = 'none';
         document.getElementById('mr-resultado').style.display = 'block';
 
-        // 7 — Vaciar carrito
+        // 8 — Vaciar carrito
         carrito = [];
         actualizarBadge();
 
