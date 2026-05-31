@@ -331,10 +331,14 @@
 
             <!-- Botones de acción -->
             <div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
-                <button id="btn-mr-wsp" onclick="confirmarYEnviarWsp()"
-                    style="width:100%; padding:14px; border-radius:12px; background:linear-gradient(135deg,#25d366,#128c7e); border:none; color:white; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;">
+                <button id="btn-mr-generar" onclick="generarPropuesta()"
+                    style="width:100%; padding:14px; border-radius:12px; background:linear-gradient(135deg,#3a86ff,#1d4ed8); border:none; color:white; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;">
+                    📄 Generar propuesta
+                </button>
+                <button id="btn-mr-wsp" onclick="enviarPorWsp()" disabled
+                    style="width:100%; padding:14px; border-radius:12px; background:linear-gradient(135deg,#25d366,#128c7e); border:none; color:white; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; opacity:0.4;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                    Generar propuesta y enviar por WhatsApp
+                    Enviar por WhatsApp
                 </button>
                 <button onclick="cerrarModalResumen()"
                     style="width:100%; padding:12px; border-radius:12px; background:transparent; border:1px solid #1e3050; color:#64748b; font-size:14px; cursor:pointer;">
@@ -1417,8 +1421,15 @@ function abrirModalResumen() {
 
     // Resetear estado
     document.getElementById('mr-resultado').style.display = 'none';
-    document.getElementById('btn-mr-wsp').style.display = 'flex';
     document.getElementById('mr-status').style.display = 'none';
+    const btnGenerar = document.getElementById('btn-mr-generar');
+    btnGenerar.style.opacity = '1';
+    btnGenerar.style.pointerEvents = 'auto';
+    btnGenerar.innerHTML = '📄 Generar propuesta';
+    const btnWsp = document.getElementById('btn-mr-wsp');
+    btnWsp.disabled = true;
+    btnWsp.style.opacity = '0.4';
+    btnWsp.style.pointerEvents = 'none';
     ['mr-nombre','mr-razon','mr-cuit','mr-telefono','mr-notas'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
@@ -1490,7 +1501,11 @@ document.getElementById('modal-resumen').addEventListener('click', function(e) {
     if (e.target === this) cerrarModalResumen();
 });
 
-async function confirmarYEnviarWsp() {
+// ─── CONSTANTE Power Automate ─────────────────────────────────────
+const PA_COTIZACIONES_URL = 'https://defaultbbd111b805224e3d9f4378d1ca0e71.cf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/b4eb28434ac742a593cd4a6474e5acbc/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=HivXdlMfjDrUpdPTOUB5HKj_cMzc4NgxEn3Ff4AcYdo';
+
+// ─── PASO 1: Generar propuesta ────────────────────────────────────
+async function generarPropuesta() {
     const nombre   = document.getElementById('mr-nombre').value.trim();
     const razon    = document.getElementById('mr-razon').value.trim();
     const cuit     = document.getElementById('mr-cuit').value.trim();
@@ -1501,16 +1516,16 @@ async function confirmarYEnviarWsp() {
     if (!nombre)   { mostrarMrStatus('Completá el nombre del médico.', 'error'); return; }
     if (!telefono) { mostrarMrStatus('Completá el teléfono de contacto.', 'error'); return; }
 
-    const btn = document.getElementById('btn-mr-wsp');
-    btn.style.opacity = '0.6';
-    btn.style.pointerEvents = 'none';
+    const btnGenerar = document.getElementById('btn-mr-generar');
+    btnGenerar.style.opacity = '0.6';
+    btnGenerar.style.pointerEvents = 'none';
+    btnGenerar.textContent = '⏳ Generando...';
     mostrarMrStatus('⏳ Subiendo presupuesto...', '');
 
     try {
-        // ID ya fue generado al abrir el modal — lo reutilizamos
         const htmlPresup = generarHTMLPresupuesto({ nombre, razon, cuit, telefono, notas, vendedor, idCot: _idCotActual });
 
-        // 2 — Subir HTML a GitHub Pages vía Apps Script
+        // Subir HTML a GitHub Pages vía Apps Script
         mostrarMrStatus('⏳ Publicando presupuesto...', '');
         const respGitHub = await fetch(FOTO_MAP_URL, {
             method:  'POST',
@@ -1528,7 +1543,6 @@ async function confirmarYEnviarWsp() {
             linkFinal      = resultGitHub.link;
             _blobUrlActual = null;
         } else {
-            // Fallback blob local si GitHub falla
             console.warn('GitHub upload falló, usando blob local:', resultGitHub.error);
             const blob = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
             _blobUrlActual = URL.createObjectURL(blob);
@@ -1536,7 +1550,7 @@ async function confirmarYEnviarWsp() {
             linkFinal = _blobUrlActual;
         }
 
-        // 3 — Registrar cotización en Google Sheets (fire-and-forget, no bloquea el flujo)
+        // Calcular datos del carrito
         const c   = calcularCarrito();
         const mod = c.mod;
         const equiposStr = carrito.map(i => {
@@ -1551,6 +1565,7 @@ async function confirmarYEnviarWsp() {
             ? 'Precio contado USD. Anticipado 100% + IVA 10,5%.'
             : mod.label + '. Precio de lista + IVA 10,5%.' + (mod.cuotas > 0 ? ' Financiación sujeta a aprobación crediticia.' : '');
 
+        // Registrar en Google Sheets (fire-and-forget)
         fetch(FOTO_MAP_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
@@ -1571,43 +1586,37 @@ async function confirmarYEnviarWsp() {
                 linkPdf:                linkFinal,
             })
         }).then(r => r.json()).then(reg => {
-            if (reg.status === 'SUCCESS') {
-                console.log('✅ Cotización registrada en Sheets:', reg.id, '— fila', reg.fila);
-            } else {
-                console.warn('⚠️ Error registrando en Sheets:', reg.message);
-            }
+            if (reg.status === 'SUCCESS') console.log('✅ Sheets:', reg.id, '— fila', reg.fila);
+            else console.warn('⚠️ Error Sheets:', reg.message);
         }).catch(err => console.warn('⚠️ Error Sheets:', err));
 
-        // 3b — Registrar en SharePoint via Power Automate (fire-and-forget)
-        const PA_URL = 'https://defaultbbd111b805224e3d9f4378d1ca0e71.cf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/b4eb28434ac742a593cd4a6474e5acbc/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=HivXdlMfjDrUpdPTOUB5HKj_cMzc4NgxEn3Ff4AcYdo';
-        const paPayload = {
-            id:          _idCotActual,
-            fecha:       new Date().toLocaleString('es-AR'),
-            vendedor:    vendedor,
-            nombre:      nombre,
-            razonSocial: razon      || '',
-            cuit:        cuit       || '',
-            telefono:    telefono   || '',
-            equipos:     equiposStr || '',
-            modalidad:   mod.label  || '',
-            netoUSD:     c.netoBase || 0,
-            iva:         c.iva      || 0,
-            totalUSD:    c.total    || 0,
-            adelanto:    c.adelantoTotal || 0,
-            cuotas:      c.cuotaTotal    || 0,
-            link:        (linkFinal && !linkFinal.startsWith('blob:')) ? linkFinal : '',
-            estado:      'Enviada',
-            notas:       notas      || '',
-        };
-        console.log('PA payload:', JSON.stringify(paPayload));
-        fetch(PA_URL, {
+        // Registrar en SharePoint via Power Automate (fire-and-forget)
+        fetch(PA_COTIZACIONES_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(paPayload)
-        }).then(r => console.log('✅ SharePoint registrado, status:', r.status))
+            body:    JSON.stringify({
+                id:          _idCotActual,
+                fecha:       new Date().toLocaleString('es-AR'),
+                vendedor:    vendedor,
+                nombre:      nombre,
+                razonSocial: razon      || '',
+                cuit:        cuit       || '',
+                telefono:    telefono   || '',
+                equipos:     equiposStr || '',
+                modalidad:   mod.label  || '',
+                netoUSD:     Math.round(c.netoBase * 100) / 100,
+                iva:         Math.round(c.iva      * 100) / 100,
+                totalUSD:    Math.round(c.total    * 100) / 100,
+                adelanto:    Math.round((c.adelantoTotal || 0) * 100) / 100,
+                cuotas:      Math.round((c.cuotaTotal    || 0) * 100) / 100,
+                link:        (linkFinal && !linkFinal.startsWith('blob:')) ? linkFinal : '',
+                estado:      'Enviada',
+                notas:       notas || '',
+            })
+        }).then(r => console.log('✅ SharePoint status:', r.status))
           .catch(err => console.warn('⚠️ Error SharePoint:', err));
 
-        // 4 — Mensaje WhatsApp con link permanente
+        // Preparar link WhatsApp
         const nombreCorto = nombre.replace(/^Dr\.?\s*/i, '').split(' ')[0];
         const msgWsp = encodeURIComponent(
             'Hola Dr. ' + nombreCorto + ', le comparto el presupuesto de TLC SRL ' +
@@ -1619,33 +1628,47 @@ async function confirmarYEnviarWsp() {
             ? 'https://wa.me/549' + telLimpio + '?text=' + msgWsp
             : 'https://wa.me/?text=' + msgWsp;
 
-        // 5 — Configurar panel resultado
-        document.getElementById('mr-nombre-resultado').textContent =
-            nombre + (razon ? ' · ' + razon : '') + ' · ' + _idCotActual;
+        // Configurar link de preview
         document.getElementById('mr-link-preview').href = linkFinal;
         document.getElementById('mr-link-preview').onclick = (e) => {
             e.preventDefault();
             window.open(linkFinal, '_blank');
         };
         document.getElementById('mr-btn-wsp2').onclick = () => window.open(_linkWspActual, '_blank');
+        document.getElementById('mr-nombre-resultado').textContent =
+            nombre + (razon ? ' · ' + razon : '') + ' · ' + _idCotActual;
 
-        // 6 — Abrir WhatsApp automáticamente
-        window.open(_linkWspActual, '_blank');
+        // Habilitar botón WhatsApp
+        const btnWsp = document.getElementById('btn-mr-wsp');
+        btnWsp.disabled = false;
+        btnWsp.style.opacity = '1';
+        btnWsp.style.pointerEvents = 'auto';
 
-        // 7 — Mostrar resultado
-        btn.style.display = 'none';
-        document.getElementById('mr-status').style.display = 'none';
+        // Mostrar panel resultado
         document.getElementById('mr-resultado').style.display = 'block';
+        document.getElementById('mr-status').style.display = 'none';
 
-        // 8 — Vaciar carrito
+        // Restaurar botón generar
+        btnGenerar.style.opacity = '1';
+        btnGenerar.style.pointerEvents = 'auto';
+        btnGenerar.textContent = '🔄 Regenerar propuesta';
+
+        // Vaciar carrito
         carrito = [];
         actualizarBadge();
 
     } catch(err) {
         mostrarMrStatus('❌ Error: ' + err.message, 'error');
-        btn.style.opacity = '1';
-        btn.style.pointerEvents = 'auto';
+        btnGenerar.style.opacity = '1';
+        btnGenerar.style.pointerEvents = 'auto';
+        btnGenerar.innerHTML = '📄 Generar propuesta';
     }
+}
+
+// ─── PASO 2: Enviar por WhatsApp ──────────────────────────────────
+function enviarPorWsp() {
+    if (!_linkWspActual) return;
+    window.open(_linkWspActual, '_blank');
 }
 
 function mostrarMrStatus(msg, tipo) {
