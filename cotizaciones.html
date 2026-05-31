@@ -45,8 +45,17 @@
         .estado-enviada { background: rgba(58,134,255,0.15); color: #60a5fa; border: 1px solid rgba(58,134,255,0.3); }
         .estado-seguimiento { background: rgba(248,150,30,0.15); color: #f8961e; border: 1px solid rgba(248,150,30,0.3); }
         .estado-cerrada { background: rgba(6,214,160,0.15); color: #06d6a0; border: 1px solid rgba(6,214,160,0.3); }
+        .estado-ganada { background: rgba(6,214,160,0.15); color: #06d6a0; border: 1px solid rgba(6,214,160,0.3); }
         .estado-perdida { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
         .estado-default { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
+
+        /* FOTOS THUMB */
+        .fotos-thumb { display: flex; gap: 4px; margin-top: 6px; }
+        .foto-thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: contain; background: #0b1329; border: 1px solid #222e50; flex-shrink: 0; }
+
+        /* SELECTOR ESTADO */
+        .estado-select { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid #222e50; background: #1c2541; color: #f8fafc; font-size: 13px; font-weight: 600; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; }
+        .estado-select:focus { border-color: #3a86ff; }
 
         /* DETALLE OVERLAY */
         .detalle-overlay { position: fixed; inset: 0; background: #0b1329; z-index: 200; display: none; overflow-y: auto; }
@@ -111,7 +120,7 @@
     <button class="filtro-btn active" data-estado="TODOS" onclick="selFiltro(this)">Todos</button>
     <button class="filtro-btn" data-estado="Enviada" onclick="selFiltro(this)">📤 Enviada</button>
     <button class="filtro-btn" data-estado="En seguimiento" onclick="selFiltro(this)">🔵 Seguimiento</button>
-    <button class="filtro-btn" data-estado="Cerrada" onclick="selFiltro(this)">✅ Cerrada</button>
+    <button class="filtro-btn" data-estado="Ganada" onclick="selFiltro(this)">✅ Ganada</button>
     <button class="filtro-btn" data-estado="Perdida" onclick="selFiltro(this)">❌ Perdida</button>
 </div>
 
@@ -141,6 +150,10 @@ const CLIENT_ID = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const PA_LEER_URL = 'https://defaultbbd111b805224e3d9f4378d1ca0e71.cf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/922cfb807b454766a7b40c7ccbfb3742/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=VUeSzJbLOaG5RWXAjz13Xmv5GP2HGAGJVyoKi8hfJI8';
 const SHEET_ID = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
+const PRECIOS_JSON_URL = 'https://cahirth.github.io/Portal-TLC/precios.json';
+const FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbxOZsC8_FfappFkx8Dj8KdsUCuVqz5QQ-jSzChKiAe6a_F_Me6GY1tFC8q42YnW00vv/exec';
+
+let dispFotoMap = {}; // nombre_dispositivo_lower → URL foto
 
 const msalConfig = {
     auth: {
@@ -190,6 +203,64 @@ async function init() {
     } catch(e) { console.warn('Permisos:', e); }
 
     await cargar();
+    // Cargar fotos en background
+    cargarFotoMap();
+}
+
+// ─── FOTO MAP ─────────────────────────────────────────────────────────────────
+async function cargarFotoMap() {
+    try {
+        // Intentar precios.json primero (más rápido)
+        const res = await fetch(PRECIOS_JSON_URL, { cache: 'default' });
+        if (res.ok) {
+            const data = await res.json();
+            let fotoMap = {};
+            // Cargar fotoMap del Apps Script para resolver rutas Fotos/xxx
+            try {
+                const r2 = await fetch(FOTO_MAP_URL, { redirect: 'follow' });
+                const t2 = await r2.text();
+                fotoMap = JSON.parse(t2);
+            } catch(e) {}
+
+            data.forEach(d => {
+                const nombre = (d['Nombre de Dispositivo'] || '').trim().toLowerCase();
+                if (!nombre) return;
+                const foto = d['Foto'] || '';
+                const url = resolverFotoUrl(foto, fotoMap);
+                if (url) dispFotoMap[nombre] = url;
+            });
+            // Re-renderizar lista con fotos
+            renderLista();
+        }
+    } catch(e) { console.warn('fotoMap:', e); }
+}
+
+function resolverFotoUrl(foto, fotoMap) {
+    if (!foto) return '';
+    const s = String(foto).trim();
+    if (s.includes('lh3.googleusercontent.com')) return s;
+    const mDrive = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (mDrive) return `https://lh3.googleusercontent.com/d/${mDrive[1]}`;
+    const mFotos = s.match(/^Fotos\/(.+)$/i);
+    if (mFotos) {
+        const nombre = mFotos[1].toLowerCase();
+        const webp = nombre.replace(/\.(png|jpg|jpeg)$/i, '.webp');
+        return fotoMap[webp] || fotoMap[nombre] || '';
+    }
+    return '';
+}
+
+function fotosDeEquipos(equiposStr) {
+    const nombres = String(equiposStr || '').split('|').map(e => e.trim().replace(/^\d+×\s*/, '').toLowerCase());
+    return nombres
+        .map(n => {
+            // Buscar match exacto o parcial
+            if (dispFotoMap[n]) return dispFotoMap[n];
+            const key = Object.keys(dispFotoMap).find(k => k.includes(n.substring(0, 8)) || n.includes(k.substring(0, 8)));
+            return key ? dispFotoMap[key] : null;
+        })
+        .filter(Boolean)
+        .slice(0, 3); // máximo 3 fotos
 }
 
 // ─── CARGAR DATOS ─────────────────────────────────────────────────────────────
@@ -250,12 +321,12 @@ async function cargar() {
 function mostrarStats() {
     const total = todasLasCot.length;
     const totalUSD = todasLasCot.reduce((s, c) => s + (parseFloat(c['TOTAL USD']) || 0), 0);
-    const cerradas = todasLasCot.filter(c => c['ESTADO'] === 'Cerrada').length;
+    const cerradas = todasLasCot.filter(c => c['ESTADO'] === 'Ganada' || c['ESTADO'] === 'Cerrada').length;
 
     document.getElementById('stats-bar').innerHTML = `
         <div class="stat-chip"><div class="val">${total}</div><div class="lbl">Cotizaciones</div></div>
         <div class="stat-chip"><div class="val">${fmtUSD(totalUSD)}</div><div class="lbl">Monto total</div></div>
-        <div class="stat-chip"><div class="val" style="color:#06d6a0;">${cerradas}</div><div class="lbl">Cerradas</div></div>
+        <div class="stat-chip"><div class="val" style="color:#06d6a0;">${cerradas}</div><div class="lbl">Ganadas</div></div>
     `;
     document.getElementById('stats-bar').style.display = 'flex';
 }
@@ -291,14 +362,19 @@ function renderLista() {
         const idx = todasLasCot.indexOf(c);
         const estadoClass = estadoBadge(c['ESTADO']);
         const equipos = String(c['EQUIPOS'] || '').split('|').map(e => e.trim()).join(' · ');
+        const fotos = fotosDeEquipos(c['EQUIPOS']);
+        const fotosHtml = fotos.length
+            ? `<div class="fotos-thumb">${fotos.map(f => `<img class="foto-thumb" src="${f}" onerror="this.style.display='none'">`).join('')}</div>`
+            : '';
         return `<div class="cot-card" onclick="abrirDetalle(${idx})">
             <div class="cot-card-header">
                 <div style="flex:1; min-width:0;">
                     <div class="cot-nombre">${c['NOMBRE'] || '—'}</div>
                     <div class="cot-equipo">${equipos || '—'}</div>
-                    <div class="cot-fecha">${formatFecha(c['FECHA'])} · ${c['ID'] || ''}</div>
+                    ${fotosHtml}
+                    <div class="cot-fecha" style="margin-top:4px;">${formatFecha(c['FECHA'])} · ${c['ID'] || ''}</div>
                 </div>
-                <div style="text-align:right; flex-shrink:0;">
+                <div style="text-align:right; flex-shrink:0; margin-left:8px;">
                     <div class="cot-monto">${fmtUSD(c['TOTAL USD'])}</div>
                     <div class="cot-modalidad">${c['MODALIDAD'] || ''}</div>
                     <div style="margin-top:5px;"><span class="estado-badge ${estadoClass}">${c['ESTADO'] || 'Sin estado'}</span></div>
@@ -330,7 +406,19 @@ function abrirDetalle(idx) {
             ${campo('ID', c['ID'])}
             ${campo('Fecha', formatFecha(c['FECHA']))}
             ${campo('Vendedor', c['VENDEDOR'])}
-            ${campo('Estado', `<span class="estado-badge ${estadoBadge(c['ESTADO'])}">${c['ESTADO'] || '—'}</span>`)}
+            <div class="campo-row" style="align-items:center;">
+                <span class="campo-label">Estado</span>
+                <div style="position:relative; width:180px;">
+                    <select class="estado-select" id="sel-estado" onchange="cambiarEstado(this.value)">
+                        <option value="Enviada" ${c['ESTADO']==='Enviada'?'selected':''}>📤 Enviada</option>
+                        <option value="En seguimiento" ${c['ESTADO']==='En seguimiento'?'selected':''}>🔵 En seguimiento</option>
+                        <option value="Ganada" ${(c['ESTADO']==='Ganada'||c['ESTADO']==='Cerrada')?'selected':''}>✅ Ganada</option>
+                        <option value="Perdida" ${c['ESTADO']==='Perdida'?'selected':''}>❌ Perdida</option>
+                    </select>
+                    <div style="position:absolute; right:10px; top:50%; transform:translateY(-50%); pointer-events:none; color:#3a86ff; font-size:11px;">▼</div>
+                </div>
+            </div>
+            <div id="estado-status" style="font-size:11px; color:#06d6a0; padding:4px 0; display:none;">✅ Estado actualizado</div>
         </div>
     </div>`;
 
@@ -416,10 +504,37 @@ function estadoBadge(estado) {
     const map = {
         'Enviada': 'estado-enviada',
         'En seguimiento': 'estado-seguimiento',
-        'Cerrada': 'estado-cerrada',
+        'Cerrada': 'estado-ganada',
+        'Ganada': 'estado-ganada',
         'Perdida': 'estado-perdida',
     };
     return map[estado] || 'estado-default';
+}
+
+// ─── CAMBIAR ESTADO ───────────────────────────────────────────────────────────
+async function cambiarEstado(nuevoEstado) {
+    if (!cotActual) return;
+    const statusEl = document.getElementById('estado-status');
+    statusEl.style.display = 'none';
+
+    // Actualizar localmente primero
+    const idxGlobal = todasLasCot.indexOf(cotActual);
+    cotActual['ESTADO'] = nuevoEstado;
+    if (idxGlobal >= 0) todasLasCot[idxGlobal]['ESTADO'] = nuevoEstado;
+
+    // Mostrar feedback
+    statusEl.textContent = '⏳ Guardando...';
+    statusEl.style.color = '#94a3b8';
+    statusEl.style.display = 'block';
+
+    // Por ahora solo local — cuando tengamos el flow de actualización lo conectamos
+    setTimeout(() => {
+        statusEl.textContent = '✅ Estado actualizado (local)';
+        statusEl.style.color = '#06d6a0';
+        // Re-renderizar lista para reflejar el cambio
+        renderLista();
+        mostrarStats();
+    }, 300);
 }
 
 function fmtUSD(n) {
