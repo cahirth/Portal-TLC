@@ -1578,30 +1578,32 @@ async function confirmarYEnviarWsp() {
             }
         }).catch(err => console.warn('⚠️ Error Sheets:', err));
 
-        // 3b — Registrar cotización en SharePoint via Power Automate (fire-and-forget)
-        const PA_COTIZACIONES_URL = 'https://defaultbbd111b805224e3d9f4378d1ca0e71.cf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/b4eb28434ac742a593cd4a6474e5acbc/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=HivXdlMfjDrUpdPTOUB5HKj_cMzc4NgxEn3Ff4AcYdo';
-        fetch(PA_COTIZACIONES_URL, {
+        // 3b — Registrar en SharePoint via Power Automate (fire-and-forget)
+        const PA_URL = 'https://defaultbbd111b805224e3d9f4378d1ca0e71.cf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/b4eb28434ac742a593cd4a6474e5acbc/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=HivXdlMfjDrUpdPTOUB5HKj_cMzc4NgxEn3Ff4AcYdo';
+        const paPayload = {
+            id:          _idCotActual,
+            fecha:       new Date().toLocaleString('es-AR'),
+            vendedor:    vendedor,
+            nombre:      nombre,
+            razonSocial: razon      || '',
+            cuit:        cuit       || '',
+            telefono:    telefono   || '',
+            equipos:     equiposStr || '',
+            modalidad:   mod.label  || '',
+            netoUSD:     c.netoBase || 0,
+            iva:         c.iva      || 0,
+            totalUSD:    c.total    || 0,
+            adelanto:    c.adelantoTotal || 0,
+            cuotas:      c.cuotaTotal    || 0,
+            link:        linkFinal  || '',
+            estado:      'Enviada',
+            notas:       notas      || '',
+        };
+        console.log('PA payload:', JSON.stringify(paPayload));
+        fetch(PA_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({
-                id:          _idCotActual,
-                fecha:       new Date().toLocaleString('es-AR'),
-                vendedor:    vendedor,
-                nombre:      nombre,
-                razonSocial: razon,
-                cuit:        cuit,
-                telefono:    telefono,
-                equipos:     equiposStr,
-                modalidad:   mod.label,
-                netoUSD:     c.netoBase,
-                iva:         c.iva,
-                totalUSD:    c.total,
-                adelanto:    c.adelantoTotal || 0,
-                cuotas:      c.cuotaTotal    || 0,
-                link:        linkFinal,
-                estado:      'Enviada',
-                notas:       notas,
-            })
+            body:    JSON.stringify(paPayload)
         }).then(r => console.log('✅ SharePoint registrado, status:', r.status))
           .catch(err => console.warn('⚠️ Error SharePoint:', err));
 
