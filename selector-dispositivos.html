@@ -160,7 +160,7 @@
 
 <!-- HEADER -->
 <div class="header">
-    <button id="btn-nav-back" onclick="navegarAtras()" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; padding:4px 8px 4px 0; line-height:1;">←</button>
+    <button id="btn-nav-back" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; padding:4px 8px 4px 0; line-height:1;">←</button>
     <img class="logo" src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" onerror="this.style.display='none'" alt="TLC">
     <div class="header-text">
         <h1>Dispositivos TLC</h1>
@@ -206,8 +206,13 @@
     </div>
 
     <!-- PANTALLA SUBCATEGORÍAS -->
-    <div id="vista-subcategorias" style="display:none; padding:12px 16px; flex-direction:column; gap:10px;">
-        <div id="subcats-grid"></div>
+    <div id="vista-subcategorias" style="display:none; flex-direction:column;">
+        <div style="position:sticky; top:62px; z-index:50; background:#030712; padding:8px 20px; border-bottom:1px solid #1c2541;">
+            <input type="text" id="buscador-subcats" placeholder="Buscar subcategoría..."
+                oninput="filtrarSubcats(this.value)"
+                style="width:100%; background:#1c2541; border:1px solid #222e50; border-radius:10px; padding:10px 16px 10px 40px; color:#f8fafc; font-size:14px; outline:none; background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E&quot;); background-repeat:no-repeat; background-position:14px center;">
+        </div>
+        <div id="subcats-grid" style="padding:12px 16px; display:flex; flex-direction:column; gap:10px;"></div>
     </div>
 
     <!-- PANTALLA LISTA -->
@@ -836,6 +841,52 @@ const CAT_LABELS = {
     'CIRUGIA':     { label: 'Cirugía',      icon: '⚕️' },
     'SERV_TECNICO':{ label: 'Servicio',     icon: '🔧' },
 };
+
+const SUBCAT_LABELS = {
+    'AUTOREFRACTOR':          'Autorefractómetro',
+    'BIOMETRO':               'Biómetro',
+    'CAMARA RETINAL':         'Cámara Retinal',
+    'CAMARA SUPERFICIE OCULAR':'Cámara Superficie Ocular',
+    'CAMPIMETRO':             'Campímetro',
+    'FOROPTERO':              'Foróptero Digital',
+    'LAMPARA HENDIDURA':      'Lámpara de Hendidura',
+    'LENSOMETRO':             'Lensómetro',
+    'MULTIPLATAFORMA':        'Multiplataforma',
+    'OCT':                    'OCT',
+    'OFTALMOSCOPIO':          'Oftalmoscopio',
+    'OFTALMOSCOPIO DIGITAL':  'Oftalmoscopio Digital',
+    'TONOMETRO':              'Tonómetro',
+    'TONOMETRO APLANACION':   'Tonómetro Aplanación',
+    'TONOMETRO NO CONTACTO':  'Tonómetro No Contacto',
+    'TOPOGRAFO':              'Topógrafo',
+    'ULTRASONIDOS':           'Ultrasonidos',
+    'OJO SECO':               'Ojo Seco',
+    'PANTALLA OPTOTIPOS':     'Pantalla Optotipos',
+    'MICROQUERATOMO':         'Microquerátomo',
+    'BISTURIES':              'Bisturíes',
+    'CORTADORES':             'Cortadores',
+    'TROCARES':               'Trocares',
+    'INSTRUMENTAL':           'Instrumental',
+    'SONDAS LASER':           'Sondas Láser',
+    'ESPONJAS PVA':           'Esponjas PVA',
+    'CUCHILLAS':              'Cuchillas LASIK',
+    'TUBULADURAS VACIO':      'Tubos de Vacío',
+    'FUNDAS MOTOR':           'Fundas Motor',
+    'LUPAS':                  'Lupas',
+};
+
+const SUBCAT_ICONS = {
+    'AUTOREFRACTOR':'👁️', 'BIOMETRO':'📏', 'CAMARA RETINAL':'📸',
+    'CAMPIMETRO':'🎯', 'FOROPTERO':'🔭', 'LAMPARA HENDIDURA':'💡',
+    'LENSOMETRO':'🔍', 'OCT':'🖥️', 'OFTALMOSCOPIO':'🔦',
+    'OFTALMOSCOPIO DIGITAL':'🔦', 'TONOMETRO':'⚡', 'TONOMETRO APLANACION':'⚡',
+    'TONOMETRO NO CONTACTO':'💨', 'TOPOGRAFO':'🌐', 'ULTRASONIDOS':'🔊',
+    'OJO SECO':'💧', 'PANTALLA OPTOTIPOS':'📺', 'MULTIPLATAFORMA':'🖥️',
+    'MICROQUERATOMO':'⚕️', 'BISTURIES':'🔪', 'CORTADORES':'✂️',
+    'TROCARES':'💉', 'INSTRUMENTAL':'🔬', 'SONDAS LASER':'⚡',
+    'ESPONJAS PVA':'🧽', 'CUCHILLAS':'🔪', 'TUBULADURAS VACIO':'🔗',
+    'FUNDAS MOTOR':'🛡️', 'LUPAS':'🔎',
+};
 const CAT_ORDEN = ['DIAGNOSTICO','EQUIPOS','INSUMOS','CIRUGIA','SERV_TECNICO'];
 
 let catActual = null;
@@ -904,17 +955,21 @@ function abrirCategoria(cat) {
             </div>
             <span style="color:#94a3b8; font-size:18px;">›</span>
         </div>` +
-        subcats.map(s => `<div onclick="abrirSubcat('${s}')" style="
-            background:#1c2541; border:1px solid #222e50; border-radius:14px;
-            padding:14px 18px; display:flex; align-items:center; gap:14px;
-            cursor:pointer; margin-bottom:10px;">
-            <span style="font-size:22px;">📦</span>
-            <div style="flex:1;">
-                <div style="font-size:14px; font-weight:700; color:#f1f5f9;">${s}</div>
-                <div style="font-size:11px; color:#64748b; margin-top:2px;">${subconteo[s]} equipos</div>
-            </div>
-            <span style="color:#94a3b8; font-size:18px;">›</span>
-        </div>`).join('');
+        subcats.map(s => {
+            const label = SUBCAT_LABELS[s] || s;
+            const icon = SUBCAT_ICONS[s] || '📦';
+            return `<div onclick="abrirSubcat('${s}')" data-subcat="${s.toLowerCase()}" style="
+                background:#1c2541; border:1px solid #222e50; border-radius:14px;
+                padding:14px 18px; display:flex; align-items:center; gap:14px;
+                cursor:pointer;">
+                <span style="font-size:22px;">${icon}</span>
+                <div style="flex:1;">
+                    <div style="font-size:14px; font-weight:700; color:#f1f5f9;">${label}</div>
+                    <div style="font-size:11px; color:#64748b; margin-top:2px;">${subconteo[s]} equipos</div>
+                </div>
+                <span style="color:#94a3b8; font-size:18px;">›</span>
+            </div>`;
+        }).join('');
 
         _mostrarVista('subcategorias');
     } else {
@@ -951,6 +1006,10 @@ function _mostrarVista(vista) {
         document.getElementById('vista-subcategorias').style.display = 'flex';
         document.getElementById('btn-nav-back').onclick = volverCategorias;
         if (greeting) greeting.textContent = CAT_INFO.label;
+        const bSub = document.getElementById('buscador-subcats');
+        if (bSub) { bSub.value = ''; }
+        // Mostrar todos
+        document.querySelectorAll('#subcats-grid [data-subcat]').forEach(el => el.style.display = 'flex');
     } else if (vista === 'lista') {
         document.getElementById('vista-lista').style.display = 'block';
         const hasSubs = document.getElementById('subcats-grid').children.length > 0;
@@ -980,17 +1039,30 @@ function volverCategorias() {
     catActual = null;
     subcatActual = 'TODAS';
     _mostrarVista('categorias');
+    window.scrollTo(0, 0);
+    document.getElementById('vista-categorias').scrollTop = 0;
 }
 
 function volverSubcategorias() {
     subcatActual = 'TODAS';
     _mostrarVista('subcategorias');
+    window.scrollTo(0, 0);
+    document.getElementById('vista-subcategorias').scrollTop = 0;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     const buscador = document.getElementById('buscador');
     if (buscador) buscador.addEventListener('input', filtrar);
 });
+
+function filtrarSubcats(q) {
+    const qLow = q.toLowerCase().trim();
+    document.querySelectorAll('#subcats-grid [data-subcat]').forEach(el => {
+        const subcat = el.dataset.subcat || '';
+        const label = (el.querySelector('div > div:first-child')?.textContent || '').toLowerCase();
+        el.style.display = (!qLow || subcat.includes(qLow) || label.includes(qLow)) ? 'flex' : 'none';
+    });
+}
 
 function filtrar() {
     const q = sinAcentos((document.getElementById('buscador')?.value || '').trim());
