@@ -923,14 +923,49 @@ function renderCategorias() {
     }
 }
 
-function abrirCategoria(cat) {
-    catActual = cat;
-    subcatActual = 'TODAS';
+// ─── ALGORITMO DE AGRUPACIÓN DINÁMICA ────────────────────────────────────────
+// Agrupa subcategorías que comparten la primera palabra
+// Ej: OFTALMOSCOPIO DIGITAL + OFTALMOSCOPIO DIRECTO → grupo OFTALMOSCOPIO
+function _agruparSubcats(subcats, subconteo) {
+    // Contar cuántas subcats comparten cada primera palabra
+    const porPrimeraWord = {};
+    subcats.forEach(s => {
+        const primera = s.split(' ')[0];
+        if (!porPrimeraWord[primera]) porPrimeraWord[primera] = [];
+        porPrimeraWord[primera].push(s);
+    });
 
-    const info = CAT_LABELS[cat] || { label: cat };
-    // cat-titulo removed
+    // Armar nodos: si una primera palabra tiene >1 hijos → es grupo expandible
+    const nodos = [];
+    const procesadas = new Set();
 
-    // Contar por subcategoría
+    subcats.forEach(s => {
+        if (procesadas.has(s)) return;
+        const primera = s.split(' ')[0];
+        const hermanos = porPrimeraWord[primera];
+
+        if (hermanos.length > 1) {
+            // Es un grupo
+            if (!procesadas.has('__grupo__' + primera)) {
+                procesadas.add('__grupo__' + primera);
+                const totalGrupo = hermanos.reduce((acc, h) => acc + (subconteo[h] || 0), 0);
+                nodos.push({ tipo: 'grupo', key: primera, hijos: hermanos.sort(), total: totalGrupo });
+                hermanos.forEach(h => procesadas.add(h));
+            }
+        } else {
+            // Es individual
+            procesadas.add(s);
+            nodos.push({ tipo: 'item', key: s, total: subconteo[s] || 0 });
+        }
+    });
+
+    return nodos;
+}
+
+// Estado del grupo expandido
+let _grupoExpandido = null;
+
+function _renderSubcatsGrid(cat) {
     const subconteo = {};
     dispositivos
         .filter(d => d['Categoria'] === cat)
@@ -940,43 +975,103 @@ function abrirCategoria(cat) {
         });
 
     const subcats = Object.keys(subconteo).sort();
+    const nodos = _agruparSubcats(subcats, subconteo);
+    const totalCat = dispositivos.filter(d => d['Categoria'] === cat).length;
+    const grid = document.getElementById('subcats-grid');
 
-    // Si hay subcategorías → mostrar pantalla de subcats
-    // Si no hay → ir directo a la lista
-    if (subcats.length > 1) {
-        const grid = document.getElementById('subcats-grid');
-        // Card "Todos" primero
-        const totalCat = dispositivos.filter(d => d['Categoria'] === cat).length;
-        grid.innerHTML = `<div onclick="abrirSubcat('TODAS')" style="
-            background:#1c2541; border:1px solid #3a86ff33; border-radius:14px;
-            padding:14px 18px; display:flex; align-items:center; gap:14px;
-            cursor:pointer; margin-bottom:10px;">
-            <span style="font-size:24px;">📋</span>
-            <div style="flex:1;">
-                <div style="font-size:14px; font-weight:700; color:#3a86ff;">Todos</div>
-                <div style="font-size:11px; color:#64748b; margin-top:2px;">${totalCat} equipos</div>
-            </div>
-            <span style="color:#94a3b8; font-size:18px;">›</span>
-        </div>` +
-        subcats.map(s => {
-            const label = SUBCAT_LABELS[s] || s;
-            const icon = SUBCAT_ICONS[s] || '📦';
-            return `<div onclick="abrirSubcat('${s}')" data-subcat="${s.toLowerCase()}" style="
+    let html = `<div onclick="abrirSubcat('TODAS')" style="
+        background:#1c2541; border:1px solid #3a86ff33; border-radius:14px;
+        padding:14px 18px; display:flex; align-items:center; gap:14px; cursor:pointer;"
+        data-subcat="todos">
+        <span style="font-size:24px;">📋</span>
+        <div style="flex:1;">
+            <div style="font-size:14px; font-weight:700; color:#3a86ff;">Todos</div>
+            <div style="font-size:11px; color:#64748b; margin-top:2px;">${totalCat} equipos</div>
+        </div>
+        <span style="color:#94a3b8; font-size:18px;">›</span>
+    </div>`;
+
+    nodos.forEach(nodo => {
+        if (nodo.tipo === 'item') {
+            const label = SUBCAT_LABELS[nodo.key] || _titleCase(nodo.key);
+            const icon = SUBCAT_ICONS[nodo.key] || '📦';
+            html += `<div onclick="abrirSubcat('${nodo.key}')" data-subcat="${nodo.key.toLowerCase()}" style="
                 background:#1c2541; border:1px solid #222e50; border-radius:14px;
-                padding:14px 18px; display:flex; align-items:center; gap:14px;
-                cursor:pointer;">
+                padding:14px 18px; display:flex; align-items:center; gap:14px; cursor:pointer;">
                 <span style="font-size:22px;">${icon}</span>
                 <div style="flex:1;">
                     <div style="font-size:14px; font-weight:700; color:#f1f5f9;">${label}</div>
-                    <div style="font-size:11px; color:#64748b; margin-top:2px;">${subconteo[s]} equipos</div>
+                    <div style="font-size:11px; color:#64748b; margin-top:2px;">${nodo.total} equipos</div>
                 </div>
                 <span style="color:#94a3b8; font-size:18px;">›</span>
             </div>`;
-        }).join('');
+        } else {
+            // Grupo expandible
+            const labelGrupo = SUBCAT_LABELS[nodo.key] || _titleCase(nodo.key);
+            const iconGrupo = SUBCAT_ICONS[nodo.key] || '📦';
+            const isOpen = _grupoExpandido === nodo.key;
+            html += `<div style="border-radius:14px; overflow:hidden; border:1px solid ${isOpen ? '#3a86ff66' : '#222e50'};">
+                <div onclick="toggleGrupo('${nodo.key}')" data-subcat="${nodo.key.toLowerCase()}" style="
+                    background:${isOpen ? '#1a2f50' : '#1c2541'};
+                    padding:14px 18px; display:flex; align-items:center; gap:14px; cursor:pointer;">
+                    <span style="font-size:22px;">${iconGrupo}</span>
+                    <div style="flex:1;">
+                        <div style="font-size:14px; font-weight:700; color:#f1f5f9;">${labelGrupo}</div>
+                        <div style="font-size:11px; color:#64748b; margin-top:2px;">${nodo.total} equipos</div>
+                    </div>
+                    <span style="color:#3a86ff; font-size:14px; transition:transform 0.2s; display:inline-block; transform:rotate(${isOpen ? '90deg' : '0deg'})">>›</span>
+                </div>
+                ${isOpen ? `<div style="background:#0f1a30; padding:8px 14px 14px; display:flex; flex-direction:column; gap:6px;">
+                    ${nodo.hijos.map(h => {
+                        const hLabel = SUBCAT_LABELS[h] || _titleCase(h.replace(nodo.key, '').trim() || h);
+                        const hSuffix = h.replace(nodo.key, '').trim();
+                        const displayLabel = hSuffix || hLabel;
+                        return `<div onclick="abrirSubcat('${h}')" style="
+                            background:#1c2541; border:1px solid #222e50; border-radius:10px;
+                            padding:11px 14px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+                            <span style="font-size:14px; color:#3a86ff;">›</span>
+                            <div style="flex:1;">
+                                <div style="font-size:13px; font-weight:600; color:#f1f5f9;">${displayLabel}</div>
+                                <div style="font-size:10px; color:#64748b;">${subconteo[h] || 0} equipos</div>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>` : ''}
+            </div>`;
+        }
+    });
 
+    grid.innerHTML = html;
+}
+
+function _titleCase(s) {
+    return s.toLowerCase().replace(/\w/g, c => c.toUpperCase());
+}
+
+function toggleGrupo(key) {
+    _grupoExpandido = _grupoExpandido === key ? null : key;
+    _renderSubcatsGrid(catActual);
+    // Re-aplicar filtro de búsqueda si hay texto
+    const q = document.getElementById('buscador-subcats')?.value || '';
+    if (q) filtrarSubcats(q);
+}
+
+function abrirCategoria(cat) {
+    catActual = cat;
+    subcatActual = 'TODAS';
+    _grupoExpandido = null;
+
+    const subcats = [...new Set(
+        dispositivos
+            .filter(d => d['Categoria'] === cat)
+            .map(d => (d['Sub Categoria'] || '').trim())
+            .filter(Boolean)
+    )];
+
+    if (subcats.length > 1) {
+        _renderSubcatsGrid(cat);
         _mostrarVista('subcategorias');
     } else {
-        // Sin subcategorías → limpiar grid e ir directo a lista
         document.getElementById('subcats-grid').innerHTML = '';
         abrirSubcat('TODAS');
     }
@@ -984,10 +1079,6 @@ function abrirCategoria(cat) {
 
 function abrirSubcat(sub) {
     subcatActual = sub;
-    const info = CAT_LABELS[catActual] || { label: catActual };
-    const label = sub === 'TODAS' ? info.label : sub;
-    // subcat-titulo removed
-
     _mostrarVista('lista');
     document.getElementById('buscador').value = '';
     filtrar();
@@ -1060,10 +1151,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function filtrarSubcats(q) {
     const qLow = q.toLowerCase().trim();
-    document.querySelectorAll('#subcats-grid [data-subcat]').forEach(el => {
-        const subcat = el.dataset.subcat || '';
-        const label = (el.querySelector('div > div:first-child')?.textContent || '').toLowerCase();
-        el.style.display = (!qLow || subcat.includes(qLow) || label.includes(qLow)) ? 'flex' : 'none';
+    // Re-render with filter applied via _renderSubcatsGrid won't work easily,
+    // so hide/show top-level items
+    document.querySelectorAll('#subcats-grid > div').forEach(el => {
+        const subcat = (el.dataset.subcat || '').toLowerCase();
+        const texts = el.textContent.toLowerCase();
+        el.style.display = (!qLow || subcat.includes(qLow) || texts.includes(qLow)) ? '' : 'none';
     });
 }
 
@@ -1072,7 +1165,11 @@ function filtrar() {
     const filtrados = dispositivos.filter(d => {
         if (!catActual) return true;
         if (d['Categoria'] !== catActual) return false;
-        if (subcatActual !== 'TODAS' && (d['Sub Categoria'] || '').trim() !== subcatActual) return false;
+        if (subcatActual !== 'TODAS') {
+            const dSub = (d['Sub Categoria'] || '').trim();
+            // Match exacto o match de grupo (primera palabra)
+            if (dSub !== subcatActual) return false;
+        }
         const nombre = sinAcentos(d['Nombre de Dispositivo']);
         const desc   = sinAcentos(d['Descripcion']);
         return !q || nombre.includes(q) || desc.includes(q);
