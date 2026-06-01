@@ -396,8 +396,16 @@ function abrirDetalle(idx) {
     const equipos = String(c['EQUIPOS'] || '').split('|').map(e => e.trim());
     const tieneFinanciacion = parseFloat(c['ADELANTO']) > 0 || parseFloat(c['CUOTAS']) > 0;
     const mod = MODAL_CARRITO_INFO[c['MODALIDAD']] || {};
+    const fotosDetalle = fotosDeEquipos(c['EQUIPOS']);
 
     let html = '';
+
+    // — Fotos arriba
+    if (fotosDetalle.length) {
+        html += `<div style="display:flex; gap:8px; justify-content:center;">
+            ${fotosDetalle.map(f => `<img src="${f}" style="flex:1; max-width:${fotosDetalle.length === 1 ? '100%' : '48%'}; height:140px; object-fit:contain; border-radius:12px; background:#1c2541; border:1px solid #222e50;" onerror="this.style.display='none'">`).join('')}
+        </div>`;
+    }
 
     // — Identificación
     html += `<div class="seccion">
@@ -512,29 +520,38 @@ function estadoBadge(estado) {
 }
 
 // ─── CAMBIAR ESTADO ───────────────────────────────────────────────────────────
+const PA_ACTUALIZAR_URL = 'https://defaultbbd111b805224e3d9f4378d1ca0e71.cf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/ceae01bda8d74903bd3e4d07816c7d7c/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2f7usQy_8IbS7SrdAhBH7D1NDwltFAhZf81dfMrFHMY';
+
 async function cambiarEstado(nuevoEstado) {
     if (!cotActual) return;
     const statusEl = document.getElementById('estado-status');
-    statusEl.style.display = 'none';
-
-    // Actualizar localmente primero
-    const idxGlobal = todasLasCot.indexOf(cotActual);
-    cotActual['ESTADO'] = nuevoEstado;
-    if (idxGlobal >= 0) todasLasCot[idxGlobal]['ESTADO'] = nuevoEstado;
-
-    // Mostrar feedback
     statusEl.textContent = '⏳ Guardando...';
     statusEl.style.color = '#94a3b8';
     statusEl.style.display = 'block';
 
-    // Por ahora solo local — cuando tengamos el flow de actualización lo conectamos
-    setTimeout(() => {
-        statusEl.textContent = '✅ Estado actualizado (local)';
-        statusEl.style.color = '#06d6a0';
-        // Re-renderizar lista para reflejar el cambio
-        renderLista();
-        mostrarStats();
-    }, 300);
+    // Actualizar localmente
+    const idxGlobal = todasLasCot.indexOf(cotActual);
+    cotActual['ESTADO'] = nuevoEstado;
+    if (idxGlobal >= 0) todasLasCot[idxGlobal]['ESTADO'] = nuevoEstado;
+
+    try {
+        const res = await fetch(PA_ACTUALIZAR_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: cotActual['ID'], estado: nuevoEstado })
+        });
+        if (res.ok || res.status === 202) {
+            statusEl.textContent = '✅ Estado actualizado';
+            statusEl.style.color = '#06d6a0';
+            renderLista();
+            mostrarStats();
+        } else {
+            throw new Error('HTTP ' + res.status);
+        }
+    } catch(e) {
+        statusEl.textContent = '❌ Error: ' + e.message;
+        statusEl.style.color = '#f87171';
+    }
 }
 
 function fmtUSD(n) {
