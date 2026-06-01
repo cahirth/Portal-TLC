@@ -689,8 +689,8 @@ async function cargarTodo() {
                     img.onerror = null;
                 }
             });
-            // Re-render categorías con conteos actualizados
-            renderCategorias();
+            // Actualizar solo el grid de categorías sin cambiar la vista actual
+            if (!catActual) renderCategorias();
         });
 
     } catch(e) {
@@ -917,7 +917,10 @@ function renderCategorias() {
         </div>`;
     }).join('');
 
-    _mostrarVista('categorias');
+    // Solo mostrar pantalla de categorías si el usuario no navegó a ninguna aún
+    if (!catActual) {
+        _mostrarVista('categorias');
+    }
 }
 
 function abrirCategoria(cat) {
