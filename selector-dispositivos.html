@@ -199,19 +199,27 @@
 
 <!-- APP -->
 <div id="app-section">
-    <div class="filtros">
-        <button class="filtro-btn active" data-cat="TODOS">Todos</button>
-        <button class="filtro-btn" data-cat="EQUIPOS">Equipos</button>
-        <button class="filtro-btn" data-cat="INSUMOS">Insumos</button>
-        <button class="filtro-btn" data-cat="SERV_TECNICO">Servicio</button>
-        <button class="filtro-btn" data-cat="OFERTAS">⭐ Ofertas</button>
+
+    <!-- PANTALLA CATEGORÍAS -->
+    <div id="vista-categorias" style="padding:12px 16px; display:flex; flex-direction:column; gap:10px;">
+        <div id="cats-grid"></div>
     </div>
-    <div class="buscador">
-        <input type="text" id="buscador" placeholder="Buscar dispositivo o descripción...">
+
+    <!-- PANTALLA LISTA CON SUBCATEGORÍAS -->
+    <div id="vista-lista" style="display:none;">
+        <div style="display:flex; align-items:center; gap:8px; padding:10px 20px; border-bottom:1px solid #1c2541;">
+            <button onclick="volverCategorias()" style="background:#1c2541; border:1px solid #222e50; border-radius:8px; color:#94a3b8; font-size:12px; padding:5px 10px; cursor:pointer;">← Categorías</button>
+            <span id="cat-titulo" style="font-size:13px; font-weight:700; color:#f1f5f9;"></span>
+        </div>
+        <div id="subcats-wrap" style="padding:10px 20px; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; border-bottom:1px solid #1c2541;"></div>
+        <div class="buscador">
+            <input type="text" id="buscador" placeholder="Buscar dispositivo o descripción...">
+        </div>
+        <div class="lista" id="lista">
+            <div class="loading"><div class="spinner"></div><p>Cargando dispositivos...</p></div>
+        </div>
     </div>
-    <div class="lista" id="lista">
-        <div class="loading"><div class="spinner"></div><p>Cargando dispositivos...</p></div>
-    </div>
+
 </div>
 
 <!-- DETALLE -->
@@ -657,8 +665,10 @@ async function cargarTodo() {
         const vendedor = vendRows.find(v => v['Email']?.toLowerCase() === email);
         currentUserRol = vendedor?.['Rol'] || 'Vend_Externo';
 
-        // Renderizar INMEDIATAMENTE con las fotos que ya haya en fotoMap
-        renderLista(dispositivos);
+        // Renderizar categorías
+        renderCategorias();
+        // Renderizar lista (vacía hasta que se elija categoría)
+        renderLista([]);
 
         // FotoMap en background — actualiza imágenes sin re-renderizar
         // Prueba la key WebP primero, luego la original como fallback
@@ -673,6 +683,8 @@ async function cargarTodo() {
                     img.onerror = null;
                 }
             });
+            // Re-render categorías con conteos actualizados
+            renderCategorias();
         });
 
     } catch(e) {
@@ -811,49 +823,119 @@ function renderLista(items) {
 }
 
 // ─── FILTROS Y BÚSQUEDA ───────────────────────────────────────────────────────
-document.querySelectorAll('.filtro-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        filtrar();
-    });
-});
-
-document.getElementById('buscador').addEventListener('input', filtrar);
-
 function sinAcentos(s) {
     return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+// ─── SISTEMA DE CATEGORÍAS ────────────────────────────────────────────────────
+const CAT_LABELS = {
+    'DIAGNOSTICO': { label: 'Diagnóstico', icon: '🔬' },
+    'EQUIPOS':     { label: 'Equipos',      icon: '🏥' },
+    'INSUMOS':     { label: 'Insumos',      icon: '🧪' },
+    'CIRUGIA':     { label: 'Cirugía',      icon: '⚕️' },
+    'SERV_TECNICO':{ label: 'Servicio',     icon: '🔧' },
+};
+const CAT_ORDEN = ['DIAGNOSTICO','EQUIPOS','INSUMOS','CIRUGIA','SERV_TECNICO'];
+
+let catActual = null;
+let subcatActual = 'TODAS';
+
+function renderCategorias() {
+    // Contar equipos por categoría
+    const conteo = {};
+    dispositivos.forEach(d => {
+        const c = d['Categoria'] || '';
+        if (c) conteo[c] = (conteo[c] || 0) + 1;
+    });
+
+    const cats = CAT_ORDEN.filter(c => conteo[c]);
+    const grid = document.getElementById('cats-grid');
+    grid.innerHTML = cats.map(cat => {
+        const info = CAT_LABELS[cat] || { label: cat, icon: '📦' };
+        return `<div onclick="abrirCategoria('${cat}')" style="
+            background:#1c2541; border:1px solid #222e50; border-radius:14px;
+            padding:16px 18px; display:flex; align-items:center; gap:14px;
+            cursor:pointer; transition:all 0.15s;">
+            <span style="font-size:28px;">${info.icon}</span>
+            <div style="flex:1;">
+                <div style="font-size:15px; font-weight:700; color:#f1f5f9;">${info.label}</div>
+                <div style="font-size:11px; color:#64748b; margin-top:2px;">${conteo[cat]} equipos</div>
+            </div>
+            <span style="color:#94a3b8; font-size:18px;">›</span>
+        </div>`;
+    }).join('');
+
+    document.getElementById('vista-categorias').style.display = 'flex';
+    document.getElementById('vista-lista').style.display = 'none';
+}
+
+function abrirCategoria(cat) {
+    catActual = cat;
+    subcatActual = 'TODAS';
+
+    const info = CAT_LABELS[cat] || { label: cat };
+    document.getElementById('cat-titulo').textContent = info.label;
+
+    // Armar subcategorías únicas
+    const subcats = [...new Set(
+        dispositivos
+            .filter(d => d['Categoria'] === cat)
+            .map(d => (d['Sub Categoria'] || '').trim())
+            .filter(Boolean)
+    )].sort();
+
+    const wrap = document.getElementById('subcats-wrap');
+    wrap.innerHTML = `<button class="filtro-btn active" data-sub="TODAS" onclick="selSubcat(this,'TODAS')">Todos</button>` +
+        subcats.map(s => `<button class="filtro-btn" data-sub="${s}" onclick="selSubcat(this,'${s}')">${s}</button>`).join('');
+
+    document.getElementById('vista-categorias').style.display = 'none';
+    document.getElementById('vista-lista').style.display = 'block';
+    document.getElementById('buscador').value = '';
+    filtrar();
+}
+
+function volverCategorias() {
+    catActual = null;
+    subcatActual = 'TODAS';
+    document.getElementById('vista-categorias').style.display = 'flex';
+    document.getElementById('vista-lista').style.display = 'none';
+}
+
+function selSubcat(btn, sub) {
+    document.querySelectorAll('#subcats-wrap .filtro-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    subcatActual = sub;
+    filtrar();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const buscador = document.getElementById('buscador');
+    if (buscador) buscador.addEventListener('input', filtrar);
+});
+
 function filtrar() {
-    const cat = document.querySelector('.filtro-btn.active')?.dataset.cat || 'TODOS';
-    const q = sinAcentos(document.getElementById('buscador').value.trim());
+    const q = sinAcentos((document.getElementById('buscador')?.value || '').trim());
     const filtrados = dispositivos.filter(d => {
-        const esOferta = d['Oferta'] === true || d['Oferta'] === 'TRUE';
-        const matchCat = cat === 'TODOS' || cat === 'OFERTAS'
-            ? (cat === 'OFERTAS' ? esOferta : true)
-            : d['Categoria'] === cat;
+        if (!catActual) return true;
+        if (d['Categoria'] !== catActual) return false;
+        if (subcatActual !== 'TODAS' && (d['Sub Categoria'] || '').trim() !== subcatActual) return false;
         const nombre = sinAcentos(d['Nombre de Dispositivo']);
         const desc   = sinAcentos(d['Descripcion']);
-        const matchQ = !q || nombre.includes(q) || desc.includes(q);
-        return matchCat && matchQ;
+        return !q || nombre.includes(q) || desc.includes(q);
     });
     renderLista(filtrados);
 }
 
 // ─── DETALLE ─────────────────────────────────────────────────────────────────
 function abrirDetalle(idx) {
-    const cat = document.querySelector('.filtro-btn.active')?.dataset.cat || 'TODOS';
-    const q = sinAcentos(document.getElementById('buscador').value.trim());
+    const q = sinAcentos((document.getElementById('buscador')?.value || '').trim());
     const filtrados = dispositivos.filter(d => {
-        const esOferta = d['Oferta'] === true || d['Oferta'] === 'TRUE';
-        const matchCat = cat === 'TODOS' ? true
-            : cat === 'OFERTAS' ? esOferta
-            : d['Categoria'] === cat;
+        if (!catActual) return true;
+        if (d['Categoria'] !== catActual) return false;
+        if (subcatActual !== 'TODAS' && (d['Sub Categoria'] || '').trim() !== subcatActual) return false;
         const nombre = sinAcentos(d['Nombre de Dispositivo']);
         const desc   = sinAcentos(d['Descripcion']);
-        const matchQ = !q || nombre.includes(q) || desc.includes(q);
-        return matchCat && matchQ;
+        return !q || nombre.includes(q) || desc.includes(q);
     });
 
     dispositivoActual = filtrados[idx];
