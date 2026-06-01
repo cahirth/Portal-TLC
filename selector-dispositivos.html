@@ -205,13 +205,21 @@
         <div id="cats-grid"></div>
     </div>
 
-    <!-- PANTALLA LISTA CON SUBCATEGORÍAS -->
-    <div id="vista-lista" style="display:none;">
-        <div style="display:flex; align-items:center; gap:8px; padding:10px 20px; border-bottom:1px solid #1c2541;">
+    <!-- PANTALLA SUBCATEGORÍAS -->
+    <div id="vista-subcategorias" style="display:none; padding:12px 16px; flex-direction:column; gap:10px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
             <button onclick="volverCategorias()" style="background:#1c2541; border:1px solid #222e50; border-radius:8px; color:#94a3b8; font-size:12px; padding:5px 10px; cursor:pointer;">← Categorías</button>
             <span id="cat-titulo" style="font-size:13px; font-weight:700; color:#f1f5f9;"></span>
         </div>
-        <div id="subcats-wrap" style="padding:10px 20px; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; border-bottom:1px solid #1c2541;"></div>
+        <div id="subcats-grid"></div>
+    </div>
+
+    <!-- PANTALLA LISTA -->
+    <div id="vista-lista" style="display:none;">
+        <div style="display:flex; align-items:center; gap:8px; padding:10px 20px; border-bottom:1px solid #1c2541;">
+            <button onclick="volverSubcategorias()" style="background:#1c2541; border:1px solid #222e50; border-radius:8px; color:#94a3b8; font-size:12px; padding:5px 10px; cursor:pointer;">← Volver</button>
+            <span id="subcat-titulo" style="font-size:13px; font-weight:700; color:#f1f5f9;"></span>
+        </div>
         <div class="buscador">
             <input type="text" id="buscador" placeholder="Buscar dispositivo o descripción...">
         </div>
@@ -876,19 +884,63 @@ function abrirCategoria(cat) {
     const info = CAT_LABELS[cat] || { label: cat };
     document.getElementById('cat-titulo').textContent = info.label;
 
-    // Armar subcategorías únicas
-    const subcats = [...new Set(
-        dispositivos
-            .filter(d => d['Categoria'] === cat)
-            .map(d => (d['Sub Categoria'] || '').trim())
-            .filter(Boolean)
-    )].sort();
+    // Contar por subcategoría
+    const subconteo = {};
+    dispositivos
+        .filter(d => d['Categoria'] === cat)
+        .forEach(d => {
+            const s = (d['Sub Categoria'] || '').trim();
+            if (s) subconteo[s] = (subconteo[s] || 0) + 1;
+        });
 
-    const wrap = document.getElementById('subcats-wrap');
-    wrap.innerHTML = `<button class="filtro-btn active" data-sub="TODAS" onclick="selSubcat(this,'TODAS')">Todos</button>` +
-        subcats.map(s => `<button class="filtro-btn" data-sub="${s}" onclick="selSubcat(this,'${s}')">${s}</button>`).join('');
+    const subcats = Object.keys(subconteo).sort();
+
+    // Si hay subcategorías → mostrar pantalla de subcats
+    // Si no hay → ir directo a la lista
+    if (subcats.length > 1) {
+        const grid = document.getElementById('subcats-grid');
+        // Card "Todos" primero
+        const totalCat = dispositivos.filter(d => d['Categoria'] === cat).length;
+        grid.innerHTML = `<div onclick="abrirSubcat('TODAS')" style="
+            background:#1c2541; border:1px solid #3a86ff33; border-radius:14px;
+            padding:14px 18px; display:flex; align-items:center; gap:14px;
+            cursor:pointer; margin-bottom:10px;">
+            <span style="font-size:24px;">📋</span>
+            <div style="flex:1;">
+                <div style="font-size:14px; font-weight:700; color:#3a86ff;">Todos</div>
+                <div style="font-size:11px; color:#64748b; margin-top:2px;">${totalCat} equipos</div>
+            </div>
+            <span style="color:#94a3b8; font-size:18px;">›</span>
+        </div>` +
+        subcats.map(s => `<div onclick="abrirSubcat('${s}')" style="
+            background:#1c2541; border:1px solid #222e50; border-radius:14px;
+            padding:14px 18px; display:flex; align-items:center; gap:14px;
+            cursor:pointer; margin-bottom:10px;">
+            <span style="font-size:22px;">📦</span>
+            <div style="flex:1;">
+                <div style="font-size:14px; font-weight:700; color:#f1f5f9;">${s}</div>
+                <div style="font-size:11px; color:#64748b; margin-top:2px;">${subconteo[s]} equipos</div>
+            </div>
+            <span style="color:#94a3b8; font-size:18px;">›</span>
+        </div>`).join('');
+
+        document.getElementById('vista-categorias').style.display = 'none';
+        document.getElementById('vista-subcategorias').style.display = 'flex';
+        document.getElementById('vista-lista').style.display = 'none';
+    } else {
+        // Sin subcategorías → ir directo a lista
+        abrirSubcat('TODAS');
+    }
+}
+
+function abrirSubcat(sub) {
+    subcatActual = sub;
+    const info = CAT_LABELS[catActual] || { label: catActual };
+    const label = sub === 'TODAS' ? info.label : sub;
+    document.getElementById('subcat-titulo').textContent = label;
 
     document.getElementById('vista-categorias').style.display = 'none';
+    document.getElementById('vista-subcategorias').style.display = 'none';
     document.getElementById('vista-lista').style.display = 'block';
     document.getElementById('buscador').value = '';
     filtrar();
@@ -898,14 +950,15 @@ function volverCategorias() {
     catActual = null;
     subcatActual = 'TODAS';
     document.getElementById('vista-categorias').style.display = 'flex';
+    document.getElementById('vista-subcategorias').style.display = 'none';
     document.getElementById('vista-lista').style.display = 'none';
 }
 
-function selSubcat(btn, sub) {
-    document.querySelectorAll('#subcats-wrap .filtro-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    subcatActual = sub;
-    filtrar();
+function volverSubcategorias() {
+    subcatActual = 'TODAS';
+    document.getElementById('vista-categorias').style.display = 'none';
+    document.getElementById('vista-subcategorias').style.display = 'flex';
+    document.getElementById('vista-lista').style.display = 'none';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
