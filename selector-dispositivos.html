@@ -160,7 +160,7 @@
 
 <!-- HEADER -->
 <div class="header">
-    <button onclick="window.location.href='index.html'" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; padding:4px 8px 4px 0; line-height:1;">←</button>
+    <button id="btn-nav-back" onclick="navegarAtras()" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; padding:4px 8px 4px 0; line-height:1;">←</button>
     <img class="logo" src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" onerror="this.style.display='none'" alt="TLC">
     <div class="header-text">
         <h1>Dispositivos TLC</h1>
@@ -207,21 +207,14 @@
 
     <!-- PANTALLA SUBCATEGORÍAS -->
     <div id="vista-subcategorias" style="display:none; padding:12px 16px; flex-direction:column; gap:10px;">
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-            <button onclick="volverCategorias()" style="background:#1c2541; border:1px solid #222e50; border-radius:8px; color:#94a3b8; font-size:12px; padding:5px 10px; cursor:pointer;">← Categorías</button>
-            <span id="cat-titulo" style="font-size:13px; font-weight:700; color:#f1f5f9;"></span>
-        </div>
         <div id="subcats-grid"></div>
     </div>
 
     <!-- PANTALLA LISTA -->
     <div id="vista-lista" style="display:none;">
-        <div style="display:flex; align-items:center; gap:8px; padding:10px 20px; border-bottom:1px solid #1c2541;">
-            <button onclick="volverSubcategorias()" style="background:#1c2541; border:1px solid #222e50; border-radius:8px; color:#94a3b8; font-size:12px; padding:5px 10px; cursor:pointer;">← Volver</button>
-            <span id="subcat-titulo" style="font-size:13px; font-weight:700; color:#f1f5f9;"></span>
-        </div>
-        <div class="buscador">
-            <input type="text" id="buscador" placeholder="Buscar dispositivo o descripción...">
+        <div style="position:sticky; top:62px; z-index:50; background:#030712; padding:8px 20px; border-bottom:1px solid #1c2541;">
+            <input type="text" id="buscador" placeholder="Buscar dispositivo o descripción..."
+                style="width:100%; background:#1c2541; border:1px solid #222e50; border-radius:10px; padding:10px 16px 10px 40px; color:#f8fafc; font-size:14px; outline:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:14px center;">
         </div>
         <div class="lista" id="lista">
             <div class="loading"><div class="spinner"></div><p>Cargando dispositivos...</p></div>
@@ -873,8 +866,7 @@ function renderCategorias() {
         </div>`;
     }).join('');
 
-    document.getElementById('vista-categorias').style.display = 'flex';
-    document.getElementById('vista-lista').style.display = 'none';
+    _mostrarVista('categorias');
 }
 
 function abrirCategoria(cat) {
@@ -924,9 +916,7 @@ function abrirCategoria(cat) {
             <span style="color:#94a3b8; font-size:18px;">›</span>
         </div>`).join('');
 
-        document.getElementById('vista-categorias').style.display = 'none';
-        document.getElementById('vista-subcategorias').style.display = 'flex';
-        document.getElementById('vista-lista').style.display = 'none';
+        _mostrarVista('subcategorias');
     } else {
         // Sin subcategorías → ir directo a lista
         abrirSubcat('TODAS');
@@ -939,26 +929,61 @@ function abrirSubcat(sub) {
     const label = sub === 'TODAS' ? info.label : sub;
     document.getElementById('subcat-titulo').textContent = label;
 
-    document.getElementById('vista-categorias').style.display = 'none';
-    document.getElementById('vista-subcategorias').style.display = 'none';
-    document.getElementById('vista-lista').style.display = 'block';
+    _mostrarVista('lista');
     document.getElementById('buscador').value = '';
     filtrar();
+}
+
+function _mostrarVista(vista) {
+    // Ocultar todas las vistas
+    document.getElementById('vista-categorias').style.display = 'none';
+    document.getElementById('vista-subcategorias').style.display = 'none';
+    document.getElementById('vista-lista').style.display = 'none';
+    const greeting = document.getElementById('user-greeting');
+    const CAT_INFO = CAT_LABELS[catActual] || { label: catActual || '' };
+    // Mostrar la correcta
+    if (vista === 'categorias') {
+        document.getElementById('vista-categorias').style.display = 'flex';
+        document.getElementById('btn-nav-back').onclick = () => window.location.href = 'index.html';
+        if (greeting) greeting.textContent = currentUser?.name?.split(' ')[0] ? 'Hola, ' + currentUser.name.split(' ')[0] : '';
+    } else if (vista === 'subcategorias') {
+        document.getElementById('vista-subcategorias').style.display = 'flex';
+        document.getElementById('btn-nav-back').onclick = volverCategorias;
+        if (greeting) greeting.textContent = CAT_INFO.label;
+    } else if (vista === 'lista') {
+        document.getElementById('vista-lista').style.display = 'block';
+        const hasSubs = document.getElementById('subcats-grid').children.length > 0;
+        document.getElementById('btn-nav-back').onclick = hasSubs ? volverSubcategorias : volverCategorias;
+        const subLabel = subcatActual === 'TODAS' ? CAT_INFO.label : subcatActual;
+        if (greeting) greeting.textContent = subLabel;
+    }
+}
+
+function navegarAtras() {
+    // Determinar en qué pantalla estamos
+    const vCat  = document.getElementById('vista-categorias').style.display !== 'none';
+    const vSub  = document.getElementById('vista-subcategorias').style.display !== 'none';
+    const vList = document.getElementById('vista-lista').style.display !== 'none';
+    if (vList) {
+        // Si hay subcategorías disponibles, volver a subcats; sino a cats
+        const hasSubs = document.getElementById('subcats-grid').children.length > 0;
+        hasSubs ? volverSubcategorias() : volverCategorias();
+    } else if (vSub) {
+        volverCategorias();
+    } else {
+        window.location.href = 'index.html';
+    }
 }
 
 function volverCategorias() {
     catActual = null;
     subcatActual = 'TODAS';
-    document.getElementById('vista-categorias').style.display = 'flex';
-    document.getElementById('vista-subcategorias').style.display = 'none';
-    document.getElementById('vista-lista').style.display = 'none';
+    _mostrarVista('categorias');
 }
 
 function volverSubcategorias() {
     subcatActual = 'TODAS';
-    document.getElementById('vista-categorias').style.display = 'none';
-    document.getElementById('vista-subcategorias').style.display = 'flex';
-    document.getElementById('vista-lista').style.display = 'none';
+    _mostrarVista('subcategorias');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
