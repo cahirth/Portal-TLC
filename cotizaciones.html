@@ -109,7 +109,7 @@
         <h1>Cotizaciones</h1>
         <p id="user-label">Cargando...</p>
     </div>
-    <button onclick="cargar()" style="background:#1c2541; border:1px solid #222e50; border-radius:8px; color:#94a3b8; font-size:12px; padding:6px 12px; cursor:pointer; flex-shrink:0;">↺ Actualizar</button>
+    <button onclick="cargar(true)" style="background:#1c2541; border:1px solid #222e50; border-radius:8px; color:#94a3b8; font-size:12px; padding:6px 12px; cursor:pointer; flex-shrink:0;">↺ Actualizar</button>
 </div>
 
 <!-- STATS -->
@@ -264,56 +264,96 @@ function fotosDeEquipos(equiposStr) {
 }
 
 // ─── CARGAR DATOS ─────────────────────────────────────────────────────────────
-async function cargar() {
+const CACHE_KEY = 'tlc_cotizaciones_v1';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+function _cacheSave(filas) {
+    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), filas })); } catch(e) {}
+}
+function _cacheLoad() {
+    try {
+        const raw = sessionStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        const p = JSON.parse(raw);
+        if (Date.now() - p.ts > CACHE_TTL) { sessionStorage.removeItem(CACHE_KEY); return null; }
+        return p.filas;
+    } catch(e) { return null; }
+}
+function _cacheClear() { sessionStorage.removeItem(CACHE_KEY); }
+
+function _sortFilas(filas) {
+    return filas.sort((a, b) => {
+        const ia = String(a['ID'] || '');
+        const ib = String(b['ID'] || '');
+        if (ib !== ia) return ib.localeCompare(ia);
+        return String(b['FECHA'] || '').localeCompare(String(a['FECHA'] || ''));
+    });
+}
+
+function _mostrarFilas(filas) {
+    todasLasCot = _sortFilas(filas);
+    mostrarStats();
+    document.getElementById('filtros-wrap').style.display = 'flex';
+    document.getElementById('buscador-wrap').style.display = 'block';
+    renderLista();
+}
+
+async function _fetchFilas() {
+    const vendedorFiltro = currentUserRol === 'Administrador' ? 'TODOS' : currentUserNombre;
+    const res = await fetch(PA_LEER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendedor: vendedorFiltro })
+    });
+    const texto = await res.text();
+    let data;
+    try { data = JSON.parse(texto); } catch(e) { throw new Error('Respuesta inválida del servidor'); }
+    if (typeof data === 'string') { try { data = JSON.parse(data); } catch(e) {} }
+    let filas = [];
+    if (data?.value) filas = data.value;
+    else if (Array.isArray(data)) filas = data;
+    if (currentUserRol !== 'Administrador') {
+        filas = filas.filter(f => {
+            const v = String(f['VENDEDOR'] || '').toLowerCase();
+            return v.includes(currentUserNombre.split(' ')[0].toLowerCase());
+        });
+    }
+    return filas;
+}
+
+async function cargar(forzar = false) {
+    if (forzar) _cacheClear();
+
+    // Mostrar cache inmediatamente si existe
+    const cached = _cacheLoad();
+    if (cached) {
+        _mostrarFilas(cached);
+        // Mostrar indicador de refresh silencioso
+        const btn = document.querySelector('button[onclick="cargar()"]');
+        if (btn) { btn.textContent = '↺ Actualizando...'; btn.style.opacity = '0.6'; }
+        // Refresh en background
+        _fetchFilas().then(filas => {
+            _cacheSave(filas);
+            _mostrarFilas(filas);
+            if (btn) { btn.textContent = '↺ Actualizar'; btn.style.opacity = '1'; }
+        }).catch(() => {
+            if (btn) { btn.textContent = '↺ Actualizar'; btn.style.opacity = '1'; }
+        });
+        return;
+    }
+
+    // Sin cache: mostrar spinner y esperar
     document.getElementById('lista').innerHTML = '<div class="loading"><div class="spinner"></div><p>Cargando cotizaciones...</p></div>';
     document.getElementById('stats-bar').style.display = 'none';
     document.getElementById('filtros-wrap').style.display = 'none';
     document.getElementById('buscador-wrap').style.display = 'none';
 
     try {
-        const vendedorFiltro = currentUserRol === 'Administrador' ? 'TODOS' : currentUserNombre;
-
-        const res = await fetch(PA_LEER_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ vendedor: vendedorFiltro })
-        });
-
-        const texto = await res.text();
-        let data;
-        try { data = JSON.parse(texto); } catch(e) { throw new Error('Respuesta inválida del servidor'); }
-
-        // Power Automate devuelve string con JSON adentro
-        let filas = [];
-        if (typeof data === 'string') {
-            try { data = JSON.parse(data); } catch(e) {}
-        }
-        if (data?.value) filas = data.value;
-        else if (Array.isArray(data)) filas = data;
-
-        // Si Admin, ya trajo todo. Si no, filtrar por nombre del vendedor
-        if (currentUserRol !== 'Administrador') {
-            filas = filas.filter(f => {
-                const v = String(f['VENDEDOR'] || '').toLowerCase();
-                return v.includes(currentUserNombre.split(' ')[0].toLowerCase());
-            });
-        }
-
-        // Ordenar por fecha descendente
-        filas.sort((a, b) => {
-            const fa = String(a['FECHA'] || '');
-            const fb = String(b['FECHA'] || '');
-            return fb.localeCompare(fa);
-        });
-
-        todasLasCot = filas;
-        mostrarStats();
-        document.getElementById('filtros-wrap').style.display = 'flex';
-        document.getElementById('buscador-wrap').style.display = 'block';
-        renderLista();
-
+        const filas = await _fetchFilas();
+        _cacheSave(filas);
+        _mostrarFilas(filas);
     } catch(e) {
-        document.getElementById('lista').innerHTML = `<div class="empty">❌ Error: ${e.message}<br><button onclick="cargar()" style="margin-top:12px; padding:8px 20px; background:#3a86ff; border:none; border-radius:8px; color:white; cursor:pointer; font-size:13px;">Reintentar</button></div>`;
+        document.getElementById('lista').innerHTML = `<div class="empty">❌ Error: ${e.message}<br><button onclick="cargar(true)" style="margin-top:12px; padding:8px 20px; background:#3a86ff; border:none; border-radius:8px; color:white; cursor:pointer; font-size:13px;">Reintentar</button></div>`;
     }
 }
 
