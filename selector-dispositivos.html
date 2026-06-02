@@ -1455,9 +1455,12 @@ function calcularCarrito() {
         }
     });
 
+    // netoLista = siempre suma de precioLista (independiente de modalidad, para mostrar en presupuesto)
+    let netoLista = 0;
+    carrito.forEach(item => { netoLista += (item.precioLista || 0) * (item.cantidad || 1); });
     const iva   = netoBase * 0.105;
     const total = netoBase + iva;
-    return { mod, netoBase, iva, total, adelantoTotal, cuotaTotal, todosCalculados };
+    return { mod, netoBase, netoLista, iva, total, adelantoTotal, cuotaTotal, todosCalculados };
 }
 
 // ─── getFinOpt alias ──────────────────────────────────────────────
@@ -2173,7 +2176,7 @@ function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, notas, vendedor
         // Header
         '<div style="background:linear-gradient(135deg,#0f1a30 0%,#1c2541 100%);padding:28px 32px;">',
         '<div class="hi" style="display:flex;align-items:center;justify-content:space-between;gap:16px;">',
-        '<img src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" alt="TLC" style="width:60px;height:60px;object-fit:contain;" onerror="this.style.display=\'none\'">',
+        '<img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25" alt="TLC" style="width:60px;height:60px;object-fit:contain;" onerror="this.style.display=\'none\'">',
         '<div class="hir" style="text-align:right;">',
         '<div style="font-size:24px;font-weight:800;color:white;letter-spacing:-0.5px;">Presupuesto<\/div>',
         '<div style="font-size:13px;color:#94a3b8;margin-top:3px;">Tecnolog\u00eda L\u00e1ser Corneal SRL<\/div>',
