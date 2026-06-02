@@ -146,7 +146,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.02.1"; console.log("%c TLC Portal v2026.06.02.1 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.02.2"; console.log("%c TLC Portal v2026.06.02.2 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const PA_LEER_URL = 'https://defaultbbd111b805224e3d9f4378d1ca0e71.cf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/922cfb807b454766a7b40c7ccbfb3742/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=VUeSzJbLOaG5RWXAjz13Xmv5GP2HGAGJVyoKi8hfJI8';
@@ -211,29 +211,66 @@ async function init() {
 // ─── FOTO MAP ─────────────────────────────────────────────────────────────────
 async function cargarFotoMap() {
     try {
-        // Intentar precios.json primero (más rápido)
+        // Paso 1: precios.json (~50ms, cacheado por browser)
         const res = await fetch(PRECIOS_JSON_URL, { cache: 'default' });
-        if (res.ok) {
-            const data = await res.json();
-            let fotoMap = {};
-            // Cargar fotoMap del Apps Script para resolver rutas Fotos/xxx
-            try {
-                const r2 = await fetch(FOTO_MAP_URL, { redirect: 'follow' });
-                const t2 = await r2.text();
-                fotoMap = JSON.parse(t2);
-            } catch(e) {}
+        if (!res.ok) return;
+        const data = await res.json();
 
-            data.forEach(d => {
-                const nombre = (d['Nombre de Dispositivo'] || '').trim().toLowerCase();
-                if (!nombre) return;
-                const foto = d['Foto'] || '';
-                const url = resolverFotoUrl(foto, fotoMap);
-                if (url) dispFotoMap[nombre] = url;
-            });
-            // Re-renderizar lista con fotos
-            renderLista();
-        }
+        // Paso 2: fotoMap del Apps Script en paralelo con el procesamiento
+        let fotoMap = {};
+        const r2p = fetch(FOTO_MAP_URL, { redirect: 'follow' })
+            .then(r => r.text()).then(t => { try { fotoMap = JSON.parse(t); } catch(e) {} })
+            .catch(() => {});
+
+        // Construir dispFotoMap con lo que ya tenemos (URLs lh3 directas)
+        data.forEach(d => {
+            const nombre = (d['Nombre de Dispositivo'] || '').trim().toLowerCase();
+            if (!nombre) return;
+            const foto = d['Foto'] || '';
+            // Solo URLs directas lh3 por ahora — no necesita fotoMap
+            const url = resolverFotoUrl(foto, {});
+            if (url) dispFotoMap[nombre] = url;
+        });
+
+        // Actualizar DOM quirúrgicamente sin re-renderizar
+        _actualizarFotosDom();
+
+        // Esperar fotoMap y actualizar los que quedaron pendientes
+        await r2p;
+        data.forEach(d => {
+            const nombre = (d['Nombre de Dispositivo'] || '').trim().toLowerCase();
+            if (dispFotoMap[nombre]) return; // ya resuelto
+            const foto = d['Foto'] || '';
+            const url = resolverFotoUrl(foto, fotoMap);
+            if (url) dispFotoMap[nombre] = url;
+        });
+        _actualizarFotosDom();
+
     } catch(e) { console.warn('fotoMap:', e); }
+}
+
+function _actualizarFotosDom() {
+    // Actualiza solo los contenedores de fotos sin tocar el resto del DOM
+    document.querySelectorAll('.fotos-thumb').forEach(wrap => {
+        const key = wrap.dataset.equiposKey || '';
+        if (!key) return;
+        const nombres = key.split('|').map(e => e.trim().replace(/^\d+×\s*/, ''));
+        const urls = nombres.map(n => {
+            if (dispFotoMap[n]) return dispFotoMap[n];
+            const found = Object.keys(dispFotoMap).find(k =>
+                k.includes(n.substring(0,8)) || n.includes(k.substring(0,8))
+            );
+            return found ? dispFotoMap[found] : null;
+        }).filter(Boolean).slice(0,3);
+
+        if (!urls.length) return;
+        // Solo actualizar si el contenedor está vacío o tiene placeholders
+        if (wrap.querySelector('img')) return;
+        wrap.innerHTML = urls.map(f =>
+            `<img class="foto-thumb" src="${f}" onerror="this.style.display='none'">`
+        ).join('');
+        wrap.classList.remove('fotos-pending');
+    });
 }
 
 function resolverFotoUrl(foto, fotoMap) {
@@ -418,9 +455,10 @@ function renderLista() {
         const estadoClass = estadoBadge(c['ESTADO']);
         const equipos = String(c['EQUIPOS'] || '').split('|').map(e => e.trim()).join(' · ');
         const fotos = fotosDeEquipos(c['EQUIPOS']);
+        const equiposKey = String(c['EQUIPOS'] || '').toLowerCase().trim();
         const fotosHtml = fotos.length
-            ? `<div class="fotos-thumb">${fotos.map(f => `<img class="foto-thumb" src="${f}" onerror="this.style.display='none'">`).join('')}</div>`
-            : '';
+            ? `<div class="fotos-thumb" data-equipos-key="${equiposKey.replace(/"/g,'')}">${fotos.map(f => `<img class="foto-thumb" src="${f}" onerror="this.style.display='none'">`).join('')}</div>`
+            : `<div class="fotos-thumb fotos-pending" data-equipos-key="${equiposKey.replace(/"/g,'')}"></div>`;
         return `<div class="cot-card" onclick="abrirDetalle(${idx})">
             <div class="cot-card-header">
                 <div style="flex:1; min-width:0;">
