@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arquitectura Sistema de Ventas — TLC — 02.06.2026</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #05080f;
+  --surface: #0c1220;
+  --surface2: #111827;
+  --border: #1e2d45;
+  --border2: #243450;
+  --blue: #3a86ff;
+  --blue2: #60a5fa;
+  --green: #06d6a0;
+  --orange: #f8961e;
+  --pink: #ff006e;
+  --purple: #8b5cf6;
+  --text: #f1f5f9;
+  --muted: #64748b;
+  --muted2: #94a3b8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; }
+.noise { position: fixed; inset: 0; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 48px 32px 80px; position: relative; z-index: 1; }
+
+/* HEADER */
+.doc-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 56px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
+.doc-logo { display: flex; align-items: center; gap: 14px; }
+.doc-logo-mark { width: 44px; height: 44px; background: var(--blue); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; color: white; letter-spacing: -0.5px; }
+.doc-logo-text { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 18px; color: var(--text); line-height: 1.2; }
+.doc-logo-sub { font-size: 11px; color: var(--muted); font-weight: 400; }
+.doc-meta { text-align: right; }
+.doc-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 28px; line-height: 1.1; letter-spacing: -0.5px; }
+.doc-title span { color: var(--blue); }
+.doc-date { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 6px; }
+.doc-version { display: inline-block; background: rgba(58,134,255,0.12); border: 1px solid rgba(58,134,255,0.3); border-radius: 20px; padding: 3px 10px; font-family: 'DM Mono', monospace; font-size: 10px; color: var(--blue2); margin-top: 6px; }
+
+/* SECTION */
+.section { margin-bottom: 48px; }
+.section-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--blue); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.section-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 20px; margin-bottom: 20px; }
+
+/* FLOW */
+.flow { display: flex; align-items: stretch; gap: 0; margin-bottom: 32px; overflow-x: auto; padding-bottom: 8px; }
+.flow-step { flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; min-width: 160px; position: relative; }
+.flow-step.highlight { border-color: var(--blue); background: rgba(58,134,255,0.06); }
+.flow-step.new { border-color: var(--green); background: rgba(6,214,160,0.06); }
+.flow-step-icon { font-size: 20px; margin-bottom: 8px; }
+.flow-step-name { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 12px; color: var(--text); margin-bottom: 4px; }
+.flow-step-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.flow-arrow { display: flex; align-items: center; padding: 0 4px; color: var(--border2); font-size: 18px; flex-shrink: 0; }
+.flow-badge { position: absolute; top: -8px; right: 10px; background: var(--green); color: #05080f; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; }
+.flow-badge.blue { background: var(--blue); color: white; }
+
+/* GRID */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 768px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; } .doc-header { flex-direction: column; gap: 20px; } .doc-meta { text-align: left; } }
+
+/* CARDS */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+.card.blue { border-color: rgba(58,134,255,0.3); background: rgba(58,134,255,0.04); }
+.card.green { border-color: rgba(6,214,160,0.3); background: rgba(6,214,160,0.04); }
+.card.orange { border-color: rgba(248,150,30,0.3); background: rgba(248,150,30,0.04); }
+.card.purple { border-color: rgba(139,92,246,0.3); background: rgba(139,92,246,0.04); }
+.card.pink { border-color: rgba(255,0,110,0.3); background: rgba(255,0,110,0.04); }
+.card-icon { font-size: 24px; margin-bottom: 10px; }
+.card-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+.card-desc { font-size: 12px; color: var(--muted2); line-height: 1.5; }
+.card-url { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--blue); margin-top: 8px; word-break: break-all; }
+.card-tag { display: inline-block; font-size: 9px; font-family: 'DM Mono', monospace; padding: 2px 7px; border-radius: 8px; margin-top: 8px; text-transform: uppercase; }
+.tag-blue { background: rgba(58,134,255,0.15); color: var(--blue2); }
+.tag-green { background: rgba(6,214,160,0.15); color: var(--green); }
+.tag-orange { background: rgba(248,150,30,0.15); color: var(--orange); }
+.tag-purple { background: rgba(139,92,246,0.15); color: #a78bfa; }
+.tag-pink { background: rgba(255,0,110,0.15); color: #ff6eac; }
+
+/* TABLE */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th { font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+.data-table td { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table code { font-family: 'DM Mono', monospace; font-size: 11px; background: var(--surface2); padding: 2px 6px; border-radius: 4px; color: var(--blue2); }
+
+/* STATUS */
+.status-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.status-row:last-child { border-bottom: none; }
+.status-label { font-size: 13px; color: var(--text); }
+.status-val { font-family: 'DM Mono', monospace; font-size: 11px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.dot-green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot-blue { background: var(--blue); box-shadow: 0 0 6px var(--blue); }
+.dot-orange { background: var(--orange); }
+.dot-muted { background: var(--muted); }
+
+/* PIPELINE */
+.pipeline { display: flex; gap: 0; margin-bottom: 8px; overflow-x: auto; }
+.pipe-stage { flex: 1; min-width: 100px; text-align: center; padding: 10px 6px; font-size: 10px; font-family: 'DM Mono', monospace; border-top: 3px solid var(--border); color: var(--muted); }
+.pipe-stage.active { border-color: var(--blue); color: var(--blue2); }
+.pipe-stage.won { border-color: var(--green); color: var(--green); }
+.pipe-stage.lost { border-color: var(--pink); color: var(--pink); }
+.pipe-pct { font-size: 16px; font-family: 'Syne', sans-serif; font-weight: 800; display: block; margin-bottom: 2px; }
+
+/* DIVIDER */
+.divider { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+/* TAG ROW */
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+/* FOOTNOTE */
+.footnote { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.footnote p { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header class="doc-header">
+    <div class="doc-logo">
+      <div class="doc-logo-mark">TLC</div>
+      <div>
+        <div class="doc-logo-text">Tecnología Láser Corneal SRL</div>
+        <div class="doc-logo-sub">Documento de Arquitectura — Confidencial</div>
+      </div>
+    </div>
+    <div class="doc-meta">
+      <div class="doc-title">Sistema Operativo<br><span>Módulo Ventas</span></div>
+      <div class="doc-date">// 02.06.2026 — v2026.06.02.5</div>
+      <div class="doc-version">PRODUCCIÓN · ESTABLE</div>
+    </div>
+  </header>
+
+  <!-- FLUJO PRINCIPAL -->
+  <section class="section">
+    <div class="section-label">01 — Flujo principal de cotización</div>
+    <div class="flow">
+      <div class="flow-step highlight">
+        <div class="flow-step-icon">👁️</div>
+        <div class="flow-step-name">Selector</div>
+        <div class="flow-step-desc">Categoría → Subcategoría → Equipo → Carrito</div>
+        <span class="flow-badge blue">PWA</span>
+      </div>
+      <div class="flow-arrow">›</div>
+      <div class="flow-step highlight">
+        <div class="flow-step-icon">🛒</div>
+        <div class="flow-step-name">Checkout</div>
+        <div class="flow-step-desc">Datos cliente, email, modalidad, notas</div>
+      </div>
+      <div class="flow-arrow">›</div>
+      <div class="flow-step highlight">
+        <div class="flow-step-icon">📄</div>
+        <div class="flow-step-name">HTML Presupuesto</div>
+        <div class="flow-step-desc">Generado en browser con fotos, bancos, PDF</div>
+      </div>
+      <div class="flow-arrow">›</div>
+      <div class="flow-step">
+        <div class="flow-step-icon">🐙</div>
+        <div class="flow-step-name">GitHub Pages</div>
+        <div class="flow-step-desc">URL permanente pública TLC-YYYYMMDD-XXXX</div>
+      </div>
+      <div class="flow-arrow">›</div>
+      <div class="flow-step new">
+        <div class="flow-step-icon">💬</div>
+        <div class="flow-step-name">WhatsApp</div>
+        <div class="flow-step-desc">wa.me/549XX con link + referencia</div>
+        <span class="flow-badge">Nuevo</span>
+      </div>
+    </div>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-step-icon">📊</div>
+        <div class="flow-step-name">Excel SharePoint</div>
+        <div class="flow-step-desc">CotizacionesHTML.xlsx — 17 columnas + LINK</div>
+      </div>
+      <div class="flow-arrow">›</div>
+      <div class="flow-step">
+        <div class="flow-step-icon">📋</div>
+        <div class="flow-step-name">Google Sheets</div>
+        <div class="flow-step-desc">Hoja Cotizaciones — registro histórico</div>
+      </div>
+      <div class="flow-arrow">›</div>
+      <div class="flow-step new">
+        <div class="flow-step-icon">🧡</div>
+        <div class="flow-step-name">HubSpot CRM</div>
+        <div class="flow-step-desc">Deal + Contacto creados automáticamente</div>
+        <span class="flow-badge">Nuevo</span>
+      </div>
+      <div class="flow-arrow">›</div>
+      <div class="flow-step highlight">
+        <div class="flow-step-icon">📱</div>
+        <div class="flow-step-name">cotizaciones.html</div>
+        <div class="flow-step-desc">Lista, estados, reenvío WhatsApp</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STACK TECNOLÓGICO -->
+  <section class="section">
+    <div class="section-label">02 — Stack tecnológico</div>
+    <div class="grid-3">
+      <div class="card blue">
+        <div class="card-icon">🔐</div>
+        <div class="card-title">Autenticación</div>
+        <div class="card-desc">MSAL v3 · Azure AD · Tenant tlcarg.onmicrosoft.com · Roles por hoja Vendedores</div>
+        <div class="tag-row"><span class="card-tag tag-blue">Administrador</span><span class="card-tag tag-orange">Vend_Interno</span><span class="card-tag tag-purple">Vend_Externo</span></div>
+      </div>
+      <div class="card green">
+        <div class="card-icon">⚡</div>
+        <div class="card-title">Precios — Carga instantánea</div>
+        <div class="card-desc">sessionStorage (0ms) → precios.json GitHub (~50ms) → Google Sheets fallback (~1500ms)</div>
+        <div class="tag-row"><span class="card-tag tag-green">Cache v1</span></div>
+      </div>
+      <div class="card orange">
+        <div class="card-icon">🔄</div>
+        <div class="card-title">Power Automate</div>
+        <div class="card-desc">3 flows activos: escribir cotización, leer por vendedor, actualizar estado. Webhooks públicos con sig=</div>
+        <div class="tag-row"><span class="card-tag tag-orange">Premium</span></div>
+      </div>
+      <div class="card purple">
+        <div class="card-icon">📜</div>
+        <div class="card-title">Apps Script</div>
+        <div class="card-desc">FotoMap · subirCotizacion → GitHub · registrarCotizacion → Sheets · sincronizarHubSpot</div>
+        <div class="card-url">v18 · AKfycbww2WC4...</div>
+      </div>
+      <div class="card pink">
+        <div class="card-icon">🐙</div>
+        <div class="card-title">GitHub Pages</div>
+        <div class="card-desc">Presupuestos HTML permanentes. precios.json sincronizado automáticamente desde Lista_Precios</div>
+        <div class="card-url">cahirth.github.io/Portal-TLC/</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🧡</div>
+        <div class="card-title">HubSpot CRM</div>
+        <div class="card-desc">Starter · 2 licencias. Deals + Contactos creados automáticamente. Service key TLC-Portal-Integration</div>
+        <div class="tag-row"><span class="card-tag tag-green">API v3</span><span class="card-tag tag-blue">crm.deals.write</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHIVOS DEL PORTAL -->
+  <section class="section">
+    <div class="section-label">03 — Archivos del portal</div>
+    <div class="card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Archivo</th>
+            <th>Función</th>
+            <th>Versión</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>index.html</code></td>
+            <td>Portal principal — menú módulos</td>
+            <td>—</td>
+            <td><span class="dot dot-green"></span>Producción</td>
+          </tr>
+          <tr>
+            <td><code>selector-dispositivos.html</code></td>
+            <td>Catálogo 3 niveles + carrito + cotización + HubSpot sync</td>
+            <td><code>v2026.06.02.5</code></td>
+            <td><span class="dot dot-green"></span>Producción</td>
+          </tr>
+          <tr>
+            <td><code>cotizaciones.html</code></td>
+            <td>Lista cotizaciones + estados + WhatsApp + caché</td>
+            <td><code>v2026.06.02.4</code></td>
+            <td><span class="dot dot-green"></span>Producción</td>
+          </tr>
+          <tr>
+            <td><code>precios.json</code></td>
+            <td>Lista_Precios sincronizada — carga instantánea</td>
+            <td>Auto-sync 10min</td>
+            <td><span class="dot dot-green"></span>Activo</td>
+          </tr>
+          <tr>
+            <td><code>cotizaciones/TLC-*.html</code></td>
+            <td>Presupuestos permanentes por cliente</td>
+            <td>Por cotización</td>
+            <td><span class="dot dot-green"></span>Permanente</td>
+          </tr>
+          <tr>
+            <td><code>FotoMap.gs</code></td>
+            <td>Apps Script — fotoMap + GitHub sync + HubSpot</td>
+            <td><code>v18</code></td>
+            <td><span class="dot dot-green"></span>Activo</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- DATOS -->
+  <section class="section">
+    <div class="section-label">04 — Fuentes de datos</div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">📊 Google Sheet — Lista_Precios</div>
+        <div class="card-desc" style="margin-top:10px;">Columnas clave:</div>
+        <table class="data-table" style="margin-top:8px;">
+          <tr><td><code>Precio LISTA</code></td><td style="color:var(--muted2)">Mostrado en cards y presupuesto</td></tr>
+          <tr><td><code>Precio CONTADO CNO</code></td><td style="color:var(--muted2)">Modalidad contado</td></tr>
+          <tr><td><code>Adelanto/Cuota TLC/Leasing/Credicoop</code></td><td style="color:var(--muted2)">8 modalidades de pago</td></tr>
+          <tr><td><code>Permiso_*</code></td><td style="color:var(--muted2)">Visibilidad por vendedor</td></tr>
+          <tr><td><code>Link_Folleto · Link_Web</code></td><td style="color:var(--muted2)">Documentación producto</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Excel SharePoint — CotizacionesHTML.xlsx</div>
+        <div class="card-desc" style="margin-top:10px;">17 columnas · Tabla1:</div>
+        <table class="data-table" style="margin-top:8px;">
+          <tr><td><code>ID · FECHA · VENDEDOR</code></td><td style="color:var(--muted2)">Identificación</td></tr>
+          <tr><td><code>NOMBRE · RAZON SOCIAL · CUIT · TELEFONO</code></td><td style="color:var(--muted2)">Cliente</td></tr>
+          <tr><td><code>EQUIPOS · MODALIDAD</code></td><td style="color:var(--muted2)">Producto</td></tr>
+          <tr><td><code>NETO USD · IVA · TOTAL USD · ADELANTO · CUOTAS</code></td><td style="color:var(--muted2)">Financiero</td></tr>
+          <tr><td><code>LINK · ESTADO · NOTAS</code></td><td style="color:var(--muted2)">Seguimiento</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODALIDADES -->
+  <section class="section">
+    <div class="section-label">05 — Modalidades de pago</div>
+    <div class="grid-4">
+      <div class="card"><div class="card-title">Contado USD</div><div class="card-desc">Precio CNO · 100% anticipado + IVA</div></div>
+      <div class="card"><div class="card-title">Crédito AR$</div><div class="card-desc">Banco Credicoop · 36 cuotas</div></div>
+      <div class="card"><div class="card-title">Directo 6c AR$</div><div class="card-desc">Financiación TLC · 6 cuotas AR$</div></div>
+      <div class="card"><div class="card-title">Directo 12c AR$</div><div class="card-desc">Financiación TLC · 12 cuotas AR$</div></div>
+      <div class="card"><div class="card-title">Directo 6c USD</div><div class="card-desc">Financiación TLC · 6 cuotas USD</div></div>
+      <div class="card"><div class="card-title">Directo 12c USD</div><div class="card-desc">Financiación TLC · 12 cuotas USD</div></div>
+      <div class="card"><div class="card-title">Leasing 36c AR$</div><div class="card-desc">Leasing · 36 cuotas AR$</div></div>
+      <div class="card"><div class="card-title">Leasing 36c USD</div><div class="card-desc">Leasing · 36 cuotas USD</div></div>
+    </div>
+  </section>
+
+  <!-- HUBSPOT PIPELINE -->
+  <section class="section">
+    <div class="section-label">06 — Pipeline HubSpot · Mapeo de estados</div>
+    <div class="card">
+      <div class="pipeline">
+        <div class="pipe-stage"><span class="pipe-pct">10%</span>Oportunidad<br>appointmentscheduled</div>
+        <div class="pipe-stage"><span class="pipe-pct">25%</span>Calificación<br>qualifiedtobuy</div>
+        <div class="pipe-stage active"><span class="pipe-pct">50%</span>Cotización ←<br>presentationscheduled</div>
+        <div class="pipe-stage active"><span class="pipe-pct">75%</span>Negociación ←<br>decisionmakerboughtin</div>
+        <div class="pipe-stage"><span class="pipe-pct">90%</span>Cierre<br>contractsent</div>
+        <div class="pipe-stage won"><span class="pipe-pct">✓</span>Ganada ←<br>closedwon</div>
+        <div class="pipe-stage lost"><span class="pipe-pct">✗</span>Perdida ←<br>closedlost</div>
+      </div>
+      <div style="margin-top:12px; font-size:11px; color:var(--muted);">← Etapas controladas desde Portal TLC · Las demás se mueven manualmente en HubSpot</div>
+      <div class="grid-2" style="margin-top:16px;">
+        <div>
+          <div class="status-row"><span class="status-label">Enviada (portal)</span><span class="status-val" style="color:var(--blue2)">→ 50% Cotización</span></div>
+          <div class="status-row"><span class="status-label">En seguimiento</span><span class="status-val" style="color:var(--orange)">→ 75% Negociación</span></div>
+        </div>
+        <div>
+          <div class="status-row"><span class="status-label">Ganada</span><span class="status-val" style="color:var(--green)">→ Cierre ganado</span></div>
+          <div class="status-row"><span class="status-label">Perdida</span><span class="status-val" style="color:var(--pink)">→ Cierre perdido</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESTADO DEL SISTEMA -->
+  <section class="section">
+    <div class="section-label">07 — Estado del sistema · 02.06.2026</div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px;">Componentes activos</div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-green"></span>Portal PWA</span><span class="status-val" style="color:var(--green)">GitHub Pages</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-green"></span>Auth MSAL v3</span><span class="status-val" style="color:var(--green)">Azure AD</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-green"></span>Precios instantáneos</span><span class="status-val" style="color:var(--green)">precios.json + cache</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-green"></span>GitHub Upload</span><span class="status-val" style="color:var(--green)">Apps Script v18</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-green"></span>SharePoint Excel</span><span class="status-val" style="color:var(--green)">PA + LINK guardado</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-green"></span>HubSpot Deals</span><span class="status-val" style="color:var(--green)">API v3 activa</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-green"></span>WhatsApp 549</span><span class="status-val" style="color:var(--green)">Formato correcto</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px;">Pendientes / Próximas tareas</div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-orange"></span>HubSpot contacto</span><span class="status-val" style="color:var(--orange)">Testear con email real</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-orange"></span>HubSpot propietario</span><span class="status-val" style="color:var(--orange)">Owner match vendedor</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-muted"></span>Prop. custom HS</span><span class="status-val" style="color:var(--muted)">tlc_cotizacion_id</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-muted"></span>Número de versión</span><span class="status-val" style="color:var(--muted)">Badge en header portal</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-muted"></span>Foto SK-5500A</span><span class="status-val" style="color:var(--muted)">Verificar fotoMap</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-muted"></span>Módulo Facturación</span><span class="status-val" style="color:var(--muted)">Dashboard 2022-2026</span></div>
+        <div class="status-row"><span class="status-label"><span class="dot dot-muted"></span>Branches ST restantes</span><span class="status-val" style="color:var(--muted)">Lab · Remoto · Inst.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CREDENCIALES CLAVE -->
+  <section class="section">
+    <div class="section-label">08 — Referencias técnicas</div>
+    <div class="card">
+      <table class="data-table">
+        <thead><tr><th>Recurso</th><th>Referencia</th><th>Notas</th></tr></thead>
+        <tbody>
+          <tr><td>Portal TLC</td><td><code>cahirth.github.io/Portal-TLC/</code></td><td>GitHub Pages · main branch</td></tr>
+          <tr><td>Apps Script</td><td><code>AKfycbww2WC4... v18</code></td><td>doPost · 6 acciones</td></tr>
+          <tr><td>PA Escribir</td><td><code>workflows/b4eb28...</code></td><td>Append Row → Tabla1</td></tr>
+          <tr><td>PA Leer</td><td><code>workflows/922cfb...</code></td><td>Filtro por VENDEDOR</td></tr>
+          <tr><td>PA Actualizar</td><td><code>workflows/ceae01...</code></td><td>Update fila por ID</td></tr>
+          <tr><td>HubSpot Portal</td><td><code>50060999</code></td><td>Starter · 2 licencias</td></tr>
+          <tr><td>HS Service Key</td><td><code>TLC-Portal-Integration</code></td><td>4 scopes CRM read/write</td></tr>
+          <tr><td>HS Pipeline</td><td><code>default</code></td><td>7 etapas · Pipeline de ventas</td></tr>
+          <tr><td>Google Sheet</td><td><code>1WNEOD8qtHJfy...</code></td><td>Lista_Precios · Vendedores · Cotizaciones</td></tr>
+          <tr><td>SharePoint</td><td><code>tlcarg.sharepoint.com/sites/TLCOperaciones</code></td><td>Portal TLC/data/CotizacionesHTML.xlsx</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- FOOTNOTE -->
+  <footer class="footnote">
+    <p>// Tecnología Láser Corneal SRL · Sistema Operativo Digital · Módulo Ventas</p>
+    <p>// Generado 02.06.2026 · v2026.06.02.5 · Confidencial</p>
+  </footer>
+
+</div>
+</body>
+</html>
