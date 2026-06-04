@@ -382,7 +382,7 @@
                     <a id="mr-link-preview" href="#" target="_blank" style="display:flex; align-items:center; gap:8px; background:#1c2541; border:1px solid #222e50; border-radius:10px; padding:12px 14px; text-decoration:none; margin-bottom:10px;">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
                         <div style="flex:1;">
-                            <div style="font-size:13px; font-weight:600; color:#f1f5f9;">Ver presupuesto</div>
+                            <div id="mr-link-txt" style="font-size:13px; font-weight:600; color:#f1f5f9;">Ver presupuesto</div>
                             <div style="font-size:11px; color:#64748b;">Abrir en nueva pestaña</div>
                         </div>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -438,7 +438,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.03.1"; console.log("%c TLC Portal v2026.06.03.1 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.03.2"; console.log("%c TLC Portal v2026.06.03.2 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2081,12 +2081,29 @@ async function generarPropuesta() {
             ? 'https://wa.me/549' + telLimpio + '?text=' + msgWsp
             : 'https://wa.me/?text=' + msgWsp;
 
-        // Configurar link de preview
-        document.getElementById('mr-link-preview').href = linkFinal;
-        document.getElementById('mr-link-preview').onclick = (e) => {
-            e.preventDefault();
-            window.open(linkFinal, '_blank');
-        };
+        // Configurar link de preview con contador 3s (GitHub Pages tarda en propagar)
+        const linkEl = document.getElementById('mr-link-preview');
+        const txtEl  = document.getElementById('mr-link-txt');
+        linkEl.href = '#';
+        linkEl.style.opacity = '0.45';
+        linkEl.style.pointerEvents = 'none';
+        linkEl.style.cursor = 'not-allowed';
+        if (txtEl) txtEl.textContent = '⏳ Disponible en 3s...';
+        let cdSec = 3;
+        const cdTimer = setInterval(() => {
+            cdSec--;
+            if (cdSec > 0) {
+                if (txtEl) txtEl.textContent = '⏳ Disponible en ' + cdSec + 's...';
+            } else {
+                clearInterval(cdTimer);
+                linkEl.href = linkFinal;
+                linkEl.style.opacity = '1';
+                linkEl.style.pointerEvents = 'auto';
+                linkEl.style.cursor = 'pointer';
+                if (txtEl) txtEl.textContent = '🔗 Ver presupuesto';
+                linkEl.onclick = (e) => { e.preventDefault(); window.open(linkFinal, '_blank'); };
+            }
+        }, 1000);
         document.getElementById('mr-btn-wsp2').onclick = () => window.open(_linkWspActual, '_blank');
         document.getElementById('mr-nombre-resultado').textContent =
             nombre + (razon ? ' · ' + razon : '') + ' · ' + _idCotActual;
@@ -2100,6 +2117,7 @@ async function generarPropuesta() {
         // Mostrar panel resultado
         document.getElementById('mr-resultado').style.display = 'block';
         document.getElementById('mr-status').style.display = 'none';
+        document.getElementById('btn-mr-wsp').style.display = 'none'; // ocultar WSP superior al mostrar resultado
 
         // Restaurar botón generar
         btnGenerar.style.opacity = '1';
@@ -2162,12 +2180,14 @@ function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, notas, vendedor
         if (opt.key === 'CONTADO') {
             precioHtml = '<div style="font-size:17px;font-weight:800;color:#2563eb;">' + fmtUSD(base) + '</div>';
         } else {
-            const ant  = i.anticipo  || 0;
-            const cuot = i.cuota     || 0;
+            // Calcular anticipo y cuota desde _data del item
+            const d2   = i._data || {};
+            const ant  = opt.adelantoKey ? parseNum(d2[opt.adelantoKey]) * qty : 0;
+            const cuot = opt.cuotaKey    ? parseNum(d2[opt.cuotaKey])    * qty : 0;
             precioHtml = [
                 '<div style="font-size:12px;color:#94a3b8;margin-bottom:2px;">Lista: ' + fmtUSD(base) + '</div>',
-                ant  ? '<div style="font-size:13px;font-weight:700;color:#f8961e;">Anticipo: ' + monedaFmt2(ant)  + '</div>' : '',
-                cuot ? '<div style="font-size:13px;font-weight:700;color:#16a34a;">Cuota: '   + monedaFmt2(cuot) + '</div>' : '',
+                (!isNaN(ant) && ant > 0)  ? '<div style="font-size:13px;font-weight:700;color:#f8961e;">Anticipo: ' + monedaFmt2(ant)  + '</div>' : '',
+                (!isNaN(cuot) && cuot > 0) ? '<div style="font-size:13px;font-weight:700;color:#16a34a;">Cuota: '   + monedaFmt2(cuot) + '</div>' : '',
             ].join('');
         }
 
@@ -2278,6 +2298,7 @@ function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, notas, vendedor
         (razon    ? '<span>\u{1F3E5} ' + razon    + '<\/span>' : ''),
         (cuit     ? '<span>\u{1F4CB} CUIT: ' + cuit  + '<\/span>' : ''),
         (telefono ? '<span>\u{1F4F1} ' + telefono  + '<\/span>' : ''),
+        (email    ? '<span>\u2709\uFE0F ' + email    + '<\/span>' : ''),
         '<span>\u{1F4C5} ' + fecha + '<\/span>',
         '<span style="color:#3a86ff;font-weight:600;">\u{1F4B3} ' + opt.label + '<\/span>',
         '<\/div><\/div><\/div>',
