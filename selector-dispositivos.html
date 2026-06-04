@@ -88,7 +88,11 @@
         .precio-desc { font-size: 11px; color: #64748b; margin-top: 4px; }
         .precio-cuota { font-size: 15px; color: #06d6a0; font-weight: 600; margin-top: 8px; }
 
-        .btn-folleto { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; border-radius: 10px; background: #1c2541; border: 1px solid #3a86ff; color: #3a86ff; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; margin-bottom: 10px; }
+        .btn-folleto { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; margin-bottom: 10px; transition: all 0.2s; }
+        #btn-folleto { background: linear-gradient(135deg, #1c2541, #0f3460); border: 1.5px solid #3a86ff; color: #60a5fa; box-shadow: 0 0 12px rgba(58,134,255,0.15); }
+        #btn-folleto:hover { background: #1e3a5f; box-shadow: 0 0 20px rgba(58,134,255,0.3); }
+        #btn-video { background: linear-gradient(135deg, #1c1520, #2d1a2e); border: 1.5px solid #f87171; color: #fca5a5; box-shadow: 0 0 12px rgba(248,113,113,0.15); }
+        #btn-video:hover { background: #3d1f1f; box-shadow: 0 0 20px rgba(248,113,113,0.3); }
         .btn-cotizar { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; border-radius: 10px; background: #3a86ff; border: none; color: white; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 10px; }
 
         /* FORMULARIO COTIZACIÓN */
@@ -438,7 +442,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.03.3"; console.log("%c TLC Portal v2026.06.03.3 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.04.1"; console.log("%c TLC Portal v2026.06.04.1 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2087,29 +2091,40 @@ async function generarPropuesta() {
             ? 'https://wa.me/549' + telLimpio + '?text=' + msgWsp
             : 'https://wa.me/?text=' + msgWsp;
 
-        // Configurar link de preview con contador 3s (GitHub Pages tarda en propagar)
+        // Polling: verifica cada 1.5s si GitHub ya sirvió el archivo (máx 20 intentos = 30s)
         const linkEl = document.getElementById('mr-link-preview');
         const txtEl  = document.getElementById('mr-link-txt');
         linkEl.href = '#';
         linkEl.style.opacity = '0.45';
         linkEl.style.pointerEvents = 'none';
         linkEl.style.cursor = 'not-allowed';
-        if (txtEl) txtEl.textContent = '⏳ Disponible en 3s...';
-        let cdSec = 3;
-        const cdTimer = setInterval(() => {
-            cdSec--;
-            if (cdSec > 0) {
-                if (txtEl) txtEl.textContent = '⏳ Disponible en ' + cdSec + 's...';
-            } else {
-                clearInterval(cdTimer);
+        if (txtEl) txtEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2.5" style="animation:spin 1s linear infinite;vertical-align:middle;margin-right:6px;flex-shrink:0;"><style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>Verificando...';
+        let pollCount = 0;
+        const pollTimer = setInterval(async () => {
+            pollCount++;
+            try {
+                const check = await fetch(linkFinal, { method: 'HEAD', cache: 'no-store' });
+                if (check.ok) {
+                    clearInterval(pollTimer);
+                    linkEl.href = linkFinal;
+                    linkEl.style.opacity = '1';
+                    linkEl.style.pointerEvents = 'auto';
+                    linkEl.style.cursor = 'pointer';
+                    if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto';
+                    linkEl.onclick = (e) => { e.preventDefault(); window.open(linkFinal, '_blank'); };
+                    return;
+                }
+            } catch(e) {}
+            if (pollCount >= 20) {
+                clearInterval(pollTimer);
                 linkEl.href = linkFinal;
                 linkEl.style.opacity = '1';
                 linkEl.style.pointerEvents = 'auto';
                 linkEl.style.cursor = 'pointer';
-                if (txtEl) txtEl.textContent = '🔗 Ver presupuesto';
+                if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto';
                 linkEl.onclick = (e) => { e.preventDefault(); window.open(linkFinal, '_blank'); };
             }
-        }, 1000);
+        }, 1500);
         document.getElementById('mr-btn-wsp2').onclick = () => window.open(_linkWspActual, '_blank');
         document.getElementById('mr-nombre-resultado').textContent =
             nombre + (razon ? ' · ' + razon : '') + ' · ' + _idCotActual;
@@ -2197,10 +2212,14 @@ function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, v
             ].join('');
         }
 
-        const linkFolleto = i.linkFolleto || '';
-        const folletoHtml = linkFolleto
-            ? '<a href="' + linkFolleto + '" target="_blank" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#3a86ff;text-decoration:none;margin-top:8px;padding:4px 10px;background:#eff6ff;border-radius:20px;border:1px solid #bfdbfe;">\u{1F4C4} Ver folleto</a>'
-            : '';
+        const linkFolleto = i.linkFolleto || i._data?.['Link_Folleto'] || '';
+        const linkVideo   = i._data?.['Link_Web'] || '';
+        const folletoHtml = (linkFolleto || linkVideo) ? [
+            '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">',
+            linkFolleto ? '<a href="' + linkFolleto + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#60a5fa;text-decoration:none;padding:6px 14px;background:linear-gradient(135deg,#1c2541,#0f3460);border-radius:20px;border:1px solid #3a86ff;font-weight:600;">\u{1F4C4} Ver folleto</a>' : '',
+            linkVideo   ? '<a href="' + linkVideo   + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#fca5a5;text-decoration:none;padding:6px 14px;background:linear-gradient(135deg,#1c1520,#2d1a2e);border-radius:20px;border:1px solid #f87171;font-weight:600;">\u25b6\ufe0f Ver video</a>' : '',
+            '</div>',
+        ].join('') : '';
 
         return [
             '<div style="display:flex;gap:16px;padding:20px 24px;border-bottom:1px solid #f1f5f9;align-items:flex-start;">',
