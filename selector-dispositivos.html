@@ -2100,30 +2100,29 @@ async function generarPropuesta() {
         linkEl.style.cursor = 'not-allowed';
         if (txtEl) txtEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2.5" style="animation:spin 1s linear infinite;vertical-align:middle;margin-right:6px;flex-shrink:0;"><style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>Verificando...';
         let pollCount = 0;
-        const pollTimer = setInterval(async () => {
+        const _habilitarLink = () => {
+            linkEl.href = linkFinal;
+            linkEl.style.opacity = '1';
+            linkEl.style.pointerEvents = 'auto';
+            linkEl.style.cursor = 'pointer';
+            if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto';
+            linkEl.onclick = (e) => { e.preventDefault(); window.open(linkFinal, '_blank'); };
+        };
+        // GitHub Pages bloquea HEAD/GET desde el browser (CORS) — usamos un img como probe
+        // Si carga → el archivo está listo. Timeout máx 25s.
+        const pollTimer = setInterval(() => {
             pollCount++;
-            try {
-                const check = await fetch(linkFinal, { method: 'HEAD', cache: 'no-store' });
-                if (check.ok) {
-                    clearInterval(pollTimer);
-                    linkEl.href = linkFinal;
-                    linkEl.style.opacity = '1';
-                    linkEl.style.pointerEvents = 'auto';
-                    linkEl.style.cursor = 'pointer';
-                    if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto';
-                    linkEl.onclick = (e) => { e.preventDefault(); window.open(linkFinal, '_blank'); };
-                    return;
-                }
-            } catch(e) {}
-            if (pollCount >= 20) {
-                clearInterval(pollTimer);
-                linkEl.href = linkFinal;
-                linkEl.style.opacity = '1';
-                linkEl.style.pointerEvents = 'auto';
-                linkEl.style.cursor = 'pointer';
-                if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto';
-                linkEl.onclick = (e) => { e.preventDefault(); window.open(linkFinal, '_blank'); };
-            }
+            const probe = new Image();
+            probe.onload = () => { clearInterval(pollTimer); _habilitarLink(); };
+            probe.onerror = () => {
+                // onerror puede ser CORS o 404 — intentamos igual con fetch no-cors
+                fetch(linkFinal, { mode: 'no-cors', cache: 'no-store' })
+                    .then(() => { clearInterval(pollTimer); _habilitarLink(); })
+                    .catch(() => {});
+            };
+            // Usamos un recurso pequeño conocido del mismo repo para evitar CORS
+            probe.src = linkFinal + '?_=' + Date.now();
+            if (pollCount >= 17) { clearInterval(pollTimer); _habilitarLink(); }
         }, 1500);
         document.getElementById('mr-btn-wsp2').onclick = () => window.open(_linkWspActual, '_blank');
         document.getElementById('mr-nombre-resultado').textContent =
