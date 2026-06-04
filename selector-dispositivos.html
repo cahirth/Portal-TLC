@@ -29,6 +29,9 @@
         .buscador { padding: 10px 20px; }
         .buscador input { width: 100%; background: #1c2541; border: 1px solid #222e50; border-radius: 10px; padding: 11px 16px 11px 40px; color: #f8fafc; font-size: 15px; outline: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 14px center; }
         .buscador input::placeholder { color: #64748b; }
+        #vista-resultados-busqueda .equipo-foto-wrap { width: 72px; height: 72px; min-width: 72px; overflow: hidden; border-radius: 8px; background: #111827; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        #vista-resultados-busqueda .equipo-foto { width: 72px; height: 72px; object-fit: contain; }
+        #vista-resultados-busqueda .equipo-foto-placeholder { font-size: 28px; }
         .buscador input:focus { border-color: #3a86ff; }
 
         /* LISTA */
@@ -442,7 +445,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.04.6"; console.log("%c TLC Portal v2026.06.04.6 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.04.7"; console.log("%c TLC Portal v2026.06.04.7 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1252,12 +1255,33 @@ function _ejecutarBusqueda(q) {
 }
 
 function _abrirDetalleDesdeResultado(idxGlobal, subcat) {
-    // Navegar al equipo directamente desde búsqueda universal
     const d = dispositivos[idxGlobal];
     if (!d) return;
-    subcatActual = subcat || 'TODAS';
+
+    // Poner el equipo directamente en dispositivoActual
     dispositivoActual = d;
-    abrirDetalle(idxGlobal);
+    subcatActual = subcat || 'TODAS';
+
+    // Limpiar búsqueda universal y restaurar vista lista con solo este equipo
+    const bSub = document.getElementById('buscador-subcats');
+    if (bSub) bSub.value = '';
+    document.getElementById('vista-resultados-busqueda')?.remove();
+    const grid = document.getElementById('subcats-grid');
+    if (grid) grid.style.display = 'flex';
+
+    // Activar vista-lista para que abrirDetalle pueda funcionar
+    mostrarVista('lista');
+
+    // Renderizar la lista con todos los equipos de la subcat para que el overlay funcione
+    const listaBase = dispositivos.filter(item =>
+        item['Categoria'] === catActual &&
+        (subcatActual === 'TODAS' || (item['Sub Categoria'] || '').trim() === subcatActual)
+    );
+    renderLista(listaBase);
+
+    // Encontrar el índice dentro de la lista filtrada
+    const idxEnLista = listaBase.indexOf(d);
+    if (idxEnLista >= 0) abrirDetalle(idxEnLista);
 }
 
 function filtrar() {
