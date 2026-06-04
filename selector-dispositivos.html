@@ -442,7 +442,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.04.2"; console.log("%c TLC Portal v2026.06.04.2 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.04.3"; console.log("%c TLC Portal v2026.06.04.3 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2091,39 +2091,37 @@ async function generarPropuesta() {
             ? 'https://wa.me/549' + telLimpio + '?text=' + msgWsp
             : 'https://wa.me/?text=' + msgWsp;
 
-        // Polling: verifica cada 1.5s si GitHub ya sirvió el archivo (máx 20 intentos = 30s)
+        // ── Vista instantánea via Blob URL ──────────────────────────────
+        // El vendedor ve el presupuesto al instante desde memoria del browser.
+        // El cliente recibe linkFinal (GitHub Pages) que estará listo cuando lo abra.
         const linkEl = document.getElementById('mr-link-preview');
         const txtEl  = document.getElementById('mr-link-txt');
-        linkEl.href = '#';
-        linkEl.style.opacity = '0.45';
-        linkEl.style.pointerEvents = 'none';
-        linkEl.style.cursor = 'not-allowed';
-        if (txtEl) txtEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2.5" style="animation:spin 1s linear infinite;vertical-align:middle;margin-right:6px;flex-shrink:0;"><style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>Verificando...';
-        let pollCount = 0;
-        const _habilitarLink = () => {
+
+        if (resultGitHub.htmlCrudo) {
+            // Crear Blob URL desde el HTML crudo — 0ms, sin esperar GitHub
+            const blob    = new Blob([resultGitHub.htmlCrudo], { type: 'text/html; charset=utf-8' });
+            const blobUrl = URL.createObjectURL(blob);
+
+            linkEl.href            = blobUrl;
+            linkEl.style.opacity   = '1';
+            linkEl.style.pointerEvents = 'auto';
+            linkEl.style.cursor    = 'pointer';
+            if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto';
+            linkEl.onclick = (e) => {
+                e.preventDefault();
+                const win = window.open(blobUrl, '_blank');
+                // Limpiar Blob de memoria después de abrir (evitar memory leak)
+                if (win) setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+            };
+        } else {
+            // Fallback si htmlCrudo no viene: habilitar con link GitHub directamente
             linkEl.href = linkFinal;
             linkEl.style.opacity = '1';
             linkEl.style.pointerEvents = 'auto';
             linkEl.style.cursor = 'pointer';
             if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto';
             linkEl.onclick = (e) => { e.preventDefault(); window.open(linkFinal, '_blank'); };
-        };
-        // GitHub Pages bloquea HEAD/GET desde el browser (CORS) — usamos un img como probe
-        // Si carga → el archivo está listo. Timeout máx 25s.
-        const pollTimer = setInterval(() => {
-            pollCount++;
-            const probe = new Image();
-            probe.onload = () => { clearInterval(pollTimer); _habilitarLink(); };
-            probe.onerror = () => {
-                // onerror puede ser CORS o 404 — intentamos igual con fetch no-cors
-                fetch(linkFinal, { mode: 'no-cors', cache: 'no-store' })
-                    .then(() => { clearInterval(pollTimer); _habilitarLink(); })
-                    .catch(() => {});
-            };
-            // Usamos un recurso pequeño conocido del mismo repo para evitar CORS
-            probe.src = linkFinal + '?_=' + Date.now();
-            if (pollCount >= 5) { clearInterval(pollTimer); _habilitarLink(); }
-        }, 5000);
+        }
         document.getElementById('mr-btn-wsp2').onclick = () => window.open(_linkWspActual, '_blank');
         document.getElementById('mr-nombre-resultado').textContent =
             nombre + (razon ? ' · ' + razon : '') + ' · ' + _idCotActual;
