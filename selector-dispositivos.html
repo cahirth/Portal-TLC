@@ -442,7 +442,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.04.3"; console.log("%c TLC Portal v2026.06.04.3 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.04.4"; console.log("%c TLC Portal v2026.06.04.4 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1967,30 +1967,25 @@ async function generarPropuesta() {
     try {
         const htmlPresup = generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot: _idCotActual });
 
-        // Subir HTML a GitHub Pages vía Apps Script
-        mostrarMrStatus('⏳ Publicando presupuesto...', '');
-        const respGitHub = await fetch(FOTO_MAP_URL, {
+        // ── PASO 1: Blob URL instantáneo — 0ms, sin esperar GitHub ──────────
+        // El vendedor ve el presupuesto al instante desde memoria del browser
+        const blobInstant = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
+        _blobUrlActual    = URL.createObjectURL(blobInstant);
+        setTimeout(() => URL.revokeObjectURL(_blobUrlActual), 600000); // limpiar en 10min
+
+        // Link final para el cliente = GitHub Pages (se construye con el ID, sin esperar)
+        const linkFinal = 'https://cahirth.github.io/Portal-TLC/cotizaciones/' + _idCotActual + '.html';
+        const resultGitHub = { ok: true, link: linkFinal }; // optimista — GitHub recibirá el push
+
+        // ── PASO 2: Subir a GitHub en background (fire-and-forget) ──────────
+        mostrarMrStatus('✅ Presupuesto listo · Publicando en segundo plano...', '');
+        fetch(FOTO_MAP_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
-            body:    JSON.stringify({
-                accion: 'subirCotizacion',
-                idCot:  _idCotActual,
-                html:   htmlPresup,
-            })
-        });
-        const resultGitHub = await respGitHub.json();
-
-        let linkFinal;
-        if (resultGitHub.ok) {
-            linkFinal      = resultGitHub.link;
-            _blobUrlActual = null;
-        } else {
-            console.warn('GitHub upload falló, usando blob local:', resultGitHub.error);
-            const blob = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
-            _blobUrlActual = URL.createObjectURL(blob);
-            setTimeout(() => URL.revokeObjectURL(_blobUrlActual), 600000);
-            linkFinal = _blobUrlActual;
-        }
+            body:    JSON.stringify({ accion: 'subirCotizacion', idCot: _idCotActual, html: htmlPresup })
+        }).then(r => r.json())
+          .then(r => { if (r.ok) console.log('✅ GitHub:', r.link); else console.warn('⚠️ GitHub:', r.error); })
+          .catch(e => console.warn('⚠️ GitHub error:', e));
 
         // Calcular datos del carrito
         const c   = calcularCarrito();
@@ -2097,31 +2092,16 @@ async function generarPropuesta() {
         const linkEl = document.getElementById('mr-link-preview');
         const txtEl  = document.getElementById('mr-link-txt');
 
-        if (resultGitHub.htmlCrudo) {
-            // Crear Blob URL desde el HTML crudo — 0ms, sin esperar GitHub
-            const blob    = new Blob([resultGitHub.htmlCrudo], { type: 'text/html; charset=utf-8' });
-            const blobUrl = URL.createObjectURL(blob);
-
-            linkEl.href            = blobUrl;
-            linkEl.style.opacity   = '1';
-            linkEl.style.pointerEvents = 'auto';
-            linkEl.style.cursor    = 'pointer';
-            if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto';
-            linkEl.onclick = (e) => {
-                e.preventDefault();
-                const win = window.open(blobUrl, '_blank');
-                // Limpiar Blob de memoria después de abrir (evitar memory leak)
-                if (win) setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
-            };
-        } else {
-            // Fallback si htmlCrudo no viene: habilitar con link GitHub directamente
-            linkEl.href = linkFinal;
-            linkEl.style.opacity = '1';
-            linkEl.style.pointerEvents = 'auto';
-            linkEl.style.cursor = 'pointer';
-            if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto';
-            linkEl.onclick = (e) => { e.preventDefault(); window.open(linkFinal, '_blank'); };
-        }
+        // Habilitar botón al instante con Blob URL (ya fue creado arriba)
+        linkEl.href = _blobUrlActual;
+        linkEl.style.opacity = '1';
+        linkEl.style.pointerEvents = 'auto';
+        linkEl.style.cursor = 'pointer';
+        if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto';
+        linkEl.onclick = (e) => {
+            e.preventDefault();
+            window.open(_blobUrlActual, '_blank');
+        };
         document.getElementById('mr-btn-wsp2').onclick = () => window.open(_linkWspActual, '_blank');
         document.getElementById('mr-nombre-resultado').textContent =
             nombre + (razon ? ' · ' + razon : '') + ' · ' + _idCotActual;
