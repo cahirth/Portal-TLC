@@ -462,7 +462,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.05.3"; console.log("%c TLC Portal v2026.06.05.3 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.05.4"; console.log("%c TLC Portal v2026.06.05.4 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -590,45 +590,52 @@ const _lazyObserver = ('IntersectionObserver' in window)
 
 // ─── SessionStorage ───────────────────────────────────────
 
-function _guardarCachePrecios(data, etag) {
+function _guardarCachePrecios(data, sha) {
     try {
         sessionStorage.setItem(PRECIOS_CACHE_KEY, JSON.stringify({
             v:    PRECIOS_CACHE_VERSION,
             ts:   Date.now(),
-            etag: etag || '',   // ETag o Last-Modified del servidor
+            sha:  sha || '',   // ETag o Last-Modified del servidor
             data
         }));
     } catch(e) { /* sessionStorage lleno → silencioso */ }
 }
 
 // Verifica si precios.json en GitHub tiene una versión más nueva que el caché
-// Usa HEAD request (~20ms) para comparar ETag sin descargar el JSON
+// Estrategia: descarga solo las primeras 200 bytes del JSON y compara el primer item
+// GitHub Pages no envía ETag confiable, así que comparamos contenido directamente
 async function _chequearActualizacionPrecios() {
     try {
         const raw = sessionStorage.getItem(PRECIOS_CACHE_KEY);
-        if (!raw) return false; // sin caché, no hay nada que comparar
-
+        if (!raw) return false;
         const p = JSON.parse(raw);
-        const cachedEtag = p.etag || '';
+        const cachedTs = p.ts || 0;
 
-        const resp = await fetch(PRECIOS_STATIC_URL, {
-            method: 'HEAD',
-            cache:  'no-store'
-        });
+        // Usar GitHub API para obtener el SHA del archivo (no descarga el contenido)
+        // SHA cambia cada vez que Apps Script pushea un nuevo precios.json
+        const apiUrl = 'https://api.github.com/repos/cahirth/Portal-TLC/contents/precios.json';
+        const resp = await fetch(apiUrl, { cache: 'no-store' });
         if (!resp.ok) return false;
 
-        const serverEtag     = resp.headers.get('etag')          || '';
-        const serverModified = resp.headers.get('last-modified') || '';
-        const serverTag      = serverEtag || serverModified;
+        const meta = await resp.json();
+        const serverSha = meta.sha || '';
+        const cachedSha = p.sha  || '';
 
-        if (serverTag && cachedEtag && serverTag !== cachedEtag) {
-            console.log('[Precios] 🔄 Nueva versión detectada — invalidando caché');
+        if (serverSha && cachedSha && serverSha !== cachedSha) {
+            console.log('[Precios] 🔄 Nueva versión detectada (SHA cambió) — invalidando caché');
             sessionStorage.removeItem(PRECIOS_CACHE_KEY);
-            return true; // hay actualización
+            return true;
         }
+
+        // Primera carga sin SHA guardado — guardar para la próxima comparación
+        if (serverSha && !cachedSha) {
+            p.sha = serverSha;
+            sessionStorage.setItem(PRECIOS_CACHE_KEY, JSON.stringify(p));
+        }
+
         return false;
     } catch(e) {
-        return false; // error → conservar caché
+        return false;
     }
 }
 
@@ -681,12 +688,18 @@ async function cargarPreciosInstantaneo() {
         _chequearActualizacionPrecios().then(hayNueva => {
             if (!hayNueva) return;
             // Recargar precios frescos en background y actualizar dispositivos
-            fetch(PRECIOS_STATIC_URL, { cache: 'no-store' })
+            // Obtener SHA nuevo y guardar junto con los datos frescos
+            fetch('https://api.github.com/repos/cahirth/Portal-TLC/contents/precios.json', { cache: 'no-store' })
                 .then(r => r.ok ? r.json() : null)
-                .then(data => {
+                .then(meta => {
+                    const sha = meta?.sha || '';
+                    return fetch(PRECIOS_STATIC_URL, { cache: 'no-store' })
+                        .then(r => r.ok ? r.json() : null)
+                        .then(data => ({ data, sha }));
+                })
+                .then(({ data, sha }) => {
                     if (!data || !data.length) return;
-                    const etag = ''; // ya se guardó en _chequearActualizacionPrecios
-                    _guardarCachePrecios(data, etag);
+                    _guardarCachePrecios(data, sha);
                     dispositivos = data;
                     console.log(`[Precios] 🔄 Actualizado en background — ${data.length} items`);
                     // Re-renderizar la vista actual si está en lista de equipos
@@ -709,11 +722,15 @@ async function cargarPreciosInstantaneo() {
         const t0   = performance.now();
         const resp = await fetch(PRECIOS_STATIC_URL, { cache: 'no-store' });
         if (resp.ok) {
-            const etag = resp.headers.get('etag') || resp.headers.get('last-modified') || '';
             const data = await resp.json();
             const ms   = Math.round(performance.now() - t0);
             console.log(`[Precios] ✅ precios.json (${ms}ms) — ${data.length} items`);
-            _guardarCachePrecios(data, etag);
+            // Obtener SHA via GitHub API para comparaciones futuras
+            fetch('https://api.github.com/repos/cahirth/Portal-TLC/contents/precios.json', { cache: 'no-store' })
+                .then(r => r.ok ? r.json() : null)
+                .then(meta => { if (meta?.sha) _guardarCachePrecios(data, meta.sha); })
+                .catch(() => {});
+            _guardarCachePrecios(data, '');
             return data;
         }
         console.warn(`[Precios] ⚠️ precios.json → HTTP ${resp.status}`);
