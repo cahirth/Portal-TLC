@@ -112,6 +112,9 @@
         textarea.form-input { resize: none; height: 80px; }
         .form-input[readonly] { color: #64748b; cursor: default; }
         .comision-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(6,214,160,0.15); color: #06d6a0; border: 1px solid #06d6a0; border-radius: 8px; padding: 10px 14px; font-size: 15px; font-weight: 700; }
+        .stock-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; letter-spacing: 0.3px; }
+        .stock-badge.con-stock { background: rgba(6,214,160,0.12); border: 1px solid rgba(6,214,160,0.35); color: #06d6a0; }
+        .stock-badge.sin-stock { background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.35); color: #f87171; }
         .btn-enviar { width: 100%; padding: 14px; border-radius: 10px; background: #3a86ff; border: none; color: white; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
         .btn-enviar:disabled { opacity: 0.5; }
         .form-status { margin-top: 12px; padding: 12px; border-radius: 10px; font-size: 14px; display: none; }
@@ -415,6 +418,20 @@
     </div>
     <div class="form-body">
         <div class="form-dispositivo" id="form-disp"></div>
+        <!-- Badge de stock + botones multimedia -->
+        <div id="form-multimedia-row" style="display:none; margin-bottom:16px;">
+            <div id="form-stock-badge-wrap" style="margin-bottom:10px;"></div>
+            <div style="display:flex; gap:8px;">
+                <a id="form-btn-folleto" href="#" target="_blank" class="btn-folleto" style="display:none; flex:1; margin-bottom:0;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Ver Folleto
+                </a>
+                <a id="form-btn-video" href="#" target="_blank" class="btn-folleto" style="display:none; flex:1; margin-bottom:0; background:linear-gradient(135deg,#1c1520,#2d1a2e); border-color:#f87171; color:#fca5a5; box-shadow:0 0 12px rgba(248,113,113,0.15);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Ver Video
+                </a>
+            </div>
+        </div>
 
         <div class="form-group">
             <label class="form-label">Nombre y Apellido *</label>
@@ -445,7 +462,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.04.9"; console.log("%c TLC Portal v2026.06.04.9 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.05.1"; console.log("%c TLC Portal v2026.06.05.1 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2477,6 +2494,26 @@ function abrirFormulario() {
         comGrp.style.display = 'none';
     }
 
+    // ── Badge de stock ──────────────────────────────────────────────
+    const stockWrap = document.getElementById('form-stock-badge-wrap');
+    const stockVal  = d['stock'] || d['Stock'] || '';
+    const conStock  = stockVal && stockVal !== '0' && String(stockVal).toLowerCase() !== 'no disponible' && String(stockVal).trim() !== '';
+    if (stockWrap) {
+        stockWrap.innerHTML = conStock
+            ? '<span class="stock-badge con-stock">✦ Con Stock</span>'
+            : '<span class="stock-badge sin-stock">◌ Sin Stock / Reservado</span>';
+    }
+
+    // ── Botones folleto y video ──────────────────────────────────────
+    const multRow    = document.getElementById('form-multimedia-row');
+    const btnFolleto = document.getElementById('form-btn-folleto');
+    const btnVideo   = document.getElementById('form-btn-video');
+    const urlFolleto = d['Link_Folleto'] || d['url_folleto'] || '';
+    const urlVideo   = d['Link_Web']     || d['url_video']   || '';
+    if (btnFolleto) { if (urlFolleto) { btnFolleto.href = urlFolleto; btnFolleto.style.display = 'flex'; } else { btnFolleto.style.display = 'none'; } }
+    if (btnVideo)   { if (urlVideo)   { btnVideo.href   = urlVideo;   btnVideo.style.display   = 'flex'; } else { btnVideo.style.display   = 'none'; } }
+    if (multRow)    { multRow.style.display = (urlFolleto || urlVideo || true) ? 'block' : 'none'; } // siempre mostrar el badge
+
     // Limpiar
     ['f-nombre','f-telefono','f-notas'].forEach(id => document.getElementById(id).value = '');
     const st = document.getElementById('form-status');
@@ -2492,7 +2529,7 @@ document.getElementById('btn-enviar').addEventListener('click', guardarCotizacio
 async function guardarCotizacion() {
     const nombre   = document.getElementById('f-nombre').value.trim();
     const telefono = document.getElementById('f-telefono').value.trim();
-    const notas    = document.getElementById('f-notas').value.trim();
+    const notasTxt = document.getElementById('f-notas').value.trim();
     const vendedor = document.getElementById('f-vendedor').value.trim();
 
     if (!nombre) { mostrarFormStatus('Completá el nombre y apellido.', 'error'); return; }
@@ -2502,11 +2539,28 @@ async function guardarCotizacion() {
 
     const d = dispositivoActual;
     const modalLabel = MODALIDADES.find(m => m.key === modalidadActual)?.label || '';
-    const fecha = new Date().toLocaleString('es-AR');
 
-    console.log('Cotización:', { fecha, dispositivo: d['Nombre de Dispositivo'], modalidad: modalLabel, nombre, telefono, notas, vendedor });
+    // ── Empaquetar notas_papiro como array cronológico ──────────────
+    const notas_papiro = notasTxt ? [{
+        fecha_nota: new Date().toISOString(),
+        usuario:    vendedor,
+        texto:      notasTxt,
+    }] : [];
 
-    // Por ahora simula éxito — próximo paso: conectar al Excel
+    // ── Payload completo ────────────────────────────────────────────
+    const payload = {
+        fecha:          new Date().toLocaleString('es-AR'),
+        dispositivo:    d['Nombre de Dispositivo'] || '',
+        modalidad:      modalLabel,
+        nombre,
+        telefono,
+        vendedor,
+        notas_papiro,  // ← array estructurado en lugar de string suelto
+    };
+
+    console.log('Cotización:', payload);
+
+    // Simula éxito — conectar al flujo principal en el próximo paso
     setTimeout(() => {
         btn.disabled = false;
         mostrarFormStatus(`✅ Cotización guardada para ${nombre}`, 'ok');
