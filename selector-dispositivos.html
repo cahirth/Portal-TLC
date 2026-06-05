@@ -2176,21 +2176,28 @@ async function generarPropuesta() {
           .catch(err => console.warn('⚠️ Error SharePoint:', err));
 
         // Sincronizar con HubSpot (fire-and-forget)
+        const equiposDetalle = carrito.map(i => ({
+            nombre:   i.nombre,
+            cantidad: i.cantidad || 1,
+            precio:   i.precioLista || 0,
+        }));
+
         fetch(FOTO_MAP_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({
-                accion:   'sincronizarHubSpot',
-                idCot:    _idCotActual,
-                nombre:   nombre,
-                razon:    razon    || '',
-                email:    email    || '',
-                telefono: telefono || '',
-                equipos:  equiposStr,
-                totalUSD: Math.round(c.total * 100) / 100,
-                estado:   'Enviada',
-                link:     (linkFinal && !linkFinal.startsWith('blob:')) ? linkFinal : '',
-                vendedor: vendedor,
+                accion:         'sincronizarHubSpot',
+                idCot:          _idCotActual,
+                nombre:         nombre,
+                razon:          razon    || '',
+                email:          email    || '',
+                telefono:       telefono || '',
+                equipos:        equiposStr,
+                equiposDetalle: equiposDetalle,
+                totalUSD:       Math.round(c.total * 100) / 100,
+                estado:         'Enviada',
+                link:           (linkFinal && !linkFinal.startsWith('blob:')) ? linkFinal : '',
+                vendedor:       vendedor,
             })
         }).then(r => r.text())
           .then(t => {
