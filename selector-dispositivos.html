@@ -462,7 +462,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.05.2"; console.log("%c TLC Portal v2026.06.05.2 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.05.3"; console.log("%c TLC Portal v2026.06.05.3 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -590,14 +590,46 @@ const _lazyObserver = ('IntersectionObserver' in window)
 
 // ─── SessionStorage ───────────────────────────────────────
 
-function _guardarCachePrecios(data) {
+function _guardarCachePrecios(data, etag) {
     try {
         sessionStorage.setItem(PRECIOS_CACHE_KEY, JSON.stringify({
-            v: PRECIOS_CACHE_VERSION,
-            ts: Date.now(),
+            v:    PRECIOS_CACHE_VERSION,
+            ts:   Date.now(),
+            etag: etag || '',   // ETag o Last-Modified del servidor
             data
         }));
     } catch(e) { /* sessionStorage lleno → silencioso */ }
+}
+
+// Verifica si precios.json en GitHub tiene una versión más nueva que el caché
+// Usa HEAD request (~20ms) para comparar ETag sin descargar el JSON
+async function _chequearActualizacionPrecios() {
+    try {
+        const raw = sessionStorage.getItem(PRECIOS_CACHE_KEY);
+        if (!raw) return false; // sin caché, no hay nada que comparar
+
+        const p = JSON.parse(raw);
+        const cachedEtag = p.etag || '';
+
+        const resp = await fetch(PRECIOS_STATIC_URL, {
+            method: 'HEAD',
+            cache:  'no-store'
+        });
+        if (!resp.ok) return false;
+
+        const serverEtag     = resp.headers.get('etag')          || '';
+        const serverModified = resp.headers.get('last-modified') || '';
+        const serverTag      = serverEtag || serverModified;
+
+        if (serverTag && cachedEtag && serverTag !== cachedEtag) {
+            console.log('[Precios] 🔄 Nueva versión detectada — invalidando caché');
+            sessionStorage.removeItem(PRECIOS_CACHE_KEY);
+            return true; // hay actualización
+        }
+        return false;
+    } catch(e) {
+        return false; // error → conservar caché
+    }
 }
 
 function _leerCachePrecios() {
@@ -643,18 +675,45 @@ async function cargarPreciosInstantaneo() {
     const cached = _leerCachePrecios();
     if (cached) {
         console.log(`[Precios] ✅ sessionStorage (0ms) — ${cached.length} items`);
+
+        // Chequeo silencioso en background: ¿hay versión nueva en GitHub?
+        // Si la hay, invalida el caché y recarga los precios sin interrumpir al usuario
+        _chequearActualizacionPrecios().then(hayNueva => {
+            if (!hayNueva) return;
+            // Recargar precios frescos en background y actualizar dispositivos
+            fetch(PRECIOS_STATIC_URL, { cache: 'no-store' })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (!data || !data.length) return;
+                    const etag = ''; // ya se guardó en _chequearActualizacionPrecios
+                    _guardarCachePrecios(data, etag);
+                    dispositivos = data;
+                    console.log(`[Precios] 🔄 Actualizado en background — ${data.length} items`);
+                    // Re-renderizar la vista actual si está en lista de equipos
+                    if (typeof renderLista === 'function' && subcatActual) {
+                        const filtered = dispositivos.filter(d =>
+                            d['Categoria'] === catActual &&
+                            (subcatActual === 'TODAS' || d['Sub Categoria'] === subcatActual)
+                        );
+                        renderLista(filtered);
+                    }
+                })
+                .catch(() => {});
+        });
+
         return cached;
     }
 
     // 2. precios.json estático — ~50ms
     try {
         const t0   = performance.now();
-        const resp = await fetch(PRECIOS_STATIC_URL, { cache: 'default' });
+        const resp = await fetch(PRECIOS_STATIC_URL, { cache: 'no-store' });
         if (resp.ok) {
+            const etag = resp.headers.get('etag') || resp.headers.get('last-modified') || '';
             const data = await resp.json();
             const ms   = Math.round(performance.now() - t0);
             console.log(`[Precios] ✅ precios.json (${ms}ms) — ${data.length} items`);
-            _guardarCachePrecios(data);
+            _guardarCachePrecios(data, etag);
             return data;
         }
         console.warn(`[Precios] ⚠️ precios.json → HTTP ${resp.status}`);
@@ -2176,28 +2235,21 @@ async function generarPropuesta() {
           .catch(err => console.warn('⚠️ Error SharePoint:', err));
 
         // Sincronizar con HubSpot (fire-and-forget)
-        const equiposDetalle = carrito.map(i => ({
-            nombre:   i.nombre,
-            cantidad: i.cantidad || 1,
-            precio:   i.precioLista || 0,
-        }));
-
         fetch(FOTO_MAP_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({
-                accion:         'sincronizarHubSpot',
-                idCot:          _idCotActual,
-                nombre:         nombre,
-                razon:          razon    || '',
-                email:          email    || '',
-                telefono:       telefono || '',
-                equipos:        equiposStr,
-                equiposDetalle: equiposDetalle,
-                totalUSD:       Math.round(c.total * 100) / 100,
-                estado:         'Enviada',
-                link:           (linkFinal && !linkFinal.startsWith('blob:')) ? linkFinal : '',
-                vendedor:       vendedor,
+                accion:   'sincronizarHubSpot',
+                idCot:    _idCotActual,
+                nombre:   nombre,
+                razon:    razon    || '',
+                email:    email    || '',
+                telefono: telefono || '',
+                equipos:  equiposStr,
+                totalUSD: Math.round(c.total * 100) / 100,
+                estado:   'Enviada',
+                link:     (linkFinal && !linkFinal.startsWith('blob:')) ? linkFinal : '',
+                vendedor: vendedor,
             })
         }).then(r => r.text())
           .then(t => {
