@@ -228,7 +228,8 @@
     <!-- PANTALLA LISTA -->
     <div id="vista-lista" style="display:none;">
         <div style="position:sticky; top:62px; z-index:50; background:#030712; padding:8px 20px; border-bottom:1px solid #1c2541;">
-            <input type="text" id="buscador" placeholder="Buscar dispositivo o descripción..."
+            <input type="text" id="buscador" placeholder="Buscar equipos, marcas o modelos..."
+                oninput="busquedaUniversal(this.value)"
                 style="width:100%; background:#1c2541; border:1px solid #222e50; border-radius:10px; padding:10px 16px 10px 40px; color:#f8fafc; font-size:14px; outline:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:14px center;">
         </div>
         <div class="lista" id="lista">
@@ -462,7 +463,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.05.4"; console.log("%c TLC Portal v2026.06.05.4 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.05.5"; console.log("%c TLC Portal v2026.06.05.5 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1928,18 +1929,26 @@ function renderCarrito() {
     const monedaFmt = mod.moneda === 'ARS' ? fmtARS : fmtUSD;
     const totalItems = carrito.reduce((s,i) => s+(i.cantidad||1), 0);
 
+    // Etiqueta dinámica según modalidad
+    const esARS      = c.mod.moneda === 'ARS';
+    const labelNeto  = esARS ? 'Anticipo AR$' : 'Neto USD';
+    const valorNeto  = esARS ? fmtARS(c.adelantoTotal || c.netoBase) : fmtUSD(c.netoBase);
+    const labelTotal = esARS ? 'TOTAL c/IVA USD' : 'TOTAL c/IVA';
+    const ivaStr     = fmtUSD(c.iva);
+    const totalStr   = fmtUSD(c.total);
+
     let totalesHtml = `<div class="carrito-totales">
         <div class="total-row">
-            <span class="total-label">Neto Lista Base</span>
-            <span class="total-valor">${fmtUSD(c.netoBase)}</span>
+            <span class="total-label">${labelNeto}</span>
+            <span class="total-valor">${valorNeto}</span>
         </div>
         <div class="total-row">
             <span class="total-label" style="color:#f8961e;">IVA 10,5%</span>
-            <span class="total-valor" style="color:#f8961e;">${fmtUSD(c.iva)}</span>
+            <span class="total-valor" style="color:#f8961e;">${ivaStr}</span>
         </div>
         <div class="total-row" style="border-top:1px solid #3a86ff33; padding-top:10px; margin-top:4px;">
-            <span class="total-label" style="font-size:14px; font-weight:700; color:#f1f5f9;">TOTAL c/IVA</span>
-            <span class="total-valor" style="font-size:20px; color:#3a86ff;">${fmtUSD(c.total)}</span>
+            <span class="total-label" style="font-size:14px; font-weight:700; color:#f1f5f9;">${labelTotal}</span>
+            <span class="total-valor" style="font-size:20px; color:#3a86ff;">${totalStr}</span>
         </div>`;
 
     if (c.todosCalculados && c.adelantoTotal > 0 && mod.cuotas > 0) {
@@ -2262,7 +2271,14 @@ async function generarPropuesta() {
                 razon:    razon    || '',
                 email:    email    || '',
                 telefono: telefono || '',
+                cuit:     cuit     || '',
                 equipos:  equiposStr,
+                // equiposDetalle: array para Line Items en HubSpot (Opción B)
+                equiposDetalle: carrito.map(i => ({
+                    nombre:   i.nombre,
+                    precio:   i.precioCNO || i.precioLista || 0,
+                    cantidad: i.cantidad  || 1,
+                })),
                 totalUSD: Math.round(c.total * 100) / 100,
                 estado:   'Enviada',
                 link:     (linkFinal && !linkFinal.startsWith('blob:')) ? linkFinal : '',
@@ -2662,6 +2678,36 @@ function mostrarFormStatus(msg, tipo) {
     el.className = `form-status${tipo ? ' ' + tipo : ''}`;
     el.style.display = 'block';
 }
+
+// ─── POLLING PRECIOS CADA 10 MIN ──────────────────────────────────────────────
+// Chequea en background si precios.json cambió — actualiza sin F5
+setInterval(() => {
+    _chequearActualizacionPrecios().then(hayNueva => {
+        if (!hayNueva) return;
+        fetch('https://api.github.com/repos/cahirth/Portal-TLC/contents/precios.json', { cache: 'no-store' })
+            .then(r => r.ok ? r.json() : null)
+            .then(meta => {
+                const sha = meta?.sha || '';
+                return fetch('./precios.json', { cache: 'no-store' })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(data => ({ data, sha }));
+            })
+            .then(({ data, sha }) => {
+                if (!data || !data.length) return;
+                _guardarCachePrecios(data, sha);
+                dispositivos = data;
+                console.log('[Precios] 🔄 Polling: actualizado en background — ' + data.length + ' items');
+                if (typeof renderLista === 'function' && subcatActual) {
+                    const filtered = dispositivos.filter(d =>
+                        d['Categoria'] === catActual &&
+                        (subcatActual === 'TODAS' || d['Sub Categoria'] === subcatActual)
+                    );
+                    renderLista(filtered);
+                }
+            })
+            .catch(() => {});
+    });
+}, 10 * 60 * 1000); // cada 10 minutos
 
 // ─── ARRANCAR ─────────────────────────────────────────────────────────────────
 document.getElementById('btn-login').addEventListener('click', () => msal_app.loginRedirect({ scopes: SCOPES }));
