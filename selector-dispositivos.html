@@ -347,7 +347,8 @@
             </div>
             <div class="form-group">
                 <label class="form-label">CUIT</label>
-                <input type="text" class="form-input" id="mr-cuit" placeholder="Ej: 20-12345678-9">
+                <input type="text" class="form-input" id="mr-cuit" placeholder="Ej: 20-12345678-9" autocomplete="off">
+                <div id="mr-cuit-badge" style="display:none; margin-top:6px; font-size:12px; padding:8px 12px; border-radius:8px; line-height:1.5;"></div>
             </div>
             <div class="form-group">
                 <label class="form-label">Teléfono de contacto *</label>
@@ -463,7 +464,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.1"; console.log("%c TLC Portal v2026.06.06.1 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.2"; console.log("%c TLC Portal v2026.06.06.2 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2058,9 +2059,93 @@ function generarIdCotizacion() {
     return 'TLC-' + fecha + '-' + rand;
 }
 
-let _blobUrlActual = null;
-let _linkWspActual = null;
-let _idCotActual   = null;
+let _blobUrlActual  = null;
+let _linkWspActual  = null;
+let _idCotActual    = null;
+let _mrCompanyId    = null;   // ID empresa HubSpot resuelto por CUIT
+let _mrContactId    = null;   // ID contacto HubSpot resuelto por email
+let _mrCuitTimer    = null;   // debounce timer CUIT lookup
+
+// ─── AUTO-RELLENO CUIT (HubSpot → ARCA) ────────────────────────────
+function _mrSetBadge(texto, tipo) {
+    // tipo: 'loading' | 'hubspot' | 'arca' | 'error' | 'hidden'
+    const badge = document.getElementById('mr-cuit-badge');
+    if (!badge) return;
+    const estilos = {
+        loading: 'background:#1c2541; color:#94a3b8; border:1px solid #1e3050;',
+        hubspot: 'background:rgba(58,134,255,0.12); color:#3a86ff; border:1px solid rgba(58,134,255,0.3);',
+        arca:    'background:rgba(6,214,160,0.10); color:#06d6a0; border:1px solid rgba(6,214,160,0.3);',
+        error:   'background:rgba(239,68,68,0.10); color:#f87171; border:1px solid rgba(239,68,68,0.3);',
+    };
+    if (tipo === 'hidden') { badge.style.display = 'none'; return; }
+    badge.style.cssText += ';display:block;' + (estilos[tipo] || estilos.error);
+    badge.innerHTML = texto;
+}
+
+async function _mrLookupCuit(cuitRaw) {
+    const cuit = cuitRaw.replace(/\D/g, '');
+    if (cuit.length < 10) { _mrSetBadge('', 'hidden'); _mrCompanyId = null; return; }
+
+    _mrSetBadge('🔍 Consultando...', 'loading');
+
+    try {
+        const resp = await fetch(FOTO_MAP_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    JSON.stringify({ accion: 'consultarCuit', cuit }),
+        }).then(r => r.text()).then(t => JSON.parse(t));
+
+        if (!resp.ok) {
+            _mrSetBadge('⚠️ No se pudo consultar el CUIT', 'error');
+            _mrCompanyId = null;
+            return;
+        }
+
+        // Guardar companyId para el payload final
+        _mrCompanyId = resp.companyId || null;
+        _mrContactId = resp.contactId || null;
+
+        // Rellenar campos si están vacíos
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el && !el.value.trim() && val) el.value = val;
+        };
+        setVal('mr-razon',    resp.razonSocial);
+        setVal('mr-nombre',   resp.nombreMedico);
+        setVal('mr-telefono', resp.telefono);
+        setVal('mr-email',    resp.email);
+
+        // Badge según origen
+        if (resp.origen === 'HUBSPOT') {
+            _mrSetBadge(
+                '🏢 <strong>Encontrado en HubSpot</strong><br>' +
+                (resp.razonSocial ? resp.razonSocial : '') +
+                (resp.condicionIva ? ' · ' + resp.condicionIva : ''),
+                'hubspot'
+            );
+        } else if (resp.origen === 'ARCA') {
+            _mrSetBadge(
+                '🏛️ <strong>Encontrado en ARCA/AFIP</strong><br>' +
+                (resp.razonSocial ? resp.razonSocial : 'Sin datos') +
+                (resp.condicionIva ? ' · ' + resp.condicionIva : ''),
+                'arca'
+            );
+        } else {
+            _mrSetBadge('ℹ️ CUIT no encontrado — se creará empresa nueva', 'error');
+            _mrCompanyId = null;
+        }
+    } catch(e) {
+        _mrSetBadge('⚠️ Error de conexión al consultar CUIT', 'error');
+        _mrCompanyId = null;
+    }
+}
+
+function _mrIniciarLookupCuit() {
+    clearTimeout(_mrCuitTimer);
+    const val = document.getElementById('mr-cuit')?.value?.replace(/\D/g, '') || '';
+    if (val.length < 10) { _mrSetBadge('', 'hidden'); _mrCompanyId = null; return; }
+    _mrCuitTimer = setTimeout(() => _mrLookupCuit(val), 600); // debounce 600ms
+}
 
 function abrirModalResumen() {
     const modal = document.getElementById('modal-resumen');
@@ -2083,6 +2168,9 @@ function abrirModalResumen() {
     btnWsp.disabled = true;
     btnWsp.style.opacity = '0.4';
     btnWsp.style.pointerEvents = 'none';
+    _mrCompanyId = null;
+    _mrContactId = null;
+    _mrSetBadge('', 'hidden');
     ['mr-nombre','mr-razon','mr-cuit','mr-telefono','mr-email','mr-notas'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
@@ -2143,6 +2231,13 @@ function abrirModalResumen() {
     cerrarCarrito();
     modal.style.display = 'block';
     setTimeout(() => document.getElementById('modal-resumen-box').style.transform = 'none', 10);
+
+    // Listener CUIT auto-relleno
+    const cuitInput = document.getElementById('mr-cuit');
+    if (cuitInput) {
+        cuitInput.removeEventListener('input', _mrIniciarLookupCuit);
+        cuitInput.addEventListener('input', _mrIniciarLookupCuit);
+    }
 }
 
 function cerrarModalResumen() {
@@ -2284,11 +2379,13 @@ async function generarPropuesta() {
                     precio:   i.precioCNO || i.precioLista || 0,
                     cantidad: i.cantidad  || 1,
                 })),
-                totalUSD: Math.round(c.total * 100) / 100,
-                estado:   'Enviada',
-                link:     (linkFinal && !linkFinal.startsWith('blob:')) ? linkFinal : '',
-                vendedor: vendedor,
-                notas:    notas    || '',
+                totalUSD:  Math.round(c.total * 100) / 100,
+                estado:    'Enviada',
+                link:      (linkFinal && !linkFinal.startsWith('blob:')) ? linkFinal : '',
+                vendedor:  vendedor,
+                notas:     notas     || '',
+                companyId: _mrCompanyId || null,
+                contactId: _mrContactId || null,
             })
         }).then(r => r.text())
           .then(t => {
