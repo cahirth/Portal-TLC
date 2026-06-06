@@ -74,8 +74,12 @@
         .kanban-empty-col { font-size:11px; color:#334155; text-align:center; padding:16px 8px; border:1px dashed #1e3050; border-radius:8px; }
 
         /* KANBAN CARD */
-        .k-card { background:#0f1a30; border-radius:10px; padding:12px; border:1px solid #1e3050; transition:transform .12s, box-shadow .12s; }
+        .k-card { background:#0f1a30; border-radius:10px; padding:12px; border:1px solid #1e3050; transition:transform .12s, box-shadow .12s; cursor:grab; }
         .k-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.4); }
+        .k-card.dragging { opacity:.4; cursor:grabbing; }
+        .kanban-cards.drag-over { border:1px dashed #3a86ff; background:#080d1a; }
+        .cambio-etapa-select { width:100%; margin-top:8px; padding:6px 10px; background:#1c2541; border:1px solid #1e3050; border-radius:8px; color:#94a3b8; font-size:11px; font-weight:600; outline:none; cursor:pointer; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:calc(100% - 10px) center; padding-right:28px; }
+        .cambio-etapa-select:focus { border-color:#3a86ff; }
         .k-id      { font-size:9px; font-weight:700; font-family:monospace; color:#3a86ff; letter-spacing:0.5px; margin-bottom:5px; }
         .k-titulo  { font-size:12px; font-weight:700; color:#f1f5f9; line-height:1.35; margin-bottom:4px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
         .k-valor   { font-size:14px; font-weight:800; color:#06d6a0; margin-bottom:4px; }
@@ -188,8 +192,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.2";
-console.log("%c TLC Cotizaciones v2026.06.06.2 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.3";
+console.log("%c TLC Cotizaciones v2026.06.06.3 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
@@ -283,6 +287,13 @@ async function init() {
 }
 
 // ─── CARGA DE VENDEDORES DESDE SHEET ────────────────────────────
+// Fallback estático — se usa si el Sheet falla o tarda
+const VENDEDORES_FALLBACK = [
+    { email:'cristian@tlcsrl.com.ar', nombre:'Cristian Hirth',      rol:'Administrador' },
+    { email:'lucio@tlcsrl.com.ar',    nombre:'Lucio Raineri',        rol:'Vendedor'      },
+    { email:'fernando@tlcsrl.com.ar', nombre:'Fernando del Campo',   rol:'Administrador' },
+];
+
 async function _cargarVendedores(emailLogueado) {
     try {
         const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Vendedores`;
@@ -297,14 +308,17 @@ async function _cargarVendedores(emailLogueado) {
             nombre: String(v['Nombre'] || v['nombre'] || '').trim(),
             rol:    String(v['Rol']    || '').trim(),
         })).filter(v => v.email || v.nombre);
-
-        // Determinar rol del usuario logueado
-        const match = listaVendedores.find(v => v.email === emailLogueado);
-        if (match) currentUserRol = match.rol || 'Vend_Externo';
-
     } catch(e) {
-        console.warn('Vendedores:', e);
+        console.warn('Vendedores Sheet falló, usando fallback:', e);
+        listaVendedores = VENDEDORES_FALLBACK;
     }
+
+    // Si el Sheet devolvió vacío, también usar fallback
+    if (!listaVendedores.length) listaVendedores = VENDEDORES_FALLBACK;
+
+    // Determinar rol del usuario logueado
+    const match = listaVendedores.find(v => v.email === emailLogueado);
+    if (match) currentUserRol = match.rol || 'Vend_Externo';
     permisos = _getPermisos(currentUserRol);
 }
 
@@ -498,13 +512,27 @@ function renderKanban() {
             const monto    = _monto(c);
             const fecha    = _fmtFecha(c.fecha);
             const linkPdf  = `https://cahirth.github.io/Portal-TLC/cotizaciones/${id}.html`;
-            return `<div class="k-card" onclick="abrirDetalle(${idxReal})">
+            const etapasOpts = KANBAN_COLS.map(k =>
+                `<option value="${k.key}" ${k.key === c.estado ? 'selected' : ''}>${k.label}</option>`
+            ).join('');
+            return `<div class="k-card"
+                draggable="true"
+                data-id="${id}"
+                data-col="${col.key}"
+                onclick="abrirDetalle(${idxReal})"
+                ondragstart="_onDragStart(event,'${id}')"
+                ondragend="_onDragEnd(event)">
                 <div class="k-id">${id}</div>
                 <div class="k-titulo">${titulo}</div>
                 <div class="k-valor">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
                 ${permisos.verVendedorEnCard && c.vendedor ? `<div class="k-prop">👤 ${c.vendedor}</div>` : ''}
                 <div class="k-fecha">📅 ${fecha}</div>
-                <a href="${linkPdf}" target="_blank" class="k-btn" onclick="event.stopPropagation()">📄 Abrir Presupuesto</a>
+                <select class="cambio-etapa-select"
+                    onclick="event.stopPropagation()"
+                    onchange="event.stopPropagation(); _mutarEstadoCotizacion('${id}', this.value)">
+                    ${etapasOpts}
+                </select>
+                <a href="${linkPdf}" target="_blank" class="k-btn" style="margin-top:6px;" onclick="event.stopPropagation()">📄 Abrir Presupuesto</a>
             </div>`;
         }).join('') : `<div class="kanban-empty-col">Sin cotizaciones</div>`;
 
@@ -516,7 +544,13 @@ function renderKanban() {
                     <span class="kanban-col-total" style="color:${col.color};">${totalFmt}</span>
                 </div>
             </div>
-            <div class="kanban-cards">${cardsHtml}</div>
+            <div class="kanban-cards"
+                data-col="${col.key}"
+                ondragover="_onDragOver(event)"
+                ondragleave="_onDragLeave(event)"
+                ondrop="_onDrop(event,'${col.key}')">
+                ${cardsHtml}
+            </div>
         </div>`;
     }).join('');
 }
@@ -580,8 +614,19 @@ function abrirDetalle(idx) {
         <div class="tot-row tot-final"><span class="tot-lbl">TOTAL c/IVA</span><span class="tot-val">USD ${Math.round(monto).toLocaleString('es-AR')}</span></div>
     </div>`;
 
-    // Notas
-    if (c.notes) {
+    // Selector de etapa en el detalle (mobile friendly)
+    const etapasDetOpts = KANBAN_COLS.map(k =>
+        `<option value="${k.key}" ${k.key === c.estado ? 'selected' : ''}>${k.label}</option>`
+    ).join('');
+    html += `<div class="seccion">
+        <div class="sec-titulo">Cambiar etapa</div>
+        <div class="sec-body">
+            <select class="cambio-etapa-select" style="font-size:13px;padding:9px 12px;"
+                onchange="_mutarEstadoCotizacion('${id}', this.value); this.closest('.detalle-overlay').classList.remove('open');">
+                ${etapasDetOpts}
+            </select>
+        </div>
+    </div>`;
         html += `<div class="seccion">
             <div class="sec-titulo" style="color:#f8961e;">Notas</div>
             <div class="sec-body" style="font-size:12px;color:#f1f5f9;line-height:1.6;">${c.notes}</div>
@@ -600,6 +645,64 @@ function abrirDetalle(idx) {
 
 function cerrarDetalle() {
     document.getElementById('detalle-overlay').classList.remove('open');
+}
+
+// ─── MOTOR DE PERSISTENCIA ───────────────────────────────────────
+// Muta el estado en memoria, recalcula UI a 0ms, y persiste en background
+function _mutarEstadoCotizacion(id, nuevoEstado) {
+    // Paso A: actualizar en memoria (todos los arrays que lo referencian)
+    [historicoCompleto, todasLasCot].forEach(arr => {
+        const c = arr.find(x => (x.idCot || x.id_cotizacion) === id);
+        if (c) c.estado = nuevoEstado;
+    });
+
+    // Paso B: recalcular UI a 0ms
+    aplicarFiltros();
+
+    // Paso C: persistir en background (fire-and-forget) vía Apps Script
+    fetch(APPS_SCRIPT_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body:    JSON.stringify({ accion: 'actualizarEstado', idCot: id, estado: nuevoEstado }),
+    })
+    .then(r => r.text()).then(t => {
+        try { const r = JSON.parse(t); console.log('Estado persistido:', r.ok ? '✅' : '⚠️ ' + r.error); }
+        catch(e) {}
+    })
+    .catch(e => console.warn('Persistencia estado:', e));
+}
+
+// ─── DRAG & DROP ─────────────────────────────────────────────────
+let _dragId = null;
+
+function _onDragStart(e, id) {
+    _dragId = id;
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function _onDragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+    document.querySelectorAll('.kanban-cards').forEach(el => el.classList.remove('drag-over'));
+}
+
+function _onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.classList.add('drag-over');
+}
+
+function _onDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+}
+
+function _onDrop(e, nuevoEstado) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    if (_dragId && nuevoEstado) {
+        _mutarEstadoCotizacion(_dragId, nuevoEstado);
+        _dragId = null;
+    }
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────
