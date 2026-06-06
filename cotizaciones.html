@@ -86,8 +86,31 @@
         .btn-wsp { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; border-radius: 10px; background: linear-gradient(135deg, #25d366, #128c7e); border: none; color: white; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; }
         .btn-ver { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; border-radius: 10px; background: #1c2541; border: 1px solid #3a86ff; color: #3a86ff; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
 
-        /* MISC */
-        .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 16px; }
+        /* TOGGLE VISTA */
+        .vista-toggle { display:flex; gap:0; background:#1c2541; border:1px solid #222e50; border-radius:10px; overflow:hidden; margin-right:8px; flex-shrink:0; }
+        .vista-btn { padding:6px 14px; font-size:12px; font-weight:600; cursor:pointer; border:none; background:transparent; color:#64748b; transition:all .15s; }
+        .vista-btn.active { background:#3a86ff; color:white; }
+
+        /* KANBAN */
+        .kanban-wrap { display:none; overflow-x:auto; padding:12px 20px 100px; gap:12px; min-height:calc(100vh - 160px); }
+        .kanban-wrap.visible { display:flex; }
+        .kanban-col { flex-shrink:0; width:280px; display:flex; flex-direction:column; gap:8px; }
+        .kanban-col-header { border-radius:10px; padding:12px 14px; margin-bottom:4px; }
+        .kanban-col-title { font-size:13px; font-weight:800; letter-spacing:0.3px; }
+        .kanban-col-total { font-size:12px; font-weight:600; margin-top:3px; opacity:0.85; }
+        .kanban-col-count { font-size:10px; opacity:0.6; margin-top:1px; }
+        .kanban-cards { display:flex; flex-direction:column; gap:8px; }
+        .kanban-card { background:#0f1a30; border-radius:12px; padding:14px; border:1px solid #1e3050; transition:transform .15s; cursor:default; }
+        .kanban-card:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+        .kanban-id { font-size:10px; font-weight:700; font-family:monospace; color:#3a86ff; letter-spacing:0.5px; margin-bottom:6px; }
+        .kanban-cliente { font-size:13px; font-weight:700; color:#f1f5f9; line-height:1.3; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .kanban-fecha { font-size:11px; color:#475569; margin-bottom:8px; }
+        .kanban-monto { font-size:16px; font-weight:800; color:#06d6a0; margin-bottom:8px; }
+        .kanban-vendedor { font-size:10px; color:#64748b; margin-bottom:8px; }
+        .kanban-btn { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; padding:8px; border-radius:8px; background:#1c2541; border:1px solid #222e50; color:#94a3b8; font-size:11px; font-weight:600; cursor:pointer; text-decoration:none; transition:all .15s; }
+        .kanban-btn:hover { border-color:#3a86ff; color:#3a86ff; }
+        .kanban-empty { font-size:12px; color:#334155; text-align:center; padding:20px 10px; border:1px dashed #1e3050; border-radius:10px; }
+     display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 16px; }
         .spinner { width: 36px; height: 36px; border: 3px solid #222e50; border-top-color: #3a86ff; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading p { color: #94a3b8; font-size: 14px; }
@@ -110,6 +133,10 @@
         <p id="user-label">Cargando...</p>
     </div>
     <button onclick="cargar(true)" style="background:#1c2541; border:1px solid #222e50; border-radius:8px; color:#94a3b8; font-size:12px; padding:6px 12px; cursor:pointer; flex-shrink:0;">↺ Actualizar</button>
+    <div class="vista-toggle">
+        <button class="vista-btn active" id="btn-vista-lista" onclick="setVista('lista')">≡ Lista</button>
+        <button class="vista-btn" id="btn-vista-kanban" onclick="setVista('kanban')">⊞ Kanban</button>
+    </div>
 </div>
 
 <!-- STATS -->
@@ -134,6 +161,9 @@
     <div class="loading"><div class="spinner"></div><p>Cargando cotizaciones...</p></div>
 </div>
 
+<!-- KANBAN -->
+<div class="kanban-wrap" id="kanban-wrap"></div>
+
 <!-- DETALLE OVERLAY -->
 <div class="detalle-overlay" id="detalle-overlay">
     <div class="detalle-header">
@@ -147,6 +177,97 @@
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const APP_VERSION = "2026.06.02.4"; console.log("%c TLC Portal v2026.06.02.4 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+
+// ─── KANBAN ───────────────────────────────────────────────────────────────────
+const HISTORICO_URL = 'https://cahirth.github.io/Portal-TLC/historico.json';
+const KANBAN_COLS = [
+    { estado: 'Enviada',    label: 'Enviada',    color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.3)'  },
+    { estado: 'Aceptada',   label: 'Aceptada',   color: '#10b981', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.3)'  },
+    { estado: 'Rechazada',  label: 'Rechazada',  color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.3)'   },
+    { estado: 'Facturada',  label: 'Facturada',  color: '#3a86ff', bg: 'rgba(58,134,255,0.1)',  border: 'rgba(58,134,255,0.3)'  },
+];
+let vistActual = 'lista';
+let historicoData = [];
+
+function setVista(v) {
+    vistActual = v;
+    document.getElementById('btn-vista-lista').classList.toggle('active', v === 'lista');
+    document.getElementById('btn-vista-kanban').classList.toggle('active', v === 'kanban');
+    document.getElementById('lista').style.display          = v === 'lista'  ? 'block' : 'none';
+    document.getElementById('filtros-wrap').style.display   = v === 'lista'  ? 'flex'  : 'none';
+    document.getElementById('buscador-wrap').style.display  = v === 'lista'  ? 'block' : 'none';
+    document.getElementById('kanban-wrap').classList.toggle('visible', v === 'kanban');
+    if (v === 'kanban') renderKanban();
+}
+
+async function cargarHistorico() {
+    try {
+        const res = await fetch(HISTORICO_URL + '?t=' + Date.now());
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        let data = await res.json();
+        if (!Array.isArray(data)) data = [];
+
+        // Filtro de seguridad por vendedor
+        const esAdmin = currentUserRol === 'Administrador' ||
+                        currentUserNombre.toLowerCase().includes('cristian hirth') ||
+                        currentUserNombre.toLowerCase().includes('cristian');
+        if (!esAdmin) {
+            const primerNombre = currentUserNombre.split(' ')[0].toLowerCase();
+            data = data.filter(c => {
+                const v = String(c.vendedor || '').toLowerCase();
+                return v.includes(primerNombre);
+            });
+        }
+
+        // Default estado si falta
+        data.forEach(c => { if (!c.estado) c.estado = 'Enviada'; });
+        historicoData = data;
+    } catch(e) {
+        console.warn('historico.json:', e);
+        historicoData = [];
+    }
+}
+
+function renderKanban() {
+    const wrap = document.getElementById('kanban-wrap');
+    if (!historicoData.length) {
+        wrap.innerHTML = '<div style="color:#475569;font-size:14px;padding:40px;text-align:center;">Sin datos en historico.json</div>';
+        return;
+    }
+
+    wrap.innerHTML = KANBAN_COLS.map(col => {
+        const tarjetas = historicoData.filter(c => (c.estado || 'Enviada') === col.estado);
+        const total    = tarjetas.reduce((s, c) => s + (parseFloat((c.totales || {}).total_con_iva || c.totalConIva || 0)), 0);
+
+        const cardsHtml = tarjetas.length ? tarjetas.map(c => {
+            const cliente    = c.cliente?.nombre || c.nombreMedico || c.razonSocial || '—';
+            const idCot      = c.id_cotizacion || c.idCot || '—';
+            const fechaRaw   = c.fecha ? new Date(c.fecha).toLocaleDateString('es-AR') : '—';
+            const monto      = parseFloat((c.totales || {}).total_con_iva || c.totalConIva || 0);
+            const vendedor   = c.vendedor || '';
+            const linkPdf    = `https://cahirth.github.io/Portal-TLC/cotizaciones/${idCot}.html`;
+            const esAdmin    = currentUserRol === 'Administrador';
+
+            return `<div class="kanban-card">
+                <div class="kanban-id">${idCot}</div>
+                <div class="kanban-cliente" title="${cliente}">${cliente}</div>
+                <div class="kanban-fecha">${fechaRaw}</div>
+                <div class="kanban-monto">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
+                ${esAdmin && vendedor ? `<div class="kanban-vendedor">👤 ${vendedor}</div>` : ''}
+                <a href="${linkPdf}" target="_blank" class="kanban-btn">📄 Abrir Presupuesto</a>
+            </div>`;
+        }).join('') : `<div class="kanban-empty">Sin cotizaciones</div>`;
+
+        return `<div class="kanban-col">
+            <div class="kanban-col-header" style="background:${col.bg};border:1px solid ${col.border};">
+                <div class="kanban-col-title" style="color:${col.color};">${col.label}</div>
+                <div class="kanban-col-total" style="color:${col.color};">USD ${Math.round(total).toLocaleString('es-AR')}</div>
+                <div class="kanban-col-count" style="color:${col.color};">${tarjetas.length} cotización${tarjetas.length !== 1 ? 'es' : ''}</div>
+            </div>
+            <div class="kanban-cards">${cardsHtml}</div>
+        </div>`;
+    }).join('');
+}
 const CLIENT_ID = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const PA_LEER_URL = 'https://defaultbbd111b805224e3d9f4378d1ca0e71.cf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/922cfb807b454766a7b40c7ccbfb3742/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=VUeSzJbLOaG5RWXAjz13Xmv5GP2HGAGJVyoKi8hfJI8';
@@ -204,6 +325,7 @@ async function init() {
     } catch(e) { console.warn('Permisos:', e); }
 
     await cargar();
+    await cargarHistorico();  // cargar historico.json en background
     // Cargar fotos en background
     cargarFotoMap();
 }

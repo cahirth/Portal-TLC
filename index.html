@@ -258,7 +258,12 @@
 
         <!-- ================= PANTALLA 3: SUB-MENÚ VENTAS ================= -->
         <div class="app-view" id="view-ventas-menu">
-            <div class="menu-list-stack">
+            <!-- PIPELINE DASHBOARD -->
+            <div id="pipeline-dashboard" style="padding:16px 20px 4px; display:none;">
+                <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#64748b; margin-bottom:12px;">Pipeline — Resumen</div>
+                <div id="pipeline-barras" style="display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
+            <div class="menu-list-stack" style="margin-top:4px;">
                 <div class="menu-item-row" onclick="window.location.href='selector-dispositivos.html'">
                     <div class="item-logo-container" style="overflow:hidden; padding:0; width:44px; height:44px;">
                         <img src="https://lh3.googleusercontent.com/d/1ZqgByiuLcmidQ3bHcvt4GZePGna6blXl" style="width:44px; height:44px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-tags\'></i>'; this.parentElement.classList.add('logo-ventas');">
@@ -869,6 +874,7 @@
         }
         executeSwitch(viewId, title, subtitle);
         if (viewId === 'view-cotizaciones') cargarCotizaciones();
+        if (viewId === 'view-ventas-menu') cargarPipelineDashboard();
         if (viewId === 'form-recepcion') initRecepcionForm();
     }
 
@@ -1509,6 +1515,71 @@
         };
         el.style.cssText += colores[tipo] || colores.info;
     }
+
+// ─── PIPELINE DASHBOARD ───────────────────────────────────────────────────────
+const HISTORICO_IDX_URL = 'https://cahirth.github.io/Portal-TLC/historico.json';
+const PIPELINE_COLS = [
+    { estado: 'Enviada',   label: 'Enviada',   color: '#f59e0b' },
+    { estado: 'Aceptada',  label: 'Aceptada',  color: '#10b981' },
+    { estado: 'Rechazada', label: 'Rechazada', color: '#ef4444' },
+    { estado: 'Facturada', label: 'Facturada', color: '#3a86ff' },
+];
+
+async function cargarPipelineDashboard() {
+    const dash = document.getElementById('pipeline-dashboard');
+    if (!dash) return;
+    dash.style.display = 'block';
+    document.getElementById('pipeline-barras').innerHTML =
+        '<div style="font-size:12px;color:#475569;padding:8px 0;">Cargando...</div>';
+    try {
+        const res  = await fetch(HISTORICO_IDX_URL + '?t=' + Date.now());
+        let data   = await res.json();
+        if (!Array.isArray(data)) data = [];
+
+        // Filtro vendedor
+        const nombreActual = currentUserIndex?.name || currentUserIndex?.username || '';
+        const esAdmin = (currentUserRolIndex === 'Administrador') ||
+                        nombreActual.toLowerCase().includes('cristian hirth') ||
+                        nombreActual.toLowerCase().includes('cristian');
+        if (!esAdmin && nombreActual) {
+            const primer = nombreActual.split(' ')[0].toLowerCase();
+            data = data.filter(c => String(c.vendedor || '').toLowerCase().includes(primer));
+        }
+        data.forEach(c => { if (!c.estado) c.estado = 'Enviada'; });
+
+        // Calcular totales por estado
+        const totGeneral = data.reduce((s, c) =>
+            s + parseFloat((c.totales || {}).total_con_iva || c.totalConIva || 0), 0);
+
+        const barras = PIPELINE_COLS.map(col => {
+            const items  = data.filter(c => c.estado === col.estado);
+            const total  = items.reduce((s, c) =>
+                s + parseFloat((c.totales || {}).total_con_iva || c.totalConIva || 0), 0);
+            const pct    = totGeneral > 0 ? Math.round((total / totGeneral) * 100) : 0;
+            const fmtTot = 'USD ' + Math.round(total).toLocaleString('es-AR');
+            return `<div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <span style="font-size:12px;font-weight:600;color:${col.color};">${col.label}</span>
+                    <span style="font-size:11px;color:#64748b;">${items.length} cot. · ${fmtTot}</span>
+                </div>
+                <div style="background:#1c2541;border-radius:6px;height:8px;overflow:hidden;">
+                    <div style="background:${col.color};height:100%;width:${pct}%;border-radius:6px;transition:width .4s;"></div>
+                </div>
+                <div style="font-size:10px;color:#475569;margin-top:2px;text-align:right;">${pct}% del total</div>
+            </div>`;
+        }).join('');
+
+        const totalFmt = 'USD ' + Math.round(totGeneral).toLocaleString('es-AR');
+        document.getElementById('pipeline-barras').innerHTML = barras +
+            `<div style="border-top:1px solid #1c2541;padding-top:10px;margin-top:4px;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:12px;color:#94a3b8;">Total emitido</span>
+                <span style="font-size:14px;font-weight:800;color:#f1f5f9;">${totalFmt}</span>
+            </div>`;
+    } catch(e) {
+        document.getElementById('pipeline-barras').innerHTML =
+            '<div style="font-size:12px;color:#475569;">Sin datos disponibles</div>';
+    }
+}
 
 
 </script>
