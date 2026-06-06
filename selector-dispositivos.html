@@ -601,7 +601,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.15"; console.log("%c TLC Portal v2026.06.06.15 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.16"; console.log("%c TLC Portal v2026.06.06.16 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2960,9 +2960,9 @@ function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, v
     const opt     = c.mod;
     const monedaFmt2 = opt.moneda === 'ARS' ? fmtARS : fmtUSD;
 
-    // ── Calcular totales reales con descuento e IVA por ítem ────────
+    // ── Totales reales con descuento e IVA por ítem ──────────────
     let netoTotal = 0, ivaTotal = 0;
-    carrito.forEach(item => {
+    carrito.forEach(function(item) {
         const qty   = item.cantidad || 1;
         const base  = (opt.key === 'CONTADO') ? (item.precioCNO || item.precioLista || 0) : (item.precioLista || 0);
         const bruto = base * qty;
@@ -2975,8 +2975,8 @@ function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, v
     });
     const totalConIva = netoTotal + ivaTotal;
 
-    // ── Tarjetas de producto ─────────────────────────────────────────
-    const tarjetasProductos = carrito.map((i, idx) => {
+    // ── Tarjetas de producto ──────────────────────────────────────
+    const tarjetasProductos = carrito.map(function(i) {
         const qty      = i.cantidad || 1;
         const base     = (opt.key === 'CONTADO') ? (i.precioCNO || i.precioLista || 0) : (i.precioLista || 0);
         const bruto    = base * qty;
@@ -2987,216 +2987,154 @@ function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, v
         const hayDesc  = dVal > 0;
         const fotoSrc  = i.foto || '';
         const fotoHtml = fotoSrc
-            ? `<img src="${fotoSrc}" alt="${i.nombre}" style="width:88px;height:88px;object-fit:contain;border-radius:10px;background:#f8fafc;flex-shrink:0;border:1px solid #e2e8f0;" onerror="this.style.display='none'">`
-            : `<div style="width:88px;height:88px;border-radius:10px;background:#f1f5f9;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:32px;">🔬</div>`;
-
-        const linkFolleto = i.linkFolleto || i._data?.['Link_Folleto'] || '';
-        const linkVideo   = i._data?.['Link_Web'] || '';
-        const folletoHtml = (linkFolleto || linkVideo) ? `
-            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-                ${linkFolleto ? `<a href="${linkFolleto}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#2563eb;text-decoration:none;padding:5px 12px;background:#eff6ff;border-radius:20px;border:1px solid #bfdbfe;font-weight:600;">📄 Ver folleto</a>` : ''}
-                ${linkVideo   ? `<a href="${linkVideo}"   target="_blank" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#dc2626;text-decoration:none;padding:5px 12px;background:#fef2f2;border-radius:20px;border:1px solid #fecaca;font-weight:600;">▶️ Ver video</a>` : ''}
-            </div>` : '';
-
-        return `
-        <div style="display:flex;gap:16px;padding:20px 24px;border-bottom:1px solid #f1f5f9;align-items:flex-start;">
-            ${fotoHtml}
-            <div style="flex:1;min-width:0;">
-                <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:3px;">${i.nombre}</div>
-                <div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">${opt.label}${qty > 1 ? ' · Cant: ' + qty : ''}</div>
-                <div style="font-size:17px;font-weight:800;color:#2563eb;">${fmtUSD(base)}</div>
-                ${hayDesc ? `<div style="font-size:12px;color:#f8961e;margin-top:2px;">Descuento: −${dTipo==='%' ? dVal+'%' : fmtUSD(dVal)}</div>` : ''}
-                ${folletoHtml}
-            </div>
-            <div style="text-align:right;flex-shrink:0;min-width:110px;">
-                ${hayDesc ? `<div style="font-size:11px;color:#94a3b8;text-decoration:line-through;margin-bottom:2px;">${fmtUSD(bruto)}</div>` : `<div style="font-size:11px;color:#94a3b8;margin-bottom:4px;">Subtotal</div>`}
-                <div style="font-size:16px;font-weight:800;color:#0f172a;">${fmtUSD(neto)}</div>
-                <div style="font-size:11px;color:#64748b;margin-top:3px;">IVA ${ivaPct === 0 ? 'Exento' : ivaPct + '%'}</div>
-            </div>
-        </div>`;
+            ? '<img src="' + fotoSrc + '" alt="' + i.nombre + '" style="width:88px;height:88px;object-fit:contain;border-radius:10px;background:#f8fafc;flex-shrink:0;border:1px solid #e2e8f0;" onerror="this.style.display=\'none\'">'
+            : '<div style="width:88px;height:88px;border-radius:10px;background:#f1f5f9;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:32px;">\u{1F52C}</div>';
+        const linkFolleto = i.linkFolleto || (i._data && i._data['Link_Folleto']) || '';
+        const linkVideo   = (i._data && i._data['Link_Web']) || '';
+        const folletoHtml = (linkFolleto || linkVideo) ? [
+            '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">',
+            linkFolleto ? '<a href="' + linkFolleto + '" target="_blank" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#2563eb;text-decoration:none;padding:5px 12px;background:#eff6ff;border-radius:20px;border:1px solid #bfdbfe;font-weight:600;">\u{1F4C4} Ver folleto</a>' : '',
+            linkVideo   ? '<a href="' + linkVideo   + '" target="_blank" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#dc2626;text-decoration:none;padding:5px 12px;background:#fef2f2;border-radius:20px;border:1px solid #fecaca;font-weight:600;">\u25B6\uFE0F Ver video</a>' : '',
+            '</div>'
+        ].join('') : '';
+        return [
+            '<div style="display:flex;gap:16px;padding:20px 24px;border-bottom:1px solid #f1f5f9;align-items:flex-start;">',
+            fotoHtml,
+            '<div style="flex:1;min-width:0;">',
+            '<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:3px;">' + i.nombre + '</div>',
+            '<div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">' + opt.label + (qty > 1 ? ' \u00B7 Cant: ' + qty : '') + '</div>',
+            '<div style="font-size:17px;font-weight:800;color:#2563eb;">' + fmtUSD(base) + '</div>',
+            hayDesc ? '<div style="font-size:12px;color:#f8961e;margin-top:2px;">Descuento: \u2212' + (dTipo==='%' ? dVal+'%' : fmtUSD(dVal)) + '</div>' : '',
+            folletoHtml,
+            '</div>',
+            '<div style="text-align:right;flex-shrink:0;min-width:110px;">',
+            hayDesc ? '<div style="font-size:11px;color:#94a3b8;text-decoration:line-through;margin-bottom:2px;">' + fmtUSD(bruto) + '</div>' : '<div style="font-size:11px;color:#94a3b8;margin-bottom:4px;">Subtotal</div>',
+            '<div style="font-size:16px;font-weight:800;color:#0f172a;">' + fmtUSD(neto) + '</div>',
+            '<div style="font-size:11px;color:#64748b;margin-top:3px;">IVA ' + (ivaPct === 0 ? 'Exento' : ivaPct + '%') + '</div>',
+            '</div>',
+            '</div>'
+        ].join('');
     }).join('');
 
-    // ── Bloque financiación ─────────────────────────────────────────
-    const financiacionBlock = (c.todosCalculados && c.adelantoTotal > 0 && opt.cuotas > 0) ? `
-        <div style="margin:0 32px 24px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:18px 20px;">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#16a34a;margin-bottom:12px;">Estructura de pago — ${opt.label}</div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px;border-bottom:1px solid #dcfce7;">
-                <span style="color:#64748b;">Anticipo inicial</span>
-                <span style="font-weight:700;color:#16a34a;">${monedaFmt2(c.adelantoTotal)}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px;">
-                <span style="color:#64748b;">Cuota mensual × ${opt.cuotas}</span>
-                <span style="font-weight:700;color:#16a34a;">${monedaFmt2(c.cuotaTotal)}</span>
-            </div>
-        </div>` : '';
+    // ── Financiación ──────────────────────────────────────────────
+    const financiacionBlock = (c.todosCalculados && c.adelantoTotal > 0 && opt.cuotas > 0) ? [
+        '<div style="margin:0 32px 24px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:18px 20px;">',
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#16a34a;margin-bottom:12px;">Estructura de pago \u2014 ' + opt.label + '</div>',
+        '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px;border-bottom:1px solid #dcfce7;"><span style="color:#64748b;">Anticipo inicial</span><span style="font-weight:700;color:#16a34a;">' + monedaFmt2(c.adelantoTotal) + '</span></div>',
+        '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px;"><span style="color:#64748b;">Cuota mensual \u00D7 ' + opt.cuotas + '</span><span style="font-weight:700;color:#16a34a;">' + monedaFmt2(c.cuotaTotal) + '</span></div>',
+        '</div>'
+    ].join('') : '';
 
-    // ── Datos bancarios ─────────────────────────────────────────────
-    const bancosHtml = `
-        <div style="padding:24px 32px;background:#fafafa;border-top:1px solid #f1f5f9;">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:16px;">Datos bancarios</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
-                    <div style="font-size:11px;font-weight:700;color:#0f172a;margin-bottom:6px;">BANCO CREDICOOP · AR$</div>
-                    <div style="font-size:11px;color:#64748b;line-height:1.7;">CC$ 191-218-015278/6<br>CBU: 19102182-55021801527864<br>Alias: <strong>jade.lado.persa</strong></div>
-                </div>
-                <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
-                    <div style="font-size:11px;font-weight:700;color:#0f172a;margin-bottom:6px;">BANCO CREDICOOP · USD</div>
-                    <div style="font-size:11px;color:#64748b;line-height:1.7;">CA USD 191-218-019730/3<br>CBU: 191021825522180197303<br>Alias: <strong>TLC.CREDICOOP.USD</strong></div>
-                </div>
-                <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;grid-column:1/-1;">
-                    <div style="font-size:11px;font-weight:700;color:#0f172a;margin-bottom:6px;">BANCO GALICIA · AR$</div>
-                    <div style="font-size:11px;color:#64748b;">CC$ Nº 4739-5 306-1 · CBU: 0070306020000004739511 · Alias: <strong>TLC.BUENOS.AIRES</strong></div>
-                </div>
-            </div>
-        </div>`;
+    // ── Bancos ────────────────────────────────────────────────────
+    const bancosHtml = [
+        '<div style="padding:24px 32px;background:#fafafa;border-top:1px solid #f1f5f9;">',
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:16px;">Datos bancarios</div>',
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">',
+        '<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;"><div style="font-size:11px;font-weight:700;color:#0f172a;margin-bottom:6px;">BANCO CREDICOOP \u00B7 AR$</div><div style="font-size:11px;color:#64748b;line-height:1.7;">CC$ 191-218-015278/6<br>CBU: 19102182-55021801527864<br>Alias: <strong>jade.lado.persa</strong></div></div>',
+        '<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;"><div style="font-size:11px;font-weight:700;color:#0f172a;margin-bottom:6px;">BANCO CREDICOOP \u00B7 USD</div><div style="font-size:11px;color:#64748b;line-height:1.7;">CA USD 191-218-019730/3<br>CBU: 191021825522180197303<br>Alias: <strong>TLC.CREDICOOP.USD</strong></div></div>',
+        '<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;grid-column:1/-1;"><div style="font-size:11px;font-weight:700;color:#0f172a;margin-bottom:6px;">BANCO GALICIA \u00B7 AR$</div><div style="font-size:11px;color:#64748b;">CC$ N\u00BA 4739-5 306-1 \u00B7 CBU: 0070306020000004739511 \u00B7 Alias: <strong>TLC.BUENOS.AIRES</strong></div></div>',
+        '</div></div>'
+    ].join('');
 
-    return `<!DOCTYPE html>\`<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Presupuesto TLC — ${nombre} — ${nroRef}</title>
-<style>
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#eef2f7; color:#1e293b; }
-.page { max-width:760px; margin:0 auto; background:white; box-shadow:0 8px 48px rgba(0,0,0,0.12); }
-.header-tlc { background:linear-gradient(135deg,#05111f 0%,#0c1e3a 50%,#0f2a52 100%); padding:32px 36px; position:relative; overflow:hidden; }
-.header-tlc::before { content:''; position:absolute; inset:0; background:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"><circle cx="350" cy="-30" r="200" fill="rgba(58,134,255,0.06)"/><circle cx="50" cy="200" r="150" fill="rgba(6,214,160,0.04)"/></svg>') no-repeat center/cover; pointer-events:none; }
-.header-inner { display:flex; align-items:center; justify-content:space-between; gap:20px; position:relative; }
-.header-logo { display:flex; flex-direction:column; gap:10px; }
-.header-tagline { font-size:11px; color:rgba(148,163,184,0.8); text-transform:uppercase; letter-spacing:2px; font-weight:600; }
-.header-right { text-align:right; }
-.header-right .doc-type { font-size:28px; font-weight:900; color:white; letter-spacing:-0.5px; line-height:1; }
-.header-right .company { font-size:12px; color:#94a3b8; margin-top:5px; }
-.header-right .ref-badge { display:inline-block; background:rgba(58,134,255,0.2); border:1px solid rgba(58,134,255,0.4); color:#60a5fa; padding:5px 16px; border-radius:20px; font-size:11px; font-weight:700; margin-top:10px; letter-spacing:0.5px; font-family:monospace; }
-.header-strip { height:4px; background:linear-gradient(90deg,#3a86ff,#06d6a0,#3a86ff); }
-@media print { body{background:white;} .page{max-width:100%;box-shadow:none;} .no-print{display:none!important;} }
-@media (max-width:600px) { .header-inner{flex-direction:column;align-items:flex-start;} .header-right{text-align:left;} }
-</style>
-<script>function guardarPDF(){document.querySelector(".no-print").style.display="none";window.print();setTimeout(function(){document.querySelector(".no-print").style.display="block";},1000);}</script>
-</head>
-<body>
-<div class="page">
+    // ── Armar HTML con parts.join (sin template literals) ─────────
+    const parts = [
+        '<!DOCTYPE html>',
+        '<html lang="es">',
+        '<head>',
+        '<meta charset="UTF-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+        '<title>Presupuesto TLC \u2014 ' + nombre + ' \u2014 ' + nroRef + '<\/title>',
+        '<style>',
+        '* { box-sizing:border-box; margin:0; padding:0; }',
+        'body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#eef2f7; color:#1e293b; }',
+        '.page { max-width:760px; margin:0 auto; background:white; box-shadow:0 8px 48px rgba(0,0,0,0.12); }',
+        '.header-strip { height:4px; background:linear-gradient(90deg,#3a86ff,#06d6a0,#3a86ff); }',
+        '@media print { body{background:white;} .page{max-width:100%;box-shadow:none;} .no-print{display:none!important;} }',
+        '@media (max-width:600px) { .hi{flex-direction:column;align-items:flex-start;} .hi .hir{text-align:left!important;} }',
+        '<\/style>',
+        '<script>function guardarPDF(){document.querySelector(".no-print").style.display="none";window.print();setTimeout(function(){document.querySelector(".no-print").style.display="block";},1000);}<\/script>',
+        '<\/head>',
+        '<body>',
+        '<div class="page">',
 
-    <!-- ══ HEADER ══════════════════════════════════════════════════ -->
-    <div class="header-tlc">
-        <div class="header-inner">
-            <div class="header-logo">
-                <img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25"
-                    alt="Tecnología Láser Corneal"
-                    style="width:160px;height:auto;object-fit:contain;filter:brightness(1.1);"
-                    onerror="this.style.display='none'">
-                <div class="header-tagline">Importador · Distribuidor · Servicio Técnico</div>
-            </div>
-            <div class="header-right">
-                <div class="doc-type">Presupuesto</div>
-                <div class="company">Tecnología Láser Corneal SRL</div>
-                <div class="ref-badge">${nroRef}</div>
-            </div>
-        </div>
-    </div>
-    <div class="header-strip"></div>
+        // HEADER
+        '<div style="background:linear-gradient(135deg,#05111f 0%,#0c1e3a 60%,#0f2a52 100%);padding:32px 36px;">',
+        '<div class="hi" style="display:flex;align-items:center;justify-content:space-between;gap:20px;">',
+        '<div>',
+        '<img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25" alt="TLC" style="width:160px;height:auto;object-fit:contain;" onerror="this.style.display=\'none\'">',
+        '<div style="font-size:11px;color:rgba(148,163,184,0.8);text-transform:uppercase;letter-spacing:2px;font-weight:600;margin-top:10px;">Importador \u00B7 Distribuidor \u00B7 Servicio T\u00E9cnico</div>',
+        '</div>',
+        '<div class="hir" style="text-align:right;">',
+        '<div style="font-size:28px;font-weight:900;color:white;letter-spacing:-0.5px;line-height:1;">Presupuesto</div>',
+        '<div style="font-size:12px;color:#94a3b8;margin-top:5px;">Tecnolog\u00EDa L\u00E1ser Corneal SRL</div>',
+        '<div style="display:inline-block;background:rgba(58,134,255,0.2);border:1px solid rgba(58,134,255,0.4);color:#60a5fa;padding:5px 16px;border-radius:20px;font-size:11px;font-weight:700;margin-top:10px;letter-spacing:0.5px;font-family:monospace;">' + nroRef + '</div>',
+        '</div></div></div>',
+        '<div class="header-strip"></div>',
 
-    <!-- ══ BOTÓN PDF ════════════════════════════════════════════════ -->
-    <div class="no-print" style="padding:12px 32px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:flex-end;">
-        <button onclick="guardarPDF()" style="display:inline-flex;align-items:center;gap:8px;padding:9px 20px;background:#0f172a;border:none;border-radius:8px;color:white;font-size:13px;font-weight:600;cursor:pointer;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Guardar PDF
-        </button>
-    </div>
+        // BOTÓN PDF
+        '<div class="no-print" style="padding:12px 32px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:flex-end;">',
+        '<button onclick="guardarPDF()" style="display:inline-flex;align-items:center;gap:8px;padding:9px 20px;background:#0f172a;border:none;border-radius:8px;color:white;font-size:13px;font-weight:600;cursor:pointer;">',
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"\/><polyline points="7 10 12 15 17 10"\/><line x1="12" y1="15" x2="12" y2="3"\/><\/svg>',
+        'Guardar PDF<\/button><\/div>',
 
-    <!-- ══ CLIENTE ══════════════════════════════════════════════════ -->
-    <div style="padding:28px 32px 20px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:12px;">Cliente</div>
-        <div style="background:linear-gradient(135deg,#f8fafc,#eff6ff);border:1px solid #e2e8f0;border-radius:14px;padding:20px 24px;border-left:4px solid #3a86ff;">
-            <div style="font-size:22px;font-weight:800;color:#0f172a;margin-bottom:10px;">${nombre}</div>
-            <div style="font-size:13px;color:#64748b;display:flex;flex-wrap:wrap;gap:14px;line-height:1.4;">
-                ${razon    ? \`<span>🏥 ${razon}</span>\` : ''}
-                ${cuit     ? \`<span>📋 CUIT: ${cuit}</span>\` : ''}
-                ${telefono ? \`<span>📱 ${telefono}</span>\` : ''}
-                ${email    ? \`<span>✉️ ${email}</span>\` : ''}
-                <span>📅 ${fecha}</span>
-                <span style="color:#3a86ff;font-weight:600;">💳 ${opt.label}</span>
-            </div>
-        </div>
-    </div>
+        // CLIENTE
+        '<div style="padding:28px 32px 20px;">',
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:12px;">Cliente<\/div>',
+        '<div style="background:linear-gradient(135deg,#f8fafc,#eff6ff);border:1px solid #e2e8f0;border-radius:14px;padding:20px 24px;border-left:4px solid #3a86ff;">',
+        '<div style="font-size:22px;font-weight:800;color:#0f172a;margin-bottom:10px;">' + nombre + '<\/div>',
+        '<div style="font-size:13px;color:#64748b;display:flex;flex-wrap:wrap;gap:14px;line-height:1.4;">',
+        (razon    ? '<span>\u{1F3E5} ' + razon    + '<\/span>' : ''),
+        (cuit     ? '<span>\u{1F4CB} CUIT: ' + cuit  + '<\/span>' : ''),
+        (telefono ? '<span>\u{1F4F1} ' + telefono  + '<\/span>' : ''),
+        (email    ? '<span>\u2709\uFE0F ' + email    + '<\/span>' : ''),
+        '<span>\u{1F4C5} ' + fecha + '<\/span>',
+        '<span style="color:#3a86ff;font-weight:600;">\u{1F4B3} ' + opt.label + '<\/span>',
+        '<\/div><\/div><\/div>',
+        '<div style="height:1px;background:#f1f5f9;margin:0 32px;"><\/div>',
 
-    <div style="height:1px;background:#f1f5f9;margin:0 32px;"></div>
+        // PRODUCTOS
+        '<div style="padding:20px 32px 8px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;">Detalle de productos<\/div><\/div>',
+        '<div style="border:1px solid #e2e8f0;border-radius:12px;margin:0 32px;overflow:hidden;">',
+        tarjetasProductos,
+        '<\/div>',
 
-    <!-- ══ PRODUCTOS ════════════════════════════════════════════════ -->
-    <div style="padding:20px 32px 8px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;">Detalle de productos</div>
-    </div>
-    <div style="border:1px solid #e2e8f0;border-radius:12px;margin:0 32px;overflow:hidden;">
-        ${tarjetasProductos}
-    </div>
+        financiacionBlock ? ('<div style="height:20px;"><\/div>' + financiacionBlock) : '',
 
-    ${financiacionBlock ? \`<div style="height:20px;"></div>${financiacionBlock}\` : ''}
+        notas ? '<div style="margin:20px 32px 0;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#92400e;margin-bottom:6px;">Notas<\/div><div style="font-size:13px;color:#78350f;line-height:1.6;">' + notas + '<\/div><\/div>' : '',
 
-    ${notas ? \`<div style="margin:20px 32px 0;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#92400e;margin-bottom:6px;">Notas</div>
-        <div style="font-size:13px;color:#78350f;line-height:1.6;">${notas}</div>
-    </div>\` : ''}
+        // TOTALES
+        '<div style="margin:20px 32px 0;background:linear-gradient(135deg,#f8fafc,#eff6ff);border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">',
+        '<div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;">',
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px;">Condiciones comerciales<\/div>',
+        '<div style="font-size:13px;color:#64748b;line-height:1.7;background:white;border-radius:8px;padding:12px 16px;border:1px solid #f1f5f9;"><strong style="color:#0f172a;">' + opt.label + '<\/strong> \u00B7 IVA discriminado por \u00EDtem \u00B7 Precios en USD \u00B7 V\u00E1lido 15 d\u00EDas h\u00E1biles desde ' + fecha + '.' + (opt.cuotas > 0 ? ' Financiaci\u00F3n sujeta a aprobaci\u00F3n crediticia.' : ' Pago anticipado al cierre de la operaci\u00F3n.') + '<\/div>',
+        '<\/div>',
+        '<div style="padding:16px 20px;">',
+        '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:#64748b;border-bottom:1px solid #f1f5f9;"><span>Subtotal Neto USD<\/span><span style="font-weight:600;color:#1e293b;">' + fmtUSD(netoTotal) + '<\/span><\/div>',
+        '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:#64748b;border-bottom:1px solid #f1f5f9;"><span>IVA discriminado<\/span><span style="font-weight:600;color:#ea580c;">' + fmtUSD(ivaTotal) + '<\/span><\/div>',
+        '<div style="display:flex;justify-content:space-between;padding:14px 0 6px;border-top:2px solid #0f172a;margin-top:6px;"><span style="font-size:16px;font-weight:800;color:#0f172a;">TOTAL USD c\/IVA<\/span><span style="font-size:24px;font-weight:900;color:#2563eb;">' + fmtUSD(totalConIva) + '<\/span><\/div>',
+        '<\/div><\/div>',
 
-    <!-- ══ TOTALES ══════════════════════════════════════════════════ -->
-    <div style="margin:20px 32px 0;background:linear-gradient(135deg,#f8fafc,#eff6ff);border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">
-        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px;">Condiciones comerciales</div>
-            <div style="font-size:13px;color:#64748b;line-height:1.7;background:white;border-radius:8px;padding:12px 16px;border:1px solid #f1f5f9;">
-                <strong style="color:#0f172a;">${opt.label}</strong> · IVA discriminado por ítem · Precios en USD · Válido 15 días hábiles desde ${fecha}.${opt.cuotas > 0 ? ' Financiación sujeta a aprobación crediticia.' : ' Pago anticipado al cierre de la operación.'}
-            </div>
-        </div>
-        <div style="padding:16px 20px;">
-            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:#64748b;border-bottom:1px solid #f1f5f9;">
-                <span>Subtotal Neto USD</span>
-                <span style="font-weight:600;color:#1e293b;">${fmtUSD(netoTotal)}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:#64748b;border-bottom:1px solid #f1f5f9;">
-                <span>IVA discriminado</span>
-                <span style="font-weight:600;color:#ea580c;">${fmtUSD(ivaTotal)}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:14px 0 6px;border-top:2px solid #0f172a;margin-top:6px;">
-                <span style="font-size:16px;font-weight:800;color:#0f172a;">TOTAL USD c/IVA</span>
-                <span style="font-size:24px;font-weight:900;color:#2563eb;">${fmtUSD(totalConIva)}</span>
-            </div>
-        </div>
-    </div>
+        // VALIDEZ
+        '<div style="text-align:center;padding:16px;margin:16px 32px;"><div style="display:inline-block;background:rgba(6,214,160,0.08);border:1px solid rgba(6,214,160,0.25);border-radius:8px;padding:8px 20px;font-size:12px;color:#059669;font-weight:600;">\u2713 V\u00E1lido 15 d\u00EDas h\u00E1biles \u00B7 ' + fecha + '<\/div><\/div>',
 
-    <!-- ══ VALIDEZ ══════════════════════════════════════════════════ -->
-    <div style="text-align:center;padding:16px;margin:16px 32px;">
-        <div style="display:inline-block;background:rgba(6,214,160,0.08);border:1px solid rgba(6,214,160,0.25);border-radius:8px;padding:8px 20px;font-size:12px;color:#059669;font-weight:600;">
-            ✓ Válido 15 días hábiles · ${fecha}
-        </div>
-    </div>
+        bancosHtml,
 
-    <!-- ══ BANCOS ════════════════════════════════════════════════════ -->
-    ${bancosHtml}
+        // FOOTER
+        '<div style="background:linear-gradient(135deg,#05111f,#0c1e3a);padding:28px 32px;">',
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;">',
+        '<img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25" alt="TLC" style="width:100px;height:auto;opacity:0.7;" onerror="this.style.display=\'none\'">',
+        '<div style="text-align:right;"><div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:4px;">Tecnolog\u00EDa L\u00E1ser Corneal SRL<\/div><div style="font-size:12px;color:#475569;margin-bottom:3px;">Del Carmen 716, CABA \u00B7 Argentina \u00B7 CUIT: 30-71488078-7<\/div><div style="font-size:12px;color:#475569;margin-bottom:6px;">Asesor: <strong style="color:#94a3b8;">' + (vendedor || 'TLC') + '<\/strong><\/div><a href="https://www.tlcsrl.com.ar" style="font-size:12px;color:#60a5fa;text-decoration:none;font-weight:600;">www.tlcsrl.com.ar<\/a><\/div>',
+        '<\/div>',
+        '<div style="height:1px;background:rgba(255,255,255,0.06);margin:20px 0;"><\/div>',
+        '<div style="text-align:center;font-size:11px;color:#334155;">M\u00E1s de 20 a\u00F1os de experiencia \u00B7 Representante oficial de marcas de primer nivel \u00B7 Servicio t\u00E9cnico especializado<\/div>',
+        '<\/div>',
 
-    <!-- ══ FOOTER ═══════════════════════════════════════════════════ -->
-    <div style="background:linear-gradient(135deg,#05111f,#0c1e3a);padding:28px 32px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;">
-            <div>
-                <img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25"
-                    alt="TLC" style="width:100px;height:auto;opacity:0.7;" onerror="this.style.display='none'">
-            </div>
-            <div style="text-align:right;">
-                <div style="font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:4px;">Tecnología Láser Corneal SRL</div>
-                <div style="font-size:12px;color:#475569;margin-bottom:3px;">Del Carmen 716, CABA · Argentina · CUIT: 30-71488078-7</div>
-                <div style="font-size:12px;color:#475569;margin-bottom:6px;">Asesor: <strong style="color:#94a3b8;">${vendedor || 'TLC'}</strong></div>
-                <a href="https://www.tlcsrl.com.ar" style="font-size:12px;color:#60a5fa;text-decoration:none;font-weight:600;">www.tlcsrl.com.ar</a>
-            </div>
-        </div>
-        <div style="height:1px;background:rgba(255,255,255,0.06);margin:20px 0;"></div>
-        <div style="text-align:center;font-size:11px;color:#334155;">
-            Más de 20 años de experiencia · Representante oficial de marcas de primer nivel · Servicio técnico especializado
-        </div>
-    </div>
-
-</div>
-</body>
-</html>`;
+        '<\/div>',
+        '<\/body>',
+        '<\/html>'
+    ];
+    return parts.join('\n');
 }
-
 
 // (mostrarCoStatus nuevoPresupuesto definidos en módulo MODAL arriba)
 
