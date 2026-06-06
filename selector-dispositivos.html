@@ -464,7 +464,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.2"; console.log("%c TLC Portal v2026.06.06.2 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.3"; console.log("%c TLC Portal v2026.06.06.3 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2103,41 +2103,136 @@ async function _mrLookupCuit(cuitRaw) {
 
         // Guardar companyId para el payload final
         _mrCompanyId = resp.companyId || null;
-        _mrContactId = resp.contactId || null;
 
-        // Rellenar campos si están vacíos
+        // Rellenar razón social siempre (no depende del contacto)
         const setVal = (id, val) => {
             const el = document.getElementById(id);
-            if (el && !el.value.trim() && val) el.value = val;
+            if (el && el.tagName === 'INPUT' && !el.value.trim() && val) el.value = val;
         };
-        setVal('mr-razon',    resp.razonSocial);
-        setVal('mr-nombre',   resp.nombreMedico);
-        setVal('mr-telefono', resp.telefono);
-        setVal('mr-email',    resp.email);
+        setVal('mr-razon', resp.razonSocial);
 
-        // Badge según origen
+        // ── Badge según origen ─────────────────────────────────────
         if (resp.origen === 'HUBSPOT') {
-            _mrSetBadge(
-                '🏢 <strong>Encontrado en HubSpot</strong><br>' +
-                (resp.razonSocial ? resp.razonSocial : '') +
-                (resp.condicionIva ? ' · ' + resp.condicionIva : ''),
-                'hubspot'
-            );
+            const contactos = resp.contactos || [];
+
+            if (contactos.length === 0) {
+                // Empresa encontrada pero sin contactos
+                _mrContactId = null;
+                _mrSetBadge(
+                    '🏢 <strong>Empresa en HubSpot</strong> — sin contactos registrados<br>' +
+                    (resp.razonSocial || ''),
+                    'hubspot'
+                );
+
+            } else if (contactos.length === 1) {
+                // Un solo contacto → auto-relleno directo
+                const c = contactos[0];
+                _mrContactId = c.id;
+                setVal('mr-nombre',   c.nombre);
+                setVal('mr-telefono', c.telefono);
+                setVal('mr-email',    c.email);
+                _mrSetBadge(
+                    '🏢 <strong>Encontrado en HubSpot</strong><br>' +
+                    (resp.razonSocial || '') +
+                    (resp.condicionIva ? ' · ' + resp.condicionIva : ''),
+                    'hubspot'
+                );
+
+            } else {
+                // Múltiples contactos → mostrar selector
+                _mrContactId = null;
+                _mrMostrarSelectorContactos(contactos);
+                _mrSetBadge(
+                    '🏢 <strong>' + resp.razonSocial + '</strong> · ' + contactos.length + ' contactos — seleccioná el médico',
+                    'hubspot'
+                );
+            }
+
         } else if (resp.origen === 'ARCA') {
+            _mrContactId = null;
+            setVal('mr-nombre',   resp.nombreMedico);
+            setVal('mr-telefono', resp.telefono);
+            setVal('mr-email',    resp.email);
             _mrSetBadge(
                 '🏛️ <strong>Encontrado en ARCA/AFIP</strong><br>' +
-                (resp.razonSocial ? resp.razonSocial : 'Sin datos') +
+                (resp.razonSocial || 'Sin datos') +
                 (resp.condicionIva ? ' · ' + resp.condicionIva : ''),
                 'arca'
             );
         } else {
             _mrSetBadge('ℹ️ CUIT no encontrado — se creará empresa nueva', 'error');
             _mrCompanyId = null;
+            _mrContactId = null;
         }
+
     } catch(e) {
         _mrSetBadge('⚠️ Error de conexión al consultar CUIT', 'error');
         _mrCompanyId = null;
     }
+}
+
+function _mrMostrarSelectorContactos(contactos) {
+    // Eliminar selector previo si existe
+    const previo = document.getElementById('mr-contacto-selector');
+    if (previo) previo.remove();
+
+    const nombreInput = document.getElementById('mr-nombre');
+    if (!nombreInput) return;
+
+    // Construir opciones
+    const optsHtml = contactos.map((c, i) =>
+        `<div class="mr-contacto-opt" data-idx="${i}"
+            style="padding:10px 14px; cursor:pointer; border-bottom:1px solid #1e3050;
+                   display:flex; flex-direction:column; gap:2px; transition:background .15s;"
+            onmouseover="this.style.background='#1c2541'"
+            onmouseout="this.style.background='transparent'">
+            <span style="font-size:13px; font-weight:600; color:#f1f5f9;">${c.nombre || '(Sin nombre)'}</span>
+            <span style="font-size:11px; color:#64748b;">${c.email || ''} ${c.telefono ? '· ' + c.telefono : ''}</span>
+        </div>`
+    ).join('');
+
+    const selector = document.createElement('div');
+    selector.id = 'mr-contacto-selector';
+    selector.style.cssText = `
+        background:#0d1520; border:1px solid #3a86ff; border-radius:12px;
+        overflow:hidden; margin-top:8px; box-shadow:0 8px 24px rgba(0,0,0,0.5);
+    `;
+    selector.innerHTML = `
+        <div style="padding:8px 14px; background:#0f1a30; font-size:11px; color:#3a86ff;
+                    font-weight:700; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #1e3050;">
+            Seleccioná el médico
+        </div>
+        ${optsHtml}
+    `;
+
+    // Insertar debajo del input nombre
+    nombreInput.parentNode.insertBefore(selector, nombreInput.nextSibling);
+
+    // Click en cada opción
+    selector.querySelectorAll('.mr-contacto-opt').forEach(opt => {
+        opt.addEventListener('click', function() {
+            const idx  = parseInt(this.dataset.idx);
+            const cont = contactos[idx];
+            _mrContactId = cont.id;
+
+            // Rellenar campos
+            nombreInput.value = cont.nombre   || '';
+            const tel = document.getElementById('mr-telefono');
+            const em  = document.getElementById('mr-email');
+            if (tel) tel.value = cont.telefono || '';
+            if (em)  em.value  = cont.email    || '';
+
+            // Remover selector
+            selector.remove();
+
+            // Actualizar badge
+            _mrSetBadge(
+                '🏢 <strong>Contacto seleccionado:</strong> ' + (cont.nombre || '') +
+                (cont.email ? '<br>' + cont.email : ''),
+                'hubspot'
+            );
+        });
+    });
 }
 
 function _mrIniciarLookupCuit() {
@@ -2171,6 +2266,9 @@ function abrirModalResumen() {
     _mrCompanyId = null;
     _mrContactId = null;
     _mrSetBadge('', 'hidden');
+    // Limpiar selector de contactos si quedó de una sesión anterior
+    const prevSel = document.getElementById('mr-contacto-selector');
+    if (prevSel) prevSel.remove();
     ['mr-nombre','mr-razon','mr-cuit','mr-telefono','mr-email','mr-notas'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
