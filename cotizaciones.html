@@ -198,13 +198,13 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.8";
-console.log("%c TLC Cotizaciones v2026.06.06.8 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.9";
+console.log("%c TLC Cotizaciones v2026.06.06.9 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
-const HISTORICO_URL   = 'https://cahirth.github.io/Portal-TLC/historico.json';
+const HISTORICO_URL   = 'https://api.github.com/repos/cahirth/Portal-TLC/contents/historico.json';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 
 // ─── 7 COLUMNAS HUBSPOT ─────────────────────────────────────────
@@ -387,9 +387,14 @@ async function cargar(forzar = false) {
     document.getElementById('kanban-outer').classList.remove('visible');
 
     try {
-        const res  = await fetch(HISTORICO_URL + '?t=' + Date.now());
+        // API GitHub devuelve el contenido en base64 — siempre fresco, sin caché CDN
+        const res  = await fetch(HISTORICO_URL, {
+            headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+        });
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        let data = await res.json();
+        const apiResp = await res.json();
+        const decoded = atob(apiResp.content.replace(/\n/g, ''));
+        let data = JSON.parse(decoded);
         if (!Array.isArray(data)) data = [];
 
         // Normalizar estados
