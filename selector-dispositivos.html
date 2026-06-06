@@ -347,8 +347,8 @@
                     autocomplete="off"
                     style="width:100%; padding:13px 14px 13px 42px; background:#080d14; border:1px solid #1e3050; border-radius:12px; color:#f1f5f9; font-size:14px; box-sizing:border-box; outline:none; transition:border-color .2s;"
                     onfocus="this.style.borderColor='#3a86ff'"
-                    onblur="this.style.borderColor='#1e3050'; _mrDispararBusqueda();"
-                    onkeydown="if(event.key==='Enter'){event.preventDefault();_mrDispararBusqueda();}">
+                    onblur="this.style.borderColor='#1e3050';"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();_mrUltimaBusqueda='';_mrDispararBusqueda();}">
             </div>
 
             <!-- Badge resultado búsqueda -->
@@ -518,7 +518,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.6"; console.log("%c TLC Portal v2026.06.06.6 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.7"; console.log("%c TLC Portal v2026.06.06.7 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2241,12 +2241,10 @@ function _mrMostrarSelectorContactos(contactos, razonSocial) {
             const c = contactos[parseInt(this.dataset.idx)];
             _mrContactId = c.id;
             _mrRellenarContacto(c);
-            // Limpiar selector y badge
+            // Limpiar solo el selector, dejar badge y quedarse en Paso 1
             contenedor.innerHTML = '';
             contenedor.style.display = 'none';
-            _mrSetBadge('', 'hidden');
-            // Avanzar directo al Paso 2
-            _mrIrPaso2();
+            _mrSetBadge('🏢 <strong>' + (c.nombre||'(sin nombre)') + '</strong>' + (c.email ? ' · ' + c.email : ''), 'hubspot');
         });
     });
 }
