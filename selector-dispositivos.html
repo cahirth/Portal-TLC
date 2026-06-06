@@ -164,7 +164,26 @@
         .btn-confirmar { width:100%; padding:14px; border-radius:10px; background:linear-gradient(135deg,#3a86ff,#1d4ed8); border:none; color:white; font-size:15px; font-weight:700; cursor:pointer; margin-top:6px; display:flex; align-items:center; justify-content:center; gap:8px; }
         .btn-seguir { width:100%; padding:13px; border-radius:10px; background:#1c2541; border:1px solid #3a86ff; color:#3a86ff; font-size:14px; font-weight:600; cursor:pointer; margin-top:8px; }
         .aviso-mixto { background:rgba(248,150,30,0.1); border:1px solid rgba(248,150,30,0.3); border-radius:10px; padding:10px 12px; font-size:11px; color:#f8961e; line-height:1.5; margin-bottom:10px; display:none; }
-    /* ── Descuento por ítem (Pantalla Comercial) ── */
+    /* ── Control cantidad por ítem ── */
+    .item-cant-ctrl { display:flex; align-items:center; gap:0; background:#0f1a30; border:1px solid #1e3050; border-radius:8px; overflow:hidden; }
+    .btn-cant-minus, .btn-cant-plus { background:none; border:none; color:#94a3b8; font-size:16px; font-weight:700; width:32px; height:32px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:color .15s; }
+    .btn-cant-minus:hover, .btn-cant-plus:hover { color:#3a86ff; }
+    .item-cantidad-input { width:36px; text-align:center; background:transparent; border:none; border-left:1px solid #1e3050; border-right:1px solid #1e3050; color:#f1f5f9; font-size:13px; font-weight:700; padding:0; height:32px; outline:none; -moz-appearance:textfield; }
+    .item-cantidad-input::-webkit-outer-spin-button, .item-cantidad-input::-webkit-inner-spin-button { -webkit-appearance:none; }
+
+    /* ── Select IVA por ítem ── */
+    .item-iva-select { padding:6px 8px; background:#080d14; border:1px solid #1e3050; border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer; }
+    .item-iva-select.sin-seleccionar { border-color:#f8961e; color:#f8961e; }
+    .item-iva-select:focus { border-color:#3a86ff; }
+
+    /* ── Tarjeta en PC: layout horizontal ── */
+    @media (min-width: 992px) {
+        #modal-resumen-box { max-width: 860px !important; }
+        .mr-item-card { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; }
+        .mr-item-card .item-descuento-row { margin-top:0; }
+    }
+
+    </style>
     .item-descuento-row { display:flex; align-items:center; gap:8px; margin-top:10px; }
     .item-descuento-input {
         width:80px; padding:7px 10px; background:#080d14; border:1px solid #1e3050;
@@ -545,7 +564,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.11"; console.log("%c TLC Portal v2026.06.06.11 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.12"; console.log("%c TLC Portal v2026.06.06.12 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1745,6 +1764,9 @@ function calcularCarrito() {
         neto = Math.max(0, neto);
         item._netoRenglon = neto;   // cachear para renderizado
         netoBase += neto;
+        // IVA por ítem (usa ivaPct si está definido, sino 10.5 como fallback)
+        const ivaPctItem = (item.ivaPct !== null && item.ivaPct !== undefined) ? item.ivaPct : 10.5;
+        item._ivaRenglon = neto * (ivaPctItem / 100);
 
         if (mod.adelantoKey) {
             const adelanto = parseNum(d[mod.adelantoKey]);
@@ -1761,7 +1783,7 @@ function calcularCarrito() {
     // netoLista = suma de precioLista sin descuentos (referencia)
     let netoLista = 0;
     carrito.forEach(item => { netoLista += (item.precioLista || 0) * (item.cantidad || 1); });
-    const iva   = netoBase * 0.105;
+    const iva   = carrito.reduce((s, item) => s + (item._ivaRenglon || 0), 0);
     const total = netoBase + iva;
     return { mod, netoBase, netoLista, iva, total, adelantoTotal, cuotaTotal, todosCalculados };
 }
@@ -2200,24 +2222,29 @@ function _mrRenderPaso2() {
     if (!cont) return;
 
     const mod = MODAL_CARRITO.find(m => m.key === modalidadCarrito) || MODAL_CARRITO[0];
+
     const itemsHtml = carrito.map((item, idx) => {
         const qty    = item.cantidad || 1;
         const base   = mod.usaCNO ? (item.precioCNO || item.precioLista || 0) : (item.precioLista || 0);
         const bruto  = base * qty;
         const dVal   = parseFloat(item.descuentoValor) || 0;
         const dTipo  = item.descuentoTipo || '%';
+        const ivaPct = item.ivaPct ?? null;   // null = sin seleccionar
         const neto   = dTipo === '%'
             ? Math.max(0, bruto - bruto * (dVal / 100))
             : Math.max(0, bruto - dVal);
         const hayDesc = dVal > 0;
+        const sinIva  = ivaPct === null;
 
         return `<div class="mr-item-card" id="mr-item-card-${idx}">
+
+            <!-- Fila superior: foto + nombre + precio neto -->
             <div style="display:flex; align-items:flex-start; gap:10px;">
                 ${item.foto ? `<img src="${item.foto}" style="width:44px;height:44px;border-radius:8px;object-fit:contain;background:#0f1a30;flex-shrink:0;" onerror="this.style.display='none'">` : ''}
                 <div style="flex:1; min-width:0;">
                     <div style="font-size:13px; font-weight:700; color:#f1f5f9; line-height:1.3;">${item.nombre}</div>
                     <div style="font-size:11px; color:#64748b; margin-top:2px;">
-                        ${qty > 1 ? qty + ' u. × ' : ''}${fmtUSD(base)} lista
+                        ${fmtUSD(base)} lista
                         ${hayDesc ? `<span style="color:#f8961e;"> · −${dTipo==='%' ? dVal+'%' : fmtUSD(dVal)}</span>` : ''}
                     </div>
                 </div>
@@ -2226,23 +2253,47 @@ function _mrRenderPaso2() {
                     <div style="font-size:15px; font-weight:800; color:#06d6a0;">${fmtUSD(neto)}</div>
                 </div>
             </div>
-            <div class="item-descuento-row">
-                <span style="font-size:11px; color:#64748b; white-space:nowrap;">Descuento:</span>
+
+            <!-- Fila controles: cantidad + descuento + IVA + quitar -->
+            <div class="item-descuento-row" style="flex-wrap:wrap; gap:8px;">
+
+                <!-- Cantidad -->
+                <div class="item-cant-ctrl">
+                    <button class="btn-cant-minus"
+                        onclick="carrito[${idx}].cantidad=Math.max(1,(carrito[${idx}].cantidad||1)-1); _mrRenderPaso2();">−</button>
+                    <input type="number" class="item-cantidad-input"
+                        min="1" value="${qty}" readonly
+                        onclick="this.removeAttribute('readonly')"
+                        onblur="carrito[${idx}].cantidad=Math.max(1,parseInt(this.value)||1); _mrRenderPaso2();">
+                    <button class="btn-cant-plus"
+                        onclick="carrito[${idx}].cantidad=(carrito[${idx}].cantidad||1)+1; _mrRenderPaso2();">+</button>
+                </div>
+
+                <!-- Descuento -->
+                <span style="font-size:11px; color:#64748b; white-space:nowrap;">Desc:</span>
                 <input type="number" class="item-descuento-input"
-                    min="0" step="any" value="${dVal || ''}"
-                    placeholder="0"
-                    data-idx="${idx}"
+                    min="0" step="any" value="${dVal || ''}" placeholder="0"
                     oninput="carrito[${idx}].descuentoValor=parseFloat(this.value)||0;"
-                    onblur="_mrRenderPaso2();"
-                    onchange="_mrRenderPaso2();">
+                    onblur="_mrRenderPaso2();" onchange="_mrRenderPaso2();">
                 <div class="desc-tipo-toggle">
                     <button class="desc-tipo-btn ${dTipo==='%'?'active':''}"
                         onclick="carrito[${idx}].descuentoTipo='%'; _mrRenderPaso2();">%</button>
                     <button class="desc-tipo-btn ${dTipo==='USD'?'active':''}"
                         onclick="carrito[${idx}].descuentoTipo='USD'; _mrRenderPaso2();">USD</button>
                 </div>
+
+                <!-- IVA -->
+                <select class="item-iva-select ${sinIva ? 'sin-seleccionar' : ''}"
+                    onchange="carrito[${idx}].ivaPct=this.value===''?null:parseFloat(this.value); _mrRenderPaso2();">
+                    <option value="" ${sinIva?'selected':''}>IVA</option>
+                    <option value="10.5" ${ivaPct===10.5?'selected':''}>10,5%</option>
+                    <option value="21"   ${ivaPct===21?'selected':''}>21%</option>
+                    <option value="0"    ${ivaPct===0?'selected':''}>Exento</option>
+                </select>
+
+                <!-- Quitar -->
                 <button onclick="quitarDelCarrito(${idx}); _mrRenderPaso2();"
-                    style="margin-left:auto; background:none; border:none; color:#64748b; font-size:18px; cursor:pointer; padding:4px 8px; line-height:1;">✕</button>
+                    style="margin-left:auto; background:none; border:none; color:#64748b; font-size:18px; cursor:pointer; padding:4px 6px; line-height:1;">✕</button>
             </div>
         </div>`;
     }).join('');
@@ -2258,23 +2309,75 @@ function _mrRenderPaso2() {
         </button>`;
 
     cont.innerHTML = (itemsHtml || '<div style="font-size:13px; color:#64748b; text-align:center; padding:20px;">Sin productos</div>') + btnAgregar;
+
     _mrActualizarTotalesPaso2();
+    _mrChequearIvaYBloquear();
+}
+
+function _mrChequearIvaYBloquear() {
+    const sinIva = carrito.reduce((acc, item, idx) => {
+        if (item.ivaPct === null || item.ivaPct === undefined) acc.push(idx + 1);
+        return acc;
+    }, []);
+
+    const btnGen = document.getElementById('btn-mr-generar');
+    if (!btnGen) return;
+
+    if (sinIva.length > 0) {
+        btnGen.disabled = true;
+        btnGen.style.opacity = '0.35';
+        btnGen.style.pointerEvents = 'none';
+        btnGen.title = 'Seleccioná IVA en todos los renglones';
+        // Badge de aviso debajo del botón
+        let aviso = document.getElementById('mr-iva-aviso');
+        if (!aviso) {
+            aviso = document.createElement('div');
+            aviso.id = 'mr-iva-aviso';
+            btnGen.parentNode.insertBefore(aviso, btnGen.nextSibling);
+        }
+        aviso.style.cssText = 'font-size:12px; color:#f8961e; text-align:center; margin-top:6px; padding:8px; background:rgba(248,150,30,0.08); border-radius:8px; border:1px solid rgba(248,150,30,0.2);';
+        aviso.textContent = '⚠️ Seleccioná el IVA en el renglón ' + sinIva.join(', ');
+    } else {
+        btnGen.disabled = false;
+        btnGen.style.opacity = '1';
+        btnGen.style.pointerEvents = 'auto';
+        btnGen.title = '';
+        const aviso = document.getElementById('mr-iva-aviso');
+        if (aviso) aviso.remove();
+    }
 }
 
 function _mrActualizarTotalesPaso2() {
-    const c = calcularCarrito();
+    const mod = MODAL_CARRITO.find(m => m.key === modalidadCarrito) || MODAL_CARRITO[0];
+    let netoTotal = 0, ivaTotal = 0;
+
+    carrito.forEach(item => {
+        const qty   = item.cantidad || 1;
+        const base  = mod.usaCNO ? (item.precioCNO || item.precioLista || 0) : (item.precioLista || 0);
+        const bruto = base * qty;
+        const dVal  = parseFloat(item.descuentoValor) || 0;
+        const dTipo = item.descuentoTipo || '%';
+        const neto  = dTipo === '%'
+            ? Math.max(0, bruto - bruto * (dVal / 100))
+            : Math.max(0, bruto - dVal);
+        const ivaPct = (item.ivaPct !== null && item.ivaPct !== undefined) ? item.ivaPct : 10.5;
+        netoTotal += neto;
+        ivaTotal  += neto * (ivaPct / 100);
+    });
+
+    const totalConIva = netoTotal + ivaTotal;
     const el = document.getElementById('mr-paso2-totales');
     if (!el) return;
     el.innerHTML = `
         <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:13px; color:#94a3b8; border-top:1px solid #1e3050;">
-            <span>Subtotal Neto USD</span><span>${fmtUSD(c.netoBase)}</span>
+            <span>Subtotal Neto USD</span><span>${fmtUSD(netoTotal)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; color:#f8961e;">
-            <span>IVA 10,5%</span><span>${fmtUSD(c.iva)}</span>
+            <span>IVA discriminado</span><span>${fmtUSD(ivaTotal)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:10px 0 4px; font-size:16px; font-weight:800; border-top:1px solid #1e3050; margin-top:4px;">
             <span style="color:#f1f5f9;">TOTAL USD c/IVA</span>
-            <span style="color:#3a86ff;">${fmtUSD(c.total)}</span>
+            <span style="color:#3a86ff;">${fmtUSD(totalConIva)}</span>
         </div>
     `;
 }
@@ -2701,6 +2804,7 @@ async function generarPropuesta() {
                         descuentoValor: dVal,
                         precioNeto:     Math.round((neto / qty) * 100) / 100,
                         cantidad:       qty,
+                        ivaPct:         i.ivaPct !== null && i.ivaPct !== undefined ? i.ivaPct : 10.5,
                     };
                 }),
                 totalUSD:    Math.round(c.netoBase * 100) / 100,
