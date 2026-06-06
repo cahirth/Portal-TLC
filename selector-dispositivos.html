@@ -545,7 +545,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.10"; console.log("%c TLC Portal v2026.06.06.10 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.11"; console.log("%c TLC Portal v2026.06.06.11 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1869,8 +1869,6 @@ function agregarAlCarrito() {
 function _agregarItem(item) {
     carrito.push(item);
     actualizarBadge();
-    // Traspaso de modalidad: si el overlay tenía una modalidad seleccionada
-    // y es compatible con el carrito, se adopta como modalidad del carrito
     if (modalidadActual) {
         const modsComp = modalidadesCompatibles();
         if (modsComp.includes(modalidadActual)) {
@@ -1879,7 +1877,18 @@ function _agregarItem(item) {
     }
     document.getElementById('detalle-overlay').classList.remove('open');
     cantidadActual = 1;
-    abrirCarrito();
+
+    if (_mrClienteValidado) {
+        // ── Cliente ya validado: abrir modal directo en Paso 2 ─────
+        cerrarModalResumen();  // asegurar que esté cerrado
+        document.getElementById('modal-resumen').style.display = 'block';
+        setTimeout(() => document.getElementById('modal-resumen-box').style.transform = 'none', 10);
+        document.getElementById('mr-paso1').style.display = 'none';
+        document.getElementById('mr-paso2').style.display = 'block';
+        _mrRenderPaso2();
+    } else {
+        abrirCarrito();
+    }
 }
 
 // ─── Popup de compatibilidad ──────────────────────────────────────
@@ -1946,6 +1955,7 @@ function abrirCarrito() {
 
 function cerrarCarrito() {
     document.getElementById('carrito-overlay').classList.remove('open');
+    _mrLimpiarCliente();   // reset cliente al salir del carrito por completo
 }
 
 // ─── Render carrito ───────────────────────────────────────────────
@@ -2158,6 +2168,7 @@ let _linkWspActual  = null;
 let _idCotActual    = null;
 let _mrCompanyId    = null;   // ID empresa HubSpot resuelto por CUIT
 let _mrContactId    = null;   // ID contacto HubSpot resuelto por email
+let _mrClienteValidado = false; // true cuando hay cliente confirmado en el wizard
 let _mrUltimaBusqueda  = '';   // dedup búsquedas idénticas
 let _mrCuitTimer    = null;   // debounce timer CUIT lookup
 
@@ -2169,6 +2180,7 @@ function _mrIrPaso2() {
         alert('Completá al menos Nombre del médico y Teléfono para continuar.');
         return;
     }
+    _mrClienteValidado = true;   // cliente confirmado — persiste entre ítems
     document.getElementById('mr-paso1').style.display = 'none';
     document.getElementById('mr-paso2').style.display = 'block';
     _mrRenderPaso2();
@@ -2237,7 +2249,7 @@ function _mrRenderPaso2() {
 
     // Botón agregar ítem
     const btnAgregar = `
-        <button onclick="cerrarModalResumen(); cerrarCarrito();"
+        <button onclick="cerrarModalResumen(); document.getElementById('carrito-overlay').classList.remove('open');"
             style="width:100%; padding:12px; border-radius:12px; background:transparent;
                    border:1px dashed #3a86ff; color:#3a86ff; font-size:14px; font-weight:600;
                    cursor:pointer; margin-bottom:4px; display:flex; align-items:center;
@@ -2437,23 +2449,39 @@ function abrirModalResumen() {
     btnWsp.disabled = true;
     btnWsp.style.opacity = '0.4';
     btnWsp.style.pointerEvents = 'none';
-    _mrCompanyId = null;
-    _mrContactId = null;
     _mrUltimaBusqueda = '';
     _mrSetBadge('', 'hidden');
-    // Resetear al Paso 1
-    document.getElementById('mr-paso1').style.display = 'block';
-    document.getElementById('mr-paso2').style.display = 'none';
-    // Limpiar buscador y selector
-    const searchInput = document.getElementById('mr-search-universal');
-    if (searchInput) searchInput.value = '';
-    const sel = document.getElementById('mr-contacto-selector');
-    if (sel) { sel.innerHTML = ''; sel.style.display = 'none'; }
-    ['mr-nombre','mr-razon','mr-cuit','mr-telefono','mr-email','mr-notas'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-    });
-    document.getElementById('mr-vendedor').value = currentUser?.name || currentUser?.username || '';
+
+    if (_mrClienteValidado) {
+        // ── Cliente ya validado: ir directo al Paso 2 ──────────────
+        document.getElementById('mr-paso1').style.display = 'none';
+        document.getElementById('mr-paso2').style.display = 'block';
+        _mrRenderPaso2();
+    } else {
+        // ── Sin cliente: mostrar Paso 1 limpio ─────────────────────
+        _mrCompanyId = null;
+        _mrContactId = null;
+        document.getElementById('mr-paso1').style.display = 'block';
+        document.getElementById('mr-paso2').style.display = 'none';
+        const searchInput = document.getElementById('mr-search-universal');
+        if (searchInput) searchInput.value = '';
+        const sel = document.getElementById('mr-contacto-selector');
+        if (sel) { sel.innerHTML = ''; sel.style.display = 'none'; }
+        ['mr-nombre','mr-razon','mr-cuit','mr-telefono','mr-email','mr-notas'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        document.getElementById('mr-vendedor').value = currentUser?.name || currentUser?.username || '';
+    }
+
+    // Asegurar vendedor siempre actualizado (aplica a ambos casos)
+    if (!_mrClienteValidado) {
+        // ya se seteó arriba en el else
+    } else {
+        // en modo cliente validado también actualizamos vendedor si está vacío
+        const vEl = document.getElementById('mr-vendedor');
+        if (vEl && !vEl.value) vEl.value = currentUser?.name || currentUser?.username || '';
+    }
 
     // Construir filas de ítems con Neto parcial
     const totalItems = carrito.reduce((s,i) => s+(i.cantidad||1), 0);
@@ -2513,6 +2541,18 @@ function abrirModalResumen() {
 
 function cerrarModalResumen() {
     document.getElementById('modal-resumen').style.display = 'none';
+}
+
+// Limpia cliente validado — solo al cerrar carrito completo con la cruz
+function _mrLimpiarCliente() {
+    _mrCompanyId       = null;
+    _mrContactId       = null;
+    _mrClienteValidado = false;
+    _mrUltimaBusqueda  = '';
+    ['mr-nombre','mr-razon','mr-cuit','mr-telefono','mr-email','mr-notas'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
 }
 
 // Cerrar al click fuera del box
