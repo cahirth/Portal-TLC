@@ -137,14 +137,21 @@
 
 <!-- FILTROS -->
 <div class="filtros-wrap" id="filtros-wrap" style="display:none;">
-    <button class="filtro-btn active" data-estado="TODOS"       onclick="selFiltro(this)">Todos</button>
-    <button class="filtro-btn" data-estado="10%"               onclick="selFiltro(this)">🌱 Oportunidad</button>
-    <button class="filtro-btn" data-estado="25%"               onclick="selFiltro(this)">🔵 Calificación</button>
-    <button class="filtro-btn" data-estado="50%"               onclick="selFiltro(this)">📋 Cotización</button>
-    <button class="filtro-btn" data-estado="75%"               onclick="selFiltro(this)">🟣 Negociación</button>
-    <button class="filtro-btn" data-estado="90%"               onclick="selFiltro(this)">🔶 Cierre</button>
-    <button class="filtro-btn" data-estado="Ganada"            onclick="selFiltro(this)">✅ Ganada</button>
-    <button class="filtro-btn" data-estado="Perdida"           onclick="selFiltro(this)">❌ Perdida</button>
+    <!-- Dropdown vendedor (solo admin ve el selector; vendedor ve su nombre fijo) -->
+    <div id="vendedor-selector-wrap" style="display:none; padding:0 0 6px 0; width:100%;">
+        <select id="vendedor-selector" onchange="selVendedor(this.value)"
+            style="width:100%; padding:7px 12px; background:#0f1a30; border:1px solid #3a86ff33;
+                   border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer;">
+        </select>
+    </div>
+    <button class="filtro-btn active" data-estado="TODOS"   onclick="selFiltro(this)">Todos</button>
+    <button class="filtro-btn" data-estado="10%"            onclick="selFiltro(this)">🌱 Oportunidad</button>
+    <button class="filtro-btn" data-estado="25%"            onclick="selFiltro(this)">🔵 Calificación</button>
+    <button class="filtro-btn" data-estado="50%"            onclick="selFiltro(this)">📋 Cotización</button>
+    <button class="filtro-btn" data-estado="75%"            onclick="selFiltro(this)">🟣 Negociación</button>
+    <button class="filtro-btn" data-estado="90%"            onclick="selFiltro(this)">🔶 Cierre</button>
+    <button class="filtro-btn" data-estado="Ganada"         onclick="selFiltro(this)">✅ Ganada</button>
+    <button class="filtro-btn" data-estado="Perdida"        onclick="selFiltro(this)">❌ Perdida</button>
 </div>
 
 <!-- BUSCADOR -->
@@ -178,26 +185,27 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════
-// TLC — Cotizaciones v2026.06.06.1
-// Motor unificado: historico.json (GitHub Pages)
+// TLC — Cotizaciones v2026.06.06.2
+// Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.1";
-console.log("%c TLC Cotizaciones v2026.06.06.1 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.2";
+console.log("%c TLC Cotizaciones v2026.06.06.2 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
-const CLIENT_ID  = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
-const TENANT_ID  = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
-const HISTORICO_URL = 'https://cahirth.github.io/Portal-TLC/historico.json';
+const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
+const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
+const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
+const HISTORICO_URL   = 'https://cahirth.github.io/Portal-TLC/historico.json';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 
 // ─── 7 COLUMNAS HUBSPOT ─────────────────────────────────────────
 const KANBAN_COLS = [
-    { key:'10%',    label:'Oportunidad reciente',       pct:'10%',  color:'#94a3b8', bg:'rgba(148,163,184,.1)',  border:'rgba(148,163,184,.2)' },
-    { key:'25%',    label:'Calificación y asesoramiento',pct:'25%', color:'#fbbf24', bg:'rgba(251,191,36,.1)',   border:'rgba(251,191,36,.2)'  },
-    { key:'50%',    label:'Cotización',                 pct:'50%',  color:'#3a86ff', bg:'rgba(58,134,255,.1)',   border:'rgba(58,134,255,.2)'  },
-    { key:'75%',    label:'Negociación',                pct:'75%',  color:'#c084fc', bg:'rgba(168,85,247,.1)',   border:'rgba(168,85,247,.2)'  },
-    { key:'90%',    label:'Cierre',                     pct:'90%',  color:'#fb923c', bg:'rgba(249,115,22,.1)',   border:'rgba(249,115,22,.2)'  },
-    { key:'Ganada', label:'Cierre ganado',              pct:'100%', color:'#34d399', bg:'rgba(16,185,129,.1)',   border:'rgba(16,185,129,.2)'  },
-    { key:'Perdida',label:'Cierre perdido',             pct:'0%',   color:'#f87171', bg:'rgba(239,68,68,.1)',    border:'rgba(239,68,68,.2)'   },
+    { key:'10%',    label:'Oportunidad reciente',        color:'#94a3b8', bg:'rgba(148,163,184,.1)', border:'rgba(148,163,184,.2)' },
+    { key:'25%',    label:'Calificación y asesoramiento',color:'#fbbf24', bg:'rgba(251,191,36,.1)',  border:'rgba(251,191,36,.2)'  },
+    { key:'50%',    label:'Cotización',                  color:'#3a86ff', bg:'rgba(58,134,255,.1)',  border:'rgba(58,134,255,.2)'  },
+    { key:'75%',    label:'Negociación',                 color:'#c084fc', bg:'rgba(168,85,247,.1)',  border:'rgba(168,85,247,.2)'  },
+    { key:'90%',    label:'Cierre',                      color:'#fb923c', bg:'rgba(249,115,22,.1)',  border:'rgba(249,115,22,.2)'  },
+    { key:'Ganada', label:'Cierre ganado',               color:'#34d399', bg:'rgba(16,185,129,.1)',  border:'rgba(16,185,129,.2)'  },
+    { key:'Perdida',label:'Cierre perdido',              color:'#f87171', bg:'rgba(239,68,68,.1)',   border:'rgba(239,68,68,.2)'   },
 ];
 
 const ESTADO_CSS = {
@@ -205,23 +213,54 @@ const ESTADO_CSS = {
     '75%':'e-negociacion','90%':'e-cierre','Ganada':'e-ganada','Perdida':'e-perdida',
 };
 
+// ─── DEFINICIÓN DE ROLES ─────────────────────────────────────────
+// Escalable: agregar nuevos roles aquí sin tocar la lógica de filtrado
+const ROLES = {
+    Administrador: {
+        verTodo:          true,   // ve cotizaciones de todos
+        dropdownVendedor: true,   // puede cambiar vendedor activo
+        verVendedorEnCard:true,   // muestra "👤 Vendedor" en tarjetas
+    },
+    Vendedor: {
+        verTodo:          false,
+        dropdownVendedor: false,
+        verVendedorEnCard:false,
+    },
+    // Futuros roles — descomentar y configurar cuando aplique:
+    // Servicio:     { verTodo:false, dropdownVendedor:false, verVendedorEnCard:false },
+    // Facturacion:  { verTodo:false, dropdownVendedor:false, verVendedorEnCard:false },
+    // Expedicion:   { verTodo:false, dropdownVendedor:false, verVendedorEnCard:false },
+    Vend_Externo: {
+        verTodo:          false,
+        dropdownVendedor: false,
+        verVendedorEnCard:false,
+    },
+};
+
+function _getPermisos(rol) {
+    return ROLES[rol] || ROLES['Vend_Externo'];
+}
+
+// ─── ESTADO GLOBAL ───────────────────────────────────────────────
 const msalConfig = {
     auth: { clientId:CLIENT_ID, authority:`https://login.microsoftonline.com/${TENANT_ID}`, redirectUri:'https://cahirth.github.io/Portal-TLC/cotizaciones.html' },
     cache: { cacheLocation:'sessionStorage' }
 };
 
-let msal_app = null;
-let currentUser = null;
+let msal_app          = null;
+let currentUser       = null;
 let currentUserNombre = '';
 let currentUserRol    = 'Vend_Externo';
-let esAdmin           = false;
+let permisos          = _getPermisos('Vend_Externo');
+let listaVendedores   = [];  // [{email, nombre, rol}] cargado desde Sheet
 
-// ─── DATOS ──────────────────────────────────────────────────────
-let todasLasCot    = [];   // array crudo filtrado por vendedor
-let cotFiltradas   = [];   // después de filtros UI
-let cotActual      = null;
-let vistaActual    = 'lista';
-let filtroEstado   = 'TODOS';
+let historicoCompleto = []; // historico.json completo (post-normalización)
+let todasLasCot       = []; // filtrado por vendedor activo
+let cotFiltradas      = []; // filtrado por estado + búsqueda
+let cotActual         = null;
+let vistaActual       = 'lista';
+let filtroEstado      = 'TODOS';
+let vendedorActivo    = null; // null = el propio usuario; string = nombre elegido por admin
 
 // ─── INIT ────────────────────────────────────────────────────────
 async function init() {
@@ -234,27 +273,81 @@ async function init() {
     currentUserNombre  = account.name || account.username || '';
     document.getElementById('user-label').textContent = currentUserNombre.split(' ')[0];
 
-    // Rol desde Sheet Vendedores
+    // Cargar roles y vendedores desde Sheet
+    await _cargarVendedores(account.username?.toLowerCase() || '');
+
+    // Configurar dropdown según permisos
+    _configurarDropdownVendedor();
+
+    await cargar();
+}
+
+// ─── CARGA DE VENDEDORES DESDE SHEET ────────────────────────────
+async function _cargarVendedores(emailLogueado) {
     try {
-        const SHEET_ID = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
         const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Vendedores`;
         const res = await fetch(url);
         const text = await res.text();
         const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
         const cols = json.table.cols.map(c => c.label);
-        const rows = (json.table.rows||[]).map(row => {
-            const obj = {}; cols.forEach((col,i) => { obj[col] = row.c?.[i]?.v ?? ''; }); return obj;
-        });
-        const email = account.username?.toLowerCase() || '';
-        const vend  = rows.find(v => String(v['Email']||'').toLowerCase() === email);
-        if (vend) currentUserRol = vend['Rol'] || 'Vend_Externo';
-    } catch(e) { console.warn('Rol:', e); }
+        listaVendedores = (json.table.rows || []).map(row => {
+            const obj = {}; cols.forEach((col, i) => { obj[col] = row.c?.[i]?.v ?? ''; }); return obj;
+        }).map(v => ({
+            email:  String(v['Email'] || '').toLowerCase().trim(),
+            nombre: String(v['Nombre'] || v['nombre'] || '').trim(),
+            rol:    String(v['Rol']    || '').trim(),
+        })).filter(v => v.email || v.nombre);
 
-    esAdmin = currentUserRol === 'Administrador' ||
-              currentUserNombre.toLowerCase().includes('cristian hirth') ||
-              currentUserNombre.toLowerCase().includes('cristian');
+        // Determinar rol del usuario logueado
+        const match = listaVendedores.find(v => v.email === emailLogueado);
+        if (match) currentUserRol = match.rol || 'Vend_Externo';
 
-    await cargar();
+    } catch(e) {
+        console.warn('Vendedores:', e);
+    }
+    permisos = _getPermisos(currentUserRol);
+}
+
+// ─── DROPDOWN VENDEDOR ───────────────────────────────────────────
+function _configurarDropdownVendedor() {
+    const wrap = document.getElementById('vendedor-selector-wrap');
+    const sel  = document.getElementById('vendedor-selector');
+    if (!wrap || !sel) return;
+
+    if (permisos.dropdownVendedor) {
+        // Admin: dropdown con todos los vendedores de la lista + "Todos"
+        wrap.style.display = 'block';
+        const opciones = [
+            '<option value="TODOS">👥 Todos los vendedores</option>',
+            ...listaVendedores
+                .filter(v => v.nombre)
+                .map(v => `<option value="${v.nombre}">${v.nombre}</option>`)
+        ].join('');
+        sel.innerHTML = opciones;
+        vendedorActivo = null; // admin empieza viendo todo
+    } else {
+        // Vendedor: fijo en su propio nombre, sin interacción
+        wrap.style.display = 'none';
+        vendedorActivo = currentUserNombre;
+    }
+}
+
+function selVendedor(valor) {
+    vendedorActivo = valor === 'TODOS' ? null : valor;
+    _aplicarFiltroVendedor();
+    aplicarFiltros();
+}
+
+// Filtra historicoCompleto por vendedor activo → todasLasCot
+function _aplicarFiltroVendedor() {
+    if (!vendedorActivo) {
+        todasLasCot = [...historicoCompleto]; // admin viendo todo
+    } else {
+        const v = vendedorActivo.toLowerCase();
+        todasLasCot = historicoCompleto.filter(c =>
+            String(c.vendedor || '').toLowerCase().includes(v.split(' ')[0])
+        );
+    }
 }
 
 // ─── CARGAR historico.json ────────────────────────────────────────
@@ -273,26 +366,27 @@ async function cargar(forzar = false) {
         let data = await res.json();
         if (!Array.isArray(data)) data = [];
 
-        // Default estado
-        data.forEach(c => { if (!c.estado) c.estado = 'Enviada'; });
-
-        // Mapear estado viejo → nuevo key
+        // Normalizar estados
         data.forEach(c => {
-            const e = String(c.estado || '').trim();
-            if (e === 'Enviada' || e === 'Cotización' || e === 'presentationscheduled') c.estado = '50%';
-            else if (e === 'En seguimiento' || e === 'decisionmakerboughtin')           c.estado = '75%';
-            else if (e === 'Ganada' || e === 'closedwon')                               c.estado = 'Ganada';
-            else if (e === 'Perdida' || e === 'closedlost')                             c.estado = 'Perdida';
-            // 10%, 25%, 90% se dejan como vienen
+            if (!c.estado) c.estado = 'Enviada';
+            const e = String(c.estado).trim();
+            if (['Enviada','Cotización','presentationscheduled'].includes(e))    c.estado = '50%';
+            else if (['En seguimiento','decisionmakerboughtin'].includes(e))     c.estado = '75%';
+            else if (['Ganada','closedwon'].includes(e))                         c.estado = 'Ganada';
+            else if (['Perdida','closedlost'].includes(e))                       c.estado = 'Perdida';
         });
 
-        // Filtro vendedor
-        if (!esAdmin && currentUserNombre) {
-            const primer = currentUserNombre.split(' ')[0].toLowerCase();
-            data = data.filter(c => String(c.vendedor||'').toLowerCase().includes(primer));
-        }
+        historicoCompleto = data;
 
-        todasLasCot = data;
+        // Aplicar filtro vendedor según permisos
+        if (!permisos.verTodo) {
+            // Vendedor: solo ve sus propias cotizaciones (no puede cambiar)
+            const primer = currentUserNombre.split(' ')[0].toLowerCase();
+            historicoCompleto = data.filter(c =>
+                String(c.vendedor || '').toLowerCase().includes(primer)
+            );
+        }
+        _aplicarFiltroVendedor();
         aplicarFiltros();
 
         document.getElementById('loading-inicial').style.display = 'none';
@@ -303,7 +397,8 @@ async function cargar(forzar = false) {
 
     } catch(e) {
         document.getElementById('loading-inicial').innerHTML =
-            `<div class="empty">❌ Error: ${e.message}<br><button onclick="cargar(true)" style="margin-top:12px;padding:8px 20px;background:#3a86ff;border:none;border-radius:8px;color:white;cursor:pointer;">Reintentar</button></div>`;
+            `<div class="empty">❌ Error: ${e.message}<br>
+             <button onclick="cargar(true)" style="margin-top:12px;padding:8px 20px;background:#3a86ff;border:none;border-radius:8px;color:white;cursor:pointer;">Reintentar</button></div>`;
     }
 }
 
@@ -378,7 +473,7 @@ function renderLista() {
                 <div style="text-align:right;flex-shrink:0;margin-left:8px;">
                     <div class="cot-monto">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
                     <span class="cot-estado ${estadoCss}">${estadoLabel}</span>
-                    ${esAdmin && c.vendedor ? `<div style="font-size:10px;color:#475569;margin-top:3px;">👤 ${c.vendedor}</div>` : ''}
+                    ${permisos.verVendedorEnCard && c.vendedor ? `<div style="font-size:10px;color:#475569;margin-top:3px;">👤 ${c.vendedor}</div>` : ''}
                 </div>
             </div>
             ${c.notes ? `<div class="cot-notas">📝 ${c.notes}</div>` : ''}
@@ -407,7 +502,7 @@ function renderKanban() {
                 <div class="k-id">${id}</div>
                 <div class="k-titulo">${titulo}</div>
                 <div class="k-valor">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
-                ${esAdmin && c.vendedor ? `<div class="k-prop">👤 ${c.vendedor}</div>` : ''}
+                ${permisos.verVendedorEnCard && c.vendedor ? `<div class="k-prop">👤 ${c.vendedor}</div>` : ''}
                 <div class="k-fecha">📅 ${fecha}</div>
                 <a href="${linkPdf}" target="_blank" class="k-btn" onclick="event.stopPropagation()">📄 Abrir Presupuesto</a>
             </div>`;
