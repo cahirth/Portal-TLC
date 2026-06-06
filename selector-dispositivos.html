@@ -545,7 +545,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.9"; console.log("%c TLC Portal v2026.06.06.9 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.10"; console.log("%c TLC Portal v2026.06.06.10 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2219,20 +2219,33 @@ function _mrRenderPaso2() {
                 <input type="number" class="item-descuento-input"
                     min="0" step="any" value="${dVal || ''}"
                     placeholder="0"
-                    oninput="carrito[${idx}].descuentoValor=parseFloat(this.value)||0; _mrRenderPaso2(); _mrActualizarTotalesPaso2();">
+                    data-idx="${idx}"
+                    oninput="carrito[${idx}].descuentoValor=parseFloat(this.value)||0;"
+                    onblur="_mrRenderPaso2();"
+                    onchange="_mrRenderPaso2();">
                 <div class="desc-tipo-toggle">
                     <button class="desc-tipo-btn ${dTipo==='%'?'active':''}"
-                        onclick="carrito[${idx}].descuentoTipo='%'; _mrRenderPaso2(); _mrActualizarTotalesPaso2();">%</button>
+                        onclick="carrito[${idx}].descuentoTipo='%'; _mrRenderPaso2();">%</button>
                     <button class="desc-tipo-btn ${dTipo==='USD'?'active':''}"
-                        onclick="carrito[${idx}].descuentoTipo='USD'; _mrRenderPaso2(); _mrActualizarTotalesPaso2();">USD</button>
+                        onclick="carrito[${idx}].descuentoTipo='USD'; _mrRenderPaso2();">USD</button>
                 </div>
-                <button onclick="quitarDelCarrito(${idx}); _mrRenderPaso2(); _mrActualizarTotalesPaso2();"
+                <button onclick="quitarDelCarrito(${idx}); _mrRenderPaso2();"
                     style="margin-left:auto; background:none; border:none; color:#64748b; font-size:18px; cursor:pointer; padding:4px 8px; line-height:1;">✕</button>
             </div>
         </div>`;
     }).join('');
 
-    cont.innerHTML = itemsHtml || '<div style="font-size:13px; color:#64748b; text-align:center; padding:20px;">Sin productos</div>';
+    // Botón agregar ítem
+    const btnAgregar = `
+        <button onclick="cerrarModalResumen(); cerrarCarrito();"
+            style="width:100%; padding:12px; border-radius:12px; background:transparent;
+                   border:1px dashed #3a86ff; color:#3a86ff; font-size:14px; font-weight:600;
+                   cursor:pointer; margin-bottom:4px; display:flex; align-items:center;
+                   justify-content:center; gap:8px;">
+            ➕ Agregar ítem a la cotización
+        </button>`;
+
+    cont.innerHTML = (itemsHtml || '<div style="font-size:13px; color:#64748b; text-align:center; padding:20px;">Sin productos</div>') + btnAgregar;
     _mrActualizarTotalesPaso2();
 }
 
