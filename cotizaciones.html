@@ -5,134 +5,127 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>TLC — Cotizaciones</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background: #030712; color: #f8fafc; min-height: 100vh; }
+        * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',sans-serif; -webkit-tap-highlight-color:transparent; }
+        body { background:#030712; color:#f8fafc; min-height:100vh; }
 
         /* HEADER */
-        .header { background: rgba(11,19,41,0.98); backdrop-filter: blur(12px); padding: 12px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #222e50; position: sticky; top: 0; z-index: 100; }
-        .logo { width: 38px; height: 38px; flex-shrink: 0; border-radius: 8px; object-fit: contain; background: #1c2541; }
-        .header-text h1 { font-size: 15px; font-weight: 700; color: #f8fafc; line-height: 1.2; }
-        .header-text p { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-
-        /* FILTROS */
-        .filtros { padding: 12px 20px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid #1c2541; }
-        .filtros::-webkit-scrollbar { display: none; }
-        .filtro-btn { flex-shrink: 0; padding: 6px 14px; border-radius: 20px; border: 1px solid #222e50; background: #1c2541; color: #94a3b8; font-size: 12px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-        .filtro-btn.active { background: #3a86ff; border-color: #3a86ff; color: white; font-weight: 600; }
-
-        /* BUSCADOR */
-        .buscador { padding: 10px 20px; }
-        .buscador input { width: 100%; background: #1c2541; border: 1px solid #222e50; border-radius: 10px; padding: 10px 16px 10px 40px; color: #f8fafc; font-size: 14px; outline: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 14px center; }
-        .buscador input::placeholder { color: #64748b; }
-        .buscador input:focus { border-color: #3a86ff; }
-
-        /* LISTA */
-        .lista { padding: 8px 20px 100px; }
-
-        /* CARD */
-        .cot-card { background: #1c2541; border-radius: 14px; margin-bottom: 10px; border: 1px solid #222e50; overflow: hidden; cursor: pointer; transition: all 0.15s; }
-        .cot-card:active { opacity: 0.85; transform: scale(0.99); }
-        .cot-card-header { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; }
-        .cot-card-body { padding: 0 14px 12px; border-top: 1px solid #162040; margin-top: 2px; padding-top: 10px; }
-        .cot-nombre { font-size: 14px; font-weight: 700; color: #f1f5f9; line-height: 1.3; }
-        .cot-equipo { font-size: 12px; color: #60a5fa; margin-top: 2px; font-weight: 500; }
-        .cot-fecha { font-size: 11px; color: #64748b; margin-top: 3px; }
-        .cot-monto { font-size: 16px; font-weight: 800; color: #3a86ff; }
-        .cot-modalidad { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-
-        /* ESTADO BADGE */
-        .estado-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px; }
-        .estado-enviada { background: rgba(58,134,255,0.15); color: #60a5fa; border: 1px solid rgba(58,134,255,0.3); }
-        .estado-seguimiento { background: rgba(248,150,30,0.15); color: #f8961e; border: 1px solid rgba(248,150,30,0.3); }
-        .estado-cerrada { background: rgba(6,214,160,0.15); color: #06d6a0; border: 1px solid rgba(6,214,160,0.3); }
-        .estado-ganada { background: rgba(6,214,160,0.15); color: #06d6a0; border: 1px solid rgba(6,214,160,0.3); }
-        .estado-perdida { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
-        .estado-default { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
-
-        /* FOTOS THUMB */
-        .fotos-thumb { display: flex; gap: 4px; margin-top: 6px; }
-        .foto-thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: contain; background: #0b1329; border: 1px solid #222e50; flex-shrink: 0; }
-
-        /* SELECTOR ESTADO */
-        .estado-select { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid #222e50; background: #1c2541; color: #f8fafc; font-size: 13px; font-weight: 600; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; }
-        .estado-select:focus { border-color: #3a86ff; }
-
-        /* DETALLE OVERLAY */
-        .detalle-overlay { position: fixed; inset: 0; background: #0b1329; z-index: 200; display: none; overflow-y: auto; }
-        .detalle-overlay.open { display: block; }
-        .detalle-header { padding: 14px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #222e50; position: sticky; top: 0; background: #0b1329; z-index: 10; }
-        .btn-back { width: 34px; height: 34px; border-radius: 50%; background: #1c2541; border: none; color: #f8fafc; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .detalle-titulo { font-size: 14px; font-weight: 600; flex: 1; }
-        .detalle-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
-
-        .seccion { background: #1c2541; border-radius: 12px; border: 1px solid #222e50; overflow: hidden; }
-        .seccion-titulo { font-size: 10px; font-weight: 700; color: #60a5fa; text-transform: uppercase; letter-spacing: 1px; padding: 10px 14px; border-bottom: 1px solid #222e50; }
-        .seccion-body { padding: 12px 14px; }
-        .campo-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid #162040; gap: 12px; }
-        .campo-row:last-child { border-bottom: none; }
-        .campo-label { font-size: 12px; color: #64748b; flex-shrink: 0; }
-        .campo-valor { font-size: 12px; color: #f1f5f9; font-weight: 500; text-align: right; word-break: break-word; }
-
-        /* TOTALES */
-        .totales-wrap { background: #0f1a30; border-radius: 12px; border: 1px solid #222e50; padding: 14px; }
-        .total-row { display: flex; justify-content: space-between; padding: 5px 0; }
-        .total-label { font-size: 12px; color: #94a3b8; }
-        .total-valor { font-size: 13px; font-weight: 600; color: #f1f5f9; }
-        .total-final { border-top: 1px solid #3a86ff33; margin-top: 6px; padding-top: 10px; }
-        .total-final .total-label { font-size: 14px; font-weight: 700; color: #f1f5f9; }
-        .total-final .total-valor { font-size: 18px; font-weight: 800; color: #3a86ff; }
-
-        /* BOTONES ACCIÓN */
-        .btn-wsp { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; border-radius: 10px; background: linear-gradient(135deg, #25d366, #128c7e); border: none; color: white; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; }
-        .btn-ver { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; border-radius: 10px; background: #1c2541; border: 1px solid #3a86ff; color: #3a86ff; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
+        .header { background:linear-gradient(135deg,#05111f,#0c1e3a); backdrop-filter:blur(12px); padding:0 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid rgba(58,134,255,0.15); position:sticky; top:0; z-index:100; height:58px; }
+        .header::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; background:linear-gradient(90deg,#3a86ff,#06d6a0,#3a86ff); }
+        .logo { height:32px; width:auto; object-fit:contain; flex-shrink:0; }
+        .header-text h1 { font-size:14px; font-weight:700; color:#f1f5f9; }
+        .header-text p  { font-size:10px; color:#64748b; margin-top:1px; }
 
         /* TOGGLE VISTA */
-        .vista-toggle { display:flex; gap:0; background:#1c2541; border:1px solid #222e50; border-radius:10px; overflow:hidden; margin-right:8px; flex-shrink:0; }
-        .vista-btn { padding:6px 14px; font-size:12px; font-weight:600; cursor:pointer; border:none; background:transparent; color:#64748b; transition:all .15s; }
+        .vista-toggle { display:flex; background:#1c2541; border:1px solid #222e50; border-radius:8px; overflow:hidden; flex-shrink:0; }
+        .vista-btn { padding:5px 12px; font-size:11px; font-weight:600; cursor:pointer; border:none; background:transparent; color:#64748b; transition:all .15s; }
         .vista-btn.active { background:#3a86ff; color:white; }
 
+        /* FILTROS */
+        .filtros-wrap { padding:10px 16px 0; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
+        .filtros-wrap::-webkit-scrollbar { display:none; }
+        .filtro-btn { flex-shrink:0; padding:5px 12px; border-radius:16px; border:1px solid #222e50; background:#1c2541; color:#94a3b8; font-size:11px; cursor:pointer; transition:all .15s; white-space:nowrap; }
+        .filtro-btn.active { background:#3a86ff; border-color:#3a86ff; color:white; font-weight:600; }
+
+        /* BUSCADOR */
+        .buscador-wrap { padding:8px 16px; }
+        .buscador-wrap input { width:100%; background:#1c2541; border:1px solid #222e50; border-radius:8px; padding:8px 14px 8px 36px; color:#f8fafc; font-size:13px; outline:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:12px center; }
+        .buscador-wrap input:focus { border-color:#3a86ff; }
+        .buscador-wrap input::placeholder { color:#475569; }
+
+        /* LISTA */
+        .lista-wrap { padding:8px 16px 100px; }
+        .cot-card { background:#0f1a30; border-radius:12px; margin-bottom:8px; border:1px solid #1e3050; overflow:hidden; cursor:pointer; transition:all .15s; }
+        .cot-card:active { opacity:.85; transform:scale(.99); }
+        .cot-card-inner { display:flex; align-items:flex-start; gap:10px; padding:12px 14px; }
+        .cot-nombre { font-size:13px; font-weight:700; color:#f1f5f9; line-height:1.3; }
+        .cot-equipo { font-size:11px; color:#3a86ff; margin-top:2px; font-weight:500; }
+        .cot-fecha  { font-size:10px; color:#475569; margin-top:3px; }
+        .cot-monto  { font-size:15px; font-weight:800; color:#06d6a0; }
+        .cot-estado { font-size:10px; font-weight:700; padding:2px 8px; border-radius:8px; margin-top:4px; display:inline-block; }
+        .cot-notas  { padding:0 14px 10px; font-size:11px; color:#475569; font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+        /* ESTADOS COLOR */
+        .e-oportunidad  { background:rgba(148,163,184,.15); color:#94a3b8; }
+        .e-calificacion { background:rgba(251,191,36,.12); color:#fbbf24; }
+        .e-cotizacion   { background:rgba(58,134,255,.12); color:#60a5fa; }
+        .e-negociacion  { background:rgba(168,85,247,.12); color:#c084fc; }
+        .e-cierre       { background:rgba(249,115,22,.12); color:#fb923c; }
+        .e-ganada       { background:rgba(16,185,129,.12); color:#34d399; }
+        .e-perdida      { background:rgba(239,68,68,.12); color:#f87171; }
+
+        /* STATS */
+        .stats-bar { display:flex; gap:8px; padding:8px 16px; overflow-x:auto; scrollbar-width:none; }
+        .stats-bar::-webkit-scrollbar { display:none; }
+        .stat-chip { background:#0f1a30; border:1px solid #1e3050; border-radius:8px; padding:7px 12px; flex-shrink:0; }
+        .stat-chip .val { font-size:15px; font-weight:800; color:#3a86ff; }
+        .stat-chip .lbl { font-size:10px; color:#475569; margin-top:1px; }
+
         /* KANBAN */
-        .kanban-wrap { display:none; overflow-x:auto; padding:12px 20px 100px; gap:12px; min-height:calc(100vh - 160px); }
-        .kanban-wrap.visible { display:flex; }
-        .kanban-col { flex-shrink:0; width:280px; display:flex; flex-direction:column; gap:8px; }
-        .kanban-col-header { border-radius:10px; padding:12px 14px; margin-bottom:4px; }
-        .kanban-col-title { font-size:13px; font-weight:800; letter-spacing:0.3px; }
-        .kanban-col-total { font-size:12px; font-weight:600; margin-top:3px; opacity:0.85; }
-        .kanban-col-count { font-size:10px; opacity:0.6; margin-top:1px; }
-        .kanban-cards { display:flex; flex-direction:column; gap:8px; }
-        .kanban-card { background:#0f1a30; border-radius:12px; padding:14px; border:1px solid #1e3050; transition:transform .15s; cursor:default; }
-        .kanban-card:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.3); }
-        .kanban-id { font-size:10px; font-weight:700; font-family:monospace; color:#3a86ff; letter-spacing:0.5px; margin-bottom:6px; }
-        .kanban-cliente { font-size:13px; font-weight:700; color:#f1f5f9; line-height:1.3; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .kanban-fecha { font-size:11px; color:#475569; margin-bottom:8px; }
-        .kanban-monto { font-size:16px; font-weight:800; color:#06d6a0; margin-bottom:8px; }
-        .kanban-vendedor { font-size:10px; color:#64748b; margin-bottom:8px; }
-        .kanban-btn { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; padding:8px; border-radius:8px; background:#1c2541; border:1px solid #222e50; color:#94a3b8; font-size:11px; font-weight:600; cursor:pointer; text-decoration:none; transition:all .15s; }
-        .kanban-btn:hover { border-color:#3a86ff; color:#3a86ff; }
-        .kanban-empty { font-size:12px; color:#334155; text-align:center; padding:20px 10px; border:1px dashed #1e3050; border-radius:10px; }
-     display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 16px; }
-        .spinner { width: 36px; height: 36px; border: 3px solid #222e50; border-top-color: #3a86ff; border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .loading p { color: #94a3b8; font-size: 14px; }
-        .empty { text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 14px; }
-        .stats-bar { display: flex; gap: 8px; padding: 10px 20px; overflow-x: auto; scrollbar-width: none; }
-        .stats-bar::-webkit-scrollbar { display: none; }
-        .stat-chip { background: #1c2541; border: 1px solid #222e50; border-radius: 10px; padding: 8px 14px; flex-shrink: 0; }
-        .stat-chip .val { font-size: 16px; font-weight: 800; color: #3a86ff; }
-        .stat-chip .lbl { font-size: 10px; color: #64748b; margin-top: 2px; }
+        .kanban-outer { display:none; overflow-x:auto; padding:12px 16px 100px; scrollbar-width:thin; scrollbar-color:#1e3050 transparent; }
+        .kanban-outer.visible { display:block; }
+        .kanban-grid { display:flex; gap:10px; min-width:max-content; }
+        .kanban-col { width:260px; display:flex; flex-direction:column; gap:0; flex-shrink:0; }
+        .kanban-col-header { border-radius:10px 10px 0 0; padding:12px 14px; border:1px solid transparent; border-bottom:none; }
+        .kanban-col-label { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; line-height:1.2; }
+        .kanban-col-meta  { display:flex; gap:8px; align-items:center; margin-top:5px; }
+        .kanban-col-count { font-size:11px; font-weight:700; padding:2px 7px; border-radius:6px; background:rgba(0,0,0,0.2); }
+        .kanban-col-total { font-size:12px; font-weight:700; }
+        .kanban-cards { background:#080d14; border:1px solid #1e3050; border-top:none; border-radius:0 0 10px 10px; padding:8px; display:flex; flex-direction:column; gap:6px; min-height:60px; }
+        .kanban-empty-col { font-size:11px; color:#334155; text-align:center; padding:16px 8px; border:1px dashed #1e3050; border-radius:8px; }
+
+        /* KANBAN CARD */
+        .k-card { background:#0f1a30; border-radius:10px; padding:12px; border:1px solid #1e3050; transition:transform .12s, box-shadow .12s; }
+        .k-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.4); }
+        .k-id      { font-size:9px; font-weight:700; font-family:monospace; color:#3a86ff; letter-spacing:0.5px; margin-bottom:5px; }
+        .k-titulo  { font-size:12px; font-weight:700; color:#f1f5f9; line-height:1.35; margin-bottom:4px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        .k-valor   { font-size:14px; font-weight:800; color:#06d6a0; margin-bottom:4px; }
+        .k-prop    { font-size:10px; color:#475569; margin-bottom:2px; }
+        .k-fecha   { font-size:10px; color:#334155; margin-bottom:8px; }
+        .k-btn     { display:flex; align-items:center; justify-content:center; gap:5px; width:100%; padding:6px; border-radius:7px; background:#1c2541; border:1px solid #222e50; color:#64748b; font-size:10px; font-weight:600; cursor:pointer; text-decoration:none; transition:all .15s; }
+        .k-btn:hover { border-color:#3a86ff; color:#3a86ff; }
+
+        /* DETALLE OVERLAY */
+        .detalle-overlay { position:fixed; inset:0; background:#0b1329; z-index:200; display:none; overflow-y:auto; }
+        .detalle-overlay.open { display:block; }
+        .detalle-header { padding:12px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid #1e3050; position:sticky; top:0; background:#0b1329; z-index:10; }
+        .btn-back { width:32px; height:32px; border-radius:50%; background:#1c2541; border:none; color:#f8fafc; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .det-titulo { font-size:13px; font-weight:600; flex:1; }
+        .det-body { padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
+        .seccion { background:#1c2541; border-radius:10px; border:1px solid #1e3050; overflow:hidden; }
+        .sec-titulo { font-size:10px; font-weight:700; color:#3a86ff; text-transform:uppercase; letter-spacing:1px; padding:8px 12px; border-bottom:1px solid #1e3050; }
+        .sec-body { padding:10px 12px; }
+        .campo-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #0f1a30; gap:10px; }
+        .campo-row:last-child { border-bottom:none; }
+        .campo-lbl { font-size:11px; color:#475569; flex-shrink:0; }
+        .campo-val { font-size:11px; color:#f1f5f9; font-weight:500; text-align:right; word-break:break-word; }
+        .totales-wrap { background:#080d14; border-radius:10px; border:1px solid #1e3050; padding:12px; }
+        .tot-row { display:flex; justify-content:space-between; padding:4px 0; }
+        .tot-lbl  { font-size:12px; color:#64748b; }
+        .tot-val  { font-size:12px; font-weight:600; color:#f1f5f9; }
+        .tot-final { border-top:1px solid #3a86ff33; margin-top:6px; padding-top:8px; }
+        .tot-final .tot-lbl { font-size:13px; font-weight:700; color:#f1f5f9; }
+        .tot-final .tot-val { font-size:17px; font-weight:800; color:#3a86ff; }
+        .btn-ver { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:12px; border-radius:10px; background:#1c2541; border:1px solid #3a86ff; color:#3a86ff; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; }
+        .btn-wsp { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:12px; border-radius:10px; background:linear-gradient(135deg,#25d366,#128c7e); border:none; color:white; font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; }
+
+        /* MISC */
+        .loading { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:14px; }
+        .spinner { width:32px; height:32px; border:3px solid #1e3050; border-top-color:#3a86ff; border-radius:50%; animation:spin .8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .empty { text-align:center; padding:60px 20px; color:#475569; font-size:13px; }
     </style>
 </head>
 <body>
 
 <!-- HEADER -->
 <div class="header">
-    <button onclick="window.location.href='index.html'" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; padding:4px 8px 4px 0; line-height:1;">←</button>
-    <img class="logo" src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" onerror="this.style.display='none'" alt="TLC">
-    <div class="header-text">
+    <button onclick="window.location.href='index.html'" style="background:none;border:none;color:#475569;font-size:18px;cursor:pointer;padding:4px 6px 4px 0;flex-shrink:0;">←</button>
+    <img class="logo" src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25" onerror="this.style.display='none'" alt="TLC">
+    <div class="header-text" style="flex:1;">
         <h1>Cotizaciones</h1>
         <p id="user-label">Cargando...</p>
     </div>
-    <button onclick="cargar(true)" style="background:#1c2541; border:1px solid #222e50; border-radius:8px; color:#94a3b8; font-size:12px; padding:6px 12px; cursor:pointer; flex-shrink:0;">↺ Actualizar</button>
+    <button onclick="cargar(true)" style="background:#1c2541;border:1px solid #1e3050;border-radius:7px;color:#64748b;font-size:11px;padding:5px 10px;cursor:pointer;flex-shrink:0;">↺</button>
     <div class="vista-toggle">
         <button class="vista-btn active" id="btn-vista-lista" onclick="setVista('lista')">≡ Lista</button>
         <button class="vista-btn" id="btn-vista-kanban" onclick="setVista('kanban')">⊞ Kanban</button>
@@ -143,580 +136,367 @@
 <div class="stats-bar" id="stats-bar" style="display:none;"></div>
 
 <!-- FILTROS -->
-<div class="filtros" id="filtros-wrap" style="display:none;">
-    <button class="filtro-btn active" data-estado="TODOS" onclick="selFiltro(this)">Todos</button>
-    <button class="filtro-btn" data-estado="Enviada" onclick="selFiltro(this)">📤 Enviada</button>
-    <button class="filtro-btn" data-estado="En seguimiento" onclick="selFiltro(this)">🔵 Seguimiento</button>
-    <button class="filtro-btn" data-estado="Ganada" onclick="selFiltro(this)">✅ Ganada</button>
-    <button class="filtro-btn" data-estado="Perdida" onclick="selFiltro(this)">❌ Perdida</button>
+<div class="filtros-wrap" id="filtros-wrap" style="display:none;">
+    <button class="filtro-btn active" data-estado="TODOS"       onclick="selFiltro(this)">Todos</button>
+    <button class="filtro-btn" data-estado="10%"               onclick="selFiltro(this)">🌱 Oportunidad</button>
+    <button class="filtro-btn" data-estado="25%"               onclick="selFiltro(this)">🔵 Calificación</button>
+    <button class="filtro-btn" data-estado="50%"               onclick="selFiltro(this)">📋 Cotización</button>
+    <button class="filtro-btn" data-estado="75%"               onclick="selFiltro(this)">🟣 Negociación</button>
+    <button class="filtro-btn" data-estado="90%"               onclick="selFiltro(this)">🔶 Cierre</button>
+    <button class="filtro-btn" data-estado="Ganada"            onclick="selFiltro(this)">✅ Ganada</button>
+    <button class="filtro-btn" data-estado="Perdida"           onclick="selFiltro(this)">❌ Perdida</button>
 </div>
 
 <!-- BUSCADOR -->
-<div class="buscador" id="buscador-wrap" style="display:none;">
-    <input type="text" id="buscador" placeholder="Buscar cliente o equipo..." oninput="renderLista()">
+<div class="buscador-wrap" id="buscador-wrap" style="display:none;">
+    <input type="text" id="buscador" placeholder="Buscar cliente, equipo o ID..." oninput="aplicarFiltros()">
 </div>
 
 <!-- LISTA -->
-<div id="lista">
-    <div class="loading"><div class="spinner"></div><p>Cargando cotizaciones...</p></div>
-</div>
+<div id="lista-wrap" class="lista-wrap" style="display:none;"></div>
 
 <!-- KANBAN -->
-<div class="kanban-wrap" id="kanban-wrap"></div>
+<div class="kanban-outer" id="kanban-outer">
+    <div class="kanban-grid" id="kanban-grid"></div>
+</div>
 
 <!-- DETALLE OVERLAY -->
 <div class="detalle-overlay" id="detalle-overlay">
     <div class="detalle-header">
         <button class="btn-back" onclick="cerrarDetalle()">←</button>
-        <div class="detalle-titulo" id="det-titulo">—</div>
+        <div class="det-titulo" id="det-titulo">—</div>
     </div>
-    <div class="detalle-body" id="det-body"></div>
+    <div class="det-body" id="det-body"></div>
+</div>
+
+<!-- SPINNER INICIAL -->
+<div class="loading" id="loading-inicial">
+    <div class="spinner"></div>
+    <p style="color:#475569;font-size:13px;">Cargando cotizaciones...</p>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
-// ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.02.4"; console.log("%c TLC Portal v2026.06.02.4 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+// ═══════════════════════════════════════════════════════════════════
+// TLC — Cotizaciones v2026.06.06.1
+// Motor unificado: historico.json (GitHub Pages)
+// ═══════════════════════════════════════════════════════════════════
+const APP_VERSION = "2026.06.06.1";
+console.log("%c TLC Cotizaciones v2026.06.06.1 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
-// ─── KANBAN ───────────────────────────────────────────────────────────────────
+const CLIENT_ID  = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
+const TENANT_ID  = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const HISTORICO_URL = 'https://cahirth.github.io/Portal-TLC/historico.json';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+
+// ─── 7 COLUMNAS HUBSPOT ─────────────────────────────────────────
 const KANBAN_COLS = [
-    { estado: 'Enviada',    label: 'Enviada',    color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.3)'  },
-    { estado: 'Aceptada',   label: 'Aceptada',   color: '#10b981', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.3)'  },
-    { estado: 'Rechazada',  label: 'Rechazada',  color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.3)'   },
-    { estado: 'Facturada',  label: 'Facturada',  color: '#3a86ff', bg: 'rgba(58,134,255,0.1)',  border: 'rgba(58,134,255,0.3)'  },
+    { key:'10%',    label:'Oportunidad reciente',       pct:'10%',  color:'#94a3b8', bg:'rgba(148,163,184,.1)',  border:'rgba(148,163,184,.2)' },
+    { key:'25%',    label:'Calificación y asesoramiento',pct:'25%', color:'#fbbf24', bg:'rgba(251,191,36,.1)',   border:'rgba(251,191,36,.2)'  },
+    { key:'50%',    label:'Cotización',                 pct:'50%',  color:'#3a86ff', bg:'rgba(58,134,255,.1)',   border:'rgba(58,134,255,.2)'  },
+    { key:'75%',    label:'Negociación',                pct:'75%',  color:'#c084fc', bg:'rgba(168,85,247,.1)',   border:'rgba(168,85,247,.2)'  },
+    { key:'90%',    label:'Cierre',                     pct:'90%',  color:'#fb923c', bg:'rgba(249,115,22,.1)',   border:'rgba(249,115,22,.2)'  },
+    { key:'Ganada', label:'Cierre ganado',              pct:'100%', color:'#34d399', bg:'rgba(16,185,129,.1)',   border:'rgba(16,185,129,.2)'  },
+    { key:'Perdida',label:'Cierre perdido',             pct:'0%',   color:'#f87171', bg:'rgba(239,68,68,.1)',    border:'rgba(239,68,68,.2)'   },
 ];
-let vistActual = 'lista';
-let historicoData = [];
 
-function setVista(v) {
-    vistActual = v;
-    document.getElementById('btn-vista-lista').classList.toggle('active', v === 'lista');
-    document.getElementById('btn-vista-kanban').classList.toggle('active', v === 'kanban');
-    document.getElementById('lista').style.display          = v === 'lista'  ? 'block' : 'none';
-    document.getElementById('filtros-wrap').style.display   = v === 'lista'  ? 'flex'  : 'none';
-    document.getElementById('buscador-wrap').style.display  = v === 'lista'  ? 'block' : 'none';
-    document.getElementById('kanban-wrap').classList.toggle('visible', v === 'kanban');
-    if (v === 'kanban') renderKanban();
-}
-
-async function cargarHistorico() {
-    try {
-        const res = await fetch(HISTORICO_URL + '?t=' + Date.now());
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        let data = await res.json();
-        if (!Array.isArray(data)) data = [];
-
-        // Filtro de seguridad por vendedor
-        const esAdmin = currentUserRol === 'Administrador' ||
-                        currentUserNombre.toLowerCase().includes('cristian hirth') ||
-                        currentUserNombre.toLowerCase().includes('cristian');
-        if (!esAdmin) {
-            const primerNombre = currentUserNombre.split(' ')[0].toLowerCase();
-            data = data.filter(c => {
-                const v = String(c.vendedor || '').toLowerCase();
-                return v.includes(primerNombre);
-            });
-        }
-
-        // Default estado si falta
-        data.forEach(c => { if (!c.estado) c.estado = 'Enviada'; });
-        historicoData = data;
-    } catch(e) {
-        console.warn('historico.json:', e);
-        historicoData = [];
-    }
-}
-
-function renderKanban() {
-    const wrap = document.getElementById('kanban-wrap');
-    if (!historicoData.length) {
-        wrap.innerHTML = '<div style="color:#475569;font-size:14px;padding:40px;text-align:center;">Sin datos en historico.json</div>';
-        return;
-    }
-
-    wrap.innerHTML = KANBAN_COLS.map(col => {
-        const tarjetas = historicoData.filter(c => (c.estado || 'Enviada') === col.estado);
-        const total    = tarjetas.reduce((s, c) => s + (parseFloat((c.totales || {}).total_con_iva || c.totalConIva || 0)), 0);
-
-        const cardsHtml = tarjetas.length ? tarjetas.map(c => {
-            const cliente    = c.cliente?.nombre || c.nombreMedico || c.razonSocial || '—';
-            const idCot      = c.id_cotizacion || c.idCot || '—';
-            const fechaRaw   = c.fecha ? new Date(c.fecha).toLocaleDateString('es-AR') : '—';
-            const monto      = parseFloat((c.totales || {}).total_con_iva || c.totalConIva || 0);
-            const vendedor   = c.vendedor || '';
-            const linkPdf    = `https://cahirth.github.io/Portal-TLC/cotizaciones/${idCot}.html`;
-            const esAdmin    = currentUserRol === 'Administrador';
-
-            return `<div class="kanban-card">
-                <div class="kanban-id">${idCot}</div>
-                <div class="kanban-cliente" title="${cliente}">${cliente}</div>
-                <div class="kanban-fecha">${fechaRaw}</div>
-                <div class="kanban-monto">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
-                ${esAdmin && vendedor ? `<div class="kanban-vendedor">👤 ${vendedor}</div>` : ''}
-                <a href="${linkPdf}" target="_blank" class="kanban-btn">📄 Abrir Presupuesto</a>
-            </div>`;
-        }).join('') : `<div class="kanban-empty">Sin cotizaciones</div>`;
-
-        return `<div class="kanban-col">
-            <div class="kanban-col-header" style="background:${col.bg};border:1px solid ${col.border};">
-                <div class="kanban-col-title" style="color:${col.color};">${col.label}</div>
-                <div class="kanban-col-total" style="color:${col.color};">USD ${Math.round(total).toLocaleString('es-AR')}</div>
-                <div class="kanban-col-count" style="color:${col.color};">${tarjetas.length} cotización${tarjetas.length !== 1 ? 'es' : ''}</div>
-            </div>
-            <div class="kanban-cards">${cardsHtml}</div>
-        </div>`;
-    }).join('');
-}
-const CLIENT_ID = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
-const TENANT_ID = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
-const PA_LEER_URL = 'https://defaultbbd111b805224e3d9f4378d1ca0e71.cf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/922cfb807b454766a7b40c7ccbfb3742/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=VUeSzJbLOaG5RWXAjz13Xmv5GP2HGAGJVyoKi8hfJI8';
-const SHEET_ID = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
-const PRECIOS_JSON_URL = 'https://cahirth.github.io/Portal-TLC/precios.json';
-const FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbxOZsC8_FfappFkx8Dj8KdsUCuVqz5QQ-jSzChKiAe6a_F_Me6GY1tFC8q42YnW00vv/exec';
-
-let dispFotoMap = {}; // nombre_dispositivo_lower → URL foto
+const ESTADO_CSS = {
+    '10%':'e-oportunidad','25%':'e-calificacion','50%':'e-cotizacion',
+    '75%':'e-negociacion','90%':'e-cierre','Ganada':'e-ganada','Perdida':'e-perdida',
+};
 
 const msalConfig = {
-    auth: {
-        clientId: CLIENT_ID,
-        authority: `https://login.microsoftonline.com/${TENANT_ID}`,
-        redirectUri: 'https://cahirth.github.io/Portal-TLC/cotizaciones.html'
-    },
-    cache: { cacheLocation: 'sessionStorage' }
+    auth: { clientId:CLIENT_ID, authority:`https://login.microsoftonline.com/${TENANT_ID}`, redirectUri:'https://cahirth.github.io/Portal-TLC/cotizaciones.html' },
+    cache: { cacheLocation:'sessionStorage' }
 };
 
 let msal_app = null;
 let currentUser = null;
 let currentUserNombre = '';
-let currentUserRol = 'Vend_Externo';
-let todasLasCot = [];
-let cotActual = null;
+let currentUserRol    = 'Vend_Externo';
+let esAdmin           = false;
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
+// ─── DATOS ──────────────────────────────────────────────────────
+let todasLasCot    = [];   // array crudo filtrado por vendedor
+let cotFiltradas   = [];   // después de filtros UI
+let cotActual      = null;
+let vistaActual    = 'lista';
+let filtroEstado   = 'TODOS';
+
+// ─── INIT ────────────────────────────────────────────────────────
 async function init() {
     msal_app = new msal.PublicClientApplication(msalConfig);
     await msal_app.initialize();
-    const resp = await msal_app.handleRedirectPromise();
+    const resp    = await msal_app.handleRedirectPromise();
     const account = resp?.account || msal_app.getAllAccounts()[0];
-    if (!account) {
-        msal_app.loginRedirect({ scopes: ['User.Read'] });
-        return;
-    }
-    currentUser = account;
-    currentUserNombre = account.name || account.username || '';
+    if (!account) { msal_app.loginRedirect({ scopes:['User.Read'] }); return; }
+    currentUser        = account;
+    currentUserNombre  = account.name || account.username || '';
     document.getElementById('user-label').textContent = currentUserNombre.split(' ')[0];
 
-    // Cargar rol del vendedor
+    // Rol desde Sheet Vendedores
     try {
+        const SHEET_ID = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
         const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Vendedores`;
         const res = await fetch(url);
         const text = await res.text();
         const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
         const cols = json.table.cols.map(c => c.label);
-        const rows = (json.table.rows || []).map(row => {
-            const obj = {};
-            cols.forEach((col, i) => { obj[col] = row.c?.[i]?.v ?? ''; });
-            return obj;
+        const rows = (json.table.rows||[]).map(row => {
+            const obj = {}; cols.forEach((col,i) => { obj[col] = row.c?.[i]?.v ?? ''; }); return obj;
         });
         const email = account.username?.toLowerCase() || '';
-        const vend = rows.find(v => String(v['Email'] || '').toLowerCase() === email);
+        const vend  = rows.find(v => String(v['Email']||'').toLowerCase() === email);
         if (vend) currentUserRol = vend['Rol'] || 'Vend_Externo';
-    } catch(e) { console.warn('Permisos:', e); }
+    } catch(e) { console.warn('Rol:', e); }
+
+    esAdmin = currentUserRol === 'Administrador' ||
+              currentUserNombre.toLowerCase().includes('cristian hirth') ||
+              currentUserNombre.toLowerCase().includes('cristian');
 
     await cargar();
-    await cargarHistorico();  // cargar historico.json en background
-    // Cargar fotos en background
-    cargarFotoMap();
 }
 
-// ─── FOTO MAP ─────────────────────────────────────────────────────────────────
-async function cargarFotoMap() {
-    try {
-        // Paso 1: precios.json (~50ms, cacheado por browser)
-        const res = await fetch(PRECIOS_JSON_URL, { cache: 'default' });
-        if (!res.ok) return;
-        const data = await res.json();
-
-        // Paso 2: fotoMap del Apps Script en paralelo con el procesamiento
-        let fotoMap = {};
-        const r2p = fetch(FOTO_MAP_URL, { redirect: 'follow' })
-            .then(r => r.text()).then(t => { try { fotoMap = JSON.parse(t); } catch(e) {} })
-            .catch(() => {});
-
-        // Construir dispFotoMap con lo que ya tenemos (URLs lh3 directas)
-        data.forEach(d => {
-            const nombre = (d['Nombre de Dispositivo'] || '').trim().toLowerCase();
-            if (!nombre) return;
-            const foto = d['Foto'] || '';
-            // Solo URLs directas lh3 por ahora — no necesita fotoMap
-            const url = resolverFotoUrl(foto, {});
-            if (url) dispFotoMap[nombre] = url;
-        });
-
-        // Actualizar DOM quirúrgicamente sin re-renderizar
-        _actualizarFotosDom();
-
-        // Esperar fotoMap y actualizar los que quedaron pendientes
-        await r2p;
-        data.forEach(d => {
-            const nombre = (d['Nombre de Dispositivo'] || '').trim().toLowerCase();
-            if (dispFotoMap[nombre]) return; // ya resuelto
-            const foto = d['Foto'] || '';
-            const url = resolverFotoUrl(foto, fotoMap);
-            if (url) dispFotoMap[nombre] = url;
-        });
-        _actualizarFotosDom();
-
-    } catch(e) { console.warn('fotoMap:', e); }
-}
-
-function _actualizarFotosDom() {
-    // Actualiza solo los contenedores de fotos sin tocar el resto del DOM
-    document.querySelectorAll('.fotos-thumb').forEach(wrap => {
-        const key = wrap.dataset.equiposKey || '';
-        if (!key) return;
-        const nombres = key.split('|').map(e => e.trim().replace(/^\d+×\s*/, ''));
-        const urls = nombres.map(n => {
-            if (dispFotoMap[n]) return dispFotoMap[n];
-            const found = Object.keys(dispFotoMap).find(k =>
-                k.includes(n.substring(0,8)) || n.includes(k.substring(0,8))
-            );
-            return found ? dispFotoMap[found] : null;
-        }).filter(Boolean).slice(0,3);
-
-        if (!urls.length) return;
-        // Solo actualizar si el contenedor está vacío o tiene placeholders
-        if (wrap.querySelector('img')) return;
-        wrap.innerHTML = urls.map(f =>
-            `<img class="foto-thumb" src="${f}" onerror="this.style.display='none'">`
-        ).join('');
-        wrap.classList.remove('fotos-pending');
-    });
-}
-
-function resolverFotoUrl(foto, fotoMap) {
-    if (!foto) return '';
-    const s = String(foto).trim();
-    if (s.includes('lh3.googleusercontent.com')) return s;
-    const mDrive = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-    if (mDrive) return `https://lh3.googleusercontent.com/d/${mDrive[1]}`;
-    const mFotos = s.match(/^Fotos\/(.+)$/i);
-    if (mFotos) {
-        const nombre = mFotos[1].toLowerCase();
-        const webp = nombre.replace(/\.(png|jpg|jpeg)$/i, '.webp');
-        return fotoMap[webp] || fotoMap[nombre] || '';
-    }
-    return '';
-}
-
-function fotosDeEquipos(equiposStr) {
-    const nombres = String(equiposStr || '').split('|').map(e => e.trim().replace(/^\d+×\s*/, '').toLowerCase());
-    return nombres
-        .map(n => {
-            // Buscar match exacto o parcial
-            if (dispFotoMap[n]) return dispFotoMap[n];
-            const key = Object.keys(dispFotoMap).find(k => k.includes(n.substring(0, 8)) || n.includes(k.substring(0, 8)));
-            return key ? dispFotoMap[key] : null;
-        })
-        .filter(Boolean)
-        .slice(0, 3); // máximo 3 fotos
-}
-
-// ─── CARGAR DATOS ─────────────────────────────────────────────────────────────
-const CACHE_KEY = 'tlc_cotizaciones_v1';
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
-
-function _cacheSave(filas) {
-    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), filas })); } catch(e) {}
-}
-function _cacheLoad() {
-    try {
-        const raw = sessionStorage.getItem(CACHE_KEY);
-        if (!raw) return null;
-        const p = JSON.parse(raw);
-        if (Date.now() - p.ts > CACHE_TTL) { sessionStorage.removeItem(CACHE_KEY); return null; }
-        return p.filas;
-    } catch(e) { return null; }
-}
-function _cacheClear() { sessionStorage.removeItem(CACHE_KEY); }
-
-function _parseFecha(f) {
-    // Soporta dd/mm/yyyy HH:mm y variantes
-    if (!f) return 0;
-    const s = String(f).trim();
-    // Formato dd/mm/yyyy HH:mm[:ss]
-    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[,\s]+(\d{1,2}):(\d{2})/);
-    if (m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5]).getTime();
-    // Intentar Date nativo como fallback
-    const d = new Date(s);
-    return isNaN(d) ? 0 : d.getTime();
-}
-
-function _sortFilas(filas) {
-    return filas.sort((a, b) => {
-        // Primero por fecha parseada descendente
-        const ta = _parseFecha(a['FECHA']);
-        const tb = _parseFecha(b['FECHA']);
-        if (tb !== ta) return tb - ta;
-        // Fallback: ID descendente
-        return String(b['ID'] || '').localeCompare(String(a['ID'] || ''));
-    });
-}
-
-function _mostrarFilas(filas) {
-    todasLasCot = _sortFilas(filas);
-    mostrarStats();
-    document.getElementById('filtros-wrap').style.display = 'flex';
-    document.getElementById('buscador-wrap').style.display = 'block';
-    renderLista();
-}
-
-async function _fetchFilas() {
-    const vendedorFiltro = currentUserRol === 'Administrador' ? 'TODOS' : currentUserNombre;
-    const res = await fetch(PA_LEER_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vendedor: vendedorFiltro })
-    });
-    const texto = await res.text();
-    let data;
-    try { data = JSON.parse(texto); } catch(e) { throw new Error('Respuesta inválida del servidor'); }
-    if (typeof data === 'string') { try { data = JSON.parse(data); } catch(e) {} }
-    let filas = [];
-    if (data?.value) filas = data.value;
-    else if (Array.isArray(data)) filas = data;
-    if (currentUserRol !== 'Administrador') {
-        filas = filas.filter(f => {
-            const v = String(f['VENDEDOR'] || '').toLowerCase();
-            return v.includes(currentUserNombre.split(' ')[0].toLowerCase());
-        });
-    }
-    return filas;
-}
-
+// ─── CARGAR historico.json ────────────────────────────────────────
 async function cargar(forzar = false) {
-    if (forzar) _cacheClear();
-
-    // Mostrar cache inmediatamente si existe
-    const cached = _cacheLoad();
-    if (cached) {
-        _mostrarFilas(cached);
-        // Mostrar indicador de refresh silencioso
-        const btn = document.querySelector('button[onclick="cargar()"]');
-        if (btn) { btn.textContent = '↺ Actualizando...'; btn.style.opacity = '0.6'; }
-        // Refresh en background
-        _fetchFilas().then(filas => {
-            _cacheSave(filas);
-            _mostrarFilas(filas);
-            if (btn) { btn.textContent = '↺ Actualizar'; btn.style.opacity = '1'; }
-        }).catch(() => {
-            if (btn) { btn.textContent = '↺ Actualizar'; btn.style.opacity = '1'; }
-        });
-        return;
-    }
-
-    // Sin cache: mostrar spinner y esperar
-    document.getElementById('lista').innerHTML = '<div class="loading"><div class="spinner"></div><p>Cargando cotizaciones...</p></div>';
-    document.getElementById('stats-bar').style.display = 'none';
-    document.getElementById('filtros-wrap').style.display = 'none';
-    document.getElementById('buscador-wrap').style.display = 'none';
+    document.getElementById('loading-inicial').style.display = 'flex';
+    document.getElementById('stats-bar').style.display       = 'none';
+    document.getElementById('filtros-wrap').style.display    = 'none';
+    document.getElementById('buscador-wrap').style.display   = 'none';
+    document.getElementById('lista-wrap').style.display      = 'none';
+    document.getElementById('kanban-outer').classList.remove('visible');
 
     try {
-        const filas = await _fetchFilas();
-        _cacheSave(filas);
-        _mostrarFilas(filas);
+        const bust = forzar ? ('?t=' + Date.now()) : '';
+        const res  = await fetch(HISTORICO_URL + bust);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        let data = await res.json();
+        if (!Array.isArray(data)) data = [];
+
+        // Default estado
+        data.forEach(c => { if (!c.estado) c.estado = 'Enviada'; });
+
+        // Mapear estado viejo → nuevo key
+        data.forEach(c => {
+            const e = String(c.estado || '').trim();
+            if (e === 'Enviada' || e === 'Cotización' || e === 'presentationscheduled') c.estado = '50%';
+            else if (e === 'En seguimiento' || e === 'decisionmakerboughtin')           c.estado = '75%';
+            else if (e === 'Ganada' || e === 'closedwon')                               c.estado = 'Ganada';
+            else if (e === 'Perdida' || e === 'closedlost')                             c.estado = 'Perdida';
+            // 10%, 25%, 90% se dejan como vienen
+        });
+
+        // Filtro vendedor
+        if (!esAdmin && currentUserNombre) {
+            const primer = currentUserNombre.split(' ')[0].toLowerCase();
+            data = data.filter(c => String(c.vendedor||'').toLowerCase().includes(primer));
+        }
+
+        todasLasCot = data;
+        aplicarFiltros();
+
+        document.getElementById('loading-inicial').style.display = 'none';
+        document.getElementById('filtros-wrap').style.display    = 'flex';
+        document.getElementById('buscador-wrap').style.display   = 'block';
+        setVista(vistaActual);
+        mostrarStats();
+
     } catch(e) {
-        document.getElementById('lista').innerHTML = `<div class="empty">❌ Error: ${e.message}<br><button onclick="cargar(true)" style="margin-top:12px; padding:8px 20px; background:#3a86ff; border:none; border-radius:8px; color:white; cursor:pointer; font-size:13px;">Reintentar</button></div>`;
+        document.getElementById('loading-inicial').innerHTML =
+            `<div class="empty">❌ Error: ${e.message}<br><button onclick="cargar(true)" style="margin-top:12px;padding:8px 20px;background:#3a86ff;border:none;border-radius:8px;color:white;cursor:pointer;">Reintentar</button></div>`;
     }
 }
 
-// ─── STATS ────────────────────────────────────────────────────────────────────
-function mostrarStats() {
-    const total = todasLasCot.length;
-    const totalUSD = todasLasCot.reduce((s, c) => s + (parseFloat(c['TOTAL USD']) || 0), 0);
-    const cerradas = todasLasCot.filter(c => c['ESTADO'] === 'Ganada' || c['ESTADO'] === 'Cerrada').length;
+// ─── FILTROS EN CALIENTE ─────────────────────────────────────────
+function selFiltro(btn) {
+    document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    filtroEstado = btn.dataset.estado;
+    aplicarFiltros();
+}
 
+function aplicarFiltros() {
+    const q = (document.getElementById('buscador')?.value || '').toLowerCase().trim();
+    cotFiltradas = todasLasCot.filter(c => {
+        const matchEstado = filtroEstado === 'TODOS' || c.estado === filtroEstado;
+        const razon  = String(c.razonSocial || c.cliente?.nombre || c.nombreMedico || '').toLowerCase();
+        const equipo = String((c.carrito || []).map(i => i.nombre).join(' ') || '').toLowerCase();
+        const id     = String(c.idCot || c.id_cotizacion || '').toLowerCase();
+        const matchQ = !q || razon.includes(q) || equipo.includes(q) || id.includes(q);
+        return matchEstado && matchQ;
+    });
+    if (vistaActual === 'lista') renderLista();
+    else renderKanban();
+    mostrarStats();
+}
+
+// ─── VISTA ───────────────────────────────────────────────────────
+function setVista(v) {
+    vistaActual = v;
+    document.getElementById('btn-vista-lista').classList.toggle('active', v === 'lista');
+    document.getElementById('btn-vista-kanban').classList.toggle('active', v === 'kanban');
+    document.getElementById('lista-wrap').style.display = v === 'lista' ? 'block' : 'none';
+    if (v === 'kanban') document.getElementById('kanban-outer').classList.add('visible');
+    else document.getElementById('kanban-outer').classList.remove('visible');
+    if (v === 'lista') renderLista();
+    else renderKanban();
+}
+
+// ─── STATS ───────────────────────────────────────────────────────
+function mostrarStats() {
+    const total    = cotFiltradas.length;
+    const totalUSD = cotFiltradas.reduce((s, c) => s + _monto(c), 0);
+    const ganadas  = cotFiltradas.filter(c => c.estado === 'Ganada').length;
     document.getElementById('stats-bar').innerHTML = `
         <div class="stat-chip"><div class="val">${total}</div><div class="lbl">Cotizaciones</div></div>
-        <div class="stat-chip"><div class="val">${fmtUSD(totalUSD)}</div><div class="lbl">Monto total</div></div>
-        <div class="stat-chip"><div class="val" style="color:#06d6a0;">${cerradas}</div><div class="lbl">Ganadas</div></div>
+        <div class="stat-chip"><div class="val" style="font-size:12px;">USD ${Math.round(totalUSD).toLocaleString('es-AR')}</div><div class="lbl">Monto total</div></div>
+        <div class="stat-chip"><div class="val" style="color:#34d399;">${ganadas}</div><div class="lbl">Ganadas</div></div>
     `;
     document.getElementById('stats-bar').style.display = 'flex';
 }
 
-// ─── FILTRO ───────────────────────────────────────────────────────────────────
-function selFiltro(btn) {
-    document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    renderLista();
-}
-
-// ─── RENDER LISTA ─────────────────────────────────────────────────────────────
+// ─── RENDER LISTA ────────────────────────────────────────────────
 function renderLista() {
-    const estado = document.querySelector('.filtro-btn.active')?.dataset.estado || 'TODOS';
-    const q = (document.getElementById('buscador')?.value || '').toLowerCase().trim();
-
-    const filtradas = todasLasCot.filter(c => {
-        const matchEstado = estado === 'TODOS' || (c['ESTADO'] || '') === estado;
-        const matchQ = !q ||
-            String(c['NOMBRE'] || '').toLowerCase().includes(q) ||
-            String(c['EQUIPOS'] || '').toLowerCase().includes(q) ||
-            String(c['ID'] || '').toLowerCase().includes(q);
-        return matchEstado && matchQ;
-    });
-
-    const lista = document.getElementById('lista');
-    if (!filtradas.length) {
-        lista.innerHTML = '<div class="empty">Sin resultados</div>';
-        return;
-    }
-
-    lista.innerHTML = '<div class="lista">' + filtradas.map((c, i) => {
-        const idx = todasLasCot.indexOf(c);
-        const estadoClass = estadoBadge(c['ESTADO']);
-        const equipos = String(c['EQUIPOS'] || '').split('|').map(e => e.trim()).join(' · ');
-        const fotos = fotosDeEquipos(c['EQUIPOS']);
-        const equiposKey = String(c['EQUIPOS'] || '').toLowerCase().trim();
-        const fotosHtml = fotos.length
-            ? `<div class="fotos-thumb" data-equipos-key="${equiposKey.replace(/"/g,'')}">${fotos.map(f => `<img class="foto-thumb" src="${f}" onerror="this.style.display='none'">`).join('')}</div>`
-            : `<div class="fotos-thumb fotos-pending" data-equipos-key="${equiposKey.replace(/"/g,'')}"></div>`;
-        return `<div class="cot-card" onclick="abrirDetalle(${idx})">
-            <div class="cot-card-header">
-                <div style="flex:1; min-width:0;">
-                    <div class="cot-nombre">${c['NOMBRE'] || '—'}</div>
-                    <div class="cot-equipo">${equipos || '—'}</div>
-                    ${fotosHtml}
-                    <div class="cot-fecha" style="margin-top:4px;">${formatFecha(c['FECHA'])} · ${c['ID'] || ''}</div>
+    const wrap = document.getElementById('lista-wrap');
+    if (!cotFiltradas.length) { wrap.innerHTML = '<div class="empty">Sin resultados</div>'; return; }
+    wrap.innerHTML = cotFiltradas.map((c, i) => {
+        const idxReal  = todasLasCot.indexOf(c);
+        const id       = c.idCot || c.id_cotizacion || '—';
+        const cliente  = c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
+        const equipos  = (c.carrito||[]).map(i => i.nombre).join(' · ') || '—';
+        const fecha    = _fmtFecha(c.fecha);
+        const monto    = _monto(c);
+        const estadoCss = ESTADO_CSS[c.estado] || 'e-cotizacion';
+        const estadoLabel = _estadoLabel(c.estado);
+        return `<div class="cot-card" onclick="abrirDetalle(${idxReal})">
+            <div class="cot-card-inner">
+                <div style="flex:1;min-width:0;">
+                    <div class="cot-nombre">${cliente}</div>
+                    <div class="cot-equipo">${equipos}</div>
+                    <div class="cot-fecha">${fecha} · ${id}</div>
                 </div>
-                <div style="text-align:right; flex-shrink:0; margin-left:8px;">
-                    <div class="cot-monto">${fmtUSD(c['TOTAL USD'])}</div>
-                    <div class="cot-modalidad">${c['MODALIDAD'] || ''}</div>
-                    <div style="margin-top:5px;"><span class="estado-badge ${estadoClass}">${c['ESTADO'] || 'Sin estado'}</span></div>
+                <div style="text-align:right;flex-shrink:0;margin-left:8px;">
+                    <div class="cot-monto">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
+                    <span class="cot-estado ${estadoCss}">${estadoLabel}</span>
+                    ${esAdmin && c.vendedor ? `<div style="font-size:10px;color:#475569;margin-top:3px;">👤 ${c.vendedor}</div>` : ''}
                 </div>
             </div>
-            ${c['NOTAS'] ? `<div class="cot-card-body"><div style="font-size:11px; color:#94a3b8; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📝 ${c['NOTAS']}</div></div>` : ''}
+            ${c.notes ? `<div class="cot-notas">📝 ${c.notes}</div>` : ''}
         </div>`;
-    }).join('') + '</div>';
+    }).join('');
 }
 
-// ─── DETALLE ──────────────────────────────────────────────────────────────────
+// ─── RENDER KANBAN (7 columnas, recalculo en caliente) ───────────
+function renderKanban() {
+    const grid = document.getElementById('kanban-grid');
+    grid.innerHTML = KANBAN_COLS.map(col => {
+        const tarjetas = cotFiltradas.filter(c => c.estado === col.key);
+        const total    = tarjetas.reduce((s, c) => s + _monto(c), 0);
+        const totalFmt = 'USD ' + Math.round(total).toLocaleString('es-AR');
+
+        const cardsHtml = tarjetas.length ? tarjetas.map(c => {
+            const idxReal  = todasLasCot.indexOf(c);
+            const id       = c.idCot || c.id_cotizacion || '—';
+            const cliente  = c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
+            const equipos  = (c.carrito||[]).map(i => i.nombre).join(' / ') || '';
+            const titulo   = cliente + (equipos ? ' / ' + equipos : '');
+            const monto    = _monto(c);
+            const fecha    = _fmtFecha(c.fecha);
+            const linkPdf  = `https://cahirth.github.io/Portal-TLC/cotizaciones/${id}.html`;
+            return `<div class="k-card" onclick="abrirDetalle(${idxReal})">
+                <div class="k-id">${id}</div>
+                <div class="k-titulo">${titulo}</div>
+                <div class="k-valor">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
+                ${esAdmin && c.vendedor ? `<div class="k-prop">👤 ${c.vendedor}</div>` : ''}
+                <div class="k-fecha">📅 ${fecha}</div>
+                <a href="${linkPdf}" target="_blank" class="k-btn" onclick="event.stopPropagation()">📄 Abrir Presupuesto</a>
+            </div>`;
+        }).join('') : `<div class="kanban-empty-col">Sin cotizaciones</div>`;
+
+        return `<div class="kanban-col">
+            <div class="kanban-col-header" style="background:${col.bg};border-color:${col.border};">
+                <div class="kanban-col-label" style="color:${col.color};">${col.label}</div>
+                <div class="kanban-col-meta">
+                    <span class="kanban-col-count" style="color:${col.color};">${tarjetas.length}</span>
+                    <span class="kanban-col-total" style="color:${col.color};">${totalFmt}</span>
+                </div>
+            </div>
+            <div class="kanban-cards">${cardsHtml}</div>
+        </div>`;
+    }).join('');
+}
+
+// ─── DETALLE ─────────────────────────────────────────────────────
 function abrirDetalle(idx) {
     const c = todasLasCot[idx];
     if (!c) return;
     cotActual = c;
+    const id      = c.idCot || c.id_cotizacion || '—';
+    const cliente = c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
+    const monto   = _monto(c);
+    const iva     = _monto_iva(c);
+    const neto    = monto - iva;
+    const linkPdf = `https://cahirth.github.io/Portal-TLC/cotizaciones/${id}.html`;
 
-    document.getElementById('det-titulo').textContent = c['NOMBRE'] || '—';
-
-    const equipos = String(c['EQUIPOS'] || '').split('|').map(e => e.trim());
-    const tieneFinanciacion = parseFloat(c['ADELANTO']) > 0 || parseFloat(c['CUOTAS']) > 0;
-    const mod = MODAL_CARRITO_INFO[c['MODALIDAD']] || {};
-    const fotosDetalle = fotosDeEquipos(c['EQUIPOS']);
+    document.getElementById('det-titulo').textContent = cliente;
 
     let html = '';
 
-    // — Fotos arriba
-    if (fotosDetalle.length) {
-        html += `<div style="display:flex; gap:8px; justify-content:center;">
-            ${fotosDetalle.map(f => `<img src="${f}" style="flex:1; max-width:${fotosDetalle.length === 1 ? '100%' : '48%'}; height:140px; object-fit:contain; border-radius:12px; background:#1c2541; border:1px solid #222e50;" onerror="this.style.display='none'">`).join('')}
-        </div>`;
-    }
-
-    // — Identificación
+    // Identificación
     html += `<div class="seccion">
-        <div class="seccion-titulo">Cotización</div>
-        <div class="seccion-body">
-            ${campo('ID', c['ID'])}
-            ${campo('Fecha', formatFecha(c['FECHA']))}
-            ${campo('Vendedor', c['VENDEDOR'])}
-            <div class="campo-row" style="align-items:center;">
-                <span class="campo-label">Estado</span>
-                <div style="position:relative; width:180px;">
-                    <select class="estado-select" id="sel-estado" onchange="cambiarEstado(this.value)">
-                        <option value="Enviada" ${c['ESTADO']==='Enviada'?'selected':''}>📤 Enviada</option>
-                        <option value="En seguimiento" ${c['ESTADO']==='En seguimiento'?'selected':''}>🔵 En seguimiento</option>
-                        <option value="Ganada" ${(c['ESTADO']==='Ganada'||c['ESTADO']==='Cerrada')?'selected':''}>✅ Ganada</option>
-                        <option value="Perdida" ${c['ESTADO']==='Perdida'?'selected':''}>❌ Perdida</option>
-                    </select>
-                    <div style="position:absolute; right:10px; top:50%; transform:translateY(-50%); pointer-events:none; color:#3a86ff; font-size:11px;">▼</div>
-                </div>
-            </div>
-            <div id="estado-status" style="font-size:11px; color:#06d6a0; padding:4px 0; display:none;">✅ Estado actualizado</div>
+        <div class="sec-titulo">Cotización</div>
+        <div class="sec-body">
+            ${_campo('ID', id)}
+            ${_campo('Fecha', _fmtFecha(c.fecha))}
+            ${_campo('Vendedor', c.vendedor)}
+            ${_campo('Estado', _estadoLabel(c.estado))}
         </div>
     </div>`;
 
-    // — Cliente
+    // Cliente
     html += `<div class="seccion">
-        <div class="seccion-titulo">Cliente</div>
-        <div class="seccion-body">
-            ${campo('Nombre', c['NOMBRE'])}
-            ${c['RAZON SOCIAL'] ? campo('Razón Social', c['RAZON SOCIAL']) : ''}
-            ${c['CUIT'] ? campo('CUIT', c['CUIT']) : ''}
-            ${c['TELEFONO'] ? campo('Teléfono', c['TELEFONO']) : ''}
+        <div class="sec-titulo">Cliente</div>
+        <div class="sec-body">
+            ${_campo('Nombre', c.nombreMedico || c.cliente?.nombre)}
+            ${_campo('Razón Social', c.razonSocial)}
+            ${_campo('CUIT', c.cuit || c.cliente?.cuit)}
+            ${_campo('Teléfono', c.telefono)}
         </div>
     </div>`;
 
-    // — Equipos
-    html += `<div class="seccion">
-        <div class="seccion-titulo">Equipos</div>
-        <div class="seccion-body">
-            ${equipos.map(e => `<div style="padding:6px 0; border-bottom:1px solid #162040; font-size:13px; color:#f1f5f9;">${e}</div>`).join('')}
-            <div style="padding-top:8px;">${campo('Modalidad', c['MODALIDAD'])}</div>
-        </div>
-    </div>`;
-
-    // — Totales
-    html += `<div class="totales-wrap">
-        <div class="total-row"><span class="total-label">Neto USD</span><span class="total-valor">${fmtUSD(c['NETO USD'])}</span></div>
-        <div class="total-row"><span class="total-label" style="color:#f8961e;">IVA 10,5%</span><span class="total-valor" style="color:#f8961e;">${fmtUSD(c['IVA'])}</span></div>
-        <div class="total-row total-final"><span class="total-label">TOTAL USD c/IVA</span><span class="total-valor">${fmtUSD(c['TOTAL USD'])}</span></div>
-        ${tieneFinanciacion ? `
-        <div style="margin-top:12px; padding-top:10px; border-top:1px solid #222e50;">
-            <div style="font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Estructura de pago</div>
-            ${parseFloat(c['ADELANTO']) > 0 ? `<div class="total-row"><span class="total-label">Adelanto</span><span class="total-valor" style="color:#06d6a0;">${fmtNum(c['ADELANTO'])}</span></div>` : ''}
-            ${parseFloat(c['CUOTAS']) > 0 ? `<div class="total-row"><span class="total-label">Cuota mensual</span><span class="total-valor" style="color:#06d6a0;">${fmtNum(c['CUOTAS'])}</span></div>` : ''}
-        </div>` : ''}
-    </div>`;
-
-    // — Notas
-    if (c['NOTAS']) {
+    // Equipos
+    if (c.carrito && c.carrito.length) {
         html += `<div class="seccion">
-            <div class="seccion-titulo" style="color:#f8961e;">Notas</div>
-            <div class="seccion-body" style="font-size:13px; color:#f1f5f9; line-height:1.6;">${c['NOTAS']}</div>
+            <div class="sec-titulo">Equipos</div>
+            <div class="sec-body">
+                ${c.carrito.map(i => `<div style="padding:5px 0;border-bottom:1px solid #0f1a30;font-size:12px;color:#f1f5f9;">
+                    <span style="color:#3a86ff;font-weight:600;">${i.cantidad||1}×</span> ${i.nombre}
+                    ${i.descuentoValor > 0 ? `<span style="color:#f8961e;font-size:10px;"> −${i.descuentoTipo==='%'?i.descuentoValor+'%':'USD '+i.descuentoValor}</span>` : ''}
+                    <span style="float:right;color:#06d6a0;font-weight:700;">USD ${Math.round((i.precioNeto||i.precio||0)*(i.cantidad||1)).toLocaleString('es-AR')}</span>
+                </div>`).join('')}
+            </div>
         </div>`;
     }
 
-    // — Botones
-    html += `<div style="display:flex; flex-direction:column; gap:8px;">`;
-    if (c['LINK']) {
-        html += `<a href="${c['LINK']}" target="_blank" class="btn-ver">📄 Ver presupuesto</a>`;
+    // Totales
+    html += `<div class="totales-wrap">
+        <div class="tot-row"><span class="tot-lbl">Neto USD</span><span class="tot-val">USD ${Math.round(neto).toLocaleString('es-AR')}</span></div>
+        <div class="tot-row"><span class="tot-lbl" style="color:#f8961e;">IVA discriminado</span><span class="tot-val" style="color:#f8961e;">USD ${Math.round(iva).toLocaleString('es-AR')}</span></div>
+        <div class="tot-row tot-final"><span class="tot-lbl">TOTAL c/IVA</span><span class="tot-val">USD ${Math.round(monto).toLocaleString('es-AR')}</span></div>
+    </div>`;
 
-        // Formatear: quitar 0 inicial, quitar 54 prefijo, agregar 549
-        const telRaw = String(c['TELEFONO'] || '').replace(/\D/g,'').replace(/^0+/,'').replace(/^54/,'');
-        const tel549 = telRaw ? '549' + telRaw : '';
-        const nombreCorto = (c['NOMBRE']||'').split(' ')[0];
-        const msg = encodeURIComponent('Hola ' + nombreCorto + ', le comparto el presupuesto de TLC SRL: ' + c['LINK'] + ' | Ref: ' + c['ID']);
-
-        if (tel549) {
-            html += `<a href="https://wa.me/${tel549}?text=${msg}" target="_blank" class="btn-wsp">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                Reenviar por WhatsApp
-            </a>`;
-        } else {
-            html += `<div style="background:#1c2541; border:1px solid #f8961e33; border-radius:10px; padding:12px 14px;">
-                <div style="font-size:11px; color:#f8961e; margin-bottom:8px;">⚠️ Sin teléfono — ingresá el número (sin 0 ni 15)</div>
-                <div style="display:flex; gap:8px;">
-                    <input id="tel-fallback" type="tel" placeholder="Ej: 11 4567 8901"
-                        style="flex:1; background:#0b1329; border:1px solid #222e50; border-radius:8px; padding:10px 12px; color:#f8fafc; font-size:14px; outline:none;">
-                    <button onclick="enviarWspManual()"
-                        style="padding:10px 16px; background:linear-gradient(135deg,#25d366,#128c7e); border:none; border-radius:8px; color:white; font-size:13px; font-weight:700; cursor:pointer;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                    </button>
-                </div>
-            </div>`;
-        }
+    // Notas
+    if (c.notes) {
+        html += `<div class="seccion">
+            <div class="sec-titulo" style="color:#f8961e;">Notas</div>
+            <div class="sec-body" style="font-size:12px;color:#f1f5f9;line-height:1.6;">${c.notes}</div>
+        </div>`;
     }
-    html += `</div>`;
+
+    // Botones
+    html += `<div style="display:flex;flex-direction:column;gap:8px;">
+        <a href="${linkPdf}" target="_blank" class="btn-ver">📄 Ver presupuesto</a>
+    </div>`;
 
     document.getElementById('det-body').innerHTML = html;
     document.getElementById('detalle-overlay').classList.add('open');
@@ -727,119 +507,37 @@ function cerrarDetalle() {
     document.getElementById('detalle-overlay').classList.remove('open');
 }
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-const MODAL_CARRITO_INFO = {};
-
-function campo(label, valor) {
-    if (!valor) return '';
+// ─── HELPERS ─────────────────────────────────────────────────────
+function _monto(c) {
+    return parseFloat((c.totales||{}).total_con_iva || c.totalConIva || 0);
+}
+function _monto_iva(c) {
+    return parseFloat((c.totales||{}).iva_total || c.ivaTotal || 0);
+}
+function _fmtFecha(f) {
+    if (!f) return '—';
+    try {
+        const d = new Date(f);
+        if (isNaN(d)) return String(f).substring(0,10);
+        return d.toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+    } catch(e) { return String(f).substring(0,10); }
+}
+function _estadoLabel(e) {
+    const map = {
+        '10%':'🌱 Oportunidad','25%':'🔵 Calificación','50%':'📋 Cotización',
+        '75%':'🟣 Negociación','90%':'🔶 Cierre','Ganada':'✅ Ganada','Perdida':'❌ Perdida'
+    };
+    return map[e] || e || '—';
+}
+function _campo(label, val) {
+    if (!val) return '';
     return `<div class="campo-row">
-        <span class="campo-label">${label}</span>
-        <span class="campo-valor">${valor}</span>
+        <span class="campo-lbl">${label}</span>
+        <span class="campo-val">${val}</span>
     </div>`;
 }
 
-function estadoBadge(estado) {
-    const map = {
-        'Enviada': 'estado-enviada',
-        'En seguimiento': 'estado-seguimiento',
-        'Cerrada': 'estado-ganada',
-        'Ganada': 'estado-ganada',
-        'Perdida': 'estado-perdida',
-    };
-    return map[estado] || 'estado-default';
-}
-
-// ─── CAMBIAR ESTADO ───────────────────────────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
-const PA_ACTUALIZAR_URL = 'https://defaultbbd111b805224e3d9f4378d1ca0e71.cf.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/ceae01bda8d74903bd3e4d07816c7d7c/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2f7usQy_8IbS7SrdAhBH7D1NDwltFAhZf81dfMrFHMY';
-
-async function cambiarEstado(nuevoEstado) {
-    if (!cotActual) return;
-    const statusEl = document.getElementById('estado-status');
-    statusEl.textContent = '⏳ Guardando...';
-    statusEl.style.color = '#94a3b8';
-    statusEl.style.display = 'block';
-
-    // Guardar estado anterior por si hay que revertir
-    cotActual['_estadoAnterior'] = cotActual['ESTADO'];
-    // Actualizar localmente — optimistic update
-    const idxGlobal = todasLasCot.indexOf(cotActual);
-    cotActual['ESTADO'] = nuevoEstado;
-    if (idxGlobal >= 0) todasLasCot[idxGlobal]['ESTADO'] = nuevoEstado;
-
-    // Actualizar caché inmediatamente con el nuevo estado
-    _cacheSave(todasLasCot);
-    renderLista();
-    mostrarStats();
-
-    try {
-        // Actualizar Excel SharePoint via PA
-        const res = await fetch(PA_ACTUALIZAR_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: cotActual['ID'], estado: nuevoEstado })
-        });
-        if (res.ok || res.status === 202) {
-            statusEl.textContent = '✅ ' + nuevoEstado;
-            statusEl.style.color = '#06d6a0';
-        } else {
-            throw new Error('HTTP ' + res.status);
-        }
-        // Actualizar HubSpot en background (fire-and-forget)
-        fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
-                accion: 'actualizarEstadoHubSpot',
-                idCot:  cotActual['ID'],
-                estado: nuevoEstado
-            })
-        }).then(r => r.json())
-          .then(r => console.log('HubSpot estado:', r.ok ? '✅' : '⚠️ ' + r.error))
-          .catch(e => console.warn('HubSpot error:', e));
-    } catch(e) {
-        // Revertir si falló
-        cotActual['ESTADO'] = cotActual['_estadoAnterior'] || cotActual['ESTADO'];
-        _cacheSave(todasLasCot);
-        renderLista();
-        mostrarStats();
-        statusEl.textContent = '❌ Error: ' + e.message;
-        statusEl.style.color = '#f87171';
-    }
-}
-
-function fmtUSD(n) {
-    const num = parseFloat(n);
-    if (isNaN(num)) return '—';
-    return 'USD ' + Math.round(num).toLocaleString('es-AR');
-}
-
-function fmtNum(n) {
-    const num = parseFloat(n);
-    if (isNaN(num)) return '—';
-    return Math.round(num).toLocaleString('es-AR');
-}
-
-function formatFecha(f) {
-    if (!f) return '—';
-    const s = String(f);
-    // Si ya tiene formato legible
-    if (s.includes('/')) return s.substring(0, 16);
-    return s.substring(0, 16);
-}
-
-
-function enviarWspManual() {
-    const telRaw = document.getElementById('tel-fallback').value.replace(/\D/g,'').replace(/^0+/,'').replace(/^54/,'');
-    if (!telRaw) { alert('Ingresá el número de teléfono'); return; }
-    const tel549 = '549' + telRaw;
-    const c = cotActual;
-    const nombreCorto = (c['NOMBRE']||'').split(' ')[0];
-    const msg = encodeURIComponent('Hola ' + nombreCorto + ', le comparto el presupuesto de TLC SRL: ' + c['LINK'] + ' | Ref: ' + c['ID']);
-    window.open('https://wa.me/' + tel549 + '?text=' + msg, '_blank');
-}
-
-// ─── ARRANCAR ─────────────────────────────────────────────────────────────────
+// ─── ARRANCAR ────────────────────────────────────────────────────
 init().catch(console.error);
 </script>
 </body>
