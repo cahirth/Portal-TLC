@@ -198,8 +198,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.16";
-console.log("%c TLC Cotizaciones v2026.06.06.16 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.17";
+console.log("%c TLC Cotizaciones v2026.06.06.17 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
@@ -209,13 +209,13 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl
 
 // ─── 7 COLUMNAS HUBSPOT ─────────────────────────────────────────
 const KANBAN_COLS = [
-    { key:'10%',    label:'Oportunidad reciente',        color:'#94a3b8', bg:'rgba(148,163,184,.1)', border:'rgba(148,163,184,.2)' },
-    { key:'25%',    label:'Calificación y asesoramiento',color:'#fbbf24', bg:'rgba(251,191,36,.1)',  border:'rgba(251,191,36,.2)'  },
-    { key:'50%',    label:'Cotización',                  color:'#3a86ff', bg:'rgba(58,134,255,.1)',  border:'rgba(58,134,255,.2)'  },
-    { key:'75%',    label:'Negociación',                 color:'#c084fc', bg:'rgba(168,85,247,.1)',  border:'rgba(168,85,247,.2)'  },
-    { key:'90%',    label:'Cierre',                      color:'#fb923c', bg:'rgba(249,115,22,.1)',  border:'rgba(249,115,22,.2)'  },
-    { key:'Ganada', label:'Cierre ganado',               color:'#34d399', bg:'rgba(16,185,129,.1)',  border:'rgba(16,185,129,.2)'  },
-    { key:'Perdida',label:'Cierre perdido',              color:'#f87171', bg:'rgba(239,68,68,.1)',   border:'rgba(239,68,68,.2)'   },
+    { key:'10%',    label:'Oportunidad reciente',         prob:'10%',  color:'#94a3b8', bg:'rgba(148,163,184,.1)', border:'rgba(148,163,184,.2)' },
+    { key:'25%',    label:'Calificación y asesoramiento', prob:'20%',  color:'#fbbf24', bg:'rgba(251,191,36,.1)',  border:'rgba(251,191,36,.2)'  },
+    { key:'50%',    label:'Cotización',                   prob:'40%',  color:'#3a86ff', bg:'rgba(58,134,255,.1)',  border:'rgba(58,134,255,.2)'  },
+    { key:'75%',    label:'Negociación',                  prob:'60%',  color:'#c084fc', bg:'rgba(168,85,247,.1)',  border:'rgba(168,85,247,.2)'  },
+    { key:'90%',    label:'Cierre',                       prob:'80%',  color:'#fb923c', bg:'rgba(249,115,22,.1)',  border:'rgba(249,115,22,.2)'  },
+    { key:'Ganada', label:'Cierre ganado',                prob:'100%', color:'#34d399', bg:'rgba(16,185,129,.1)',  border:'rgba(16,185,129,.2)'  },
+    { key:'Perdida',label:'Cierre perdido',               prob:'0%',   color:'#f87171', bg:'rgba(239,68,68,.1)',   border:'rgba(239,68,68,.2)'   },
 ];
 
 const ESTADO_CSS = {
@@ -535,29 +535,35 @@ function renderKanban() {
         const cardsHtml = tarjetas.length ? tarjetas.map(c => {
             const idxReal   = todasLasCot.indexOf(c);
             const id        = c.idCot || c.id_cotizacion || c.id || '—';
-            // Nombre: preferir nombreNegocio (HubSpot) > razonSocial > nombreMedico
-            const titulo    = c.nombreNegocio || c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
+            const titulo    = _fixEncoding(c.nombreNegocio || c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—');
             const monto     = _monto(c);
             const fecha     = _fmtFecha(c.fechaCreacion || c.fecha);
             const linkPdf   = c.link && !c.link.startsWith('blob:') ? c.link : null;
-            const hsLink    = c.id ? `https://app.hubspot.com/contacts/${c.id}` : null;
 
-            // Productos como badges
+            // Productos como badges con fix encoding
             const prods = Array.isArray(c.productos) ? c.productos : [];
             const prodsHtml = prods.length
                 ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;">
                     ${prods.slice(0,3).map(p =>
-                        `<span style="font-size:9px;padding:2px 6px;background:#0f2a52;border:1px solid #1e3a6e;border-radius:10px;color:#60a5fa;white-space:nowrap;overflow:hidden;max-width:140px;text-overflow:ellipsis;" title="${p}">${p}</span>`
+                        `<span style="font-size:9px;padding:2px 6px;background:#0f2a52;border:1px solid #1e3a6e;border-radius:10px;color:#60a5fa;white-space:nowrap;overflow:hidden;max-width:140px;text-overflow:ellipsis;" title="${_fixEncoding(p)}">${_fixEncoding(p)}</span>`
                     ).join('')}
                     ${prods.length > 3 ? `<span style="font-size:9px;padding:2px 6px;background:#1e3050;border-radius:10px;color:#475569;">+${prods.length-3}</span>` : ''}
                    </div>`
                 : (c.carrito?.length
-                    ? `<div style="font-size:10px;color:#3a86ff;margin-bottom:6px;">${c.carrito.map(i=>i.nombre).join(' · ')}</div>`
+                    ? `<div style="font-size:10px;color:#3a86ff;margin-bottom:6px;">${c.carrito.map(i=>_fixEncoding(i.nombre)).join(' · ')}</div>`
                     : '');
 
             const etapasOpts = KANBAN_COLS.map(k =>
                 `<option value="${k.key}" ${k.key === c.estado ? 'selected' : ''}>${k.label}</option>`
             ).join('');
+
+            const linkHtml = linkPdf
+                ? `<a href="${linkPdf}" target="_blank" onclick="event.stopPropagation()"
+                    style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#60a5fa;
+                           text-decoration:none;margin-top:4px;padding:3px 0;border-bottom:1px solid #1e3a6e;">
+                    📄 Ver presupuesto
+                   </a>`
+                : '';
 
             return `<div class="k-card"
                 draggable="true"
@@ -565,28 +571,24 @@ function renderKanban() {
                 onclick="abrirDetalle(${idxReal})"
                 ondragstart="_onDragStart(event,'${id}')"
                 ondragend="_onDragEnd(event)">
-                <div class="k-id">${id !== '—' ? id : (c.nombreNegocio ? '' : '—')}</div>
+                <div class="k-id">${id !== '—' ? id : ''}</div>
                 <div class="k-titulo">${titulo}</div>
                 ${prodsHtml}
                 <div class="k-valor">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
                 ${permisos.verVendedorEnCard && c.vendedor ? `<div class="k-prop">👤 ${c.vendedor}</div>` : ''}
                 <div class="k-fecha">📅 ${fecha}</div>
+                ${linkHtml}
                 <select class="cambio-etapa-select"
                     onclick="event.stopPropagation()"
                     onchange="event.stopPropagation(); _mutarEstadoCotizacion('${id}', this.value)">
                     ${etapasOpts}
                 </select>
-                <div style="display:flex;gap:6px;margin-top:6px;">
-                    ${linkPdf ? `<a href="${linkPdf}" target="_blank" class="k-btn" style="flex:1;" onclick="event.stopPropagation()">📄 Presupuesto</a>` : ''}
-                    ${hsLink  ? `<a href="${hsLink}"  target="_blank" class="k-btn" style="flex:1;${linkPdf?'':'width:100%;'}" onclick="event.stopPropagation()">🔗 HubSpot</a>` : ''}
-                    ${!linkPdf && !hsLink ? `<span class="k-btn" style="opacity:.4;pointer-events:none;width:100%;">Sin link</span>` : ''}
-                </div>
             </div>`;
         }).join('') : `<div class="kanban-empty-col">Sin cotizaciones</div>`;
 
         return `<div class="kanban-col">
             <div class="kanban-col-header" style="background:${col.bg};border-color:${col.border};">
-                <div class="kanban-col-label" style="color:${col.color};">${col.label}</div>
+                <div class="kanban-col-label" style="color:${col.color};">${col.label} <span style="font-weight:400;opacity:0.7;">(${col.prob})</span></div>
                 <div class="kanban-col-meta">
                     <span class="kanban-col-count" style="color:${col.color};">${tarjetas.length}</span>
                     <span class="kanban-col-total" style="color:${col.color};">${totalFmt}</span>
@@ -691,19 +693,35 @@ function _renderDetalle(c) {
         </div>
     </div>`;
 
-    // ── Historial de notas (notas_papiro) ─────────────────────────
+    // ── Historial de notas con lápiz editable ─────────────────────
     const notas = (c.notas_papiro || c.Notas_Papiro || []);
-    // Nota estática legacy (campo .notes)
     const notaLegacy = c.notes ? [{ texto: c.notes, fecha: c.fecha, vendedor: c.vendedor || '' }] : [];
     const todasNotas = [...notas, ...notaLegacy]
         .filter(n => n && n.texto)
         .sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
 
     const notasHtml = todasNotas.length
-        ? todasNotas.map(n => `
+        ? todasNotas.map((n, ni) => `
             <div style="padding:10px 0;border-bottom:1px solid #0f1a30;">
-                <div style="font-size:12px;color:#f1f5f9;line-height:1.6;margin-bottom:5px;">${n.texto}</div>
-                <div style="font-size:10px;color:#475569;">📅 ${_fmtFechaHora(n.fecha)} · 👤 ${n.vendedor || '—'}</div>
+                <div style="display:flex;align-items:flex-start;gap:8px;">
+                    <div id="nota-txt-display-${id}-${ni}"
+                        style="flex:1;font-size:12px;color:#f1f5f9;line-height:1.6;">${_fixEncoding(n.texto)}</div>
+                    <button onclick="_editarNota('${id}',${ni})"
+                        style="background:none;border:none;color:#475569;cursor:pointer;font-size:13px;
+                               padding:2px 4px;flex-shrink:0;" title="Editar">✏️</button>
+                </div>
+                <div id="nota-edit-${id}-${ni}" style="display:none;margin-top:6px;">
+                    <textarea style="width:100%;background:#080d14;border:1px solid #3a86ff;border-radius:6px;
+                                     padding:8px;color:#f1f5f9;font-size:12px;resize:vertical;min-height:60px;
+                                     outline:none;font-family:inherit;">${_fixEncoding(n.texto)}</textarea>
+                    <div style="display:flex;gap:6px;margin-top:4px;">
+                        <button onclick="_guardarEdicionNota('${id}',${ni})"
+                            style="padding:4px 12px;background:#3a86ff;border:none;border-radius:6px;color:white;font-size:11px;cursor:pointer;">💾 Guardar</button>
+                        <button onclick="_cancelarEdicionNota('${id}',${ni})"
+                            style="padding:4px 12px;background:#1c2541;border:1px solid #1e3050;border-radius:6px;color:#64748b;font-size:11px;cursor:pointer;">Cancelar</button>
+                    </div>
+                </div>
+                <div style="font-size:10px;color:#475569;margin-top:4px;">📅 ${_fmtFechaHora(n.fecha)} · 👤 ${n.vendedor || '—'}</div>
             </div>`).join('')
         : `<div style="font-size:12px;color:#334155;padding:8px 0;">Sin notas todavía.</div>`;
 
@@ -730,42 +748,54 @@ function _renderDetalle(c) {
         </div>
     </div>`;
 
-    // ── Historial de presupuestos del cliente ─────────────────────
-    const clienteKey = (c.razonSocial || c.nombreMedico || c.cliente?.nombre || '').toLowerCase().trim();
-    const anteriores = clienteKey
+    // ── Historial del cliente — tabla corporativa ─────────────────
+    const clienteKey = _fixEncoding(c.nombreNegocio || c.razonSocial || c.nombreMedico || c.cliente?.nombre || '').toLowerCase().trim();
+    const anteriores = clienteKey.length >= 4
         ? todasLasCot.filter(x => {
             if (String(x.idCot || x.id_cotizacion || x.id || '') === String(id)) return false;
-            const xKey = (x.razonSocial || x.nombreMedico || x.cliente?.nombre || '').toLowerCase().trim();
+            const xKey = _fixEncoding(x.nombreNegocio || x.razonSocial || x.nombreMedico || x.cliente?.nombre || '').toLowerCase().trim();
             return xKey && xKey.includes(clienteKey.substring(0, 6));
-          }).sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0))
+          }).sort((a, b) => new Date(b.fechaCreacion || b.fecha || 0) - new Date(a.fechaCreacion || a.fecha || 0))
         : [];
 
-    const anterHtml = anteriores.length
-        ? anteriores.map(x => {
-            const xId    = x.idCot || x.id_cotizacion || x.id || '—';
-            const xMonto = _monto(x);
-            const xFecha = _fmtFecha(x.fecha);
-            const xLink  = `https://cahirth.github.io/Portal-TLC/cotizaciones/${xId}.html`;
-            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #0f1a30;font-size:11px;">
-                <div style="flex:1;min-width:0;">
-                    <span style="color:#3a86ff;font-family:monospace;">${xId}</span>
-                    <span style="color:#475569;margin:0 6px;">·</span>
-                    <span style="color:#64748b;">${xFecha}</span>
-                    <span style="color:#475569;margin:0 6px;">·</span>
-                    <span style="color:#06d6a0;font-weight:700;">USD ${Math.round(xMonto).toLocaleString('es-AR')}</span>
-                    <span style="color:#475569;margin:0 6px;">·</span>
-                    <span style="color:#94a3b8;">${_estadoLabel(x.estado)}</span>
-                </div>
-                <a href="${xLink}" target="_blank"
-                    style="flex-shrink:0;font-size:10px;color:#3a86ff;text-decoration:none;
-                           padding:3px 8px;border:1px solid #3a86ff33;border-radius:6px;">📄</a>
-            </div>`;
-          }).join('')
-        : `<div style="font-size:12px;color:#334155;padding:6px 0;">Primer presupuesto con este cliente.</div>`;
+    const tablaHtml = anteriores.length ? `
+        <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+            <thead>
+                <tr style="background:#0f1a30;border-bottom:1px solid #1e3050;">
+                    <th style="padding:6px 8px;text-align:left;color:#64748b;font-weight:700;white-space:nowrap;">ID</th>
+                    <th style="padding:6px 8px;text-align:left;color:#64748b;font-weight:700;white-space:nowrap;">Fecha</th>
+                    <th style="padding:6px 8px;text-align:left;color:#64748b;font-weight:700;">Negocio</th>
+                    <th style="padding:6px 8px;text-align:left;color:#64748b;font-weight:700;">Equipos</th>
+                    <th style="padding:6px 8px;text-align:right;color:#64748b;font-weight:700;white-space:nowrap;">Monto USD</th>
+                    <th style="padding:6px 8px;text-align:center;color:#64748b;font-weight:700;">Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${anteriores.map(x => {
+                    const xId    = x.idCot || x.id_cotizacion || x.id || '—';
+                    const xLink  = x.link && !x.link.startsWith('blob:') ? x.link : null;
+                    const xProds = Array.isArray(x.productos) ? x.productos.map(p=>_fixEncoding(p)).join(', ')
+                                 : (x.carrito||[]).map(i=>_fixEncoding(i.nombre)).join(', ') || '—';
+                    return `<tr style="border-bottom:1px solid #0f1a30;">
+                        <td style="padding:6px 8px;color:#3a86ff;font-family:monospace;white-space:nowrap;">
+                            ${xLink ? `<a href="${xLink}" target="_blank" style="color:#3a86ff;text-decoration:none;">${xId} 📄</a>` : xId}
+                        </td>
+                        <td style="padding:6px 8px;color:#64748b;white-space:nowrap;">${_fmtFecha(x.fechaCreacion||x.fecha)}</td>
+                        <td style="padding:6px 8px;color:#f1f5f9;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_fixEncoding(x.nombreNegocio||x.razonSocial||'')}">${_fixEncoding(x.nombreNegocio||x.razonSocial||'—')}</td>
+                        <td style="padding:6px 8px;color:#94a3b8;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${xProds}">${xProds||'—'}</td>
+                        <td style="padding:6px 8px;text-align:right;color:#06d6a0;font-weight:700;white-space:nowrap;">USD ${Math.round(_monto(x)).toLocaleString('es-AR')}</td>
+                        <td style="padding:6px 8px;text-align:center;white-space:nowrap;">${_estadoLabel(x.estado)}</td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+        </table>
+        </div>`
+        : `<div style="font-size:12px;color:#334155;padding:6px 0;">Primer negocio con este cliente.</div>`;
 
     html += `<div class="seccion">
         <div class="sec-titulo">Historial del cliente</div>
-        <div class="sec-body">${anterHtml}</div>
+        <div class="sec-body" style="padding:0;">${tablaHtml}</div>
     </div>`;
 
     // ── Botones ───────────────────────────────────────────────────
@@ -883,6 +913,44 @@ async function _recargarHistoricoSilencioso() {
     }
 }
 
+// ─── EDICIÓN DE NOTAS INLINE ─────────────────────────────────────
+function _editarNota(id, ni) {
+    document.getElementById(`nota-txt-display-${id}-${ni}`).style.display = 'none';
+    document.getElementById(`nota-edit-${id}-${ni}`).style.display = 'block';
+}
+
+function _cancelarEdicionNota(id, ni) {
+    document.getElementById(`nota-txt-display-${id}-${ni}`).style.display = 'block';
+    document.getElementById(`nota-edit-${id}-${ni}`).style.display = 'none';
+}
+
+async function _guardarEdicionNota(id, ni) {
+    const editDiv  = document.getElementById(`nota-edit-${id}-${ni}`);
+    const textarea = editDiv.querySelector('textarea');
+    const nuevoTexto = textarea.value.trim();
+    if (!nuevoTexto) return;
+
+    // Actualizar en memoria
+    const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id));
+    if (c && Array.isArray(c.notas_papiro) && c.notas_papiro[ni]) {
+        c.notas_papiro[ni].texto = nuevoTexto;
+        document.getElementById(`nota-txt-display-${id}-${ni}`).textContent = nuevoTexto;
+        _cancelarEdicionNota(id, ni);
+
+        // Persistir nota completa actualizada
+        fetch(APPS_SCRIPT_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    JSON.stringify({ accion: 'editarNota', idCot: id, indice: ni, texto: nuevoTexto }),
+        })
+        .then(r => r.text()).then(t => {
+            try { const r = JSON.parse(t); console.log('Nota editada:', r.ok ? '✅' : '⚠️ ' + r.error); }
+            catch(e) {}
+        })
+        .catch(e => console.warn('Edición nota:', e));
+    }
+}
+
 // ─── GUARDAR NOTA INLINE ─────────────────────────────────────────
 async function _guardarNotaInline(id) {
     const txtEl = document.getElementById(`nueva-nota-txt-${id}`);
@@ -933,6 +1001,17 @@ function _monto(c) {
 function _monto_iva(c) {
     return parseFloat((c.totales||{}).iva_total || c.ivaTotal || 0);
 }
+// ─── FIX ENCODING UTF-8 ──────────────────────────────────────────
+function _fixEncoding(str) {
+    if (!str) return '';
+    try {
+        // Detectar y corregir mojibake Latin-1→UTF-8
+        return decodeURIComponent(escape(str));
+    } catch(e) {
+        return str;
+    }
+}
+
 function _fmtFechaHora(f) {
     if (!f) return '—';
     try {
