@@ -198,8 +198,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.12";
-console.log("%c TLC Cotizaciones v2026.06.06.12 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.13";
+console.log("%c TLC Cotizaciones v2026.06.06.13 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
@@ -783,7 +783,7 @@ function _mutarEstadoCotizacion(id, nuevoEstado) {
     });
     aplicarFiltros();
 
-    // Paso C: encolar escritura — espera a que termine la anterior
+    // Paso B: encolar escritura serializada → recargar JSON al confirmar
     _mutacionQueue = _mutacionQueue.then(() =>
         fetch(APPS_SCRIPT_URL, {
             method:  'POST',
@@ -791,8 +791,15 @@ function _mutarEstadoCotizacion(id, nuevoEstado) {
             body:    JSON.stringify({ accion: 'actualizarEstado', idCot: id, estado: nuevoEstado }),
         })
         .then(r => r.text()).then(t => {
-            try { const r = JSON.parse(t); console.log('Estado persistido:', r.ok ? '✅' : '⚠️ ' + r.error); }
-            catch(e) {}
+            try {
+                const r = JSON.parse(t);
+                if (r.ok) {
+                    console.log('Estado persistido ✅ — recargando JSON...');
+                    _recargarHistoricoSilencioso();
+                } else {
+                    console.warn('Estado ⚠️', r.error);
+                }
+            } catch(e) {}
         })
         .catch(e => console.warn('Persistencia estado:', e))
     );
@@ -831,6 +838,42 @@ function _onDrop(e, nuevoEstado) {
     }
 }
 
+// ─── RECARGA SILENCIOSA POST-PERSISTENCIA ────────────────────────
+// Se dispara después de confirmar ok:true del GS — sin spinner, sin reset de UI
+async function _recargarHistoricoSilencioso() {
+    try {
+        const res = await fetch(HISTORICO_URL, {
+            headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+        });
+        if (!res.ok) return;
+        const apiResp = await res.json();
+        const decoded = atob(apiResp.content.replace(/\n/g, ''));
+        let data = JSON.parse(decoded);
+        if (!Array.isArray(data)) return;
+
+        // Normalizar estados igual que en cargar()
+        data.forEach(c => {
+            if (!c.estado) c.estado = 'Enviada';
+            const e = String(c.estado).trim();
+            if (['Enviada','Cotización','presentationscheduled'].includes(e))    c.estado = '50%';
+            else if (['En seguimiento','decisionmakerboughtin'].includes(e))     c.estado = '75%';
+            else if (['Ganada','closedwon'].includes(e))                         c.estado = 'Ganada';
+            else if (['Perdida','closedlost'].includes(e))                       c.estado = 'Perdida';
+        });
+
+        historicoCompleto = permisos.verTodo ? data : (() => {
+            const primer = currentUserNombre.split(' ')[0].toLowerCase();
+            return data.filter(c => String(c.vendedor||'').toLowerCase().includes(primer));
+        })();
+
+        _aplicarFiltroVendedor();
+        aplicarFiltros();
+        console.log('JSON recargado silenciosamente ✅');
+    } catch(e) {
+        console.warn('_recargarHistoricoSilencioso:', e);
+    }
+}
+
 // ─── GUARDAR NOTA INLINE ─────────────────────────────────────────
 async function _guardarNotaInline(id) {
     const txtEl = document.getElementById(`nueva-nota-txt-${id}`);
@@ -854,15 +897,22 @@ async function _guardarNotaInline(id) {
         _renderDetalle(c);
     }
 
-    // Paso B: persistir en background (fire-and-forget)
+    // Paso B: persistir en background → recargar JSON al confirmar
     fetch(APPS_SCRIPT_URL, {
         method:  'POST',
         headers: { 'Content-Type': 'text/plain' },
         body:    JSON.stringify({ accion: 'agregarNota', idCot: id, nota: nuevaNota }),
     })
     .then(r => r.text()).then(t => {
-        try { const r = JSON.parse(t); console.log('Nota persistida:', r.ok ? '✅' : '⚠️ ' + r.error); }
-        catch(e) {}
+        try {
+            const r = JSON.parse(t);
+            if (r.ok) {
+                console.log('Nota persistida ✅ — recargando JSON...');
+                _recargarHistoricoSilencioso();
+            } else {
+                console.warn('Nota ⚠️', r.error);
+            }
+        } catch(e) {}
     })
     .catch(e => console.warn('Persistencia nota:', e));
 }
