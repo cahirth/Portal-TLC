@@ -643,7 +643,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.20"; console.log("%c TLC Portal v2026.06.06.20 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.21"; console.log("%c TLC Portal v2026.06.06.21 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -3171,12 +3171,12 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         '<div style="text-align:right;font-size:11px;color:#64748b;font-family:Arial,sans-serif;margin-bottom:16px;">Hoja 1 de 1<\/div>',
 
         // CLIENTE
-        '<div style="border:1px solid #cbd5e1;border-radius:4px;padding:12px 16px;margin-bottom:20px;background:#f8fafc;">',
+        '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:20px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);">',
         '<div style="font-size:13px;font-family:Arial,sans-serif;"><strong>Se\u00F1ores:<\/strong> ' + nombre + '<\/div>',
-        razon    ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:3px;"><strong>Instituci\u00F3n:<\/strong> ' + razon + '<\/div>' : '',
-        cuit     ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:3px;"><strong>CUIT:<\/strong> ' + cuit + '<\/div>' : '',
-        telefono ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:3px;"><strong>Tel\u00E9fono:<\/strong> ' + telefono + '<\/div>' : '',
-        email    ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:3px;"><strong>Email:<\/strong> ' + email + '<\/div>' : '',
+        razon    ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Instituci\u00F3n:<\/strong> ' + razon + '<\/div>' : '',
+        cuit     ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>CUIT:<\/strong> ' + cuit + '<\/div>' : '',
+        telefono ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Tel\u00E9fono:<\/strong> ' + telefono + '<\/div>' : '',
+        email    ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Email:<\/strong> ' + email + '<\/div>' : '',
         '<\/div>',
 
         '<p style="font-size:12px;color:#374151;margin-bottom:14px;font-family:Arial,sans-serif;">Por medio de la presente tengo el agrado de hacerle llegar la siguiente propuesta comercial:<\/p>',
@@ -3205,12 +3205,15 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         // Notas
         notas ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:10px 14px;margin-bottom:12px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#92400e;margin-bottom:4px;font-family:Arial,sans-serif;">Notas<\/div><div style="font-size:12px;color:#78350f;line-height:1.5;">' + notas + '<\/div><\/div>' : '',
 
-        '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;line-height:1.8;">',
-        '<strong>Condiciones Comerciales<\/strong><br>',
-        'Condici\u00F3n de Pago: ' + condPago + '<br>',
-        'Plazo de Entrega: ' + (plazoEntrega === 'inmediato' ? 'Inmediato hasta agotar stock' : (plazoEntrega + ' d\u00EDas')) + '<br>',
-        'Forma de Pago: Transferencia o dep\u00F3sito bancario. Valores expresados en d\u00F3lares oficiales Banco Naci\u00F3n con el tipo de cambio del d\u00EDa de acreditaci\u00F3n de cada pago.<br>',
-        'Lugar de Entrega: ' + (lugarEntrega || 'Cl\u00EDnica del Cliente'),
+        '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);">',
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:10px;font-family:Arial,sans-serif;">Condiciones Comerciales<\/div>',
+        '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;line-height:1.9;">',
+        '<strong>Condici\u00F3n de Pago:<\/strong> ' + condPago + '<br>',
+        '<span style="font-size:11px;color:#6b7280;font-style:italic;">' + leyendaBNA + '<\/span><br>',
+        '<strong>Plazo de Entrega:<\/strong> ' + (plazoEntrega === 'inmediato' ? 'Inmediato hasta agotar stock' : (plazoEntrega + ' d\u00EDas')) + '<br>',
+        '<strong>Forma de Pago:<\/strong> Transferencia o dep\u00F3sito bancario. Valores expresados en d\u00F3lares oficiales Banco Naci\u00F3n con el tipo de cambio del d\u00EDa de acreditaci\u00F3n de cada pago.<br>',
+        '<strong>Lugar de Entrega:<\/strong> ' + (lugarEntrega || 'Cl\u00EDnica del Cliente'),
+        '<\/div>',
         '<\/div>',
         '<\/td>',
 
