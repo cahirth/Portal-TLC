@@ -198,8 +198,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.20";
-console.log("%c TLC Cotizaciones v2026.06.06.20 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.21";
+console.log("%c TLC Cotizaciones v2026.06.06.21 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
@@ -594,12 +594,11 @@ function renderKanban() {
                 <div class="k-valor">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
                 ${permisos.verVendedorEnCard && c.vendedor ? `<div class="k-prop">👤 ${c.vendedor}</div>` : ''}
                 <div class="k-fecha">📅 ${fecha}</div>
-                ${linkHtml}
                 <select class="cambio-etapa-select"
                     onclick="event.stopPropagation()"
                     onchange="event.stopPropagation(); _mutarEstadoCotizacion('${id}', this.value)">
                     ${etapasOpts}
-                </select>
+                </select>${linkHtml}
             </div>`;
         }).join('') : `<div class="kanban-empty-col">Sin cotizaciones</div>`;
 
@@ -768,18 +767,28 @@ function _renderDetalle(c) {
     </div>`;
 
     // ── Historial del cliente — filtro estricto por cliente ────────
-    const clienteHsId  = String(c.empresa?.cuit || c.cuit || '').replace(/\D/g,'');
-    const clienteNombreKey = _fixEncoding(c.nombreNegocio || c.razonSocial || c.nombreMedico || c.cliente?.nombre || '').toLowerCase().trim();
+    // Usar datos del CLIENTE (contacto/empresa), NO el nombre del deal
+    const clienteHsId      = String(c.empresa?.cuit || c.cuit || '').replace(/\D/g,'');
+    const clienteRazon     = _fixEncoding(c.empresa?.razonSocial || c.razonSocial || '').toLowerCase().trim();
+    const clienteContacto  = _fixEncoding(c.contacto?.nombre    || c.nombreMedico || '').toLowerCase().trim();
 
     const anteriores = todasLasCot.filter(x => {
         if (String(x.idCot || x.id_cotizacion || x.id || '') === String(id)) return false;
+
+        // Prioridad 1: mismo CUIT exacto
         if (clienteHsId.length >= 10) {
             const xCuit = String(x.empresa?.cuit || x.cuit || '').replace(/\D/g,'');
             if (xCuit === clienteHsId) return true;
         }
-        if (clienteNombreKey.length >= 8) {
-            const xN = _fixEncoding(x.nombreNegocio || x.razonSocial || x.nombreMedico || x.cliente?.nombre || '').toLowerCase().trim();
-            if (xN.length >= 8 && (xN.startsWith(clienteNombreKey.substring(0,10)) || clienteNombreKey.startsWith(xN.substring(0,10)))) return true;
+        // Prioridad 2: misma razón social (mínimo 6 chars)
+        if (clienteRazon.length >= 6) {
+            const xRazon = _fixEncoding(x.empresa?.razonSocial || x.razonSocial || '').toLowerCase().trim();
+            if (xRazon.length >= 6 && xRazon === clienteRazon) return true;
+        }
+        // Prioridad 3: mismo contacto (mínimo 6 chars)
+        if (clienteContacto.length >= 6) {
+            const xCont = _fixEncoding(x.contacto?.nombre || x.nombreMedico || '').toLowerCase().trim();
+            if (xCont.length >= 6 && xCont === clienteContacto) return true;
         }
         return false;
     }).sort((a, b) => new Date(b.fechaCreacion || b.fecha || 0) - new Date(a.fechaCreacion || a.fecha || 0));
