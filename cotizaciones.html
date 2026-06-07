@@ -198,8 +198,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.14";
-console.log("%c TLC Cotizaciones v2026.06.06.14 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.15";
+console.log("%c TLC Cotizaciones v2026.06.06.15 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
@@ -499,7 +499,7 @@ function renderLista() {
     if (!cotFiltradas.length) { wrap.innerHTML = '<div class="empty">Sin resultados</div>'; return; }
     wrap.innerHTML = cotFiltradas.map((c, i) => {
         const idxReal  = todasLasCot.indexOf(c);
-        const id       = c.idCot || c.id_cotizacion || '—';
+        const id       = c.idCot || c.id_cotizacion || String(c.id || '') || '—';
         const cliente  = c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
         const equipos  = (c.carrito||[]).map(i => i.nombre).join(' · ') || '—';
         const fecha    = _fmtFecha(c.fecha);
@@ -614,7 +614,7 @@ function abrirDetalle(idx) {
 }
 
 function _renderDetalle(c) {
-    const id      = c.idCot || c.id_cotizacion || '—';
+    const id      = c.idCot || c.id_cotizacion || String(c.id || '') || '—';
     const cliente = c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
     const monto   = _monto(c);
     const iva     = _monto_iva(c);
