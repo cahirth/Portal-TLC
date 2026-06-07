@@ -198,8 +198,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.17";
-console.log("%c TLC Cotizaciones v2026.06.06.17 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.18";
+console.log("%c TLC Cotizaciones v2026.06.06.18 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
@@ -559,10 +559,23 @@ function renderKanban() {
 
             const linkHtml = linkPdf
                 ? `<a href="${linkPdf}" target="_blank" onclick="event.stopPropagation()"
-                    style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#60a5fa;
-                           text-decoration:none;margin-top:4px;padding:3px 0;border-bottom:1px solid #1e3a6e;">
-                    📄 Ver presupuesto
+                    style="display:flex;align-items:center;justify-content:center;gap:5px;width:100%;
+                           padding:6px;margin-top:6px;border-radius:7px;
+                           background:#0f2a52;border:1px solid #1e3a6e;
+                           color:#60a5fa;font-size:10px;font-weight:600;text-decoration:none;
+                           transition:all .15s;"
+                    onmouseover="this.style.background='#1e3a6e'"
+                    onmouseout="this.style.background='#0f2a52'">
+                    📄 Ver Presupuesto
                    </a>`
+                : '';
+
+            // % de probabilidad de la etapa
+            const colData = KANBAN_COLS.find(k => k.key === c.estado) || {};
+            const probHtml = colData.prob
+                ? `<span style="font-size:9px;font-weight:700;color:${colData.color};
+                               background:${colData.bg};border:1px solid ${colData.border};
+                               padding:1px 6px;border-radius:8px;float:right;margin-top:-2px;">${colData.prob}</span>`
                 : '';
 
             return `<div class="k-card"
@@ -571,7 +584,10 @@ function renderKanban() {
                 onclick="abrirDetalle(${idxReal})"
                 ondragstart="_onDragStart(event,'${id}')"
                 ondragend="_onDragEnd(event)">
-                <div class="k-id">${id !== '—' ? id : ''}</div>
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2px;">
+                    <div class="k-id" style="margin-bottom:0;">${id !== '—' ? id : ''}</div>
+                    ${probHtml}
+                </div>
                 <div class="k-titulo">${titulo}</div>
                 ${prodsHtml}
                 <div class="k-valor">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
@@ -719,6 +735,8 @@ function _renderDetalle(c) {
                             style="padding:4px 12px;background:#3a86ff;border:none;border-radius:6px;color:white;font-size:11px;cursor:pointer;">💾 Guardar</button>
                         <button onclick="_cancelarEdicionNota('${id}',${ni})"
                             style="padding:4px 12px;background:#1c2541;border:1px solid #1e3050;border-radius:6px;color:#64748b;font-size:11px;cursor:pointer;">Cancelar</button>
+                        <button onclick="_eliminarNota('${id}',${ni})"
+                            style="padding:4px 12px;background:#450a0a;border:1px solid #7f1d1d;border-radius:6px;color:#f87171;font-size:11px;cursor:pointer;margin-left:auto;">🗑️ Eliminar</button>
                     </div>
                 </div>
                 <div style="font-size:10px;color:#475569;margin-top:4px;">📅 ${_fmtFechaHora(n.fecha)} · 👤 ${n.vendedor || '—'}</div>
@@ -748,15 +766,22 @@ function _renderDetalle(c) {
         </div>
     </div>`;
 
-    // ── Historial del cliente — tabla corporativa ─────────────────
-    const clienteKey = _fixEncoding(c.nombreNegocio || c.razonSocial || c.nombreMedico || c.cliente?.nombre || '').toLowerCase().trim();
-    const anteriores = clienteKey.length >= 4
-        ? todasLasCot.filter(x => {
-            if (String(x.idCot || x.id_cotizacion || x.id || '') === String(id)) return false;
-            const xKey = _fixEncoding(x.nombreNegocio || x.razonSocial || x.nombreMedico || x.cliente?.nombre || '').toLowerCase().trim();
-            return xKey && xKey.includes(clienteKey.substring(0, 6));
-          }).sort((a, b) => new Date(b.fechaCreacion || b.fecha || 0) - new Date(a.fechaCreacion || a.fecha || 0))
-        : [];
+    // ── Historial del cliente — filtro estricto por cliente ────────
+    const clienteHsId  = String(c.empresa?.cuit || c.cuit || '').replace(/\D/g,'');
+    const clienteNombreKey = _fixEncoding(c.nombreNegocio || c.razonSocial || c.nombreMedico || c.cliente?.nombre || '').toLowerCase().trim();
+
+    const anteriores = todasLasCot.filter(x => {
+        if (String(x.idCot || x.id_cotizacion || x.id || '') === String(id)) return false;
+        if (clienteHsId.length >= 10) {
+            const xCuit = String(x.empresa?.cuit || x.cuit || '').replace(/\D/g,'');
+            if (xCuit === clienteHsId) return true;
+        }
+        if (clienteNombreKey.length >= 8) {
+            const xN = _fixEncoding(x.nombreNegocio || x.razonSocial || x.nombreMedico || x.cliente?.nombre || '').toLowerCase().trim();
+            if (xN.length >= 8 && (xN.startsWith(clienteNombreKey.substring(0,10)) || clienteNombreKey.startsWith(xN.substring(0,10)))) return true;
+        }
+        return false;
+    }).sort((a, b) => new Date(b.fechaCreacion || b.fecha || 0) - new Date(a.fechaCreacion || a.fecha || 0));
 
     const tablaHtml = anteriores.length ? `
         <div style="overflow-x:auto;">
@@ -775,15 +800,19 @@ function _renderDetalle(c) {
                 ${anteriores.map(x => {
                     const xId    = x.idCot || x.id_cotizacion || x.id || '—';
                     const xLink  = x.link && !x.link.startsWith('blob:') ? x.link : null;
+                    const xNom   = _fixEncoding(x.nombreNegocio || x.razonSocial || '—');
                     const xProds = Array.isArray(x.productos) ? x.productos.map(p=>_fixEncoding(p)).join(', ')
                                  : (x.carrito||[]).map(i=>_fixEncoding(i.nombre)).join(', ') || '—';
-                    return `<tr style="border-bottom:1px solid #0f1a30;">
+                    return `<tr style="border-bottom:1px solid #0f1a30;cursor:${xLink?'pointer':'default'};"
+                            onclick="${xLink?`window.open('${xLink}','_blank')`:''}">
                         <td style="padding:6px 8px;color:#3a86ff;font-family:monospace;white-space:nowrap;">
-                            ${xLink ? `<a href="${xLink}" target="_blank" style="color:#3a86ff;text-decoration:none;">${xId} 📄</a>` : xId}
+                            <span style="${xLink?'text-decoration:underline;cursor:pointer;':''}">${xId}${xLink?' 📄':''}</span>
                         </td>
                         <td style="padding:6px 8px;color:#64748b;white-space:nowrap;">${_fmtFecha(x.fechaCreacion||x.fecha)}</td>
-                        <td style="padding:6px 8px;color:#f1f5f9;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_fixEncoding(x.nombreNegocio||x.razonSocial||'')}">${_fixEncoding(x.nombreNegocio||x.razonSocial||'—')}</td>
-                        <td style="padding:6px 8px;color:#94a3b8;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${xProds}">${xProds||'—'}</td>
+                        <td style="padding:6px 8px;color:#f1f5f9;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${xNom}">
+                            <span style="${xLink?'text-decoration:underline;cursor:pointer;':''}">${xNom}</span>
+                        </td>
+                        <td style="padding:6px 8px;color:#94a3b8;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${xProds}">${xProds}</td>
                         <td style="padding:6px 8px;text-align:right;color:#06d6a0;font-weight:700;white-space:nowrap;">USD ${Math.round(_monto(x)).toLocaleString('es-AR')}</td>
                         <td style="padding:6px 8px;text-align:center;white-space:nowrap;">${_estadoLabel(x.estado)}</td>
                     </tr>`;
@@ -791,7 +820,7 @@ function _renderDetalle(c) {
             </tbody>
         </table>
         </div>`
-        : `<div style="font-size:12px;color:#334155;padding:6px 0;">Primer negocio con este cliente.</div>`;
+        : `<div style="font-size:12px;color:#334155;padding:6px 0;">Sin otros negocios con este cliente.</div>`;
 
     html += `<div class="seccion">
         <div class="sec-titulo">Historial del cliente</div>
@@ -922,6 +951,25 @@ function _editarNota(id, ni) {
 function _cancelarEdicionNota(id, ni) {
     document.getElementById(`nota-txt-display-${id}-${ni}`).style.display = 'block';
     document.getElementById(`nota-edit-${id}-${ni}`).style.display = 'none';
+}
+
+async function _eliminarNota(id, ni) {
+    if (!confirm('¿Eliminar esta nota? Esta acción no se puede deshacer.')) return;
+    const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id));
+    if (c && Array.isArray(c.notas_papiro)) {
+        c.notas_papiro.splice(ni, 1);
+        _renderDetalle(c); // re-renderizar sin la nota
+        fetch(APPS_SCRIPT_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    JSON.stringify({ accion: 'eliminarNota', idCot: id, indice: ni }),
+        })
+        .then(r => r.text()).then(t => {
+            try { const r = JSON.parse(t); console.log('Nota eliminada:', r.ok ? '✅' : '⚠️ ' + r.error); }
+            catch(e) {}
+        })
+        .catch(e => console.warn('Eliminar nota:', e));
+    }
 }
 
 async function _guardarEdicionNota(id, ni) {
