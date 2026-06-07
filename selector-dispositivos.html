@@ -417,16 +417,18 @@
             <div id="mr-resumen-items" style="background:#080d14; border-radius:12px; padding:14px; margin-bottom:16px; border:1px solid #1e3050;"></div>
 
             <!-- BUSCADOR UNIVERSAL -->
-            <div style="position:relative; margin-bottom:20px;">
+            <form id="form-busqueda-mr" onsubmit="event.preventDefault(); _mrUltimaBusqueda=''; _mrDispararBusqueda(); document.getElementById('mr-search-universal').blur();" style="position:relative; margin-bottom:20px;">
                 <svg style="position:absolute; left:14px; top:50%; transform:translateY(-50%); pointer-events:none;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" id="mr-search-universal"
+                <input type="search" id="mr-search-universal"
                     placeholder="Buscar por Nombre, CUIT o Institución..."
                     autocomplete="off"
+                    inputmode="search"
+                    enterkeyhint="search"
                     style="width:100%; padding:13px 14px 13px 42px; background:#080d14; border:1px solid #1e3050; border-radius:12px; color:#f1f5f9; font-size:14px; box-sizing:border-box; outline:none; transition:border-color .2s;"
                     onfocus="this.style.borderColor='#3a86ff'"
                     onblur="this.style.borderColor='#1e3050';"
-                    onkeydown="if(event.key==='Enter'){event.preventDefault();_mrUltimaBusqueda='';_mrDispararBusqueda();}">
-            </div>
+                    oninput="_mrDispararBusqueda()">
+            </form>
 
             <!-- Badge resultado búsqueda -->
             <div id="mr-cuit-badge" style="display:none; margin-top:-12px; margin-bottom:14px; font-size:12px; padding:8px 12px; border-radius:8px; line-height:1.5;"></div>
@@ -434,36 +436,76 @@
             <!-- Lista flotante contactos múltiples -->
             <div id="mr-contacto-selector" style="display:none;"></div>
 
-            <!-- Formulario cliente -->
-            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Datos del cliente</div>
+            <!-- Formulario cliente — Box Premium Glassmorphism -->
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:20px; box-shadow:0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05); padding:18px; margin-bottom:16px; backdrop-filter:blur(8px);">
+                <div style="font-size:10px; font-weight:700; color:#3a86ff; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:14px; display:flex; align-items:center; gap:6px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Datos del cliente
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nombre y Apellido del médico *</label>
+                    <input type="text" class="form-input" id="mr-nombre" placeholder="Ej: Dr. Juan García">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Razón Social / Institución</label>
+                    <input type="text" class="form-input" id="mr-razon" placeholder="Ej: Clínica Oftalmológica SRL">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">CUIT</label>
+                    <input type="text" class="form-input" id="mr-cuit" placeholder="Ej: 20-12345678-9" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Teléfono de contacto *</label>
+                    <input type="tel" class="form-input" id="mr-telefono" placeholder="Ej: 11 4567 8901 (sin 0 ni 15)">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email del cliente *</label>
+                    <input type="email" class="form-input" id="mr-email" placeholder="Ej: doctor@clinica.com.ar">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notas</label>
+                    <textarea class="form-input" id="mr-notas" placeholder="Observaciones, intereses, seguimiento..." style="min-height:72px; resize:vertical;"></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Vendedor</label>
+                    <input type="text" class="form-input" id="mr-vendedor" readonly style="opacity:.6;">
+                </div>
+            </div>
 
-            <div class="form-group">
-                <label class="form-label">Nombre y Apellido del médico *</label>
-                <input type="text" class="form-input" id="mr-nombre" placeholder="Ej: Dr. Juan García">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Razón Social / Institución</label>
-                <input type="text" class="form-input" id="mr-razon" placeholder="Ej: Clínica Oftalmológica SRL">
-            </div>
-            <div class="form-group">
-                <label class="form-label">CUIT</label>
-                <input type="text" class="form-input" id="mr-cuit" placeholder="Ej: 20-12345678-9" autocomplete="off">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Teléfono de contacto *</label>
-                <input type="tel" class="form-input" id="mr-telefono" placeholder="Ej: 11 4567 8901 (sin 0 ni 15)">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Email del cliente *</label>
-                <input type="email" class="form-input" id="mr-email" placeholder="Ej: doctor@clinica.com.ar">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Notas</label>
-                <textarea class="form-input" id="mr-notas" placeholder="Observaciones, intereses, seguimiento..." style="min-height:72px; resize:vertical;"></textarea>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Vendedor</label>
-                <input type="text" class="form-input" id="mr-vendedor" readonly style="opacity:.6;">
+            <!-- Condiciones Comerciales — Box Premium Glassmorphism -->
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:20px; box-shadow:0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05); padding:18px; margin-bottom:16px; backdrop-filter:blur(8px);">
+                <div style="font-size:10px; font-weight:700; color:#06d6a0; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:14px; display:flex; align-items:center; gap:6px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Condiciones Comerciales
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="color:#94a3b8;">Condición de Pago</label>
+                    <div id="mr-condicion-pago" style="background:#080d14; border:1px solid #1e3050; border-radius:10px; padding:10px 14px; font-size:12px; color:#64748b; min-height:36px; line-height:1.5;">
+                        — se completará automáticamente según la modalidad elegida —
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="color:#94a3b8;">Forma de Pago</label>
+                    <div style="background:#080d14; border:1px solid #1e3050; border-radius:10px; padding:10px 14px; font-size:11px; color:#64748b; line-height:1.6;">
+                        Transferencia o depósito bancario. Valores expresados en dólares oficiales Banco Nación con el tipo de cambio del día de acreditación de cada pago.
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="color:#94a3b8;">Plazo de Entrega</label>
+                    <select id="mr-plazo-entrega" class="form-input" style="appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:calc(100% - 14px) center;padding-right:36px;cursor:pointer;">
+                        <option value="inmediato">Inmediato hasta agotar stock</option>
+                        <option value="30">30 días</option>
+                        <option value="45">45 días</option>
+                        <option value="60">60 días</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label" style="color:#94a3b8;">Lugar de Entrega</label>
+                    <select id="mr-lugar-entrega" class="form-input" style="appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:calc(100% - 14px) center;padding-right:36px;cursor:pointer;">
+                        <option value="cliente">Clínica del Cliente</option>
+                        <option value="oficina">Se entrega en nuestra oficina en Del Carmen 716 PB CABA. Enviar autorización con los datos de la persona o empresa que retira el producto a info@tlcsrl.com.ar. El envío y el seguro están a cargo del comprador.</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Botón Siguiente -->
@@ -601,7 +643,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.18"; console.log("%c TLC Portal v2026.06.06.18 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.19"; console.log("%c TLC Portal v2026.06.06.19 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2676,6 +2718,10 @@ function abrirModalResumen() {
             </div>
         </div>`;
 
+    // Inyectar condición de pago dinámica según modalidad
+    const condPagoEl = document.getElementById('mr-condicion-pago');
+    if (condPagoEl) condPagoEl.textContent = condiciones;
+
     cerrarCarrito();
     modal.style.display = 'block';
     setTimeout(() => document.getElementById('modal-resumen-box').style.transform = 'none', 10);
@@ -2714,6 +2760,8 @@ async function generarPropuesta() {
     const email    = document.getElementById('mr-email').value.trim();
     const notas    = document.getElementById('mr-notas').value.trim();
     const vendedor = document.getElementById('mr-vendedor').value.trim();
+    const plazoEntrega  = document.getElementById('mr-plazo-entrega')?.value  || 'inmediato';
+    const lugarEntrega  = document.getElementById('mr-lugar-entrega')?.selectedOptions[0]?.text || 'Clínica del Cliente';
 
     if (!nombre)   { mostrarMrStatus('Completá el nombre del médico.', 'error'); return; }
     if (!telefono) { mostrarMrStatus('Completá el teléfono de contacto.', 'error'); return; }
@@ -2725,7 +2773,7 @@ async function generarPropuesta() {
     mostrarMrStatus('⏳ Subiendo presupuesto...', '');
 
     try {
-        const htmlPresup = generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot: _idCotActual });
+        const htmlPresup = generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot: _idCotActual, plazoEntrega, lugarEntrega });
 
         // ── PASO 1: Blob URL instantáneo — 0ms, sin esperar GitHub ──────────
         // El vendedor ve el presupuesto al instante desde memoria del browser
@@ -2955,7 +3003,7 @@ function abrirCheckout() { abrirModalResumen(); }
 function nuevoPresupuesto() { nuevaCotizacion(); }
 function mostrarCoStatus(msg, tipo) { mostrarMrStatus(msg, tipo); }
 
-function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot }) {
+function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot, plazoEntrega, lugarEntrega }) {
     const fecha    = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'long', year:'numeric' });
     const nroRef   = idCot || generarIdCotizacion();
     const c        = calcularCarrito();
@@ -3131,8 +3179,9 @@ function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, v
         '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;line-height:1.8;">',
         '<strong>Condiciones Comerciales<\/strong><br>',
         'Condici\u00F3n de Pago: ' + condPago + '<br>',
-        'Plazo de Entrega: 30 d\u00EDas<br>',
-        'Forma de Pago: Transferencia o dep\u00F3sito bancario',
+        'Plazo de Entrega: ' + (plazoEntrega === 'inmediato' ? 'Inmediato hasta agotar stock' : (plazoEntrega + ' d\u00EDas')) + '<br>',
+        'Forma de Pago: Transferencia o dep\u00F3sito bancario. Valores expresados en d\u00F3lares oficiales Banco Naci\u00F3n con el tipo de cambio del d\u00EDa de acreditaci\u00F3n de cada pago.<br>',
+        'Lugar de Entrega: ' + (lugarEntrega || 'Cl\u00EDnica del Cliente'),
         '<\/div>',
         '<\/td>',
 
