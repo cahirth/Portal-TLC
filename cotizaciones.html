@@ -198,8 +198,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.10";
-console.log("%c TLC Cotizaciones v2026.06.06.10 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.11";
+console.log("%c TLC Cotizaciones v2026.06.06.11 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
@@ -409,6 +409,15 @@ async function cargar(forzar = false) {
 
         historicoCompleto = data;
 
+        // Extraer vendedores únicos del JSON y mergear con listaVendedores del Sheet
+        const vendedoresEnJSON = [...new Set(data.map(c => c.vendedor).filter(Boolean))];
+        vendedoresEnJSON.forEach(nombre => {
+            const yaExiste = listaVendedores.find(v => v.nombre === nombre);
+            if (!yaExiste) listaVendedores.push({ email: '', nombre, rol: 'Vendedor' });
+        });
+        // Reconstruir dropdown con la lista completa
+        _configurarDropdownVendedor();
+
         // Aplicar filtro vendedor según permisos
         if (!permisos.verTodo) {
             // Vendedor: solo ve sus propias cotizaciones (no puede cambiar)
@@ -445,10 +454,13 @@ function aplicarFiltros() {
     const q = (document.getElementById('buscador')?.value || '').toLowerCase().trim();
     cotFiltradas = todasLasCot.filter(c => {
         const matchEstado = filtroEstado === 'TODOS' || c.estado === filtroEstado;
-        const razon  = String(c.razonSocial || c.cliente?.nombre || c.nombreMedico || '').toLowerCase();
-        const equipo = String((c.carrito || []).map(i => i.nombre).join(' ') || '').toLowerCase();
-        const id     = String(c.idCot || c.id_cotizacion || '').toLowerCase();
-        const matchQ = !q || razon.includes(q) || equipo.includes(q) || id.includes(q);
+        const razon   = String(c.nombreNegocio || c.razonSocial || c.cliente?.nombre || c.nombreMedico || '').toLowerCase();
+        const equipo  = String([
+            ...(c.carrito||[]).map(i => i.nombre),
+            ...(Array.isArray(c.productos) ? c.productos : []),
+        ].join(' ')).toLowerCase();
+        const id      = String(c.idCot || c.id_cotizacion || c.id || '').toLowerCase();
+        const matchQ  = !q || razon.includes(q) || equipo.includes(q) || id.includes(q);
         return matchEstado && matchQ;
     });
     if (vistaActual === 'lista') renderLista();
@@ -521,26 +533,41 @@ function renderKanban() {
         const totalFmt = 'USD ' + Math.round(total).toLocaleString('es-AR');
 
         const cardsHtml = tarjetas.length ? tarjetas.map(c => {
-            const idxReal  = todasLasCot.indexOf(c);
-            const id       = c.idCot || c.id_cotizacion || '—';
-            const cliente  = c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
-            const equipos  = (c.carrito||[]).map(i => i.nombre).join(' / ') || '';
-            const titulo   = cliente + (equipos ? ' / ' + equipos : '');
-            const monto    = _monto(c);
-            const fecha    = _fmtFecha(c.fecha);
-            const linkPdf  = `https://cahirth.github.io/Portal-TLC/cotizaciones/${id}.html`;
+            const idxReal   = todasLasCot.indexOf(c);
+            const id        = c.idCot || c.id_cotizacion || c.id || '—';
+            // Nombre: preferir nombreNegocio (HubSpot) > razonSocial > nombreMedico
+            const titulo    = c.nombreNegocio || c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
+            const monto     = _monto(c);
+            const fecha     = _fmtFecha(c.fechaCreacion || c.fecha);
+            const linkPdf   = c.link && !c.link.startsWith('blob:') ? c.link : null;
+            const hsLink    = c.id ? `https://app.hubspot.com/contacts/${c.id}` : null;
+
+            // Productos como badges
+            const prods = Array.isArray(c.productos) ? c.productos : [];
+            const prodsHtml = prods.length
+                ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;">
+                    ${prods.slice(0,3).map(p =>
+                        `<span style="font-size:9px;padding:2px 6px;background:#0f2a52;border:1px solid #1e3a6e;border-radius:10px;color:#60a5fa;white-space:nowrap;overflow:hidden;max-width:140px;text-overflow:ellipsis;" title="${p}">${p}</span>`
+                    ).join('')}
+                    ${prods.length > 3 ? `<span style="font-size:9px;padding:2px 6px;background:#1e3050;border-radius:10px;color:#475569;">+${prods.length-3}</span>` : ''}
+                   </div>`
+                : (c.carrito?.length
+                    ? `<div style="font-size:10px;color:#3a86ff;margin-bottom:6px;">${c.carrito.map(i=>i.nombre).join(' · ')}</div>`
+                    : '');
+
             const etapasOpts = KANBAN_COLS.map(k =>
                 `<option value="${k.key}" ${k.key === c.estado ? 'selected' : ''}>${k.label}</option>`
             ).join('');
+
             return `<div class="k-card"
                 draggable="true"
                 data-id="${id}"
-                data-col="${col.key}"
                 onclick="abrirDetalle(${idxReal})"
                 ondragstart="_onDragStart(event,'${id}')"
                 ondragend="_onDragEnd(event)">
-                <div class="k-id">${id}</div>
+                <div class="k-id">${id !== '—' ? id : (c.nombreNegocio ? '' : '—')}</div>
                 <div class="k-titulo">${titulo}</div>
+                ${prodsHtml}
                 <div class="k-valor">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
                 ${permisos.verVendedorEnCard && c.vendedor ? `<div class="k-prop">👤 ${c.vendedor}</div>` : ''}
                 <div class="k-fecha">📅 ${fecha}</div>
@@ -549,7 +576,11 @@ function renderKanban() {
                     onchange="event.stopPropagation(); _mutarEstadoCotizacion('${id}', this.value)">
                     ${etapasOpts}
                 </select>
-                <a href="${linkPdf}" target="_blank" class="k-btn" style="margin-top:6px;" onclick="event.stopPropagation()">📄 Abrir Presupuesto</a>
+                <div style="display:flex;gap:6px;margin-top:6px;">
+                    ${linkPdf ? `<a href="${linkPdf}" target="_blank" class="k-btn" style="flex:1;" onclick="event.stopPropagation()">📄 Presupuesto</a>` : ''}
+                    ${hsLink  ? `<a href="${hsLink}"  target="_blank" class="k-btn" style="flex:1;${linkPdf?'':'width:100%;'}" onclick="event.stopPropagation()">🔗 HubSpot</a>` : ''}
+                    ${!linkPdf && !hsLink ? `<span class="k-btn" style="opacity:.4;pointer-events:none;width:100%;">Sin link</span>` : ''}
+                </div>
             </div>`;
         }).join('') : `<div class="kanban-empty-col">Sin cotizaciones</div>`;
 
@@ -838,7 +869,7 @@ async function _guardarNotaInline(id) {
 
 // ─── HELPERS ─────────────────────────────────────────────────────
 function _monto(c) {
-    return parseFloat((c.totales||{}).total_con_iva || c.totalConIva || 0);
+    return parseFloat((c.totales||{}).total_con_iva || c.totalConIva || c.montoUSD || 0);
 }
 function _monto_iva(c) {
     return parseFloat((c.totales||{}).iva_total || c.ivaTotal || 0);
