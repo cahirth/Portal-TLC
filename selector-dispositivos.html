@@ -643,7 +643,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.19"; console.log("%c TLC Portal v2026.06.06.19 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.20"; console.log("%c TLC Portal v2026.06.06.20 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -664,7 +664,18 @@ const msalConfig = {
 
 // Modalidades — el descKey es el GATILLO: si está vacío, no se muestra el botón
 // Orden visual: Contado | Crédito / Dir 6AR | Dir 12AR / Dir 6USD | Dir 12USD / Lea$ | LeaUSD
-const MODALIDADES = [
+// ── Diccionario de leyendas de planes ────────────────────────────
+const PLANES_LEYENDA = {
+    'CONTADO':    { nombre: 'Contado USD',            leyenda: 'Pago anticipado 100% en d\u00F3lares al tipo de cambio BNA vendedor del d\u00EDa de acreditaci\u00F3n.' },
+    'CREDITO':    { nombre: 'Cr\u00E9dito Bancario 36 cuotas $', leyenda: 'Cr\u00E9dito para Adquisici\u00F3n de bienes de Capital. Financiaci\u00F3n de hasta el 80% del precio de lista en 36 cuotas fijas en pesos. Primeras 6 cuotas con TNA del 14%, resto del plazo a TNA del 35% con quebranto bancario incluido.' },
+    '04':         { nombre: 'Cr\u00E9dito Bancario 36 cuotas $', leyenda: 'Cr\u00E9dito para Adquisici\u00F3n de bienes de Capital. Financiaci\u00F3n de hasta el 80% del precio de lista en 36 cuotas fijas en pesos. Primeras 6 cuotas con TNA del 14%, resto del plazo a TNA del 35% con quebranto bancario incluido.' },
+    'LEASING':    { nombre: 'Leasing 36 cuotas AR$',  leyenda: 'Contrato de leasing financiero. Precio de lista en 36 cuotas mensuales en pesos. Adelanto inicial requerido. Financiaci\u00F3n sujeta a aprobaci\u00F3n crediticia.' },
+    'LEASINGUSD': { nombre: 'Leasing 36 cuotas USD',  leyenda: 'Contrato de leasing financiero en d\u00F3lares. Precio de lista en 36 cuotas mensuales en USD. Adelanto inicial requerido. Financiaci\u00F3n sujeta a aprobaci\u00F3n crediticia.' },
+    'TLC6':       { nombre: 'Directo TLC 6 cuotas AR$',leyenda: 'Plan de financiaci\u00F3n directo TLC. 6 cuotas mensuales en pesos con adelanto inicial.' },
+    'TLC6USD':    { nombre: 'Directo TLC 6 cuotas USD',leyenda: 'Plan de financiaci\u00F3n directo TLC. 6 cuotas mensuales en d\u00F3lares con adelanto inicial.' },
+    'TLC12':      { nombre: 'Directo TLC 12 cuotas AR$',leyenda: 'Plan de financiaci\u00F3n directo TLC. 12 cuotas mensuales en pesos con adelanto inicial.' },
+    'TLC12USD':   { nombre: 'Directo TLC 12 cuotas USD',leyenda: 'Plan de financiaci\u00F3n directo TLC. 12 cuotas mensuales en d\u00F3lares con adelanto inicial.' },
+};
     { key: 'CONTADO',   label: 'Contado USD',    triggerKey: 'Descripcion_USD_CONTADO',    precioKey: 'Precio CONTADO CNO',    cuotaKey: null,                    descKey: 'Descripcion_USD_CONTADO',    moneda: 'USD' },
     { key: 'CREDITO',   label: 'Crédito AR$',     triggerKey: 'Descripcion_$_CREDICOOP_36', precioKey: 'Adelanto_$_CREDICOOP',  cuotaKey: 'Cuotas_$_CREDICOOP_36', descKey: 'Descripcion_$_CREDICOOP_36', moneda: 'ARS' },
     { key: 'TLC6',      label: 'Directo 6c AR$',  triggerKey: 'Descripcion_TLC_$_6',        precioKey: 'Adelanto_TLC_$_6',      cuotaKey: 'CUOTA_TLC_$_6',         descKey: 'Descripcion_TLC_$_6',        moneda: 'ARS' },
@@ -2773,7 +2784,7 @@ async function generarPropuesta() {
     mostrarMrStatus('⏳ Subiendo presupuesto...', '');
 
     try {
-        const htmlPresup = generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot: _idCotActual, plazoEntrega, lugarEntrega });
+        const htmlPresup = await generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot: _idCotActual, plazoEntrega, lugarEntrega });
 
         // ── PASO 1: Blob URL instantáneo — 0ms, sin esperar GitHub ──────────
         // El vendedor ve el presupuesto al instante desde memoria del browser
@@ -3003,7 +3014,7 @@ function abrirCheckout() { abrirModalResumen(); }
 function nuevoPresupuesto() { nuevaCotizacion(); }
 function mostrarCoStatus(msg, tipo) { mostrarMrStatus(msg, tipo); }
 
-function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot, plazoEntrega, lugarEntrega }) {
+async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot, plazoEntrega, lugarEntrega }) {
     const fecha    = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'long', year:'numeric' });
     const nroRef   = idCot || generarIdCotizacion();
     const c        = calcularCarrito();
@@ -3073,10 +3084,26 @@ function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, v
         ].join('');
     }).join('');
 
-    // ── Condiciones según modalidad ───────────────────────────────
+    // ── Fetch dólar BNA en tiempo real ───────────────────────────
+    let tcBNA = null;
+    try {
+        const respDolar = await fetch('https://dolarapi.com/v1/dolares/oficial');
+        if (respDolar.ok) {
+            const dolarData = await respDolar.json();
+            tcBNA = dolarData.venta || null;
+        }
+    } catch(e) { console.warn('BNA fetch:', e); }
+
+    const fechaHoy = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const leyendaBNA = tcBNA
+        ? `Cotizaci\u00F3n del d\u00F3lar: BNA tipo vendedor del d\u00EDa de hoy ${fechaHoy}, TC=$${tcBNA.toLocaleString('es-AR')}, valor tomado como referencia ilustrativa.`
+        : `Valores expresados en d\u00F3lares oficiales Banco Naci\u00F3n (BNA). TC referencial del ${fechaHoy}.`;
+
+    // ── Condiciones según modalidad + leyenda del plan ────────────
+    const planInfo   = PLANES_LEYENDA[modalidadActual] || {};
     const condPago = opt.key === 'CONTADO'
-        ? 'Anticipado - Cotizaci\u00F3n D\u00F3lar BNA.'
-        : opt.label + (opt.cuotas > 0 ? ' - Financiaci\u00F3n sujeta a aprobaci\u00F3n crediticia.' : '.');
+        ? 'Anticipado 100% \u2014 ' + leyendaBNA
+        : (planInfo.leyenda || opt.label + (opt.cuotas > 0 ? ' \u2014 Financiaci\u00F3n sujeta a aprobaci\u00F3n crediticia.' : '.'));
 
     const estructuraHtml = (c.todosCalculados && c.adelantoTotal > 0 && opt.cuotas > 0) ? [
         '<tr><td colspan="4" style="padding:4px 10px 4px 120px;font-size:12px;color:#374151;">',
@@ -3194,11 +3221,6 @@ function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, v
         '<\/td>',
         '<\/tr>',
         '<\/table>',
-
-        // LUGAR DE ENTREGA
-        '<p style="font-size:11px;color:#374151;font-family:Arial,sans-serif;margin-bottom:20px;border-top:1px solid #e2e8f0;padding-top:12px;">',
-        '<strong>Lugar de Entrega:<\/strong> Se entrega en nuestra oficina en Del Carmen 716 CABA. Enviar autorizaci\u00F3n con los datos de la persona o empresa que retira el producto a info@tlcsrl.com.ar. El env\u00EDo y el seguro est\u00E1n a cargo del comprador.',
-        '<\/p>',
 
         // FIRMA
         '<div style="text-align:right;font-size:12px;font-family:Arial,sans-serif;color:#374151;margin-bottom:24px;">',
