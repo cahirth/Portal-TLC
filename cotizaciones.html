@@ -198,8 +198,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.15";
-console.log("%c TLC Cotizaciones v2026.06.06.15 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.16";
+console.log("%c TLC Cotizaciones v2026.06.06.16 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
@@ -611,6 +611,15 @@ function abrirDetalle(idx) {
     _renderDetalle(c);
     document.getElementById('detalle-overlay').classList.add('open');
     document.getElementById('detalle-overlay').scrollTop = 0;
+    // Refrescar JSON en background para tener notas y estado actualizados
+    _recargarHistoricoSilencioso().then(() => {
+        // Re-buscar el objeto actualizado y re-renderizar si sigue abierto
+        const overlay = document.getElementById('detalle-overlay');
+        if (!overlay.classList.contains('open')) return;
+        const id = String(c.idCot || c.id_cotizacion || c.id || '');
+        const actualizado = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === id);
+        if (actualizado) _renderDetalle(actualizado);
+    });
 }
 
 function _renderDetalle(c) {
