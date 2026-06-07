@@ -643,7 +643,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.21"; console.log("%c TLC Portal v2026.06.06.21 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.22"; console.log("%c TLC Portal v2026.06.06.22 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2891,19 +2891,26 @@ async function generarPropuesta() {
                 equipos:  equiposStr,
                 // equiposDetalle: array para Line Items en HubSpot con precios netos reales
                 equiposDetalle: carrito.map(i => {
-                    const qty    = i.cantidad || 1;
-                    const base   = i.precioCNO || i.precioLista || 0;
-                    const bruto  = base * qty;
-                    const dVal   = parseFloat(i.descuentoValor) || 0;
-                    const dTipo  = i.descuentoTipo || '%';
-                    const neto   = dTipo === '%'
-                        ? Math.max(0, bruto - bruto * (dVal / 100))
-                        : Math.max(0, bruto - dVal);
+                    const qty       = i.cantidad || 1;
+                    const esContado = (mod.key === 'CONTADO');
+                    // CONTADO → precio base = CNO (precio contado bonificado)
+                    // FINANCIADO → precio base = precioLista puro (sin bonificación contado)
+                    const base      = esContado
+                        ? (i.precioCNO || i.precioLista || 0)
+                        : (i.precioLista || 0);
+                    const bruto     = base * qty;
+                    const dVal      = esContado ? 0 : (parseFloat(i.descuentoValor) || 0);
+                    const dTipo     = i.descuentoTipo || '%';
+                    const neto      = esContado
+                        ? bruto  // contado: el precio CNO ya es el neto final
+                        : (dTipo === '%'
+                            ? Math.max(0, bruto - bruto * (dVal / 100))
+                            : Math.max(0, bruto - dVal));
                     return {
                         nombre:         i.nombre,
                         precioLista:    base,
-                        descuentoTipo:  dTipo,
-                        descuentoValor: dVal,
+                        descuentoTipo:  esContado ? '%'  : dTipo,
+                        descuentoValor: esContado ? 0    : dVal,
                         precioNeto:     Math.round((neto / qty) * 100) / 100,
                         cantidad:       qty,
                         ivaPct:         i.ivaPct !== null && i.ivaPct !== undefined ? i.ivaPct : 10.5,
@@ -3104,7 +3111,7 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
     // ── Condiciones según modalidad + leyenda del plan ────────────
     const planInfo   = PLANES_LEYENDA[modalidadActual] || {};
     const condPago = opt.key === 'CONTADO'
-        ? 'Anticipado 100% \u2014 ' + leyendaBNA
+        ? 'Anticipado 100% en d\u00F3lares al tipo de cambio BNA vendedor.'
         : (planInfo.leyenda || opt.label + (opt.cuotas > 0 ? ' \u2014 Financiaci\u00F3n sujeta a aprobaci\u00F3n crediticia.' : '.'));
 
     const estructuraHtml = (c.todosCalculados && c.adelantoTotal > 0 && opt.cuotas > 0) ? [
