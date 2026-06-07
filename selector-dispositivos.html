@@ -288,8 +288,18 @@
 <div id="app-section">
 
     <!-- PANTALLA CATEGORÍAS -->
-    <div id="vista-categorias" style="padding:12px 16px; display:flex; flex-direction:column; gap:10px;">
-        <div id="cats-grid"></div>
+    <div id="vista-categorias" style="display:flex; flex-direction:column; gap:0;">
+        <!-- Buscador universal — filtra en todas las categorías y equipos -->
+        <div style="position:sticky; top:62px; z-index:50; background:#030712; padding:8px 16px 8px; border-bottom:1px solid #1c2541;">
+            <input type="text" id="buscador-cats"
+                placeholder="Buscar equipos, marcas o subcategorías..."
+                oninput="busquedaDesdeCategoria(this.value)"
+                style="width:100%; background:#1c2541; border:1px solid #222e50; border-radius:10px;
+                       padding:10px 16px 10px 40px; color:#f8fafc; font-size:14px; outline:none;
+                       background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E&quot;);
+                       background-repeat:no-repeat; background-position:14px center;">
+        </div>
+        <div id="cats-grid" style="padding:12px 16px; display:flex; flex-direction:column; gap:10px;"></div>
     </div>
 
     <!-- PANTALLA SUBCATEGORÍAS -->
@@ -1200,6 +1210,18 @@ const CAT_ORDEN = ['DIAGNOSTICO','EQUIPOS','INSUMOS','CIRUGIA','SERV_TECNICO'];
 
 let catActual = null;
 let subcatActual = 'TODAS';
+
+
+// Buscador desde pantalla de categorías — redirige a "Todos" y filtra
+function busquedaDesdeCategoria(q) {
+    if (!q.trim()) return;  // vacío → no hacer nada
+    // Ir a la vista "Todos" con la búsqueda aplicada
+    abrirSubcategoria('Todos');
+    setTimeout(() => {
+        const bSub = document.getElementById('buscador-subcats');
+        if (bSub) { bSub.value = q; busquedaUniversal(q); }
+    }, 50);
+}
 
 function renderCategorias() {
     // Contar equipos por categoría
