@@ -236,14 +236,34 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.25";
-console.log("%c TLC Cotizaciones v2026.06.06.25 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.06.26";
+console.log("%c TLC Cotizaciones v2026.06.06.26 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 const HISTORICO_URL   = 'https://api.github.com/repos/cahirth/Portal-TLC/contents/historico.json';
+const PRECIOS_URL     = 'https://cahirth.github.io/Portal-TLC/precios.json';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+
+let _preciosCache = null; // cache lazy de precios.json
+
+async function _getPrecios() {
+    if (_preciosCache) return _preciosCache;
+    try {
+        const res = await fetch(PRECIOS_URL + '?t=' + Date.now());
+        if (res.ok) _preciosCache = await res.json();
+    } catch(e) { console.warn('precios.json:', e); }
+    return _preciosCache || [];
+}
+
+function _buscarPrecio(nombre) {
+    if (!_preciosCache || !nombre) return null;
+    const n = nombre.toLowerCase().trim();
+    return _preciosCache.find(d =>
+        (d['Nombre de Dispositivo'] || '').toLowerCase().trim() === n
+    ) || null;
+}
 
 // ─── 7 COLUMNAS HUBSPOT ─────────────────────────────────────────
 const KANBAN_COLS = [
@@ -328,6 +348,7 @@ async function init() {
     _configurarDropdownVendedor();
 
     await cargar();
+    _getPrecios(); // cargar precios.json en background para folletos/videos
 }
 
 // ─── CARGA DE VENDEDORES DESDE SHEET ────────────────────────────
@@ -748,13 +769,30 @@ function _renderDetalle(c) {
     // ── EQUIPOS ───────────────────────────────────────────────────
     if (carrito.length || prods.length) {
         const equiposHtml = carrito.length
-            ? carrito.map(i => `<div class="equipo-row">
+            ? carrito.map(i => {
+                const precioData = _buscarPrecio(i.nombre);
+                const folleto = i.linkFolleto || precioData?.['Link_Folleto'] || '';
+                const video   = i.linkVideo   || precioData?.['Link_Web']     || '';
+                return `<div class="equipo-row">
                 <div>
                     <div class="equipo-nombre"><span style="color:#3a86ff;">${i.cantidad||1}×</span> ${_fixEncoding(i.nombre)}</div>
                     ${i.descuentoValor > 0 ? `<div class="equipo-desc">−${i.descuentoTipo==='%'?i.descuentoValor+'%':'USD '+i.descuentoValor}</div>` : ''}
+                    ${folleto || video ? `<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;">
+                        ${folleto ? `<a href="${folleto}" target="_blank" onclick="event.stopPropagation()"
+                            style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;
+                                   color:#60a5fa;text-decoration:none;padding:3px 8px;
+                                   background:#0f2a52;border:1px solid #1e3a6e;border-radius:8px;">
+                            📄 Folleto</a>` : ''}
+                        ${video ? `<a href="${video}" target="_blank" onclick="event.stopPropagation()"
+                            style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;
+                                   color:#f87171;text-decoration:none;padding:3px 8px;
+                                   background:#2d0a0a;border:1px solid #7f1d1d;border-radius:8px;">
+                            🎬 Video</a>` : ''}
+                    </div>` : ''}
                 </div>
                 <div class="equipo-precio">USD ${Math.round((i.precioNeto||i.precio||0)*(i.cantidad||1)).toLocaleString('es-AR')}</div>
-              </div>`).join('')
+              </div>`;
+            }).join('')
             : prods.map(p => `<div class="equipo-row">
                 <div class="equipo-nombre">${_fixEncoding(p)}</div>
               </div>`).join('');
