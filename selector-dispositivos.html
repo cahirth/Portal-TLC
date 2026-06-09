@@ -2199,11 +2199,15 @@ function renderCarrito() {
         return `<option value="${m.key}" ${modalidadCarrito===m.key?'selected':''}>${m.label}</option>`;
     }).join('');
 
+    const incompatibles = MODAL_CARRITO.length - modsComp.length;
     const selectorHtml = `
     <div style="background:#0f1a30; border-radius:14px; padding:16px; margin:12px 0;">
-        <div style="font-size:12px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">
-            Forma de pago
-            ${modsComp.length < MODAL_CARRITO.length ? `<span style="color:#f8961e; font-weight:400; font-size:11px; margin-left:6px;">· ${MODAL_CARRITO.length - modsComp.length} opciones no disponibles para esta combinación</span>` : ''}
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px;">Forma de pago</span>
+                ${incompatibles > 0 ? `<span style="color:#f8961e; font-weight:600; font-size:10px;">· ${incompatibles} opciones no disponibles para esta combinación</span>` : ''}
+            </div>
+            ${incompatibles > 0 ? `<span style="font-size:9px; font-weight:700; color:#f8961e; text-transform:uppercase; letter-spacing:0.5px; text-align:right; line-height:1.3;">Solo las opciones disponibles<br>de los ítems en el carrito</span>` : ''}
         </div>
         <div style="position:relative;">
             <select id="sel-financiacion" onchange="cambiarFinanciacion(this.value)"
@@ -2224,15 +2228,18 @@ function renderCarrito() {
 
     // Etiqueta dinámica según modalidad
     const esARS      = c.mod.moneda === 'ARS';
-    const labelNeto  = esARS ? 'Anticipo AR$' : 'Neto USD';
+    const labelNetoAnterior = esARS ? 'Anticipo AR$' : 'Neto USD';
     const valorNeto  = esARS ? fmtARS(c.adelantoTotal || c.netoBase) : fmtUSD(c.netoBase);
-    const labelTotal = esARS ? 'TOTAL c/IVA USD' : 'TOTAL c/IVA';
+    const labelTotal = 'TOTAL c/IVA USD';
     const ivaStr     = fmtUSD(c.iva);
     const totalStr   = fmtUSD(c.total);
 
     let totalesHtml = `<div class="carrito-totales">
         <div class="total-row">
-            <span class="total-label">${labelNeto}</span>
+            <div>
+                <div style="font-size:10px; color:#64748b; text-decoration:line-through; margin-bottom:1px;">${labelNetoAnterior}</div>
+                <span class="total-label" style="font-size:13px; font-weight:800; color:#f1f5f9; text-transform:uppercase; letter-spacing:0.5px;">TOTAL NETO</span>
+            </div>
             <span class="total-valor">${valorNeto}</span>
         </div>
         <div class="total-row">
@@ -2245,15 +2252,28 @@ function renderCarrito() {
         </div>`;
 
     if (c.todosCalculados && c.adelantoTotal > 0 && mod.cuotas > 0) {
+        // Descripción dinámica de la estructura
+        const monedaNombre = mod.moneda === 'ARS' ? 'PESOS' : 'USD';
+        const tipoInstrumento = mod.key.startsWith('LEASING') ? 'e-cheques / cuotas leasing' : mod.key.startsWith('CREDITO') ? 'cuotas bancarias fijas' : 'e-cheques fijos';
+        const descEstructura = `Anticipo 50% + ${mod.cuotas} ${tipoInstrumento} en ${monedaNombre}`;
         totalesHtml += `
         <div style="margin-top:12px; background:#0a1628; border-radius:10px; padding:12px; border:1px solid #1e3050;">
-            <div style="font-size:11px; color:#64748b; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px;">Estructura — ${mod.label}</div>
-            <div class="total-row" style="border-top:1px solid #1e3050; padding-top:8px;">
-                <span class="total-label" style="font-size:14px; font-weight:700; color:#f1f5f9;">Adelanto inicial</span>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+                <div style="font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:1px; font-weight:700;">Estructura — ${mod.label}</div>
+                <div style="font-size:10px; color:#f8961e; font-weight:600; text-align:right;">${descEstructura}</div>
+            </div>
+            <div class="total-row" style="border-top:1px solid #1e3050; padding-top:8px; margin-bottom:8px;">
+                <div>
+                    <span class="total-label" style="font-size:13px; font-weight:700; color:#f1f5f9;">Adelanto inicial</span>
+                    <span style="font-size:10px; color:#64748b; margin-left:6px;">+IVA</span>
+                </div>
                 <span class="total-valor" style="font-size:16px; font-weight:800; color:#06d6a0;">${monedaFmt(c.adelantoTotal)}</span>
             </div>
             <div class="total-row">
-                <span class="total-label" style="font-size:14px; font-weight:700; color:#f1f5f9;">Cuota mensual × ${mod.cuotas}</span>
+                <div>
+                    <span class="total-label" style="font-size:13px; font-weight:700; color:#f1f5f9;">Cuota mensual × ${mod.cuotas}</span>
+                    <span style="font-size:10px; color:#64748b; margin-left:6px;">+IVA</span>
+                </div>
                 <span class="total-valor" style="font-size:16px; font-weight:800; color:#06d6a0;">${monedaFmt(c.cuotaTotal)}</span>
             </div>
         </div>`;
@@ -2279,8 +2299,11 @@ function renderCarrito() {
             const netoListaTotal = carrito.reduce((s,i) => s + (i.precioLista||0)*(i.cantidad||1), 0);
             const pctDisplay = netoListaTotal > 0 ? ((comisionTotal / netoListaTotal) * 100).toFixed(1) + '%' : '';
             totalesHtml += `
-            <div style="margin-top:10px; background:#0a1628; border:1px solid #f8961e33; border-radius:10px; padding:10px 12px;">
-                <div style="font-size:10px; color:#f8961e; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; font-weight:700;">💰 Comisión estimada</div>
+            <div style="margin-top:10px; background:#0a1628; border:1px solid #f8961e44; border-radius:10px; padding:10px 12px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                    <span style="font-size:10px; color:#f8961e; text-transform:uppercase; letter-spacing:1px; font-weight:700;">🔥 Comisión estimada</span>
+                    <span style="font-size:9px; color:#64748b; font-style:italic;">Solo administradores y vend. externos</span>
+                </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
                     <span style="color:#94a3b8;">Sobre Neto Lista Base</span>
                     <div style="text-align:right;">
