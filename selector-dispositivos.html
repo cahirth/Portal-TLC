@@ -667,7 +667,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.09.32"; console.log("%c TLC Portal v2026.06.06.30 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.09.32"; console.log("%c TLC Portal v2026.06.09.32 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1838,10 +1838,12 @@ function seleccionarModalidad(key) {
 
     document.getElementById('precio-desc').textContent = desc;
 
-    // Calcular % anticipo dinámicamente
-    const pctAnticipo = (tieneValor(anticipo) && tieneValor(precioLista) && precioLista > 0)
-        ? Math.round((parseFloat(anticipo) / parseFloat(precioLista)) * 100)
-        : null;
+    // % anticipo: extraer del texto de descripción del plan (ej: "Anticipo 50% + 12 e-cheques...")
+    let pctAnticipo = null;
+    const matchPct = desc.match(/(\d+)\s*%/i);
+    if (matchPct) {
+        pctAnticipo = parseInt(matchPct[1]);
+    }
 
     // Cuotas según modalidad
     const nCuotas = m.key.includes('6') ? 6 : m.key.includes('12') ? 12 : m.key.includes('36') || m.key.startsWith('LEASING') || m.key.startsWith('CREDITO') ? 36 : null;
