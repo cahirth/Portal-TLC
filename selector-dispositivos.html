@@ -667,7 +667,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.09.34"; console.log("%c TLC Portal v2026.06.09.34 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.09.35"; console.log("%c TLC Portal v2026.06.09.35 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1987,6 +1987,22 @@ function verComision() {
     return currentUserRol === 'Administrador' || currentUserRol === 'Vend_Externo';
 }
 
+// Devuelve el % de adelanto del plan activo del carrito extrayéndolo del campo Descripcion del ítem
+function _pctAdelantoCarrito() {
+    const descKey2 = {
+        'TLC6':'Descripcion_TLC_$_6','TLC12':'Descripcion_TLC_$_12',
+        'TLC6USD':'Descripcion_TLC_USD_6','TLC12USD':'Descripcion_TLC_USD_12',
+        'LEASING':'Descripcion_L$_36','LEASINGUSD':'Descripcion_L_USD_36',
+        'CREDITO':'Descripcion_$_CREDICOOP_36'
+    }[modalidadCarrito] || '';
+    for (const it of carrito) {
+        const v = it?._data?.[descKey2] || '';
+        const m = v.match(/(\d+)\s*%/i);
+        if (m) return parseInt(m[1]);
+    }
+    return null;
+}
+
 function fmtComision(comisionRaw, precioLista) {
     if (!comisionRaw && !precioLista) return null;
     // Si es número directo (ej: 0.05 = 5%) lo calculamos sobre precio lista
@@ -2287,9 +2303,11 @@ function renderCarrito() {
 
     if (c.todosCalculados && c.adelantoTotal > 0 && mod.cuotas > 0) {
         // Descripción dinámica de la estructura
+        const _pctAdel = _pctAdelantoCarrito();
+        const _pctAdelLabel = _pctAdel !== null ? ` ${_pctAdel}%` : '';
         const monedaNombre = mod.moneda === 'ARS' ? 'PESOS' : 'USD';
         const tipoInstrumento = mod.key.startsWith('LEASING') ? 'e-cheques / cuotas leasing' : mod.key.startsWith('CREDITO') ? 'cuotas bancarias fijas' : 'e-cheques fijos';
-        const descEstructura = `Anticipo 50% + ${mod.cuotas} ${tipoInstrumento} en ${monedaNombre}`;
+        const descEstructura = `Anticipo${_pctAdelLabel} + ${mod.cuotas} ${tipoInstrumento} en ${monedaNombre}`;
         totalesHtml += `
         <div style="margin-top:12px; background:#0a1628; border-radius:10px; padding:12px; border:1px solid #1e3050;">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
@@ -2298,7 +2316,7 @@ function renderCarrito() {
             </div>
             <div class="total-row" style="border-top:1px solid #1e3050; padding-top:8px; margin-bottom:8px;">
                 <div>
-                    <span class="total-label" style="font-size:13px; font-weight:700; color:#f1f5f9;">Adelanto inicial</span>
+                    <span class="total-label" style="font-size:13px; font-weight:700; color:#f1f5f9;">Adelanto inicial${_pctAdelLabel}</span>
                     <span style="font-size:10px; color:#64748b; margin-left:6px;">+IVA</span>
                 </div>
                 <span class="total-valor" style="font-size:16px; font-weight:800; color:#06d6a0;">${monedaFmt(c.adelantoTotal)}</span>
@@ -2816,11 +2834,13 @@ function abrirModalResumen() {
     }).join('');
 
     // Estructura de pago (si aplica)
+    const _pctAdelModal = _pctAdelantoCarrito();
+    const _pctAdelModalLabel = _pctAdelModal !== null ? ` ${_pctAdelModal}%` : '';
     const estructuraHtml = (c.todosCalculados && c.adelantoTotal > 0 && opt.cuotas > 0) ? `
     <div style="background:#0a1628; border-radius:8px; padding:10px 12px; margin-top:8px; border:1px solid #1e3050;">
         <div style="font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">${opt.label}</div>
         <div style="display:flex; justify-content:space-between; font-size:12px; padding:3px 0;">
-            <span style="color:#64748b;">Adelanto</span><span style="color:#06d6a0; font-weight:700;">${monedaFmt(c.adelantoTotal)}</span>
+            <span style="color:#64748b;">Adelanto${_pctAdelModalLabel}</span><span style="color:#06d6a0; font-weight:700;">${monedaFmt(c.adelantoTotal)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; font-size:12px; padding:3px 0;">
             <span style="color:#64748b;">Cuota × ${opt.cuotas}</span><span style="color:#06d6a0; font-weight:700;">${monedaFmt(c.cuotaTotal)}</span>
