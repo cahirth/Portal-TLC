@@ -151,8 +151,66 @@
         .campo-row,.campo-lbl,.campo-val { display:none; }
         .tot-row,.tot-lbl,.tot-val,.tot-final { display:none; }
 
-        /* MISC */
-        .loading { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:14px; }
+        /* PANTALLA COMERCIAL */
+        .pc-overlay { position:fixed; inset:0; background:rgba(3,7,18,0.88); z-index:400; display:none; overflow-y:auto; padding:16px; }
+        .pc-overlay.open { display:block; }
+        .pc-box { background:#0d1520; border:1px solid #1e3050; border-radius:20px; max-width:480px; margin:0 auto; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.6); }
+        .pc-header { background:linear-gradient(135deg,#0f1a30,#1c2541); padding:16px 20px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #1e3050; }
+        .pc-titulo { font-size:15px; font-weight:800; color:#f1f5f9; flex:1; }
+        .pc-cliente { font-size:11px; color:#64748b; margin-top:2px; }
+        .pc-body { padding:16px 20px; }
+
+        /* Item card */
+        .pc-item { background:#080d14; border:1px solid #1e3050; border-radius:12px; padding:14px; margin-bottom:10px; position:relative; }
+        .pc-item-header { display:flex; align-items:flex-start; gap:10px; margin-bottom:12px; }
+        .pc-item-foto { width:52px; height:52px; border-radius:8px; object-fit:contain; background:#0f1a30; flex-shrink:0; }
+        .pc-item-nombre { font-size:13px; font-weight:700; color:#f1f5f9; line-height:1.3; }
+        .pc-item-precio-lista { font-size:11px; color:#64748b; margin-top:2px; }
+        .pc-item-neto { font-size:15px; font-weight:800; color:#06d6a0; margin-left:auto; white-space:nowrap; }
+        .pc-item-remove { position:absolute; top:10px; right:10px; background:none; border:none; color:#475569; font-size:16px; cursor:pointer; line-height:1; padding:2px 4px; }
+        .pc-item-remove:hover { color:#f87171; }
+
+        /* Controles item */
+        .pc-controles { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        .pc-qty { display:flex; align-items:center; background:#0f1a30; border:1px solid #1e3050; border-radius:8px; overflow:hidden; flex-shrink:0; }
+        .pc-qty-btn { width:32px; height:32px; border:none; background:none; color:#f8fafc; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+        .pc-qty-btn:active { background:rgba(58,134,255,.15); }
+        .pc-qty-num { min-width:28px; text-align:center; font-size:13px; font-weight:700; color:#3a86ff; }
+        .pc-desc-label { font-size:11px; color:#64748b; flex-shrink:0; }
+        .pc-desc-input { width:64px; padding:6px 8px; background:#080d14; border:1px solid #1e3050; border-radius:8px; color:#f1f5f9; font-size:13px; text-align:right; outline:none; -moz-appearance:textfield; }
+        .pc-desc-input::-webkit-inner-spin-button, .pc-desc-input::-webkit-outer-spin-button { -webkit-appearance:none; }
+        .pc-desc-input:focus { border-color:#3a86ff; }
+        .pc-tipo-toggle { display:flex; background:#080d14; border:1px solid #1e3050; border-radius:8px; overflow:hidden; flex-shrink:0; }
+        .pc-tipo-btn { padding:6px 10px; font-size:12px; font-weight:700; border:none; background:transparent; color:#64748b; cursor:pointer; transition:all .15s; }
+        .pc-tipo-btn.active { background:#3a86ff; color:#fff; }
+        .pc-iva-select { padding:5px 8px; background:#080d14; border:1px solid #1e3050; border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer; }
+        .pc-iva-select:focus { border-color:#3a86ff; }
+
+        /* Agregar ítem */
+        .pc-btn-add { width:100%; padding:13px; border-radius:12px; background:transparent; border:1px dashed #3a86ff66; color:#3a86ff; font-size:13px; font-weight:600; cursor:pointer; margin-bottom:14px; transition:all .15s; }
+        .pc-btn-add:hover { background:rgba(58,134,255,.08); border-color:#3a86ff; }
+
+        /* Buscador de equipo */
+        .pc-search-wrap { position:relative; margin-bottom:10px; }
+        .pc-search-input { width:100%; padding:10px 14px 10px 36px; background:#080d14; border:1px solid #3a86ff; border-radius:10px; color:#f1f5f9; font-size:13px; outline:none; }
+        .pc-search-results { position:absolute; top:calc(100% + 4px); left:0; right:0; background:#0d1520; border:1px solid #1e3050; border-radius:10px; max-height:200px; overflow-y:auto; z-index:10; }
+        .pc-search-result { padding:9px 14px; font-size:12px; color:#f1f5f9; cursor:pointer; border-bottom:1px solid #1e3050; transition:background .1s; }
+        .pc-search-result:last-child { border-bottom:none; }
+        .pc-search-result:hover { background:#1e3050; }
+        .pc-search-result .pc-res-precio { color:#06d6a0; font-weight:700; float:right; }
+
+        /* Totales */
+        .pc-totales { background:#0f1a30; border-radius:12px; padding:14px 16px; margin-bottom:14px; border:1px solid #1e3050; }
+        .pc-tot-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:3px 0; }
+        .pc-tot-final { display:flex; justify-content:space-between; align-items:center; padding-top:10px; margin-top:6px; border-top:1px solid #3a86ff33; }
+        .pc-tot-label { color:#94a3b8; }
+        .pc-tot-val { font-weight:600; color:#f1f5f9; }
+        .pc-tot-final-label { font-size:14px; font-weight:800; color:#f1f5f9; text-transform:uppercase; }
+        .pc-tot-final-val { font-size:20px; font-weight:900; color:#3a86ff; }
+
+        /* Botones acción */
+        .pc-btn-primary { width:100%; padding:14px; border-radius:12px; background:linear-gradient(135deg,#3a86ff,#1d4ed8); border:none; color:white; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:8px; }
+        .pc-btn-secondary { width:100%; padding:12px; border-radius:12px; background:transparent; border:1px solid #1e3050; color:#64748b; font-size:13px; cursor:pointer; }
         .spinner { width:32px; height:32px; border:3px solid #1e3050; border-top-color:#3a86ff; border-radius:50%; animation:spin .8s linear infinite; }
         @keyframes spin { to { transform:rotate(360deg); } }
         .empty { text-align:center; padding:60px 20px; color:#475569; font-size:13px; }
@@ -224,6 +282,54 @@
     <div class="det-body" id="det-body"></div>
 </div>
 
+<!-- PANTALLA COMERCIAL OVERLAY -->
+<div class="pc-overlay" id="pc-overlay">
+    <div class="pc-box">
+        <div class="pc-header">
+            <button onclick="_pcCerrar()" style="background:#1c2541;border:1px solid #222e50;border-radius:8px;padding:6px 12px;color:#94a3b8;font-size:13px;cursor:pointer;">← Volver</button>
+            <div style="flex:1;">
+                <div class="pc-titulo" id="pc-titulo">Pantalla Comercial</div>
+                <div class="pc-cliente" id="pc-cliente"></div>
+            </div>
+            <button onclick="_pcCerrar()" style="background:#1c2541;border:1px solid #222e50;border-radius:50%;width:32px;height:32px;color:#94a3b8;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
+        </div>
+        <div class="pc-body">
+            <!-- Items renderizados acá -->
+            <div id="pc-items-wrap"></div>
+
+            <!-- Buscador agregar equipo (oculto por defecto) -->
+            <div id="pc-search-panel" style="display:none;margin-bottom:10px;">
+                <div class="pc-search-wrap">
+                    <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" class="pc-search-input" id="pc-search-input"
+                        placeholder="Buscar equipo por nombre o marca..."
+                        oninput="_pcBuscarEquipo(this.value)">
+                </div>
+                <div class="pc-search-results" id="pc-search-results" style="display:none;"></div>
+            </div>
+
+            <button class="pc-btn-add" onclick="_pcToggleBuscador()">+ Agregar ítem a la cotización</button>
+
+            <!-- Totales -->
+            <div class="pc-totales" id="pc-totales">
+                <div class="pc-tot-row"><span class="pc-tot-label">Subtotal Neto USD</span><span class="pc-tot-val" id="pc-subtotal">—</span></div>
+                <div class="pc-tot-row"><span class="pc-tot-label" style="color:#f8961e;">IVA discriminado</span><span class="pc-tot-val" style="color:#f8961e;" id="pc-iva">—</span></div>
+                <div class="pc-tot-final">
+                    <span class="pc-tot-final-label">TOTAL USD c/IVA</span>
+                    <span class="pc-tot-final-val" id="pc-total">—</span>
+                </div>
+            </div>
+
+            <div id="pc-status" style="display:none;margin-bottom:10px;padding:10px 14px;border-radius:10px;font-size:13px;"></div>
+
+            <button class="pc-btn-primary" id="pc-btn-generar" onclick="_pcGenerarPropuesta()">
+                📄 Generar propuesta
+            </button>
+            <button class="pc-btn-secondary" onclick="_pcCerrar()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
 <!-- SPINNER INICIAL -->
 <div class="loading" id="loading-inicial">
     <div class="spinner"></div>
@@ -236,8 +342,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.06.26";
-console.log("%c TLC Cotizaciones v2026.06.06.26 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.09.27";
+console.log("%c TLC Cotizaciones v2026.06.09.27 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
@@ -803,6 +909,20 @@ function _renderDetalle(c) {
         </div>`;
     }
 
+    // ── BOTÓN PANTALLA COMERCIAL ──────────────────────────────────
+    if (carrito.length > 0) {
+        html += `<div style="padding:0 16px 4px;">
+            <button onclick="_pcAbrir('${id}')"
+                style="width:100%;padding:11px;border-radius:10px;
+                       background:linear-gradient(135deg,#0f2a52,#1e3a6e);
+                       border:1px solid #3a86ff55;color:#60a5fa;
+                       font-size:13px;font-weight:700;cursor:pointer;
+                       display:flex;align-items:center;justify-content:center;gap:8px;">
+                ✏️ Editar cotización
+            </button>
+        </div>`;
+    }
+
     // ── CAMBIAR ETAPA ─────────────────────────────────────────────
     const etapasOpts = KANBAN_COLS.map(k =>
         `<option value="${k.key}" ${k.key === c.estado ? 'selected' : ''}>${k.label} (${k.prob})</option>`
@@ -1180,6 +1300,268 @@ function _campo(label, val) {
         <span class="campo-lbl">${label}</span>
         <span class="campo-val">${val}</span>
     </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANTALLA COMERCIAL — Motor de edición de ítems
+// ═══════════════════════════════════════════════════════════════════
+let _pcIdCot    = null;  // idCot de la cotización en edición
+let _pcItems    = [];    // array de ítems editables
+
+// Abre la Pantalla Comercial precargada con los ítems de la cotización
+function _pcAbrir(idCot) {
+    const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(idCot));
+    if (!c) return;
+
+    _pcIdCot = idCot;
+    const cliente = _fixEncoding(c.razonSocial || c.empresa?.razonSocial || c.nombreMedico || '—');
+    document.getElementById('pc-titulo').textContent  = 'Pantalla Comercial';
+    document.getElementById('pc-cliente').textContent = cliente;
+
+    // Clonar carrito para edición local
+    _pcItems = (c.carrito || []).map(i => ({
+        nombre:         _fixEncoding(i.nombre || ''),
+        precioLista:    parseFloat(i.precioLista || i.precio || i.precioNeto || 0),
+        cantidad:       parseInt(i.cantidad || 1),
+        descuentoValor: parseFloat(i.descuentoValor || 0),
+        descuentoTipo:  i.descuentoTipo || '%',
+        ivaPct:         (i.ivaPct !== null && i.ivaPct !== undefined) ? parseFloat(i.ivaPct) : 10.5,
+        foto:           i.foto || '',
+    }));
+
+    _pcRenderItems();
+    _pcRecalcular();
+    document.getElementById('pc-search-panel').style.display = 'none';
+    document.getElementById('pc-status').style.display = 'none';
+    document.getElementById('pc-btn-generar').disabled = false;
+    document.getElementById('pc-btn-generar').textContent = '📄 Generar propuesta';
+
+    document.getElementById('pc-overlay').classList.add('open');
+    document.getElementById('pc-overlay').scrollTop = 0;
+}
+
+function _pcCerrar() {
+    document.getElementById('pc-overlay').classList.remove('open');
+    document.getElementById('pc-search-panel').style.display = 'none';
+    document.getElementById('pc-search-results').style.display = 'none';
+}
+
+// ── Render de items ────────────────────────────────────────────────
+function _pcRenderItems() {
+    const wrap = document.getElementById('pc-items-wrap');
+    if (!_pcItems.length) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = _pcItems.map((item, idx) => {
+        const base  = item.precioLista;
+        const dVal  = item.descuentoValor;
+        const dTipo = item.descuentoTipo;
+        const neto  = dTipo === '%'
+            ? Math.max(0, base - base * (dVal / 100)) * item.cantidad
+            : Math.max(0, base * item.cantidad - dVal);
+        const netoFmt = 'USD ' + Math.round(neto).toLocaleString('es-AR');
+
+        return `<div class="pc-item" id="pc-item-${idx}">
+            <button class="pc-item-remove" onclick="_pcQuitarItem(${idx})">×</button>
+            <div class="pc-item-header">
+                ${item.foto ? `<img src="${item.foto}" class="pc-item-foto" onerror="this.style.display='none'">` : ''}
+                <div style="flex:1;min-width:0;">
+                    <div class="pc-item-nombre">${item.nombre}</div>
+                    <div class="pc-item-precio-lista">USD ${Math.round(item.precioLista).toLocaleString('es-AR')} lista</div>
+                </div>
+                <div class="pc-item-neto">${netoFmt}</div>
+            </div>
+            <div class="pc-controles">
+                <!-- Cantidad -->
+                <div class="pc-qty">
+                    <button class="pc-qty-btn" onclick="_pcCambiarQty(${idx},-1)">−</button>
+                    <span class="pc-qty-num" id="pc-qty-${idx}">${item.cantidad}</span>
+                    <button class="pc-qty-btn" onclick="_pcCambiarQty(${idx},1)">+</button>
+                </div>
+                <!-- Descuento -->
+                <span class="pc-desc-label">Desc:</span>
+                <input type="number" class="pc-desc-input" value="${dVal}"
+                    min="0" step="0.5"
+                    onchange="_pcCambiarDesc(${idx}, this.value)"
+                    oninput="_pcCambiarDesc(${idx}, this.value)">
+                <!-- Tipo descuento -->
+                <div class="pc-tipo-toggle">
+                    <button class="pc-tipo-btn ${dTipo==='%'?'active':''}"
+                        onclick="_pcTipoDesc(${idx},'%')">%</button>
+                    <button class="pc-tipo-btn ${dTipo==='USD'?'active':''}"
+                        onclick="_pcTipoDesc(${idx},'USD')">USD</button>
+                </div>
+                <!-- IVA -->
+                <select class="pc-iva-select" onchange="_pcCambiarIva(${idx}, this.value)">
+                    <option value="10.5" ${item.ivaPct===10.5?'selected':''}>IVA 10,5%</option>
+                    <option value="21"   ${item.ivaPct===21?'selected':''}>IVA 21%</option>
+                    <option value="0"    ${item.ivaPct===0?'selected':''}>Exento</option>
+                </select>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── Mutaciones de items ────────────────────────────────────────────
+function _pcCambiarQty(idx, delta) {
+    _pcItems[idx].cantidad = Math.max(1, _pcItems[idx].cantidad + delta);
+    _pcRenderItems(); _pcRecalcular();
+}
+function _pcCambiarDesc(idx, val) {
+    _pcItems[idx].descuentoValor = Math.max(0, parseFloat(val) || 0);
+    _pcRecalcular();
+    // Actualizar solo el neto del ítem sin re-renderizar todo
+    const item   = _pcItems[idx];
+    const base   = item.precioLista;
+    const neto   = item.descuentoTipo === '%'
+        ? Math.max(0, base - base * (item.descuentoValor / 100)) * item.cantidad
+        : Math.max(0, base * item.cantidad - item.descuentoValor);
+    const el = document.querySelector(`#pc-item-${idx} .pc-item-neto`);
+    if (el) el.textContent = 'USD ' + Math.round(neto).toLocaleString('es-AR');
+}
+function _pcTipoDesc(idx, tipo) {
+    _pcItems[idx].descuentoTipo = tipo;
+    _pcRenderItems(); _pcRecalcular();
+}
+function _pcCambiarIva(idx, val) {
+    _pcItems[idx].ivaPct = parseFloat(val);
+    _pcRecalcular();
+}
+function _pcQuitarItem(idx) {
+    _pcItems.splice(idx, 1);
+    _pcRenderItems(); _pcRecalcular();
+}
+
+// ── Recalcular totales ─────────────────────────────────────────────
+function _pcRecalcular() {
+    let neto = 0, iva = 0;
+    _pcItems.forEach(item => {
+        const base   = item.precioLista;
+        const bruto  = base * item.cantidad;
+        const dVal   = item.descuentoValor;
+        const netoIt = item.descuentoTipo === '%'
+            ? Math.max(0, bruto - bruto * (dVal / 100))
+            : Math.max(0, bruto - dVal);
+        neto += netoIt;
+        iva  += netoIt * (item.ivaPct / 100);
+    });
+    const total = neto + iva;
+    const fmt = n => 'USD ' + Math.round(n).toLocaleString('es-AR');
+    document.getElementById('pc-subtotal').textContent = fmt(neto);
+    document.getElementById('pc-iva').textContent      = fmt(iva);
+    document.getElementById('pc-total').textContent    = fmt(total);
+}
+
+// ── Buscador para agregar equipo ───────────────────────────────────
+function _pcToggleBuscador() {
+    const panel = document.getElementById('pc-search-panel');
+    const input = document.getElementById('pc-search-input');
+    const isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) { input.value = ''; input.focus(); _getPrecios(); }
+    document.getElementById('pc-search-results').style.display = 'none';
+}
+
+function _pcBuscarEquipo(q) {
+    const resWrap = document.getElementById('pc-search-results');
+    const precios = _preciosCache || [];
+    if (!q || q.length < 2) { resWrap.style.display = 'none'; return; }
+    const matches = precios.filter(d => {
+        const nombre = (d['Nombre de Dispositivo'] || '').toLowerCase();
+        return nombre.includes(q.toLowerCase());
+    }).slice(0, 8);
+
+    if (!matches.length) { resWrap.style.display = 'none'; return; }
+
+    resWrap.innerHTML = matches.map(d => {
+        const nombre = d['Nombre de Dispositivo'] || '';
+        const precio = parseFloat(d['Precio LISTA'] || 0);
+        const foto   = d['Foto'] || d['foto'] || '';
+        return `<div class="pc-search-result"
+            onclick="_pcAgregarEquipo('${nombre.replace(/'/g,"\\'")}', ${precio}, '${foto.replace(/'/g,"\\'")}')">
+            ${nombre}
+            <span class="pc-res-precio">USD ${Math.round(precio).toLocaleString('es-AR')}</span>
+        </div>`;
+    }).join('');
+    resWrap.style.display = 'block';
+}
+
+function _pcAgregarEquipo(nombre, precioLista, foto) {
+    _pcItems.push({ nombre, precioLista, cantidad: 1, descuentoValor: 0, descuentoTipo: '%', ivaPct: 10.5, foto });
+    document.getElementById('pc-search-input').value = '';
+    document.getElementById('pc-search-results').style.display = 'none';
+    document.getElementById('pc-search-panel').style.display = 'none';
+    _pcRenderItems();
+    _pcRecalcular();
+}
+
+// ── Generar propuesta desde Pantalla Comercial ─────────────────────
+async function _pcGenerarPropuesta() {
+    if (!_pcItems.length) { _pcMostrarStatus('Agregá al menos un ítem.', 'error'); return; }
+
+    const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(_pcIdCot));
+    if (!c) return;
+
+    const btn = document.getElementById('pc-btn-generar');
+    btn.disabled  = true;
+    btn.textContent = '⏳ Generando...';
+    _pcMostrarStatus('⏳ Guardando cambios...', '');
+
+    // Calcular totales finales
+    let netoTotal = 0, ivaTotal = 0;
+    _pcItems.forEach(item => {
+        const bruto  = item.precioLista * item.cantidad;
+        const dVal   = item.descuentoValor;
+        const netoIt = item.descuentoTipo === '%'
+            ? Math.max(0, bruto - bruto * (dVal / 100))
+            : Math.max(0, bruto - dVal);
+        netoTotal += netoIt;
+        ivaTotal  += netoIt * (item.ivaPct / 100);
+    });
+    const totalConIva = netoTotal + ivaTotal;
+
+    // Actualizar cotización en memoria
+    c.carrito = _pcItems.map(i => ({
+        nombre:         i.nombre,
+        precioLista:    i.precioLista,
+        precioNeto:     i.descuentoTipo === '%'
+            ? Math.max(0, i.precioLista - i.precioLista * (i.descuentoValor / 100))
+            : Math.max(0, i.precioLista - i.descuentoValor / i.cantidad),
+        cantidad:       i.cantidad,
+        descuentoValor: i.descuentoValor,
+        descuentoTipo:  i.descuentoTipo,
+        ivaPct:         i.ivaPct,
+        foto:           i.foto,
+    }));
+    c.totales = { subtotal_neto: netoTotal, iva_total: ivaTotal, total_con_iva: totalConIva };
+
+    // Persistir en historico.json via GAS → accionActualizarMonto
+    try {
+        await fetch(APPS_SCRIPT_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    JSON.stringify({ accion: 'actualizarMonto', idCot: _pcIdCot, monto: totalConIva }),
+        }).then(r => r.json());
+
+        _pcMostrarStatus('✅ Cotización actualizada correctamente.', 'ok');
+        aplicarFiltros(); // refrescar Kanban/lista con nuevo monto
+        btn.textContent = '✅ Guardado';
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = '📄 Generar propuesta';
+        }, 2500);
+    } catch(e) {
+        _pcMostrarStatus('⚠️ Error al guardar: ' + e.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '📄 Generar propuesta';
+    }
+}
+
+function _pcMostrarStatus(msg, tipo) {
+    const el = document.getElementById('pc-status');
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = tipo === 'ok' ? 'rgba(6,214,160,.15)' : tipo === 'error' ? 'rgba(239,68,68,.15)' : 'rgba(58,134,255,.1)';
+    el.style.border = tipo === 'ok' ? '1px solid #06d6a0' : tipo === 'error' ? '1px solid #f87171' : '1px solid #3a86ff33';
+    el.style.color  = tipo === 'ok' ? '#06d6a0' : tipo === 'error' ? '#f87171' : '#94a3b8';
 }
 
 // ─── ARRANCAR ────────────────────────────────────────────────────
