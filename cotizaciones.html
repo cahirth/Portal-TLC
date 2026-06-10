@@ -322,6 +322,8 @@
 
             <div id="pc-status" style="display:none;margin-bottom:10px;padding:10px 14px;border-radius:10px;font-size:13px;"></div>
 
+            <div id="pc-btn-ver-wrap"></div>
+
             <button class="pc-btn-primary" id="pc-btn-generar" onclick="_pcGenerarPropuesta()">
                 📄 Generar propuesta
             </button>
@@ -342,8 +344,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.09.28";
-console.log("%c TLC Cotizaciones v2026.06.09.28 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.09.29";
+console.log("%c TLC Cotizaciones v2026.06.09.29 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
@@ -1010,16 +1012,20 @@ function _renderDetalle(c) {
             </a>`;
         }
 
-        // Versiones editadas /1, /2, ...
+        // Versiones editadas /v1, /v2, ...
         versiones.slice().reverse().forEach(v => {
-            const vLink  = v.link;
-            const vFecha = _fmtFecha(v.fecha);
-            const vMonto = v.total_iva ? 'USD ' + Math.round(v.total_iva).toLocaleString('es-AR') : '—';
-            const tag    = `<span style="font-size:10px;font-weight:800;font-family:monospace;
-                                         color:#f8961e;background:rgba(248,150,30,.12);
-                                         border:1px solid rgba(248,150,30,.25);
-                                         padding:1px 7px;border-radius:8px;">/v${v.version}</span>`;
-            if (vLink) {
+            const idBase2 = String(c.idCot || c.id_cotizacion || c.id || '').split('/')[0];
+            const bKey    = idBase2 + '/v' + v.version;
+            const bUrl    = v.blobUrl || _pcBlobUrls[bKey] || null;  // Blob URL en memoria
+            const vLink   = bUrl || v.link;                           // Preferir blob; fallback a GitHub Pages
+            const vFecha  = _fmtFecha(v.fecha);
+            const vMonto  = v.total_iva ? 'USD ' + Math.round(v.total_iva).toLocaleString('es-AR') : '—';
+            const tag     = `<span style="font-size:10px;font-weight:800;font-family:monospace;
+                                          color:#f8961e;background:rgba(248,150,30,.12);
+                                          border:1px solid rgba(248,150,30,.25);
+                                          padding:1px 7px;border-radius:8px;">/v${v.version}</span>`;
+            const disponible = !!vLink;
+            if (disponible) {
                 html += `<a href="${vLink}" target="_blank"
                     style="display:flex;align-items:center;gap:10px;background:#0f1a30;
                            border:1px solid #1e3050;border-radius:10px;padding:10px 14px;
@@ -1031,13 +1037,13 @@ function _renderDetalle(c) {
                         <div style="font-size:12px;font-weight:700;color:#f1f5f9;display:flex;align-items:center;gap:6px;">
                             Edición ${tag}
                         </div>
-                        <div style="font-size:10px;color:#475569;">${vFecha} · ${vMonto}</div>
+                        <div style="font-size:10px;color:#475569;">${vFecha} · ${vMonto}${bUrl && !v.link ? ' · <span style="color:#f8961e;">Solo esta sesión</span>' : ''}</div>
                     </div>
                     <span style="font-size:10px;color:#f8961e;font-weight:700;">Abrir →</span>
                 </a>`;
             } else {
                 html += `<div style="display:flex;align-items:center;gap:10px;background:#0f1a30;
-                               border:1px solid #1e3050;border-radius:10px;padding:10px 14px;opacity:.7;">
+                               border:1px solid #1e3050;border-radius:10px;padding:10px 14px;opacity:.6;">
                     <span style="font-size:18px;">📋</span>
                     <div style="flex:1;">
                         <div style="font-size:12px;font-weight:700;color:#f1f5f9;display:flex;align-items:center;gap:6px;">
@@ -1402,6 +1408,8 @@ function _pcAbrir(idCot) {
     document.getElementById('pc-status').style.display = 'none';
     document.getElementById('pc-btn-generar').disabled = false;
     document.getElementById('pc-btn-generar').textContent = '📄 Generar propuesta';
+    const bvw = document.getElementById('pc-btn-ver-wrap');
+    if (bvw) bvw.innerHTML = '';
 
     document.getElementById('pc-overlay').classList.add('open');
     document.getElementById('pc-overlay').scrollTop = 0;
@@ -1561,15 +1569,39 @@ function _pcAgregarEquipo(nombre, precioLista, foto) {
 }
 
 // ── Generar propuesta desde Pantalla Comercial ─────────────────────
+// Array en memoria: { version, blobUrl } — se pierden al cerrar tab, que es el comportamiento correcto
+const _pcBlobUrls = {};
+
+function _pcGuardarBlobUrl(idBase, nroVersion, htmlStr) {
+    const key = idBase + '/v' + nroVersion;
+    // Revocar el anterior si existía
+    if (_pcBlobUrls[key]) { try { URL.revokeObjectURL(_pcBlobUrls[key]); } catch(e) {} }
+    const blob = new Blob([htmlStr], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    _pcBlobUrls[key] = url;
+    setTimeout(() => { try { URL.revokeObjectURL(url); delete _pcBlobUrls[key]; } catch(e) {} }, 30 * 60 * 1000); // limpiar en 30 min
+    return url;
+}
+
+function _pcAbrirVersion(idBase, nroVersion) {
+    const key = idBase + '/v' + nroVersion;
+    const url = _pcBlobUrls[key];
+    if (url) { window.open(url, '_blank'); return; }
+    // Si el blob expiró, mostrar aviso
+    alert('El PDF de esta versión expiró de la sesión. Abrí la cotización y guardá nuevamente para regenerarlo.');
+}
+
 async function _pcGenerarPropuesta() {
     if (!_pcItems.length) { _pcMostrarStatus('Agregá al menos un ítem.', 'error'); return; }
 
     const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(_pcIdCot));
     if (!c) return;
 
-    const btn = document.getElementById('pc-btn-generar');
+    const btn    = document.getElementById('pc-btn-generar');
+    const btnVer = document.getElementById('pc-btn-ver');
     btn.disabled    = true;
     btn.textContent = '⏳ Guardando...';
+    if (btnVer) { btnVer.style.display = 'none'; }
     _pcMostrarStatus('⏳ Guardando cambios...', '');
 
     // ── 1. Calcular totales ────────────────────────────────────────
@@ -1596,11 +1628,15 @@ async function _pcGenerarPropuesta() {
 
     // ── 2. Calcular versión siguiente ─────────────────────────────
     const versiones    = Array.isArray(c.versiones_presupuesto) ? c.versiones_presupuesto : [];
-    const nroVersion   = versiones.length + 1;          // 1, 2, 3...
-    const idBase       = String(c.idCot || c.id_cotizacion || c.id || '').split('/')[0]; // quita /1 previo si hubiera
-    const idVersionado = idBase + '/' + nroVersion;     // ej: TLC-20260608-K88L/1
+    const nroVersion   = versiones.length + 1;
+    const idBase       = String(c.idCot || c.id_cotizacion || c.id || '').split('/')[0];
+    const idVersionado = idBase + '/' + nroVersion;
 
-    // ── 3. Actualizar objeto en memoria ANTES del fetch (0ms) ─────
+    // ── 3. Generar HTML del presupuesto para Blob URL ─────────────
+    const htmlPresup = _pcGenerarHTMLPresupuesto(c, carritoActualizado, netoTotal, ivaTotal, totalConIva, idVersionado, nroVersion);
+    const blobUrl    = _pcGuardarBlobUrl(idBase, nroVersion, htmlPresup);
+
+    // ── 4. Actualizar objeto en memoria (0ms) ─────────────────────
     c.carrito = carritoActualizado;
     c.totales = { subtotal_neto: netoTotal, iva_total: ivaTotal, total_con_iva: totalConIva };
     if (!Array.isArray(c.versiones_presupuesto)) c.versiones_presupuesto = [];
@@ -1608,19 +1644,36 @@ async function _pcGenerarPropuesta() {
         version:     nroVersion,
         idVersionado,
         fecha:       new Date().toISOString(),
-        monto_neto:  Math.round(netoTotal * 100) / 100,
-        total_iva:   Math.round(totalConIva * 100) / 100,
-        link:        null, // se actualizará cuando el GAS devuelva el link PDF
+        monto_neto:  Math.round(netoTotal   * 100) / 100,
+        total_iva:   Math.round(totalConIva  * 100) / 100,
+        link:        null,      // GitHub Pages — se llena en background
+        blobUrl,                // disponible al instante en esta sesión
         carrito:     carritoActualizado,
     };
     c.versiones_presupuesto.push(nuevaVersion);
 
-    // ── 4. Refresh UI inmediato (optimista) ───────────────────────
+    // ── 5. Mostrar botón "Ver propuesta" de inmediato ─────────────
+    _pcMostrarBtnVer(blobUrl, nroVersion);
+
+    // ── 6. Refresh UI ─────────────────────────────────────────────
     _pcRefrescarUI(c);
 
-    // ── 5. Persistir en GAS (fire-and-confirm) ────────────────────
+    // ── 7. Subir a GitHub Pages en background ─────────────────────
+    fetch(APPS_SCRIPT_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body:    JSON.stringify({ accion: 'subirCotizacion', idCot: idVersionado, html: htmlPresup }),
+    }).then(r => r.json()).then(r => {
+        if (r.ok && r.link) {
+            const v = c.versiones_presupuesto.find(v => v.version === nroVersion);
+            if (v) v.link = r.link;
+            console.log('✅ GitHub Pages:', r.link);
+        }
+    }).catch(e => console.warn('GitHub upload (no crítico):', e));
+
+    // ── 8. Persistir metadatos en GAS ─────────────────────────────
     try {
-        const resp = await fetch(APPS_SCRIPT_URL, {
+        const resp   = await fetch(APPS_SCRIPT_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({
@@ -1637,44 +1690,36 @@ async function _pcGenerarPropuesta() {
         const result = await resp.json();
 
         if (result.ok && result.dealActualizado) {
-            // GAS devolvió el deal completo — reemplazar en memoria y refrescar
             const dealFresco = result.dealActualizado;
+            const e = String(dealFresco.estado || '').trim();
+            if (['Enviada','Cotización','presentationscheduled'].includes(e))  dealFresco.estado = '50%';
+            else if (['En seguimiento','decisionmakerboughtin'].includes(e))   dealFresco.estado = '75%';
+            else if (['Ganada','closedwon'].includes(e))                       dealFresco.estado = 'Ganada';
+            else if (['Perdida','closedlost'].includes(e))                     dealFresco.estado = 'Perdida';
 
-            // Normalizar estado igual que en cargar()
-            if (dealFresco.estado) {
-                const e = String(dealFresco.estado).trim();
-                if (['Enviada','Cotización','presentationscheduled'].includes(e))  dealFresco.estado = '50%';
-                else if (['En seguimiento','decisionmakerboughtin'].includes(e))   dealFresco.estado = '75%';
-                else if (['Ganada','closedwon'].includes(e))                       dealFresco.estado = 'Ganada';
-                else if (['Perdida','closedlost'].includes(e))                     dealFresco.estado = 'Perdida';
+            // Preservar blobUrls en el deal fresco (no viajan por el GAS)
+            if (Array.isArray(dealFresco.versiones_presupuesto)) {
+                dealFresco.versiones_presupuesto.forEach(v => {
+                    const key = idBase + '/v' + v.version;
+                    if (_pcBlobUrls[key]) v.blobUrl = _pcBlobUrls[key];
+                });
             }
 
-            // Reemplazar en historicoCompleto y todasLasCot
             [historicoCompleto, todasLasCot].forEach(arr => {
                 const idx = arr.findIndex(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(idBase));
                 if (idx !== -1) arr[idx] = dealFresco;
             });
 
-            // Si el GAS incluyó link PDF en la versión, actualizar la entrada en versiones
-            if (result.linkPdf) {
-                const vIdx = dealFresco.versiones_presupuesto?.findIndex(v => v.version === nroVersion);
-                if (vIdx !== undefined && vIdx !== -1) dealFresco.versiones_presupuesto[vIdx].link = result.linkPdf;
-            }
-
             _pcRefrescarUI(dealFresco);
             _pcMostrarStatus(`✅ Versión /v${nroVersion} guardada correctamente.`, 'ok');
         } else if (result.ok) {
-            // GAS respondió ok pero sin deal — el refresh optimista ya está aplicado
             _pcMostrarStatus(`✅ Versión /v${nroVersion} guardada.`, 'ok');
         } else {
             throw new Error(result.error || 'Error en el servidor');
         }
 
         btn.textContent = '✅ Guardado';
-        setTimeout(() => {
-            btn.disabled    = false;
-            btn.textContent = '📄 Generar propuesta';
-        }, 3000);
+        setTimeout(() => { btn.disabled = false; btn.textContent = '📄 Generar propuesta'; }, 3000);
 
     } catch(e) {
         console.error('_pcGenerarPropuesta:', e);
@@ -1682,6 +1727,18 @@ async function _pcGenerarPropuesta() {
         btn.disabled    = false;
         btn.textContent = '📄 Generar propuesta';
     }
+}
+
+function _pcMostrarBtnVer(blobUrl, nroVersion) {
+    const wrap = document.getElementById('pc-btn-ver-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = `<a href="${blobUrl}" target="_blank"
+        style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+               padding:13px;border-radius:12px;background:linear-gradient(135deg,#0f2a52,#1e3a6e);
+               border:1.5px solid #3a86ff;color:#60a5fa;font-size:14px;font-weight:700;
+               text-decoration:none;margin-bottom:8px;">
+        🔗 Ver propuesta /v${nroVersion}
+    </a>`;
 }
 
 // ── Refresh visual en cascada: Kanban + detalle overlay ──────────
@@ -1699,6 +1756,137 @@ function _pcRefrescarUI(dealActualizado) {
             _renderDetalle(dealActualizado);
         }
     }
+}
+
+// ── Generador de HTML de presupuesto para Blob URL ───────────────
+// Versión compacta pero completa, sin depender de selector-dispositivos.html
+function _pcGenerarHTMLPresupuesto(c, carrito, netoTotal, ivaTotal, totalConIva, idVersionado, nroVersion) {
+    const fmtUSD = n => 'USD ' + Math.round(n).toLocaleString('es-AR');
+    const fmtARS = n => 'AR$ ' + Math.round(n).toLocaleString('es-AR');
+    const fecha  = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'long', year:'numeric' });
+
+    const cliente  = _fixEncoding(c.razonSocial || c.empresa?.razonSocial || c.nombreMedico || '');
+    const medico   = _fixEncoding(c.contacto?.nombre || c.nombreMedico || '');
+    const cuit     = c.cuit || c.empresa?.cuit || '';
+    const telefono = c.telefono || c.contacto?.telefono || '';
+    const email    = c.email   || c.contacto?.email    || '';
+    const vendedor = c.vendedor || '';
+
+    const filasProductos = carrito.map(i => {
+        const base      = i.precioLista;
+        const bruto     = base * i.cantidad;
+        const dVal      = i.descuentoValor;
+        const dTipo     = i.descuentoTipo;
+        const neto      = dTipo === '%' ? Math.max(0, bruto - bruto*(dVal/100)) : Math.max(0, bruto - dVal);
+        const descMonto = bruto - neto;
+        const hayDesc   = dVal > 0;
+        const fotoHtml  = i.foto
+            ? `<img src="${i.foto}" style="width:52px;height:52px;object-fit:contain;border-radius:4px;background:#f8fafc;" onerror="this.style.display='none'">`
+            : '';
+        return `<tr style="border-bottom:1px solid #e2e8f0;">
+          <td style="padding:12px 8px;text-align:center;font-size:13px;color:#374151;vertical-align:top;width:40px;">${i.cantidad}</td>
+          <td style="padding:12px 8px;vertical-align:top;">
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              ${fotoHtml ? `<div style="flex-shrink:0;">${fotoHtml}</div>` : ''}
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#0f172a;">${_fixEncoding(i.nombre)}</div>
+                ${hayDesc ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px;">Desc. ${dTipo==='%'?dVal+'%':'USD '+dVal}</div>` : ''}
+              </div>
+            </div>
+          </td>
+          <td style="padding:12px 8px;text-align:right;vertical-align:top;width:120px;">
+            <div style="font-size:13px;color:#374151;">USD&nbsp;${Math.round(base).toLocaleString('es-AR')}</div>
+          </td>
+          <td style="padding:12px 8px;text-align:right;vertical-align:top;width:120px;">
+            <div style="font-size:13px;font-weight:600;color:#0f172a;">USD&nbsp;${Math.round(neto).toLocaleString('es-AR')}</div>
+            ${hayDesc ? `<div style="font-size:11px;color:#dc2626;">−USD&nbsp;${Math.round(descMonto).toLocaleString('es-AR')}</div>` : ''}
+          </td>
+        </tr>`;
+    }).join('');
+
+    const versionBadge = nroVersion > 0
+        ? `<span style="font-size:11px;background:#f8961e22;border:1px solid #f8961e66;color:#f8961e;padding:2px 8px;border-radius:8px;margin-left:8px;">/v${nroVersion}</span>`
+        : '';
+
+    return `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Presupuesto TLC — ${medico||cliente} — ${idVersionado}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Times New Roman",Times,serif;background:#f1f5f9;color:#0f172a;font-size:13px;}
+.page{max-width:800px;margin:0 auto;background:white;padding:32px 40px;box-shadow:0 4px 24px rgba(0,0,0,.12);}
+table{width:100%;border-collapse:collapse;}
+@media print{body{background:white;}.page{box-shadow:none;padding:20px;}}
+</style></head><body><div class="page">
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0f172a;">
+  <img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25" alt="TLC" style="height:40px;" onerror="this.style.display='none'">
+  <div style="text-align:right;font-size:11px;color:#64748b;">
+    <div style="font-size:13px;font-weight:700;color:#0f172a;">Presupuesto ${idVersionado}${versionBadge}</div>
+    <div>${fecha}</div>
+    ${vendedor ? `<div>Vendedor: ${vendedor}</div>` : ''}
+  </div>
+</div>
+
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+  ${medico   ? `<div><strong>Señores:</strong> ${medico}</div>` : ''}
+  ${cliente  ? `<div style="margin-top:3px;"><strong>Institución:</strong> ${cliente}</div>` : ''}
+  ${cuit     ? `<div style="margin-top:3px;"><strong>CUIT:</strong> ${cuit}</div>` : ''}
+  ${telefono ? `<div style="margin-top:3px;"><strong>Teléfono:</strong> ${telefono}</div>` : ''}
+  ${email    ? `<div style="margin-top:3px;"><strong>Email:</strong> ${email}</div>` : ''}
+</div>
+
+<p style="font-size:12px;color:#374151;margin-bottom:16px;">Por medio de la presente tengo el agrado de hacerle llegar la siguiente propuesta comercial:</p>
+
+<table style="margin-bottom:20px;">
+  <thead>
+    <tr style="background:#0f172a;color:white;">
+      <th style="padding:8px;text-align:center;font-size:12px;width:40px;">Cant.</th>
+      <th style="padding:8px;text-align:left;font-size:12px;">Descripción</th>
+      <th style="padding:8px;text-align:right;font-size:12px;width:120px;">Precio Unit.</th>
+      <th style="padding:8px;text-align:right;font-size:12px;width:120px;">Precio Total</th>
+    </tr>
+  </thead>
+  <tbody>${filasProductos}</tbody>
+</table>
+
+<div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
+  <table style="min-width:240px;border-collapse:collapse;">
+    <tr><td style="padding:5px 8px;font-size:13px;color:#374151;">Subtotal</td><td style="padding:5px 8px;text-align:right;font-weight:600;">USD&nbsp;${Math.round(netoTotal).toLocaleString('es-AR')}</td></tr>
+    <tr><td style="padding:5px 8px;font-size:13px;color:#374151;">IVA</td><td style="padding:5px 8px;text-align:right;font-weight:600;color:#f8961e;">USD&nbsp;${Math.round(ivaTotal).toLocaleString('es-AR')}</td></tr>
+    <tr style="border-top:2px solid #0f172a;">
+      <td style="padding:8px;font-size:15px;font-weight:700;">Total</td>
+      <td style="padding:8px;text-align:right;font-size:15px;font-weight:700;color:#0f172a;">USD&nbsp;${Math.round(totalConIva).toLocaleString('es-AR')}</td>
+    </tr>
+  </table>
+</div>
+
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:10px;">Condiciones Comerciales</div>
+  <div style="font-size:12px;color:#374151;line-height:1.9;">
+    <strong>Forma de Pago:</strong> Transferencia o depósito bancario. Valores en dólares oficiales Banco Nación al TC del día de acreditación.<br>
+    <strong>Validez:</strong> 10 días hábiles desde la fecha de emisión.
+  </div>
+</div>
+
+<div style="text-align:right;font-size:12px;color:#374151;margin-bottom:24px;">
+  Atentamente,<br><strong>${vendedor || 'Tecnología Láser Corneal'}</strong><br>info@tlcsrl.com.ar
+</div>
+
+<div style="border-top:1px solid #e2e8f0;padding-top:12px;margin-bottom:16px;">
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:6px;">Datos Bancarios</div>
+  <div style="font-size:11px;color:#374151;line-height:1.8;">
+    <strong>Credicoop AR$:</strong> CC$ 191-218-015278/6 · CBU: 19102182-55021801527864 · Alias: jade.lado.persa<br>
+    <strong>Credicoop USD:</strong> CA USD 191-218-019730/3 · CBU: 191021825522180197303 · Alias: TLC.CREDICOOP.USD<br>
+    <strong>Galicia AR$:</strong> CC$ Nº 4739-5 306-1 · CBU: 0070306020000004739511 · Alias: TLC.BUENOS.AIRES
+  </div>
+</div>
+
+<div style="border-top:2px solid #0f172a;padding-top:12px;font-size:11px;color:#374151;">
+  <strong>TECNOLOGÍA LÁSER CORNEAL S.R.L.</strong> · Pasaje del Carmen 716 LOCAL PB C1019AAB · Buenos Aires, Argentina
+</div>
+
+</div></body></html>`;
 }
 
 function _pcMostrarStatus(msg, tipo) {
