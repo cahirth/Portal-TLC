@@ -342,8 +342,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.09.27";
-console.log("%c TLC Cotizaciones v2026.06.09.27 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.09.28";
+console.log("%c TLC Cotizaciones v2026.06.09.28 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
@@ -986,6 +986,73 @@ function _renderDetalle(c) {
         </button>
     </div>`;
 
+    // ── VERSIONES DE PRESUPUESTO ──────────────────────────────────
+    const versiones = Array.isArray(c.versiones_presupuesto) ? c.versiones_presupuesto : [];
+    if (versiones.length > 0 || linkPdf) {
+        html += `<div style="padding:0 16px 12px;">
+            <div class="sec-titulo" style="display:flex;">📑 Historial de versiones</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">`;
+
+        // Versión original (link principal)
+        if (linkPdf) {
+            html += `<a href="${linkPdf}" target="_blank"
+                style="display:flex;align-items:center;gap:10px;background:#0f1a30;
+                       border:1px solid #1e3050;border-radius:10px;padding:10px 14px;
+                       text-decoration:none;transition:border-color .15s;"
+                onmouseover="this.style.borderColor='#3a86ff'"
+                onmouseout="this.style.borderColor='#1e3050'">
+                <span style="font-size:18px;">📄</span>
+                <div style="flex:1;">
+                    <div style="font-size:12px;font-weight:700;color:#f1f5f9;">Versión original</div>
+                    <div style="font-size:10px;color:#475569;">${id}</div>
+                </div>
+                <span style="font-size:10px;color:#3a86ff;font-weight:700;">Abrir →</span>
+            </a>`;
+        }
+
+        // Versiones editadas /1, /2, ...
+        versiones.slice().reverse().forEach(v => {
+            const vLink  = v.link;
+            const vFecha = _fmtFecha(v.fecha);
+            const vMonto = v.total_iva ? 'USD ' + Math.round(v.total_iva).toLocaleString('es-AR') : '—';
+            const tag    = `<span style="font-size:10px;font-weight:800;font-family:monospace;
+                                         color:#f8961e;background:rgba(248,150,30,.12);
+                                         border:1px solid rgba(248,150,30,.25);
+                                         padding:1px 7px;border-radius:8px;">/v${v.version}</span>`;
+            if (vLink) {
+                html += `<a href="${vLink}" target="_blank"
+                    style="display:flex;align-items:center;gap:10px;background:#0f1a30;
+                           border:1px solid #1e3050;border-radius:10px;padding:10px 14px;
+                           text-decoration:none;transition:border-color .15s;"
+                    onmouseover="this.style.borderColor='#f8961e'"
+                    onmouseout="this.style.borderColor='#1e3050'">
+                    <span style="font-size:18px;">📋</span>
+                    <div style="flex:1;">
+                        <div style="font-size:12px;font-weight:700;color:#f1f5f9;display:flex;align-items:center;gap:6px;">
+                            Edición ${tag}
+                        </div>
+                        <div style="font-size:10px;color:#475569;">${vFecha} · ${vMonto}</div>
+                    </div>
+                    <span style="font-size:10px;color:#f8961e;font-weight:700;">Abrir →</span>
+                </a>`;
+            } else {
+                html += `<div style="display:flex;align-items:center;gap:10px;background:#0f1a30;
+                               border:1px solid #1e3050;border-radius:10px;padding:10px 14px;opacity:.7;">
+                    <span style="font-size:18px;">📋</span>
+                    <div style="flex:1;">
+                        <div style="font-size:12px;font-weight:700;color:#f1f5f9;display:flex;align-items:center;gap:6px;">
+                            Edición ${tag}
+                        </div>
+                        <div style="font-size:10px;color:#475569;">${vFecha} · ${vMonto}</div>
+                    </div>
+                    <span style="font-size:10px;color:#475569;">Sin PDF</span>
+                </div>`;
+            }
+        });
+
+        html += `</div></div>`;
+    }
+
     // ── HISTORIAL CLIENTE ─────────────────────────────────────────
     const clienteHsId      = String(c.empresa?.cuit || c.cuit || '').replace(/\D/g,'');
     const clienteRazon     = _fixEncoding(c.empresa?.razonSocial || c.razonSocial || '').toLowerCase().trim();
@@ -1501,57 +1568,136 @@ async function _pcGenerarPropuesta() {
     if (!c) return;
 
     const btn = document.getElementById('pc-btn-generar');
-    btn.disabled  = true;
-    btn.textContent = '⏳ Generando...';
+    btn.disabled    = true;
+    btn.textContent = '⏳ Guardando...';
     _pcMostrarStatus('⏳ Guardando cambios...', '');
 
-    // Calcular totales finales
+    // ── 1. Calcular totales ────────────────────────────────────────
     let netoTotal = 0, ivaTotal = 0;
-    _pcItems.forEach(item => {
-        const bruto  = item.precioLista * item.cantidad;
-        const dVal   = item.descuentoValor;
-        const netoIt = item.descuentoTipo === '%'
-            ? Math.max(0, bruto - bruto * (dVal / 100))
-            : Math.max(0, bruto - dVal);
+    const carritoActualizado = _pcItems.map(i => {
+        const bruto  = i.precioLista * i.cantidad;
+        const netoIt = i.descuentoTipo === '%'
+            ? Math.max(0, bruto - bruto * (i.descuentoValor / 100))
+            : Math.max(0, bruto - i.descuentoValor);
         netoTotal += netoIt;
-        ivaTotal  += netoIt * (item.ivaPct / 100);
+        ivaTotal  += netoIt * (i.ivaPct / 100);
+        return {
+            nombre:         i.nombre,
+            precioLista:    i.precioLista,
+            precioNeto:     netoIt / i.cantidad,
+            cantidad:       i.cantidad,
+            descuentoValor: i.descuentoValor,
+            descuentoTipo:  i.descuentoTipo,
+            ivaPct:         i.ivaPct,
+            foto:           i.foto,
+        };
     });
     const totalConIva = netoTotal + ivaTotal;
 
-    // Actualizar cotización en memoria
-    c.carrito = _pcItems.map(i => ({
-        nombre:         i.nombre,
-        precioLista:    i.precioLista,
-        precioNeto:     i.descuentoTipo === '%'
-            ? Math.max(0, i.precioLista - i.precioLista * (i.descuentoValor / 100))
-            : Math.max(0, i.precioLista - i.descuentoValor / i.cantidad),
-        cantidad:       i.cantidad,
-        descuentoValor: i.descuentoValor,
-        descuentoTipo:  i.descuentoTipo,
-        ivaPct:         i.ivaPct,
-        foto:           i.foto,
-    }));
-    c.totales = { subtotal_neto: netoTotal, iva_total: ivaTotal, total_con_iva: totalConIva };
+    // ── 2. Calcular versión siguiente ─────────────────────────────
+    const versiones    = Array.isArray(c.versiones_presupuesto) ? c.versiones_presupuesto : [];
+    const nroVersion   = versiones.length + 1;          // 1, 2, 3...
+    const idBase       = String(c.idCot || c.id_cotizacion || c.id || '').split('/')[0]; // quita /1 previo si hubiera
+    const idVersionado = idBase + '/' + nroVersion;     // ej: TLC-20260608-K88L/1
 
-    // Persistir en historico.json via GAS → accionActualizarMonto
+    // ── 3. Actualizar objeto en memoria ANTES del fetch (0ms) ─────
+    c.carrito = carritoActualizado;
+    c.totales = { subtotal_neto: netoTotal, iva_total: ivaTotal, total_con_iva: totalConIva };
+    if (!Array.isArray(c.versiones_presupuesto)) c.versiones_presupuesto = [];
+    const nuevaVersion = {
+        version:     nroVersion,
+        idVersionado,
+        fecha:       new Date().toISOString(),
+        monto_neto:  Math.round(netoTotal * 100) / 100,
+        total_iva:   Math.round(totalConIva * 100) / 100,
+        link:        null, // se actualizará cuando el GAS devuelva el link PDF
+        carrito:     carritoActualizado,
+    };
+    c.versiones_presupuesto.push(nuevaVersion);
+
+    // ── 4. Refresh UI inmediato (optimista) ───────────────────────
+    _pcRefrescarUI(c);
+
+    // ── 5. Persistir en GAS (fire-and-confirm) ────────────────────
     try {
-        await fetch(APPS_SCRIPT_URL, {
+        const resp = await fetch(APPS_SCRIPT_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
-            body:    JSON.stringify({ accion: 'actualizarMonto', idCot: _pcIdCot, monto: totalConIva }),
-        }).then(r => r.json());
+            body:    JSON.stringify({
+                accion:       'actualizarCotizacion',
+                idCot:        idBase,
+                idVersionado,
+                nroVersion,
+                carrito:      carritoActualizado,
+                totalNeto:    Math.round(netoTotal   * 100) / 100,
+                ivaTotal:     Math.round(ivaTotal     * 100) / 100,
+                totalConIva:  Math.round(totalConIva  * 100) / 100,
+            }),
+        });
+        const result = await resp.json();
 
-        _pcMostrarStatus('✅ Cotización actualizada correctamente.', 'ok');
-        aplicarFiltros(); // refrescar Kanban/lista con nuevo monto
+        if (result.ok && result.dealActualizado) {
+            // GAS devolvió el deal completo — reemplazar en memoria y refrescar
+            const dealFresco = result.dealActualizado;
+
+            // Normalizar estado igual que en cargar()
+            if (dealFresco.estado) {
+                const e = String(dealFresco.estado).trim();
+                if (['Enviada','Cotización','presentationscheduled'].includes(e))  dealFresco.estado = '50%';
+                else if (['En seguimiento','decisionmakerboughtin'].includes(e))   dealFresco.estado = '75%';
+                else if (['Ganada','closedwon'].includes(e))                       dealFresco.estado = 'Ganada';
+                else if (['Perdida','closedlost'].includes(e))                     dealFresco.estado = 'Perdida';
+            }
+
+            // Reemplazar en historicoCompleto y todasLasCot
+            [historicoCompleto, todasLasCot].forEach(arr => {
+                const idx = arr.findIndex(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(idBase));
+                if (idx !== -1) arr[idx] = dealFresco;
+            });
+
+            // Si el GAS incluyó link PDF en la versión, actualizar la entrada en versiones
+            if (result.linkPdf) {
+                const vIdx = dealFresco.versiones_presupuesto?.findIndex(v => v.version === nroVersion);
+                if (vIdx !== undefined && vIdx !== -1) dealFresco.versiones_presupuesto[vIdx].link = result.linkPdf;
+            }
+
+            _pcRefrescarUI(dealFresco);
+            _pcMostrarStatus(`✅ Versión /v${nroVersion} guardada correctamente.`, 'ok');
+        } else if (result.ok) {
+            // GAS respondió ok pero sin deal — el refresh optimista ya está aplicado
+            _pcMostrarStatus(`✅ Versión /v${nroVersion} guardada.`, 'ok');
+        } else {
+            throw new Error(result.error || 'Error en el servidor');
+        }
+
         btn.textContent = '✅ Guardado';
         setTimeout(() => {
-            btn.disabled = false;
+            btn.disabled    = false;
             btn.textContent = '📄 Generar propuesta';
-        }, 2500);
+        }, 3000);
+
     } catch(e) {
+        console.error('_pcGenerarPropuesta:', e);
         _pcMostrarStatus('⚠️ Error al guardar: ' + e.message, 'error');
-        btn.disabled = false;
+        btn.disabled    = false;
         btn.textContent = '📄 Generar propuesta';
+    }
+}
+
+// ── Refresh visual en cascada: Kanban + detalle overlay ──────────
+function _pcRefrescarUI(dealActualizado) {
+    // A) Refrescar Kanban/Lista
+    aplicarFiltros();
+
+    // B) Si el detalle overlay está abierto para este deal → re-renderizarlo
+    const overlay = document.getElementById('detalle-overlay');
+    if (overlay && overlay.classList.contains('open') && cotActual) {
+        const idActual = String(cotActual.idCot || cotActual.id_cotizacion || cotActual.id || '');
+        const idDeal   = String(dealActualizado.idCot || dealActualizado.id_cotizacion || dealActualizado.id || '');
+        if (idActual === idDeal) {
+            cotActual = dealActualizado;
+            _renderDetalle(dealActualizado);
+        }
     }
 }
 
