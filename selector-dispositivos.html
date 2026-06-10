@@ -667,7 +667,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.06.30"; console.log("%c TLC Portal v2026.06.06.30 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.09.31"; console.log("%c TLC Portal v2026.06.06.30 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -719,6 +719,16 @@ let dispositivos = [];
 let dispositivoActual = null;
 let modalidadActual = null;
 let cantidadActual = 1;
+let _tcBNA = null; // TC BNA vendedor — se fetchea al iniciar y se actualiza periódicamente
+
+async function _fetchTcBNA() {
+    try {
+        const r = await fetch('https://dolarapi.com/v1/dolares/oficial');
+        if (r.ok) { const d = await r.json(); _tcBNA = d.venta || null; }
+    } catch(e) { console.warn('BNA fetch:', e); }
+}
+_fetchTcBNA();
+setInterval(_fetchTcBNA, 15 * 60 * 1000); // actualizar cada 15 min
 
 // ─── MSAL ─────────────────────────────────────────────────────────────────────
 async function initMsal() {
@@ -2227,29 +2237,29 @@ function renderCarrito() {
     const monedaFmt = mod.moneda === 'ARS' ? fmtARS : fmtUSD;
     const totalItems = carrito.reduce((s,i) => s+(i.cantidad||1), 0);
 
-    // Etiqueta dinámica según modalidad
-    const esARS      = c.mod.moneda === 'ARS';
-    const labelNetoAnterior = esARS ? 'Anticipo AR$' : 'Neto USD';
-    const valorNeto  = esARS ? fmtARS(c.adelantoTotal || c.netoBase) : fmtUSD(c.netoBase);
+    // TOTAL NETO siempre en USD (suma precioLista × cantidad)
+    const netoUSD    = carrito.reduce((s, i) => s + (i.precioLista || 0) * (i.cantidad || 1), 0);
     const labelTotal = 'TOTAL c/IVA USD';
     const ivaStr     = fmtUSD(c.iva);
     const totalStr   = fmtUSD(c.total);
+    const tcBNAStr   = _tcBNA ? `TC BNA vendedor: $${_tcBNA.toLocaleString('es-AR')}` : '';
+    const rowLabelStyle = 'font-size:14px; font-weight:800; color:#f1f5f9; text-transform:uppercase; letter-spacing:0.5px;';
 
     let totalesHtml = `<div class="carrito-totales">
         <div class="total-row">
-            <div>
-                <div style="font-size:10px; color:#64748b; text-decoration:line-through; margin-bottom:1px;">${labelNetoAnterior}</div>
-                <span class="total-label" style="font-size:13px; font-weight:800; color:#f1f5f9; text-transform:uppercase; letter-spacing:0.5px;">TOTAL NETO</span>
-            </div>
-            <span class="total-valor">${valorNeto}</span>
+            <span style="${rowLabelStyle}">TOTAL NETO</span>
+            <span class="total-valor" style="font-size:15px; font-weight:700;">${fmtUSD(netoUSD)}</span>
         </div>
         <div class="total-row">
             <span class="total-label" style="color:#f8961e;">IVA 10,5%</span>
             <span class="total-valor" style="color:#f8961e;">${ivaStr}</span>
         </div>
         <div class="total-row" style="border-top:1px solid #3a86ff33; padding-top:10px; margin-top:4px;">
-            <span class="total-label" style="font-size:14px; font-weight:700; color:#f1f5f9;">${labelTotal}</span>
-            <span class="total-valor" style="font-size:20px; color:#3a86ff;">${totalStr}</span>
+            <span style="${rowLabelStyle}">${labelTotal}</span>
+            <div style="text-align:right;">
+                <div class="total-valor" style="font-size:20px; color:#3a86ff;">${totalStr}</div>
+                ${tcBNAStr ? `<div style="font-size:10px; color:#64748b; margin-top:3px;">${tcBNAStr}</div>` : ''}
+            </div>
         </div>`;
 
     if (c.todosCalculados && c.adelantoTotal > 0 && mod.cuotas > 0) {
