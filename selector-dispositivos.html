@@ -1280,7 +1280,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.13.48"; console.log("%c TLC Portal v2026.06.13.48 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.13.49"; console.log("%c TLC Portal v2026.06.13.48 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -3994,9 +3994,28 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
     const opt      = c.mod;
     const monedaFmt2 = opt.moneda === 'ARS' ? fmtARS : fmtUSD;
 
-    // Link WhatsApp con URL pública (GitHub Pages) — nunca blob URL
-    // Si linkPublico aún no está disponible (upload en curso) se omite el botón
-    const wspLinkPresup = linkPublico ? _buildWspLink(telefono, linkPublico, nombre, nroRef) : '';
+    // ── Semáforo WhatsApp — datos serializados en tiempo de generación ───
+    // El teléfono se sanitiza aquí (en el contexto de la PWA donde existe _formatearTelefono)
+    const wspTelSanitizado = (function(raw) {
+        var d = (raw || '').replace(/\D/g, '');
+        if (!d) return '';
+        if (d.startsWith('0') && d.length > 10) d = d.slice(1);
+        if (d.startsWith('5499'))                d = '549' + d.slice(4);
+        if (d.startsWith('549')) { d = '549' + d.slice(3).replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2'); }
+        else if (d.length <= 10) { d = '549' + d.replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2'); }
+        return d;
+    })(telefono);
+
+    const wspSaludoRaw = (function() {
+        try { return localStorage.getItem('tlc_wsp_saludo') || ''; } catch(e) { return ''; }
+    })();
+    const wspSaludoFinal = (wspSaludoRaw
+        .replace(/\s*https?:\/\/\S*/gi, '')
+        .trimEnd()
+        .replace(/[:.]+$/, '') || 'Le compartimos el presupuesto de Tecnolog\u00EDa L\u00E1ser Corneal SRL') + ':';
+
+    // wspLinkPresup ya no se usa — el semáforo construye el link en tiempo de ejecución del presupuesto
+    const wspLinkPresup = '';
 
     // ── Totales reales con descuento e IVA por ítem ──────────────
     let netoTotal = 0, ivaTotal = 0;
@@ -4140,16 +4159,76 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         '.badge-novalido { border:1px solid #94a3b8; padding:3px 10px; font-size:10px; color:#64748b; font-family:Arial,sans-serif; }',
         '@media print { body{background:white;} .page{margin:0;box-shadow:none;padding:24px 28px;} .no-print{display:none!important;} }',
         '@media (max-width:600px) { .page{padding:12px;} .hi{display:block!important;} .hi td{display:block;width:100%!important;text-align:left!important;padding-bottom:10px;} }',
+        // CSS del semáforo + IIFE embebido — tags escapados con concatenación
+        // para que el parser HTML del archivo fuente no los vea como tags reales
+        '.btn-accion{padding:8px 18px;border:none;border-radius:6px;color:white;font-size:12px;font-family:Arial,sans-serif;display:inline-flex;align-items:center;gap:6px;transition:background .4s ease,opacity .4s ease,box-shadow .3s ease;}',
+        '.btn-pdf{background:#0f172a;cursor:pointer;}',
+        '.btn-pdf:hover{background:#1e293b;}',
+        '.btn-ws-disabled{background:#94a3b8;cursor:not-allowed;opacity:0.70;}',
+        '.btn-ws-active{background:#25D366;cursor:pointer;opacity:1;box-shadow:0 4px 14px rgba(37,211,102,0.40);}',
+        '.btn-ws-active:hover{background:#1ebe5d;}',
+        '.btn-ws-contingencia{background:#f8961e;cursor:pointer;opacity:1;}',
         '<\/style>',
-        '<script>function guardarPDF(){document.querySelector(".no-print").style.display="none";window.print();setTimeout(function(){document.querySelector(".no-print").style.display="block";},1000);}<\/script>',
+
+        // IIFE semáforo — datos serializados en tiempo de generación
+        '<' + 'script>',
+        '(function(){',
+        '  var URL_PUBLICA  = ' + JSON.stringify(linkPublico || '') + ';',
+        '  var TEL          = ' + JSON.stringify(wspTelSanitizado) + ';',
+        '  var SALUDO       = ' + JSON.stringify(wspSaludoFinal) + ';',
+        '  var MAX_INTENTOS = 5;',
+        '  var INTERVALO_MS = 3000;',
+        '  var intentos     = 0;',
+        '  var timerId      = null;',
+        '  function buildLinkWsp(){',
+        '    var msg = encodeURIComponent(SALUDO + "\\n" + URL_PUBLICA);',
+        '    return TEL ? "https://wa.me/" + TEL + "?text=" + msg : "https://wa.me/?text=" + msg;',
+        '  }',
+        '  function activarVerde(){',
+        '    var b = document.getElementById("btn-whatsapp");',
+        '    if(!b) return;',
+        '    b.disabled = false;',
+        '    b.className = "btn-accion btn-ws-active";',
+        '    b.textContent = "\uD83D\uDCAC Enviar por WhatsApp";',
+        '    b.onclick = function(e){ e.preventDefault(); window.open(buildLinkWsp(),"_blank","noopener,noreferrer"); };',
+        '  }',
+        '  function activarContingencia(){',
+        '    var b = document.getElementById("btn-whatsapp");',
+        '    if(!b) return;',
+        '    b.disabled = false;',
+        '    b.className = "btn-accion btn-ws-contingencia";',
+        '    b.textContent = "\u26A0\uFE0F Enviar (enlace en proceso)";',
+        '    b.title = "El enlace puede tardar unos segundos m\u00E1s en activarse.";',
+        '    b.onclick = function(e){ e.preventDefault(); window.open(buildLinkWsp(),"_blank","noopener,noreferrer"); };',
+        '  }',
+        '  function verificar(){',
+        '    intentos++;',
+        '    if(intentos > MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); return; }',
+        '    fetch(URL_PUBLICA,{method:"HEAD",mode:"cors",cache:"no-store"})',
+        '      .then(function(res){',
+        '        if(res.status===200){ clearInterval(timerId); activarVerde(); return; }',
+        '        if(intentos>=MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); }',
+        '      })',
+        '      .catch(function(){ clearInterval(timerId); activarContingencia(); });',
+        '  }',
+        '  function guardarPDF(){',
+        '    var np=document.querySelector(".no-print");',
+        '    if(np) np.style.display="none";',
+        '    window.print();',
+        '    setTimeout(function(){ if(np) np.style.display="flex"; },1200);',
+        '  }',
+        '  window.guardarPDF = guardarPDF;',
+        '  document.addEventListener("DOMContentLoaded",function(){ verificar(); timerId=setInterval(verificar,INTERVALO_MS); });',
+        '})();',
+        '<' + '/script>',
         '<\/head>',
         '<body>',
         '<div class="page">',
 
-        // BOTONES: PDF + WhatsApp (solo visible en pantalla, oculto al imprimir)
+        // BOTONES: PDF + semáforo WhatsApp
         '<div class="no-print" style="text-align:right;margin-bottom:16px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">',
-        '<button onclick="guardarPDF()" style="padding:8px 18px;background:#0f172a;border:none;border-radius:6px;color:white;font-size:12px;font-family:Arial,sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">&#8595; Guardar PDF<\/button>',
-        wspLinkPresup ? '<a href="' + wspLinkPresup + '" target="_blank" rel="noopener" style="padding:8px 18px;background:#25D366;border:none;border-radius:6px;color:white;font-size:12px;font-family:Arial,sans-serif;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-weight:600;">&#128172; Enviar por WhatsApp<\/a>' : '',
+        '<button class="btn-accion btn-pdf" onclick="guardarPDF()">&#8595; Guardar PDF<\/button>',
+        linkPublico ? '<button id="btn-whatsapp" disabled class="btn-accion btn-ws-disabled">&#9203; Verificando enlace...<\/button>' : '',
         '<\/div>',
 
         // HEADER: logo + datos del doc — flexbox responsive
