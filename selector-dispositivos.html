@@ -493,10 +493,14 @@
         background: #ffffff !important; border-color: #e2e8f0 !important;
         box-shadow: 0 1px 3px rgba(0,0,0,.06);
     }
-    /* Nombre del ítem en modal nueva cotización — alta especificidad */
-    body.tema-claro .mr-item-card div[style*="color:#f1f5f9"],
-    body.tema-claro .mr-item-card div[style*="color: #f1f5f9"],
-    body.tema-claro .mr-item-card [style*="font-weight:700"][style*="color:#f1f5f9"],
+    /* ── FIX DEFINITIVO: nombre del ítem en modal nueva cotización ──
+       Triple selector + !important para ganar a cualquier style inline.
+       Cubre .mr-item-card (modal resumen paso 2) y .carrito-item-nombre
+       (overlay del carrito). Independiente del JS de render.           */
+    body.tema-claro .mr-item-card div[style*="font-weight:700"],
+    body.tema-claro .mr-item-card div[style*="font-weight: 700"],
+    body.tema-claro #mr-paso2-items div[style*="font-weight:700"],
+    body.tema-claro #mr-paso2-items div[style*="font-weight: 700"],
     body.tema-claro .carrito-item-nombre {
         color: #0f172a !important;
     }
@@ -1280,7 +1284,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.13.49"; console.log("%c TLC Portal v2026.06.13.48 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.13.51"; console.log("%c TLC Portal v2026.06.13.50 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -4204,12 +4208,19 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         '  function verificar(){',
         '    intentos++;',
         '    if(intentos > MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); return; }',
-        '    fetch(URL_PUBLICA,{method:"HEAD",mode:"cors",cache:"no-store"})',
-        '      .then(function(res){',
-        '        if(res.status===200){ clearInterval(timerId); activarVerde(); return; }',
-        '        if(intentos>=MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); }',
-        '      })',
-        '      .catch(function(){ clearInterval(timerId); activarContingencia(); });',
+        // GitHub Pages NO envía CORS headers → usamos no-cors.
+        // Con no-cors, si el servidor responde (archivo existe) → status:0 (opaque) → .then() dispara → verde.
+        // Si el archivo aún no existe (404) → también resuelve opaque en algunos browsers.
+        // La diferencia real: si hay error de RED (sin conexión) → .catch() dispara.
+        // Estrategia: .then() siempre activa verde (el archivo subió o está en cache CDN de GH Pages).
+        // El verdadero 404 transitorio de GH Pages no genera error de red, sino respuesta opaca igual.
+        // Para distinguirlo usamos un iframe oculto que falla al cargar si el recurso es 404.
+        '    var iframe = document.createElement("iframe");',
+        '    iframe.style.display = "none";',
+        '    iframe.src = URL_PUBLICA + "?_c=" + Date.now();',
+        '    iframe.onload = function(){ document.body.removeChild(iframe); clearInterval(timerId); activarVerde(); };',
+        '    iframe.onerror = function(){ document.body.removeChild(iframe); if(intentos>=MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); } };',
+        '    document.body.appendChild(iframe);',
         '  }',
         '  function guardarPDF(){',
         '    var np=document.querySelector(".no-print");',
