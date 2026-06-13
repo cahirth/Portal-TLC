@@ -1284,7 +1284,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.13.51"; console.log("%c TLC Portal v2026.06.13.50 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.13.52"; console.log("%c TLC Portal v2026.06.13.52 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -4178,10 +4178,11 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         '<' + 'script>',
         '(function(){',
         '  var URL_PUBLICA  = ' + JSON.stringify(linkPublico || '') + ';',
+        '  var GAS_URL      = ' + JSON.stringify(FOTO_MAP_URL) + ';',
         '  var TEL          = ' + JSON.stringify(wspTelSanitizado) + ';',
         '  var SALUDO       = ' + JSON.stringify(wspSaludoFinal) + ';',
-        '  var MAX_INTENTOS = 5;',
-        '  var INTERVALO_MS = 3000;',
+        '  var MAX_INTENTOS = 10;',  // 10 × 5s = 50s máx
+        '  var INTERVALO_MS = 5000;',
         '  var intentos     = 0;',
         '  var timerId      = null;',
         '  function buildLinkWsp(){',
@@ -4208,19 +4209,18 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         '  function verificar(){',
         '    intentos++;',
         '    if(intentos > MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); return; }',
-        // GitHub Pages NO envía CORS headers → usamos no-cors.
-        // Con no-cors, si el servidor responde (archivo existe) → status:0 (opaque) → .then() dispara → verde.
-        // Si el archivo aún no existe (404) → también resuelve opaque en algunos browsers.
-        // La diferencia real: si hay error de RED (sin conexión) → .catch() dispara.
-        // Estrategia: .then() siempre activa verde (el archivo subió o está en cache CDN de GH Pages).
-        // El verdadero 404 transitorio de GH Pages no genera error de red, sino respuesta opaca igual.
-        // Para distinguirlo usamos un iframe oculto que falla al cargar si el recurso es 404.
-        '    var iframe = document.createElement("iframe");',
-        '    iframe.style.display = "none";',
-        '    iframe.src = URL_PUBLICA + "?_c=" + Date.now();',
-        '    iframe.onload = function(){ document.body.removeChild(iframe); clearInterval(timerId); activarVerde(); };',
-        '    iframe.onerror = function(){ document.body.removeChild(iframe); if(intentos>=MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); } };',
-        '    document.body.appendChild(iframe);',
+        // GAS proxy: el GAS hace el HEAD a GitHub Pages y devuelve {status:200} o {status:404}
+        // Evita el problema CORS del browser — el servidor no tiene restricciones
+        '    var proxyUrl = GAS_URL + "?accion=checkUrl&url=" + encodeURIComponent(URL_PUBLICA) + "&_c=" + Date.now();',
+        '    fetch(proxyUrl, { method:"GET", mode:"cors", cache:"no-store" })',
+        '      .then(function(r){ return r.json(); })',
+        '      .then(function(data){',
+        '        if(data.status === 200){ clearInterval(timerId); activarVerde(); }',
+        '        else if(intentos >= MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); }',
+        '      })',
+        '      .catch(function(){',
+        '        if(intentos >= MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); }',
+        '      });',
         '  }',
         '  function guardarPDF(){',
         '    var np=document.querySelector(".no-print");',
