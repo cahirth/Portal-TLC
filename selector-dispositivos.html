@@ -570,6 +570,20 @@
 
             <div id="mr-status" class="form-status" style="display:none;"></div>
 
+            <!-- Saludo WhatsApp personalizable -->
+            <div style="background:#0a1628; border:1px solid #1e3050; border-radius:10px; padding:10px 12px;">
+                <div style="font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                    Saludo WhatsApp personalizado
+                </div>
+                <textarea id="wsp-saludo-input" rows="2"
+                    style="width:100%; background:#080d14; border:1px solid #1e3050; border-radius:8px;
+                           color:#f1f5f9; font-size:12px; padding:8px 10px; resize:none; line-height:1.4; outline:none;"
+                    placeholder="Hola, le compartimos el presupuesto de Tecnología Láser Corneal SRL: "
+                    oninput="_guardarSaludoWsp(this.value)"></textarea>
+                <div style="font-size:10px; color:#475569; margin-top:4px;">Se guarda automáticamente · La URL del presupuesto se agrega al final</div>
+            </div>
+
             <!-- Botones acción -->
             <div style="display:flex; flex-direction:column; gap:10px; margin-top:4px;">
                 <button id="btn-mr-generar" onclick="generarPropuesta()"
@@ -667,7 +681,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.09.35"; console.log("%c TLC Portal v2026.06.09.35 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.09.36"; console.log("%c TLC Portal v2026.06.09.36 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2791,6 +2805,9 @@ function abrirModalResumen() {
     _mrUltimaBusqueda = '';
     _mrSetBadge('', 'hidden');
 
+    // Cargar saludo WhatsApp guardado desde localStorage
+    _initSaludoWsp();
+
     if (_mrClienteValidado) {
         // ── Cliente ya validado: ir directo al Paso 2 ──────────────
         document.getElementById('mr-paso1').style.display = 'none';
@@ -2930,18 +2947,16 @@ async function generarPropuesta() {
     mostrarMrStatus('⏳ Subiendo presupuesto...', '');
 
     try {
-        const htmlPresup = await generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot: _idCotActual, plazoEntrega, lugarEntrega });
+        // Calcular la URL pública GitHub Pages ANTES de generar el HTML
+        // para poder incrustarla en el botón WhatsApp del presupuesto
+        const linkFinal = 'https://cahirth.github.io/Portal-TLC/cotizaciones/' + _idCotActual + '.html';
+
+        const htmlPresup = await generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot: _idCotActual, plazoEntrega, lugarEntrega, linkPublico: linkFinal });
 
         // ── PASO 1: Blob URL instantáneo — 0ms, sin esperar GitHub ──────────
-        // El vendedor ve el presupuesto al instante desde memoria del browser
         const blobInstant = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
         _blobUrlActual    = URL.createObjectURL(blobInstant);
-        setTimeout(() => URL.revokeObjectURL(_blobUrlActual), 600000); // limpiar en 10min
-
-        // Link final para el cliente = GitHub Pages (se construye con el ID, sin esperar)
-        const linkFinal = 'https://cahirth.github.io/Portal-TLC/cotizaciones/' + _idCotActual + '.html';
-        const resultGitHub = { ok: true, link: linkFinal }; // optimista — GitHub recibirá el push
-
+        setTimeout(() => URL.revokeObjectURL(_blobUrlActual), 600000);
         // ── PASO 2: Subir a GitHub en background (fire-and-forget) ──────────
         mostrarMrStatus('✅ Presupuesto listo · Publicando en segundo plano...', '');
         fetch(FOTO_MAP_URL, {
@@ -3085,17 +3100,8 @@ async function generarPropuesta() {
           })
           .catch(err => console.warn('⚠️ Error HubSpot fetch:', err));
 
-        // Preparar link WhatsApp
-        const nombreCorto = nombre.replace(/^Dr\.?\s*/i, '').split(' ')[0];
-        const msgWsp = encodeURIComponent(
-            'Hola Dr. ' + nombreCorto + ', le comparto el presupuesto de TLC SRL ' +
-            'para los equipos solicitados: ' + linkFinal +
-            ' | Ref: ' + _idCotActual
-        );
-        const telLimpio = telefono.replace(/\D/g,'').replace(/^0/,'').replace(/^54/,'');
-        _linkWspActual = telLimpio
-            ? 'https://wa.me/549' + telLimpio + '?text=' + msgWsp
-            : 'https://wa.me/?text=' + msgWsp;
+        // ── WhatsApp: teléfono + mensaje personalizado ────────────────
+        _linkWspActual = _buildWspLink(telefono, linkFinal, nombre, _idCotActual);
 
         // ── Vista instantánea via Blob URL ──────────────────────────────
         // El vendedor ve el presupuesto al instante desde memoria del browser.
@@ -3145,6 +3151,85 @@ async function generarPropuesta() {
     }
 }
 
+// ─── FORMATEO ROBUSTO DE TELÉFONO ARGENTINO ───────────────────────
+/**
+ * Recibe cualquier string de teléfono del usuario y devuelve
+ * el número en formato internacional estricto para wa.me.
+ *
+ * Reglas aplicadas en orden:
+ *  1. Elimina todo lo que no sea dígito
+ *  2. Elimina cero inicial (línea local)
+ *  3. Corrige bucle "5499..." → "549..."
+ *  4. Elimina el "15" de celular después del código de área
+ *  5. Si no tiene prefijo de país, inyecta "549"
+ *
+ * Ejemplos:
+ *  "+54 9 11 2492-9343"  → "5491124929343"
+ *  "011 15 2492 9343"    → "5491124929343"
+ *  "+5499 11 2492 9343"  → "5491124929343"  (corrige doble 9)
+ *  "1124929343"          → "5491124929343"  (inyecta prefijo)
+ *  "+598 99 123 456"     → "59899123456"    (Uruguay, respeta)
+ */
+function _formatearTelefono(raw) {
+    if (!raw) return '';
+
+    // 1. Solo dígitos
+    let d = String(raw).replace(/\D/g, '');
+    if (!d) return '';
+
+    // 2. Eliminar cero inicial de discado local ("0810...", "011...")
+    if (d.startsWith('0') && d.length > 10) d = d.slice(1);
+
+    // 3. Corregir bucle "5499" → "549"  (error frecuente: +54 9 9...)
+    if (d.startsWith('5499')) d = '549' + d.slice(4);
+
+    // 4. Si ya tiene prefijo argentino "549" → quitar el "15" de celular
+    //    Estructura: 549 + [código área 2-4 dígitos] + [posible 15] + [número]
+    if (d.startsWith('549')) {
+        // Después de "549" puede venir cód área (2-4 dígitos) + "15" + número
+        const sinPrefijo = d.slice(3);           // ej: "1115224929343" o "11224929343"
+        const con15 = sinPrefijo.replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2');
+        d = '549' + con15;
+    }
+
+    // 5. Si no tiene prefijo de país (número corto argentino sin "549")
+    //    Detección: longitud <= 10 dígitos, o empieza con "11","2","3","4"
+    if (d.length <= 10 && !d.startsWith('549')) {
+        // Quitar "15" si viene como primer bloque de celular
+        d = d.replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2');
+        d = '549' + d;
+    }
+
+    return d;
+}
+
+/**
+ * Construye el link wa.me completo con teléfono formateado
+ * y mensaje personalizado leído desde localStorage.
+ *
+ * localStorage key: 'tlc_wsp_saludo'
+ * Valor por defecto si no existe:
+ *   "Hola, le compartimos el presupuesto de Tecnología Láser Corneal SRL: "
+ */
+function _buildWspLink(telefonoRaw, urlPresupuesto, nombreCliente, refId) {
+    const telFormateado = _formatearTelefono(telefonoRaw);
+
+    // Saludo personalizado del vendedor (guardado en localStorage)
+    const saludoDefault = 'Hola, le compartimos el presupuesto de Tecnología Láser Corneal SRL: ';
+    const saludoCustom  = (() => {
+        try { return localStorage.getItem('tlc_wsp_saludo') || saludoDefault; }
+        catch(e) { return saludoDefault; }
+    })();
+
+    // Mensaje final: saludo + URL pública GitHub Pages + ref
+    const msgTexto = saludoCustom + urlPresupuesto + (refId ? ' (Ref: ' + refId + ')' : '');
+    const msgEncoded = encodeURIComponent(msgTexto);
+
+    return telFormateado
+        ? 'https://wa.me/' + telFormateado + '?text=' + msgEncoded
+        : 'https://wa.me/?text=' + msgEncoded;
+}
+
 // ─── PASO 2: Enviar por WhatsApp ──────────────────────────────────
 function enviarPorWsp() {
     if (!_linkWspActual) return;
@@ -3162,17 +3247,35 @@ function nuevaCotizacion() {
     cerrarModalResumen();
 }
 
+// ─── SALUDO WSP — persistencia en localStorage ────────────────────
+function _guardarSaludoWsp(val) {
+    try { localStorage.setItem('tlc_wsp_saludo', val.trim()); } catch(e) {}
+}
+
+function _initSaludoWsp() {
+    const ta = document.getElementById('wsp-saludo-input');
+    if (!ta) return;
+    try {
+        const saved = localStorage.getItem('tlc_wsp_saludo');
+        ta.value = saved || '';
+    } catch(e) {}
+}
+
 // ─── Función pública abrirCheckout (alias para compatibilidad) ────
 function abrirCheckout() { abrirModalResumen(); }
 function nuevoPresupuesto() { nuevaCotizacion(); }
 function mostrarCoStatus(msg, tipo) { mostrarMrStatus(msg, tipo); }
 
-async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot, plazoEntrega, lugarEntrega }) {
+async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot, plazoEntrega, lugarEntrega, linkPublico }) {
     const fecha    = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'long', year:'numeric' });
     const nroRef   = idCot || generarIdCotizacion();
     const c        = calcularCarrito();
     const opt      = c.mod;
     const monedaFmt2 = opt.moneda === 'ARS' ? fmtARS : fmtUSD;
+
+    // Link WhatsApp con URL pública (GitHub Pages) — nunca blob URL
+    // Si linkPublico aún no está disponible (upload en curso) se omite el botón
+    const wspLinkPresup = linkPublico ? _buildWspLink(telefono, linkPublico, nombre, nroRef) : '';
 
     // ── Totales reales con descuento e IVA por ítem ──────────────
     let netoTotal = 0, ivaTotal = 0;
@@ -3322,9 +3425,10 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         '<body>',
         '<div class="page">',
 
-        // BOTÓN PDF
-        '<div class="no-print" style="text-align:right;margin-bottom:16px;">',
-        '<button onclick="guardarPDF()" style="padding:8px 18px;background:#0f172a;border:none;border-radius:6px;color:white;font-size:12px;font-family:Arial,sans-serif;cursor:pointer;">&#8595; Guardar PDF<\/button>',
+        // BOTONES: PDF + WhatsApp (solo visible en pantalla, oculto al imprimir)
+        '<div class="no-print" style="text-align:right;margin-bottom:16px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">',
+        '<button onclick="guardarPDF()" style="padding:8px 18px;background:#0f172a;border:none;border-radius:6px;color:white;font-size:12px;font-family:Arial,sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">&#8595; Guardar PDF<\/button>',
+        wspLinkPresup ? '<a href="' + wspLinkPresup + '" target="_blank" rel="noopener" style="padding:8px 18px;background:#25D366;border:none;border-radius:6px;color:white;font-size:12px;font-family:Arial,sans-serif;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-weight:600;">&#128172; Enviar por WhatsApp<\/a>' : '',
         '<\/div>',
 
         // HEADER: logo + datos del doc — flexbox responsive
