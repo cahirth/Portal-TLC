@@ -214,6 +214,271 @@
         .spinner { width:32px; height:32px; border:3px solid #1e3050; border-top-color:#3a86ff; border-radius:50%; animation:spin .8s linear infinite; }
         @keyframes spin { to { transform:rotate(360deg); } }
         .empty { text-align:center; padding:60px 20px; color:#475569; font-size:13px; }
+
+        /* ═══════════════════════════════════════════════════════════
+           TEMA CLARO — cotizaciones.html
+           Se activa con body.tema-claro (misma clase que selector.html)
+        ═══════════════════════════════════════════════════════════ */
+
+        /* ── Fondo y texto global ───────────────────────────────── */
+        body.tema-claro { background:#f0f4f8 !important; color:#1e293b !important; }
+
+        /* ── Header ─────────────────────────────────────────────── */
+        body.tema-claro .header {
+            background:linear-gradient(135deg,#ffffff,#f1f5f9) !important;
+            border-bottom:1px solid #cbd5e1 !important;
+            box-shadow:0 2px 12px rgba(0,0,0,.08) !important;
+        }
+        body.tema-claro .header::after { background:linear-gradient(90deg,#1a4b8c,#0097b2,#1a4b8c) !important; }
+        body.tema-claro .header-text h1 { color:#0f172a !important; }
+        body.tema-claro .header-text p  { color:#64748b !important; }
+
+        /* ── Zona superior / stats / filtros ────────────────────── */
+        body.tema-claro .zona-superior { background:#f0f4f8 !important; border-bottom-color:#e2e8f0 !important; }
+        body.tema-claro .stat-chip { background:#ffffff !important; border-color:#e2e8f0 !important; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+        body.tema-claro .stat-chip .val { color:#1a4b8c !important; }
+        body.tema-claro .stat-chip .lbl { color:#64748b !important; }
+        body.tema-claro .filtro-btn { background:#ffffff !important; border-color:#cbd5e1 !important; color:#475569 !important; }
+        body.tema-claro .filtro-btn.active { background:#1a4b8c !important; border-color:#1a4b8c !important; color:#fff !important; }
+        body.tema-claro .buscador-wrap input { background:#ffffff !important; border-color:#cbd5e1 !important; color:#0f172a !important; }
+        body.tema-claro .buscador-wrap input::placeholder { color:#94a3b8 !important; }
+        body.tema-claro .buscador-wrap input:focus { border-color:#1a4b8c !important; }
+        body.tema-claro .vista-toggle { background:#ffffff !important; border-color:#cbd5e1 !important; }
+        body.tema-claro .vista-btn { color:#475569 !important; }
+        body.tema-claro .vista-btn.active { background:#1a4b8c !important; color:#fff !important; }
+
+        /* ── Cards de lista ─────────────────────────────────────── */
+        body.tema-claro .cot-card { background:#ffffff !important; border-color:#e2e8f0 !important; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+        body.tema-claro .cot-nombre { color:#0f172a !important; }
+        body.tema-claro .cot-equipo { color:#1a4b8c !important; }
+        body.tema-claro .cot-fecha  { color:#64748b !important; }
+        body.tema-claro .cot-monto  { color:#059669 !important; }
+        body.tema-claro .cot-notas  { color:#64748b !important; }
+
+        /* FIX 1: Desglose totales — etiquetas ilegibles en tema claro */
+        /* .pc-tot-label (Neto USD, IVA 10,5%, etc.) */
+        body.tema-claro .pc-tot-label { color:#475569 !important; }
+        body.tema-claro .pc-tot-val   { color:#0f172a !important; }
+        body.tema-claro .pc-tot-final-label { color:#0f172a !important; }
+        body.tema-claro .pc-tot-final-val   { color:#1a4b8c !important; }
+        body.tema-claro .pc-totales { background:#f1f5f9 !important; border-color:#e2e8f0 !important; }
+        body.tema-claro .pc-tot-final { border-top-color:#cbd5e1 !important; }
+        /* También cubre totales del detalle con style inline */
+        body.tema-claro [style*="color:#94a3b8"] { color:#475569 !important; }
+        body.tema-claro [style*="color: #94a3b8"] { color:#475569 !important; }
+
+        /* FIX 2: Título del equipo en modal nueva cotización */
+        body.tema-claro .equipo-nombre { color:#1a4b8c !important; }
+        body.tema-claro .equipo-precio { color:#059669 !important; }
+        body.tema-claro .equipo-desc   { color:#64748b !important; }
+        /* Fuerza el nombre también cuando viene con span inline */
+        body.tema-claro .equipo-nombre span[style*="color:#3a86ff"],
+        body.tema-claro .equipo-nombre span[style*="color: #3a86ff"] { color:#1a4b8c !important; }
+
+        /* FIX 3: Dropdown buscador de médicos / equipos en Pantalla Comercial */
+        body.tema-claro .pc-search-results {
+            background:#ffffff !important;
+            border-color:#cbd5e1 !important;
+            box-shadow:0 4px 16px rgba(0,0,0,.12) !important;
+        }
+        body.tema-claro .pc-search-result {
+            color:#0f172a !important;
+            border-bottom-color:#e2e8f0 !important;
+        }
+        body.tema-claro .pc-search-result:hover { background:#f1f5f9 !important; }
+        body.tema-claro .pc-search-result .pc-res-precio { color:#059669 !important; }
+        /* Input del buscador */
+        body.tema-claro .pc-search-input {
+            background:#ffffff !important;
+            border-color:#1a4b8c !important;
+            color:#0f172a !important;
+        }
+
+        /* ── Pantalla Comercial (pc-overlay / pc-box / pc-item) ── */
+        body.tema-claro .pc-overlay { background:rgba(0,0,0,.5) !important; }
+        body.tema-claro .pc-box { background:#f8fafc !important; border-color:#e2e8f0 !important; box-shadow:0 24px 64px rgba(0,0,0,.18) !important; }
+        body.tema-claro .pc-header { background:linear-gradient(135deg,#ffffff,#f1f5f9) !important; border-bottom-color:#e2e8f0 !important; }
+        body.tema-claro .pc-titulo { color:#0f172a !important; }
+        body.tema-claro .pc-cliente { color:#475569 !important; }
+        body.tema-claro .pc-item { background:#ffffff !important; border-color:#e2e8f0 !important; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+        body.tema-claro .pc-item-nombre { color:#0f172a !important; }
+        body.tema-claro .pc-item-precio-lista { color:#64748b !important; }
+        body.tema-claro .pc-item-neto { color:#059669 !important; }
+        body.tema-claro .pc-qty { background:#f1f5f9 !important; border-color:#e2e8f0 !important; }
+        body.tema-claro .pc-qty-btn { color:#374151 !important; }
+        body.tema-claro .pc-qty-num { color:#1a4b8c !important; }
+        body.tema-claro .pc-desc-input,
+        body.tema-claro .pc-iva-select { background:#ffffff !important; border-color:#cbd5e1 !important; color:#0f172a !important; }
+        body.tema-claro .pc-tipo-toggle { background:#ffffff !important; border-color:#cbd5e1 !important; }
+        body.tema-claro .pc-tipo-btn { color:#475569 !important; }
+        body.tema-claro .pc-tipo-btn.active { background:#1a4b8c !important; color:#fff !important; }
+        body.tema-claro .pc-btn-add { background:transparent !important; border-color:#93c5fd !important; color:#1a4b8c !important; }
+        body.tema-claro .pc-btn-secondary { border-color:#e2e8f0 !important; color:#475569 !important; }
+        body.tema-claro #pc-status { border-color:#e2e8f0 !important; }
+
+        /* ── Detalle overlay ─────────────────────────────────────── */
+        body.tema-claro .detalle-overlay { background:#f8fafc !important; }
+        body.tema-claro .det-header { background:#ffffff !important; border-bottom-color:#e2e8f0 !important; }
+        body.tema-claro .det-titulo { color:#0f172a !important; }
+        body.tema-claro .det-hero { background:#f1f5f9 !important; }
+        body.tema-claro .det-hero-monto { color:#1a4b8c !important; }
+        body.tema-claro .det-grid { border-top-color:#e2e8f0 !important; }
+        body.tema-claro .det-card { background:#ffffff !important; border-color:#e2e8f0 !important; }
+        body.tema-claro .det-card-label { color:#64748b !important; }
+        body.tema-claro .det-card-val { color:#0f172a !important; }
+        body.tema-claro .det-card-val.accent { color:#1a4b8c !important; }
+        body.tema-claro .det-card-full { background:#ffffff !important; border-color:#e2e8f0 !important; }
+        body.tema-claro .sec-titulo { color:#1a4b8c !important; border-bottom-color:#e2e8f0 !important; }
+        /* Versiones de presupuesto en detalle */
+        body.tema-claro .detalle-overlay a[style*="background:#0f1a30"],
+        body.tema-claro .detalle-overlay div[style*="background:#0f1a30"],
+        body.tema-claro .detalle-overlay a[style*="background:#0f2a52"],
+        body.tema-claro .detalle-overlay div[style*="background:#0f2a52"] {
+            background:#ffffff !important; border-color:#e2e8f0 !important;
+        }
+        body.tema-claro .detalle-overlay [style*="color:#f1f5f9"] { color:#0f172a !important; }
+        body.tema-claro .detalle-overlay [style*="color:#475569"]  { color:#64748b !important; }
+        body.tema-claro .detalle-overlay [style*="color:#60a5fa"]  { color:#1a4b8c !important; }
+
+        /* ── Kanban ─────────────────────────────────────────────── */
+        body.tema-claro .kanban-outer { background:#f0f4f8 !important; }
+        body.tema-claro .kanban-cards { background:#e8edf3 !important; border-color:#d1d9e6 !important; }
+        body.tema-claro .k-card { background:#ffffff !important; border-color:#e2e8f0 !important; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+        body.tema-claro .k-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.12) !important; }
+        body.tema-claro .k-titulo { color:#0f172a !important; }
+        body.tema-claro .k-valor  { color:#059669 !important; }
+        body.tema-claro .k-prop   { color:#64748b !important; }
+        body.tema-claro .k-fecha  { color:#94a3b8 !important; }
+        body.tema-claro .k-id     { color:#1a4b8c !important; }
+        body.tema-claro .k-btn    { background:#f1f5f9 !important; border-color:#e2e8f0 !important; color:#475569 !important; }
+        body.tema-claro .k-btn:hover { border-color:#1a4b8c !important; color:#1a4b8c !important; }
+        body.tema-claro .kanban-empty-col { color:#94a3b8 !important; border-color:#d1d9e6 !important; }
+        body.tema-claro .cambio-etapa-select { background:#ffffff !important; border-color:#e2e8f0 !important; color:#374151 !important; }
+
+        /* ── Notas papiro ───────────────────────────────────────── */
+        body.tema-claro .nota-burbuja { background:#ffffff !important; border-color:#e2e8f0 !important; }
+        body.tema-claro .nota-texto   { color:#0f172a !important; }
+        body.tema-claro .nota-meta    { color:#64748b !important; }
+        body.tema-claro .nota-input   { background:#ffffff !important; border-color:#cbd5e1 !important; color:#0f172a !important; }
+        body.tema-claro textarea, body.tema-claro input[type="text"] {
+            background:#ffffff !important; border-color:#cbd5e1 !important; color:#0f172a !important;
+        }
+
+        /* ── Fondos inline oscuros en detalle overlay ───────────── */
+        body.tema-claro .detalle-overlay [style*="background:#080d14"],
+        body.tema-claro .detalle-overlay [style*="background: #080d14"],
+        body.tema-claro .detalle-overlay [style*="background:#0a1628"],
+        body.tema-claro .detalle-overlay [style*="background: #0a1628"],
+        body.tema-claro .detalle-overlay [style*="background:#0f1a30"],
+        body.tema-claro .detalle-overlay [style*="background: #0f1a30"] {
+            background:#f1f5f9 !important; border-color:#e2e8f0 !important;
+        }
+        body.tema-claro .detalle-overlay [style*="background:linear-gradient(135deg,#0f2a52"],
+        body.tema-claro .detalle-overlay [style*="background:linear-gradient(135deg, #0f2a52"] {
+            background:linear-gradient(135deg,#e8f0fc,#dbeafe) !important;
+            border-color:#93c5fd !important;
+        }
+
+        /* ── COMPLEMENTO AGRESIVO: fondos oscuros inline en TODO el documento ──
+           Cubre modales, historial de versiones, encabezados, inputs y cualquier
+           contenedor con fondo de la paleta nocturna, sin scope restrictivo.   */
+
+        /* Fondos #0f1a30 — cards, stat-chips, k-cards, nota-item, etc. */
+        body.tema-claro [style*="background:#0f1a30"],
+        body.tema-claro [style*="background: #0f1a30"] {
+            background:#ffffff !important;
+            border-color:#e2e8f0 !important;
+        }
+        /* Fondos #0a1628 — contenedores secundarios */
+        body.tema-claro [style*="background:#0a1628"],
+        body.tema-claro [style*="background: #0a1628"] {
+            background:#f8fafc !important;
+            border-color:#e2e8f0 !important;
+        }
+        /* Fondos #080d14 — inputs, contenedores terciarios */
+        body.tema-claro [style*="background:#080d14"],
+        body.tema-claro [style*="background: #080d14"] {
+            background:#ffffff !important;
+            border-color:#cbd5e1 !important;
+        }
+        /* Fondos #0d1520 — pc-box, dropdowns */
+        body.tema-claro [style*="background:#0d1520"],
+        body.tema-claro [style*="background: #0d1520"] {
+            background:#ffffff !important;
+            border-color:#e2e8f0 !important;
+        }
+        /* Fondos #1c2541 — selects, toggles */
+        body.tema-claro [style*="background:#1c2541"],
+        body.tema-claro [style*="background: #1c2541"] {
+            background:#f1f5f9 !important;
+            border-color:#e2e8f0 !important;
+        }
+        /* Gradientes oscuros inline */
+        body.tema-claro [style*="background:linear-gradient(135deg,#0f1a30"],
+        body.tema-claro [style*="background:linear-gradient(135deg, #0f1a30"],
+        body.tema-claro [style*="background:linear-gradient(135deg,#05111f"],
+        body.tema-claro [style*="background:linear-gradient(135deg, #05111f"] {
+            background:linear-gradient(135deg,#f0f4f8,#e8edf5) !important;
+            border-color:#e2e8f0 !important;
+        }
+
+        /* Textos blancos/claros que quedan sobre fondos ahora claros */
+        body.tema-claro [style*="color:#f1f5f9"] { color:#0f172a !important; }
+        body.tema-claro [style*="color: #f1f5f9"] { color:#0f172a !important; }
+        body.tema-claro [style*="color:#f8fafc"] { color:#0f172a !important; }
+        body.tema-claro [style*="color: #f8fafc"] { color:#0f172a !important; }
+        body.tema-claro [style*="color:#94a3b8"] { color:#475569 !important; }
+        body.tema-claro [style*="color: #94a3b8"] { color:#475569 !important; }
+        body.tema-claro [style*="color:#64748b"] { color:#64748b !important; }
+        body.tema-claro [style*="color:#475569"] { color:#374151 !important; }
+        body.tema-claro [style*="color:#334155"] { color:#475569 !important; }
+
+        /* FIX específico: encabezado modal "Nueva Cotización" / pc-header */
+        body.tema-claro .pc-box { background:#f8fafc !important; border-color:#e2e8f0 !important; }
+        body.tema-claro .pc-header {
+            background:linear-gradient(135deg,#ffffff,#f1f5f9) !important;
+            border-bottom-color:#e2e8f0 !important;
+        }
+        body.tema-claro .pc-titulo  { color:#0f172a !important; }
+        body.tema-claro .pc-cliente { color:#475569 !important; }
+
+        /* FIX específico: inputs de búsqueda dentro del modal */
+        body.tema-claro .pc-search-input {
+            background:#ffffff !important; border-color:#1a4b8c !important; color:#0f172a !important;
+        }
+
+        /* FIX específico: listado flotante de contactos / médicos */
+        body.tema-claro .pc-search-results {
+            background:#ffffff !important;
+            border-color:#cbd5e1 !important;
+            box-shadow:0 8px 24px rgba(0,0,0,.12) !important;
+        }
+        body.tema-claro .pc-search-result {
+            color:#0f172a !important;
+            border-bottom-color:#e2e8f0 !important;
+            background:#ffffff !important;
+        }
+        body.tema-claro .pc-search-result * { color:#0f172a !important; }
+        body.tema-claro .pc-search-result .pc-res-precio { color:#059669 !important; }
+        body.tema-claro .pc-search-result:hover { background:#f1f5f9 !important; }
+        body.tema-claro .pc-search-result:hover * { color:#0f172a !important; }
+
+        /* FIX específico: badge /v1 /v2 con fondo crema — texto debe ser visible */
+        body.tema-claro [style*="background:rgba(248,150,30"] { color:#92400e !important; }
+        body.tema-claro [style*="background: rgba(248,150,30"] { color:#92400e !important; }
+        /* Textos de los items dentro del bloque de versiones/historial */
+        body.tema-claro .detalle-overlay div[style*="color:#475569"] { color:#374151 !important; }
+
+        /* FIX: selects, textareas, inputs en todo el documento */
+        body.tema-claro select,
+        body.tema-claro textarea,
+        body.tema-claro input:not([type="checkbox"]):not([type="radio"]) {
+            background:#ffffff !important;
+            border-color:#cbd5e1 !important;
+            color:#0f172a !important;
+        }
+        /* Selectores de etapa en kanban */
+        body.tema-claro .cambio-etapa-select { color:#374151 !important; }
     </style>
 </head>
 <body>
@@ -344,7 +609,7 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.09.29";
+const APP_VERSION = "2026.06.13.31";
 console.log("%c TLC Cotizaciones v2026.06.09.29 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
@@ -440,6 +705,11 @@ let vendedorActivo    = null; // null = el propio usuario; string = nombre elegi
 
 // ─── INIT ────────────────────────────────────────────────────────
 async function init() {
+    // FIX 4: Aplicar tema guardado desde el primer milisegundo,
+    // antes de cualquier render, para que los subcomponentes
+    // hereden la paleta correcta desde su primera pintada.
+    _aplicarTemaCot();
+
     msal_app = new msal.PublicClientApplication(msalConfig);
     await msal_app.initialize();
     const resp    = await msal_app.handleRedirectPromise();
@@ -457,6 +727,25 @@ async function init() {
 
     await cargar();
     _getPrecios(); // cargar precios.json en background para folletos/videos
+}
+
+// ── Propagación del tema a cotizaciones.html ─────────────────────
+// Lee localStorage['tlc_tema'] (compartido con selector-dispositivos.html)
+// y aplica/quita la clase body.tema-claro. Se llama en init() y puede
+// llamarse externamente si el usuario cambia el switch en selector.html.
+function _aplicarTemaCot() {
+    try {
+        const tema = localStorage.getItem('tlc_tema') || 'dark';
+        if (tema === 'light') {
+            document.body.classList.add('tema-claro');
+        } else {
+            document.body.classList.remove('tema-claro');
+        }
+        // Re-renderizar si ya hay datos cargados (llamada tardía desde menú)
+        if (typeof aplicarFiltros === 'function' && todasLasCot && todasLasCot.length > 0) {
+            aplicarFiltros();
+        }
+    } catch(e) {}
 }
 
 // ─── CARGA DE VENDEDORES DESDE SHEET ────────────────────────────
@@ -1808,6 +2097,29 @@ function _pcGenerarHTMLPresupuesto(c, carrito, netoTotal, ivaTotal, totalConIva,
         ? `<span style="font-size:11px;background:#f8961e22;border:1px solid #f8961e66;color:#f8961e;padding:2px 8px;border-radius:8px;margin-left:8px;">/v${nroVersion}</span>`
         : '';
 
+    // Link GitHub Pages para el semáforo de polling
+    const linkGitHub = 'https://cahirth.github.io/Portal-TLC/cotizaciones/' + idVersionado + '.html';
+
+    // Saludo WhatsApp — leído y sanitizado de localStorage
+    const saludoRaw = (() => {
+        try { return localStorage.getItem('tlc_wsp_saludo') || ''; } catch(e) { return ''; }
+    })();
+    const saludoSanitizado = saludoRaw
+        .replace(/\s*https?:\/\/\S*/gi, '').trimEnd()  // eliminar URLs pegadas
+        .replace(/[:.]+$/, '');                          // normalizar final
+    const saludoFinal = (saludoSanitizado || 'Le compartimos el presupuesto de Tecnología Láser Corneal SRL') + ':';
+    const telLimpio = (() => {
+        const raw = telefono || '';
+        let d = raw.replace(/\D/g,'');
+        if (d.startsWith('0') && d.length > 10) d = d.slice(1);
+        if (d.startsWith('5499')) d = '549' + d.slice(4);
+        if (d.startsWith('549')) { d = '549' + d.slice(3).replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2'); }
+        else if (d.length <= 10) { d = '549' + d.replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2'); }
+        return d;
+    })();
+    const msgWsp = encodeURIComponent(saludoFinal + '\n' + linkGitHub);
+    const linkWsp = telLimpio ? 'https://wa.me/' + telLimpio + '?text=' + msgWsp : 'https://wa.me/?text=' + msgWsp;
+
     return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Presupuesto TLC — ${medico||cliente} — ${idVersionado}</title>
@@ -1816,8 +2128,90 @@ function _pcGenerarHTMLPresupuesto(c, carrito, netoTotal, ivaTotal, totalConIva,
 body{font-family:"Times New Roman",Times,serif;background:#f1f5f9;color:#0f172a;font-size:13px;}
 .page{max-width:800px;margin:0 auto;background:white;padding:32px 40px;box-shadow:0 4px 24px rgba(0,0,0,.12);}
 table{width:100%;border-collapse:collapse;}
-@media print{body{background:white;}.page{box-shadow:none;padding:20px;}}
-</style></head><body><div class="page">
+.no-print{display:block;}
+@media print{body{background:white;}.page{box-shadow:none;padding:20px;}.no-print{display:none!important;}}
+</style>
+<script>
+// ── SEMÁFORO WHATSAPP — polling asincrónico anti-404 ─────────────
+(function() {
+    var LINK_FINAL  = ${JSON.stringify(linkGitHub)};
+    var LINK_WSP    = ${JSON.stringify(linkWsp)};
+    var MAX_INTENTOS = 5;   // 5 × 3s = 15s timeout
+    var intento = 0;
+    var poller  = null;
+
+    function activarBoton() {
+        var btn = document.getElementById('btn-whatsapp');
+        if (!btn) return;
+        btn.disabled = false;
+        btn.style.background = '#25D366';
+        btn.style.cursor = 'pointer';
+        btn.style.opacity = '1';
+        btn.innerHTML = '&#128172; Enviar por WhatsApp';
+        btn.onclick = function() { window.open(LINK_WSP, '_blank'); };
+    }
+
+    function verificar() {
+        intento++;
+        // Usamos 'no-cors' — no podemos leer el status, pero si no lanza
+        // TypeError de red el recurso existe. En GitHub Pages un 404 devuelve
+        // HTML válido (no un error de red), así que esperamos el timeout.
+        fetch(LINK_FINAL, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' })
+            .then(function() {
+                // fetch resolvió → recurso accesible (o CORS opaque: igual lo habilitamos)
+                clearInterval(poller);
+                activarBoton();
+            })
+            .catch(function() {
+                // Error de red puro → seguir esperando
+                if (intento >= MAX_INTENTOS) {
+                    clearInterval(poller);
+                    activarBoton(); // liberar por timeout de contingencia
+                }
+            });
+        if (intento >= MAX_INTENTOS) {
+            clearInterval(poller);
+            activarBoton();
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+        // Estado inicial: gris / deshabilitado
+        var btn = document.getElementById('btn-whatsapp');
+        if (btn) {
+            btn.disabled = true;
+            btn.style.background = '#94a3b8';
+            btn.style.cursor = 'not-allowed';
+            btn.style.opacity = '0.7';
+        }
+        // Primer check inmediato, luego cada 3 segundos
+        verificar();
+        poller = setInterval(verificar, 3000);
+    });
+})();
+
+function guardarPDF() {
+    document.querySelector('.no-print').style.display = 'none';
+    window.print();
+    setTimeout(function() { document.querySelector('.no-print').style.display = 'block'; }, 1000);
+}
+</script>
+</head><body><div class="page">
+
+<!-- BOTONES: sin print -->
+<div class="no-print" style="text-align:right;margin-bottom:16px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+  <button onclick="guardarPDF()"
+      style="padding:8px 18px;background:#0f172a;border:none;border-radius:6px;color:white;font-size:12px;
+             font-family:Arial,sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+    &#8595; Guardar PDF
+  </button>
+  <button id="btn-whatsapp"
+      style="padding:8px 18px;background:#94a3b8;border:none;border-radius:6px;color:white;font-size:12px;
+             font-family:Arial,sans-serif;cursor:not-allowed;opacity:0.7;display:inline-flex;align-items:center;gap:6px;
+             transition:background .3s,opacity .3s;">
+    &#9203; Verificando enlace...
+  </button>
+</div>
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0f172a;">
   <img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25" alt="TLC" style="height:40px;" onerror="this.style.display='none'">
@@ -1899,6 +2293,11 @@ function _pcMostrarStatus(msg, tipo) {
 }
 
 // ─── ARRANCAR ────────────────────────────────────────────────────
+// Sincronizar tema si el usuario lo cambia en selector.html (otra pestaña)
+window.addEventListener('storage', (e) => {
+    if (e.key === 'tlc_tema') _aplicarTemaCot();
+});
+
 init().catch(console.error);
 </script>
 </body>
