@@ -288,9 +288,12 @@
     body.tema-claro #btn-avatar {
         background: #ffffff !important;
         border-color: #cbd5e1 !important;
-        color: #1a4b8c !important;
+        color: #1e293b !important;
         box-shadow: 0 1px 4px rgba(0,0,0,.1);
     }
+    /* SVG del carrito: stroke inline necesita override en el elemento */
+    body.tema-claro #btn-carrito svg { stroke: #1e293b !important; }
+    body.tema-claro #btn-avatar { color: #1a4b8c !important; }
     body.tema-claro #btn-nav-back {
         background: #ffffff !important;
         border-color: #cbd5e1 !important;
@@ -406,6 +409,31 @@
     }
     body.tema-claro .aviso-mixto { background: rgba(248,150,30,.08) !important; }
 
+    /* ── Contenedores con background inline oscuro en renderCarrito ─
+       Estructura (DIRECTO 12C USD) y Comisión estimada tienen
+       background:#0a1628 puesto inline — forzamos con selector de atributo */
+    body.tema-claro .carrito-totales [style*="background:#0a1628"],
+    body.tema-claro .carrito-totales [style*="background: #0a1628"],
+    body.tema-claro [style*="background:#0a1628"],
+    body.tema-claro [style*="background: #0a1628"] {
+        background: #f1f5f9 !important;
+        border-color: #cbd5e1 !important;
+    }
+    body.tema-claro [style*="background:#0a1628"] [style*="color:#f1f5f9"],
+    body.tema-claro [style*="background:#0a1628"] [style*="color: #f1f5f9"],
+    body.tema-claro [style*="background:#0a1628"] [style*="color:#64748b"],
+    body.tema-claro [style*="background:#0a1628"] .total-label,
+    body.tema-claro [style*="background:#0a1628"] .total-valor,
+    body.tema-claro [style*="background:#0a1628"] span { color: inherit !important; }
+    /* Labels de Adelanto / Cuota en estructura */
+    body.tema-claro [style*="background:#0a1628"] [style*="color:#f1f5f9"] { color: #0f172a !important; }
+    body.tema-claro [style*="background:#0a1628"] [style*="color:#64748b"] { color: #475569 !important; }
+    /* Comisión estimada — borde naranja se mantiene, solo el fondo cambia */
+    body.tema-claro [style*="border:1px solid #f8961e"] {
+        background: #fff8f0 !important;
+        border-color: #f8961e88 !important;
+    }
+
     /* ── Pantalla Comercial (pc-*) ───────────────────────────────── */
     body.tema-claro .pc-overlay { background: rgba(0,0,0,.5) !important; }
     body.tema-claro .pc-box {
@@ -493,6 +521,44 @@
     body.tema-claro #modal-resumen-box textarea,
     body.tema-claro #modal-resumen-box select {
         background: #ffffff !important; border-color: #cbd5e1 !important; color: #0f172a !important;
+    }
+    /* Fondos oscuros inline dentro del modal-resumen (tarjeta equipo, subtotales, condiciones) */
+    body.tema-claro #modal-resumen [style*="background:#0f1a30"],
+    body.tema-claro #modal-resumen [style*="background: #0f1a30"],
+    body.tema-claro #modal-resumen [style*="background:#0a1628"],
+    body.tema-claro #modal-resumen [style*="background: #0a1628"],
+    body.tema-claro #modal-resumen [style*="background:#080d14"],
+    body.tema-claro #modal-resumen [style*="background: #080d14"],
+    body.tema-claro #modal-resumen [style*="background:#1c2541"],
+    body.tema-claro #modal-resumen [style*="background: #1c2541"],
+    body.tema-claro #modal-resumen [style*="background:#0b1329"],
+    body.tema-claro #modal-resumen [style*="background: #0b1329"] {
+        background: #f8fafc !important;
+        border-color: #e2e8f0 !important;
+    }
+    /* Textos blancos dentro de esos fondos ahora oscuros */
+    body.tema-claro #modal-resumen [style*="color:#f1f5f9"],
+    body.tema-claro #modal-resumen [style*="color: #f1f5f9"],
+    body.tema-claro #modal-resumen [style*="color:#f8fafc"],
+    body.tema-claro #modal-resumen [style*="color: #f8fafc"] { color: #0f172a !important; }
+    body.tema-claro #modal-resumen [style*="color:#94a3b8"],
+    body.tema-claro #modal-resumen [style*="color: #94a3b8"] { color: #475569 !important; }
+    body.tema-claro #modal-resumen [style*="color:#64748b"],
+    body.tema-claro #modal-resumen [style*="color: #64748b"] { color: #64748b !important; }
+    /* Bordes */
+    body.tema-claro #modal-resumen [style*="border:1px solid #222e50"],
+    body.tema-claro #modal-resumen [style*="border: 1px solid #222e50"],
+    body.tema-claro #modal-resumen [style*="border:1px solid #1e3050"],
+    body.tema-claro #modal-resumen [style*="border: 1px solid #1e3050"] {
+        border-color: #e2e8f0 !important;
+    }
+    /* Panel resultado ✅ */
+    body.tema-claro #mr-resultado > div {
+        background: #f0fdf4 !important;
+        border-color: rgba(6,214,160,.3) !important;
+    }
+    body.tema-claro #mr-link-preview {
+        background: #ffffff !important; border-color: #e2e8f0 !important;
     }
 
     /* ── Dropdown perfil ─────────────────────────────────────────── */
@@ -925,13 +991,6 @@
                     </a>
                     <!-- id mr-btn-wsp2 se mantiene en DOM (oculto) para no romper referencias JS -->
                     <button id="mr-btn-wsp2" style="display:none;"></button>
-                    <!-- Link público GitHub Pages (universal, sin auth) -->
-                    <div id="mr-link-publico-wrap" style="display:none; margin-bottom:10px; padding:8px 12px;
-                         background:#080d14; border:1px solid #1e3050; border-radius:8px;">
-                        <div style="font-size:9px; color:#475569; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:3px; font-weight:700;">🌐 Link público (para compartir)</div>
-                        <a id="mr-link-publico" href="#" target="_blank" rel="noopener"
-                           style="font-size:10px; color:#3a86ff; word-break:break-all; text-decoration:none; font-family:monospace;">—</a>
-                    </div>
                     <button onclick="nuevaCotizacion()" style="width:100%; padding:11px; border-radius:10px; background:#1c2541; border:1px solid #222e50; color:#94a3b8; font-size:13px; cursor:pointer;">
                         + Nueva cotización
                     </button>
@@ -995,7 +1054,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.13.38"; console.log("%c TLC Portal v2026.06.13.38 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.13.39"; console.log("%c TLC Portal v2026.06.13.39 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -3498,18 +3557,11 @@ async function generarPropuesta() {
         linkEl.style.opacity = '1';
         linkEl.style.pointerEvents = 'auto';
         linkEl.style.cursor = 'pointer';
-        if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto <span style="font-size:10px;color:#64748b;font-weight:400;">(vista previa)</span>';
+        if (txtEl) txtEl.innerHTML = '🔗 Ver presupuesto';
         linkEl.onclick = (e) => {
             e.preventDefault();
             window.open(_blobUrlActual, '_blank');
         };
-        // Mostrar link público GitHub Pages debajo del botón
-        const linkPublicoEl = document.getElementById('mr-link-publico');
-        if (linkPublicoEl) {
-            linkPublicoEl.href = linkFinal;
-            linkPublicoEl.textContent = linkFinal;
-            linkPublicoEl.parentElement.style.display = 'block';
-        }
         document.getElementById('mr-btn-wsp2').onclick = () => window.open(_linkWspActual, '_blank');
         document.getElementById('mr-nombre-resultado').textContent =
             nombre + (razon ? ' · ' + razon : '') + ' · ' + _idCotActual;
@@ -3598,15 +3650,23 @@ function _formatearTelefono(raw) {
 function _buildWspLink(telefonoRaw, urlPresupuesto, nombreCliente, refId) {
     const telFormateado = _formatearTelefono(telefonoRaw);
 
-    // Saludo personalizado del vendedor (guardado en localStorage)
-    const saludoDefault = 'Hola, le compartimos el presupuesto de Tecnología Láser Corneal SRL: ';
-    const saludoCustom  = (() => {
-        try { return localStorage.getItem('tlc_wsp_saludo') || saludoDefault; }
-        catch(e) { return saludoDefault; }
-    })();
+    // Fuente ÚNICA del saludo: localStorage['tlc_wsp_saludo']
+    // Si está vacío, usar el default. Nunca concatenar otras variables.
+    const saludoDefault = 'Hola, le compartimos el presupuesto de Tecnología Láser Corneal SRL:';
+    let saludo = '';
+    try { saludo = (localStorage.getItem('tlc_wsp_saludo') || '').trim(); } catch(e) {}
+    if (!saludo) saludo = saludoDefault;
 
-    // Mensaje final: saludo + URL pública GitHub Pages + ref
-    const msgTexto = saludoCustom + urlPresupuesto + (refId ? ' (Ref: ' + refId + ')' : '');
+    // Garantizar separación limpia entre saludo y URL:
+    // 1. Eliminar cualquier http/https que pudiera haber quedado pegado al saludo
+    saludo = saludo.replace(/\s*https?:\/\/\S*/gi, '').trimEnd();
+    // 2. Eliminar punto o dos puntos final para estandarizar, luego agregar ":"
+    saludo = saludo.replace(/[:.]+$/, '') + ':';
+
+    // Mensaje final: saludo + SALTO DE LÍNEA + URL + ref
+    // El \n garantiza que WhatsApp renderice la URL como hipervínculo propio
+    const ref = refId ? '\n(Ref: ' + refId + ')' : '';
+    const msgTexto = saludo + '\n' + urlPresupuesto + ref;
     const msgEncoded = encodeURIComponent(msgTexto);
 
     return telFormateado
