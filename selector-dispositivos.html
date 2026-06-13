@@ -1177,7 +1177,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.13.42"; console.log("%c TLC Portal v2026.06.13.42 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.13.43"; console.log("%c TLC Portal v2026.06.13.43 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2691,7 +2691,17 @@ function agregarAlCarrito() {
 }
 
 function _agregarItem(item) {
-    carrito.push(item);
+    // Buscar si el mismo equipo ya existe en el carrito (por nombre)
+    const idxExistente = carrito.findIndex(c => c.nombre === item.nombre);
+
+    if (idxExistente !== -1) {
+        // Ya existe → sumar cantidad en lugar de duplicar fila
+        carrito[idxExistente].cantidad += item.cantidad;
+    } else {
+        // No existe → agregar fila nueva
+        carrito.push(item);
+    }
+
     actualizarBadge();
     if (modalidadActual) {
         const modsComp = modalidadesCompatibles();
@@ -2703,8 +2713,7 @@ function _agregarItem(item) {
     cantidadActual = 1;
 
     if (_mrClienteValidado) {
-        // ── Cliente ya validado: abrir modal directo en Paso 2 ─────
-        cerrarModalResumen();  // asegurar que esté cerrado
+        cerrarModalResumen();
         document.getElementById('modal-resumen').style.display = 'block';
         setTimeout(() => document.getElementById('modal-resumen-box').style.transform = 'none', 10);
         document.getElementById('mr-paso1').style.display = 'none';
