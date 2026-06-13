@@ -704,6 +704,102 @@
     body.tema-claro .pc-search-result    { background: #ffffff !important; border-bottom-color: #e2e8f0 !important; }
     body.tema-claro .pc-search-result:hover { background: #f1f5f9 !important; }
     body.tema-claro .pc-search-result .pc-res-precio { color: #059669 !important; }
+
+    /* ═══════════════════════════════════════════════════════════
+       FIXES ACCESIBILIDAD — Alto contraste (Lucio, 60+)
+    ═══════════════════════════════════════════════════════════ */
+
+    /* FIX A: .card-nombre invisible en modo claro
+       Doble selector + #modal-resumen para ganar a cualquier inline
+       Cubre la lista de dispositivos Y el detalle overlay              */
+    body.tema-claro .card-nombre,
+    body.tema-claro .dispositivo-card .card-nombre,
+    body.tema-claro #modal-resumen .card-nombre,
+    body.tema-claro .equipo-nombre,
+    body.tema-claro .equipo-row .equipo-nombre,
+    body.tema-claro .det-card-full .equipo-nombre,
+    body.tema-claro [id="precio-lista-valor"] {
+        color: #0f172a !important;
+    }
+
+    /* FIX B: pc-search-results con fondo oscuro heredado
+       Aplica también sin body.tema-claro para el dropdown en modo oscuro
+       (ya que el dropdown abre sobre un fondo diferente)                */
+    .pc-search-results {
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+    body.tema-claro .pc-search-results,
+    body.tema-claro #mr-contactos-lista,
+    body.tema-claro [id$="-lista"][style*="background"],
+    body.tema-claro [id$="-results"][style*="background"] {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,.12) !important;
+        color: #0f172a !important;
+    }
+    body.tema-claro .pc-search-result,
+    body.tema-claro .pc-search-result *,
+    body.tema-claro #mr-contactos-lista *,
+    body.tema-claro [id$="-lista"] *,
+    body.tema-claro [id$="-results"] * {
+        color: #0f172a !important;
+    }
+    body.tema-claro .pc-search-result { background: #ffffff !important; border-bottom-color: #e2e8f0 !important; }
+    body.tema-claro .pc-search-result:hover { background: #f1f5f9 !important; }
+
+    /* FIX C: Desborde de texto en select "Lugar de Entrega"
+       y en cualquier input/select/textarea del modal de resumen
+       — word-wrap + overflow impiden el scroll horizontal infinito     */
+    #mr-lugar-entrega,
+    #mr-lugar-entrega option,
+    .form-input,
+    .form-input option,
+    #modal-resumen input,
+    #modal-resumen select,
+    #modal-resumen textarea,
+    #modal-resumen-box input,
+    #modal-resumen-box select,
+    #modal-resumen-box textarea {
+        white-space: normal !important;
+        overflow-wrap: break-word !important;
+        word-wrap: break-word !important;
+        word-break: break-word !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    /* El select en sí no puede cortar las palabras del option en todos los browsers,
+       pero sí podemos evitar que desborde el contenedor padre               */
+    #mr-lugar-entrega {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;   /* select nativo: 1 línea con ellipsis */
+    }
+    /* El panel donde se muestra el valor seleccionado (si se usa custom select) */
+    #mr-lugar-entrega + .select-value,
+    .form-group:has(#mr-lugar-entrega) {
+        overflow: hidden !important;
+        max-width: 100% !important;
+    }
+    /* Notas y campos de texto libre: salto de línea automático */
+    #mr-notas,
+    #f-notas,
+    .form-input[type="text"],
+    .form-input[type="email"],
+    .form-input[type="tel"],
+    textarea.form-input {
+        white-space: pre-wrap !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    /* Contenedor global del modal: nunca más ancho que la pantalla */
+    #modal-resumen-box {
+        max-width: min(480px, calc(100vw - 32px)) !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+    }
     </style>
 </head>
 <body>
@@ -1177,7 +1273,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.13.43"; console.log("%c TLC Portal v2026.06.13.43 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.13.44"; console.log("%c TLC Portal v2026.06.13.44 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
