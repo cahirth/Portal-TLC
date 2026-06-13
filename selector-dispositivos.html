@@ -1273,7 +1273,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.13.46"; console.log("%c TLC Portal v2026.06.13.46 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.13.47"; console.log("%c TLC Portal v2026.06.13.47 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2476,11 +2476,14 @@ function toggleFinanciado() {
     const dd = document.getElementById('fin-dropdown');
     const arrow = document.getElementById('fin-arrow');
     if (!dd) return;
+    const claro = document.body.classList.contains('tema-claro');
     const open = dd.style.display !== 'none';
     dd.style.display = open ? 'none' : 'block';
     if (arrow) arrow.textContent = open ? '▼' : '▲';
     const btn = document.getElementById('btn-financiado');
-    if (btn) btn.style.borderColor = open ? '#222e50' : '#3a86ff';
+    if (btn) btn.style.borderColor = open
+        ? (claro ? '#cbd5e1' : '#222e50')
+        : (claro ? '#1a4b8c' : '#3a86ff');
 }
 
 function seleccionarModalidad(key) {
@@ -2495,21 +2498,24 @@ function seleccionarModalidad(key) {
     const dd = document.getElementById('fin-dropdown');
     const btnFin = document.getElementById('btn-financiado');
     const arrow = document.getElementById('fin-arrow');
+    const claro = document.body.classList.contains('tema-claro');
     if (key !== 'CONTADO' && btnFin) {
         const m2 = MODALIDADES.find(x => x.key === key);
         btnFin.childNodes[0].textContent = m2?.label || 'Financiado';
-        btnFin.style.background = '#3a86ff';
-        btnFin.style.borderColor = '#3a86ff';
+        // Activo: azul en ambos temas pero más oscuro en claro
+        btnFin.style.background   = claro ? '#1a4b8c' : '#3a86ff';
+        btnFin.style.borderColor  = claro ? '#1a4b8c' : '#3a86ff';
+        btnFin.style.color        = '#ffffff';
         btnFin.dataset.key = key;
         if (dd) dd.style.display = 'none';
         if (arrow) arrow.textContent = '▼';
-        // Desactivar botón Contado visualmente
         document.querySelectorAll('.modalidad-btn[data-key="CONTADO"]').forEach(b => b.classList.remove('active'));
     } else if (key === 'CONTADO' && btnFin) {
-        // Resetear dropdown
+        // Inactivo: fondo neutro legible en cada tema
         btnFin.childNodes[0].textContent = 'Financiado';
-        btnFin.style.background = '#1c2541';
-        btnFin.style.borderColor = '#222e50';
+        btnFin.style.background  = claro ? '#ffffff' : '#1c2541';
+        btnFin.style.borderColor = claro ? '#cbd5e1' : '#222e50';
+        btnFin.style.color       = claro ? '#0f172a' : '#f8fafc';
     }
 
     const d = dispositivoActual;
@@ -3315,16 +3321,21 @@ function _mrActualizarTotalesPaso2() {
     const totalConIva = netoTotal + ivaTotal;
     const el = document.getElementById('mr-paso2-totales');
     if (!el) return;
+    const claro = document.body.classList.contains('tema-claro');
+    const colorLabel  = claro ? '#475569'  : '#94a3b8';
+    const colorBorder = claro ? '#e2e8f0'  : '#1e3050';
+    const colorTotal  = claro ? '#0f172a'  : '#f1f5f9';
+    const colorAccent = claro ? '#1a4b8c'  : '#3a86ff';
     el.innerHTML = `
-        <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:13px; color:#94a3b8; border-top:1px solid #1e3050;">
+        <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:13px; color:${colorLabel}; border-top:1px solid ${colorBorder};">
             <span>Subtotal Neto USD</span><span>${fmtUSD(netoTotal)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; color:#f8961e;">
             <span>IVA discriminado</span><span>${fmtUSD(ivaTotal)}</span>
         </div>
-        <div style="display:flex; justify-content:space-between; padding:10px 0 4px; font-size:16px; font-weight:800; border-top:1px solid #1e3050; margin-top:4px;">
-            <span style="color:#f1f5f9;">TOTAL USD c/IVA</span>
-            <span style="color:#3a86ff;">${fmtUSD(totalConIva)}</span>
+        <div style="display:flex; justify-content:space-between; padding:10px 0 4px; font-size:16px; font-weight:800; border-top:1px solid ${colorBorder}; margin-top:4px;">
+            <span style="color:${colorTotal};">TOTAL USD c/IVA</span>
+            <span style="color:${colorAccent};">${fmtUSD(totalConIva)}</span>
         </div>
     `;
 }
