@@ -166,7 +166,12 @@
         .form-status.ok { background: rgba(6,214,160,0.15); border: 1px solid #06d6a0; color: #06d6a0; display: block; }
         .form-status.error { background: rgba(255,0,127,0.15); border: 1px solid #ff007f; color: #ff99cc; display: block; }
 
-        /* MISC */
+        @keyframes fadeSlideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* MISC */
         .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 16px; }
         .spinner { width: 36px; height: 36px; border: 3px solid #222e50; border-top-color: #3a86ff; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -276,16 +281,78 @@
             <button id="btn-avatar" onclick="toggleAvatarMenu()" style="display:none; background:#1c2541; border:1px solid #222e50; border-radius:50%; width:44px; height:44px; align-items:center; justify-content:center; cursor:pointer; font-size:13px; font-weight:800; color:#3a86ff; flex-shrink:0;">
                 <span id="avatar-initials">?</span>
             </button>
-            <div id="avatar-menu" style="display:none; position:absolute; top:52px; right:0; background:#1c2541; border:1px solid #222e50; border-radius:12px; min-width:200px; z-index:500; box-shadow:0 8px 32px rgba(0,0,0,0.4); overflow:hidden;">
-                <div style="padding:12px 16px; border-bottom:1px solid #222e50;">
-                    <div style="font-size:13px; font-weight:700; color:#f1f5f9;" id="avatar-nombre-menu">—</div>
-                    <div style="font-size:11px; color:#64748b; margin-top:2px;" id="avatar-email-menu">—</div>
+
+            <!-- ── DROPDOWN PERFIL ─────────────────────────────────────── -->
+            <div id="avatar-menu" style="display:none; position:absolute; top:52px; right:0;
+                 background:#0d1520; border:1px solid #1e3050; border-radius:16px;
+                 width:300px; z-index:600; box-shadow:0 16px 48px rgba(0,0,0,0.6);
+                 overflow:hidden; animation:fadeSlideDown .15s ease;">
+
+                <!-- Cabecera usuario -->
+                <div style="padding:16px; border-bottom:1px solid #1e3050; display:flex; align-items:center; gap:12px; background:#080d14;">
+                    <div style="width:40px; height:40px; border-radius:50%; background:#1c2541; border:2px solid #3a86ff33;
+                                display:flex; align-items:center; justify-content:center;
+                                font-size:14px; font-weight:800; color:#3a86ff; flex-shrink:0;" id="avatar-menu-icon">?</div>
+                    <div style="min-width:0;">
+                        <div style="font-size:13px; font-weight:700; color:#f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="avatar-nombre-menu">—</div>
+                        <div style="font-size:10px; color:#64748b; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="avatar-email-menu">—</div>
+                        <div id="avatar-rol-badge" style="display:inline-block; margin-top:4px; font-size:9px; font-weight:700;
+                             text-transform:uppercase; letter-spacing:0.6px; padding:1px 7px; border-radius:20px;
+                             background:rgba(58,134,255,.15); color:#3a86ff; border:1px solid rgba(58,134,255,.25);">—</div>
+                    </div>
                 </div>
-                <button onclick="cerrarSesion()" style="width:100%; padding:12px 16px; background:none; border:none; color:#f87171; font-size:14px; font-weight:600; cursor:pointer; text-align:left; display:flex; align-items:center; gap:8px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                    Cerrar sesión
-                </button>
-            </div>
+
+                <div style="padding:12px; display:flex; flex-direction:column; gap:10px;">
+
+                    <!-- Switch Tema -->
+                    <div style="background:#080d14; border:1px solid #1e3050; border-radius:10px; padding:10px 12px;">
+                        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#64748b; margin-bottom:8px;">Apariencia</div>
+                        <div style="display:flex; background:#0a1628; border-radius:8px; overflow:hidden; border:1px solid #1e3050;">
+                            <button id="btn-tema-oscuro" onclick="_setTema('dark')"
+                                style="flex:1; padding:8px; border:none; cursor:pointer; font-size:12px; font-weight:600;
+                                       display:flex; align-items:center; justify-content:center; gap:5px; transition:all .15s;
+                                       background:#3a86ff; color:#fff; border-radius:7px 0 0 7px;">
+                                🌙 Oscuro
+                            </button>
+                            <button id="btn-tema-claro" onclick="_setTema('light')"
+                                style="flex:1; padding:8px; border:none; cursor:pointer; font-size:12px; font-weight:600;
+                                       display:flex; align-items:center; justify-content:center; gap:5px; transition:all .15s;
+                                       background:transparent; color:#64748b;">
+                                ☀️ Claro
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Saludo WhatsApp -->
+                    <div style="background:#080d14; border:1px solid #1e3050; border-radius:10px; padding:10px 12px;">
+                        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;
+                                    color:#64748b; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                            Saludo WhatsApp
+                        </div>
+                        <textarea id="wsp-saludo-input" rows="2"
+                            style="width:100%; background:#0a1628; border:1px solid #1e3050; border-radius:8px;
+                                   color:#f1f5f9; font-size:12px; padding:8px 10px; resize:none;
+                                   line-height:1.4; outline:none; font-family:inherit;"
+                            placeholder="Hola, le compartimos el presupuesto de TLC SRL: "
+                            oninput="_guardarSaludoWsp(this.value)"></textarea>
+                        <div style="font-size:10px; color:#334155; margin-top:3px;">Se guarda automáticamente · URL se agrega al final</div>
+                    </div>
+
+                    <!-- Cerrar sesión -->
+                    <button onclick="cerrarSesion()"
+                        style="width:100%; padding:11px; border-radius:10px; background:transparent;
+                               border:1px solid #2d1a1a; color:#f87171; font-size:13px; font-weight:600;
+                               cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+                               transition:background .15s;"
+                        onmouseover="this.style.background='rgba(248,113,113,.08)'"
+                        onmouseout="this.style.background='transparent'">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        Cerrar sesión
+                    </button>
+
+                </div>
+            </div><!-- /avatar-menu -->
         </div>
     </div>
 </div>
@@ -570,30 +637,11 @@
 
             <div id="mr-status" class="form-status" style="display:none;"></div>
 
-            <!-- Saludo WhatsApp personalizable -->
-            <div style="background:#0a1628; border:1px solid #1e3050; border-radius:10px; padding:10px 12px;">
-                <div style="font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                    Saludo WhatsApp personalizado
-                </div>
-                <textarea id="wsp-saludo-input" rows="2"
-                    style="width:100%; background:#080d14; border:1px solid #1e3050; border-radius:8px;
-                           color:#f1f5f9; font-size:12px; padding:8px 10px; resize:none; line-height:1.4; outline:none;"
-                    placeholder="Hola, le compartimos el presupuesto de Tecnología Láser Corneal SRL: "
-                    oninput="_guardarSaludoWsp(this.value)"></textarea>
-                <div style="font-size:10px; color:#475569; margin-top:4px;">Se guarda automáticamente · La URL del presupuesto se agrega al final</div>
-            </div>
-
             <!-- Botones acción -->
             <div style="display:flex; flex-direction:column; gap:10px; margin-top:4px;">
                 <button id="btn-mr-generar" onclick="generarPropuesta()"
                     style="width:100%; padding:14px; border-radius:12px; background:linear-gradient(135deg,#3a86ff,#1d4ed8); border:none; color:white; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;">
                     📄 Generar propuesta
-                </button>
-                <button id="btn-mr-wsp" onclick="enviarPorWsp()" disabled
-                    style="width:100%; padding:14px; border-radius:12px; background:linear-gradient(135deg,#25d366,#128c7e); border:none; color:white; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; opacity:0.4;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                    Enviar por WhatsApp
                 </button>
                 <button onclick="cerrarModalResumen()"
                     style="width:100%; padding:12px; border-radius:12px; background:transparent; border:1px solid #1e3050; color:#64748b; font-size:14px; cursor:pointer;">
@@ -614,10 +662,8 @@
                         </div>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3a86ff" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </a>
-                    <button id="mr-btn-wsp2" style="width:100%; padding:13px; border-radius:10px; background:linear-gradient(135deg,#25d366,#128c7e); border:none; color:white; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:8px;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                        Reenviar por WhatsApp
-                    </button>
+                    <!-- id mr-btn-wsp2 se mantiene en DOM (oculto) para no romper referencias JS -->
+                    <button id="mr-btn-wsp2" style="display:none;"></button>
                     <button onclick="nuevaCotizacion()" style="width:100%; padding:11px; border-radius:10px; background:#1c2541; border:1px solid #222e50; color:#94a3b8; font-size:13px; cursor:pointer;">
                         + Nueva cotización
                     </button>
@@ -681,7 +727,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.09.36"; console.log("%c TLC Portal v2026.06.09.36 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.13.37"; console.log("%c TLC Portal v2026.06.13.37 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -762,7 +808,8 @@ async function mostrarApp(account) {
     console.log('Account info:', JSON.stringify({name: account.name, user: account.username, claims: account.idTokenClaims}));
     document.getElementById('user-greeting').textContent = `Hola, ${nombre}`;
     document.getElementById('btn-carrito').style.display = 'flex';
-    // Avatar
+
+    // Avatar — iniciales
     const partes = nombre.trim().split(' ');
     const iniciales = partes.length >= 2
         ? (partes[0][0] + partes[partes.length-1][0]).toUpperCase()
@@ -771,16 +818,64 @@ async function mostrarApp(account) {
     document.getElementById('avatar-nombre-menu').textContent = nombre;
     document.getElementById('avatar-email-menu').textContent = account.username || '';
     document.getElementById('btn-avatar').style.display = 'flex';
+    // Sincronizar icono grande del menú con las mismas iniciales
+    const menuIcon = document.getElementById('avatar-menu-icon');
+    if (menuIcon) menuIcon.textContent = iniciales;
+
     await cargarTodo();
+
+    // Inicializar rol badge (cargarTodo setea currentUserRol)
+    const rolBadge = document.getElementById('avatar-rol-badge');
+    if (rolBadge) rolBadge.textContent = currentUserRol || 'Usuario';
+
+    // Cargar saludo WSP guardado en el textarea del menú
+    _initSaludoWsp();
+
+    // Aplicar tema guardado
+    _aplicarTema(localStorage.getItem('tlc_tema') || 'dark');
 }
 
 function toggleAvatarMenu() {
     const menu = document.getElementById('avatar-menu');
-    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    const abierto = menu.style.display !== 'none';
+    menu.style.display = abierto ? 'none' : 'block';
+    // Sincronizar saludo cada vez que se abre
+    if (!abierto) _initSaludoWsp();
 }
 
-function cerrarSesion() {
-    msal_app.logoutRedirect({ postLogoutRedirectUri: 'https://cahirth.github.io/Portal-TLC/selector-dispositivos.html' });
+// ── Tema claro / oscuro ────────────────────────────────────────────
+function _setTema(tema) {
+    _aplicarTema(tema);
+    try { localStorage.setItem('tlc_tema', tema); } catch(e) {}
+}
+
+function _aplicarTema(tema) {
+    const root = document.documentElement;
+    if (tema === 'light') {
+        root.style.setProperty('--bg-app', '#f0f4f8');
+        root.style.setProperty('--bg-card', '#ffffff');
+        root.style.setProperty('--text-main', '#0f172a');
+        root.style.setProperty('--border-color', '#e2e8f0');
+        document.body.style.background = '#f0f4f8';
+    } else {
+        root.style.removeProperty('--bg-app');
+        root.style.removeProperty('--bg-card');
+        root.style.removeProperty('--text-main');
+        root.style.removeProperty('--border-color');
+        document.body.style.background = '';
+    }
+    // Actualizar botones del switch
+    const btnOsc = document.getElementById('btn-tema-oscuro');
+    const btnCla = document.getElementById('btn-tema-claro');
+    if (btnOsc && btnCla) {
+        if (tema === 'light') {
+            btnOsc.style.background = 'transparent'; btnOsc.style.color = '#64748b';
+            btnCla.style.background = '#3a86ff';     btnCla.style.color = '#fff';
+        } else {
+            btnOsc.style.background = '#3a86ff'; btnOsc.style.color = '#fff';
+            btnCla.style.background = 'transparent'; btnCla.style.color = '#64748b';
+        }
+    }
 }
 
 document.addEventListener('click', (e) => {
@@ -2798,10 +2893,6 @@ function abrirModalResumen() {
     btnGenerar.style.opacity = '1';
     btnGenerar.style.pointerEvents = 'auto';
     btnGenerar.innerHTML = '📄 Generar propuesta';
-    const btnWsp = document.getElementById('btn-mr-wsp');
-    btnWsp.disabled = true;
-    btnWsp.style.opacity = '0.4';
-    btnWsp.style.pointerEvents = 'none';
     _mrUltimaBusqueda = '';
     _mrSetBadge('', 'hidden');
 
@@ -3123,16 +3214,9 @@ async function generarPropuesta() {
         document.getElementById('mr-nombre-resultado').textContent =
             nombre + (razon ? ' · ' + razon : '') + ' · ' + _idCotActual;
 
-        // Habilitar botón WhatsApp
-        const btnWsp = document.getElementById('btn-mr-wsp');
-        btnWsp.disabled = false;
-        btnWsp.style.opacity = '1';
-        btnWsp.style.pointerEvents = 'auto';
-
         // Mostrar panel resultado
         document.getElementById('mr-resultado').style.display = 'block';
         document.getElementById('mr-status').style.display = 'none';
-        document.getElementById('btn-mr-wsp').style.display = 'none'; // ocultar WSP superior al mostrar resultado
 
         // Restaurar botón generar
         btnGenerar.style.opacity = '1';
