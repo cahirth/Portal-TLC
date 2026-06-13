@@ -1273,7 +1273,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.13.44"; console.log("%c TLC Portal v2026.06.13.44 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.13.46"; console.log("%c TLC Portal v2026.06.13.46 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2434,13 +2434,22 @@ function abrirDetalle(idx) {
 
         // Dropdown Financiado
         if (financiadas.length > 0) {
+            const claro = document.body.classList.contains('tema-claro');
+            const finBg     = claro ? '#ffffff'   : '#1c2541';
+            const finBorder = claro ? '#cbd5e1'   : '#222e50';
+            const finColor  = claro ? '#0f172a'   : '#f8fafc';
+            const finDdBg   = claro ? '#ffffff'   : '#1c2541';
+            const finDdBorder= claro ? '#1a4b8c'  : '#3a86ff';
+            const finItemBorder = claro ? '#e2e8f0' : '#222e50';
+            const finHover  = claro ? '#f1f5f9'   : '#222e50';
+
             html += `<div style="position:relative; flex:1;" id="fin-wrap">
-                <button id="btn-financiado" onclick="toggleFinanciado()" style="width:100%; padding:11px 8px; border-radius:10px; border:1px solid #222e50; background:#1c2541; color:#f8fafc; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:all 0.2s;" data-key="FIN">
+                <button id="btn-financiado" onclick="toggleFinanciado()" style="width:100%; padding:11px 8px; border-radius:10px; border:1px solid ${finBorder}; background:${finBg}; color:${finColor}; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:all 0.2s;" data-key="FIN">
                     Financiado <span id="fin-arrow" style="font-size:10px;">▼</span>
                 </button>
-                <div id="fin-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; background:#1c2541; border:1px solid #3a86ff; border-radius:10px; z-index:50; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+                <div id="fin-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; background:${finDdBg}; border:1px solid ${finDdBorder}; border-radius:10px; z-index:50; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.4);">
                     ${financiadas.map(m => `
-                    <button onclick="seleccionarModalidad('${m.key}')" data-key="${m.key}" style="width:100%; padding:11px 14px; background:none; border:none; border-bottom:1px solid #222e50; color:#f8fafc; font-size:13px; font-weight:600; cursor:pointer; text-align:left; transition:background 0.15s;" onmouseover="this.style.background='#222e50'" onmouseout="this.style.background='none'">${m.label}</button>`).join('')}
+                    <button onclick="seleccionarModalidad('${m.key}')" data-key="${m.key}" style="width:100%; padding:11px 14px; background:none; border:none; border-bottom:1px solid ${finItemBorder}; color:${finColor}; font-size:13px; font-weight:600; cursor:pointer; text-align:left; transition:background 0.15s;" onmouseover="this.style.background='${finHover}'" onmouseout="this.style.background='none'">${m.label}</button>`).join('')}
                 </div>
             </div>`;
         }
@@ -3171,6 +3180,8 @@ function _mrRenderPaso2() {
             : Math.max(0, bruto - dVal);
         const hayDesc = dVal > 0;
         const sinIva  = ivaPct === null;
+        const claro   = document.body.classList.contains('tema-claro');
+        const colorNombre = claro ? '#0f172a' : '#f1f5f9';
 
         return `<div class="mr-item-card" id="mr-item-card-${idx}">
 
@@ -3178,7 +3189,7 @@ function _mrRenderPaso2() {
             <div style="display:flex; align-items:flex-start; gap:10px;">
                 ${item.foto ? `<img src="${item.foto}" style="width:44px;height:44px;border-radius:8px;object-fit:contain;background:#0f1a30;flex-shrink:0;" onerror="this.style.display='none'">` : ''}
                 <div style="flex:1; min-width:0;">
-                    <div style="font-size:13px; font-weight:700; color:#f1f5f9; line-height:1.3;">${item.nombre}</div>
+                    <div style="font-size:13px; font-weight:700; color:${colorNombre}; line-height:1.3;">${item.nombre}</div>
                     <div style="font-size:11px; color:#64748b; margin-top:2px;">
                         ${fmtUSD(base)} lista
                         ${hayDesc ? `<span style="color:#f8961e;"> · −${dTipo==='%' ? dVal+'%' : fmtUSD(dVal)}</span>` : ''}
@@ -3403,20 +3414,30 @@ function _mrMostrarSelectorContactos(contactos, razonSocial) {
     const contenedor = document.getElementById('mr-contacto-selector');
     if (!contenedor) return;
 
+    const claro = document.body.classList.contains('tema-claro');
+    const bg        = claro ? '#ffffff'  : '#0d1520';
+    const border    = claro ? '#1a4b8c'  : '#3a86ff';
+    const bgHeader  = claro ? '#e8f0fc'  : '#0f1a30';
+    const colorHeader = claro ? '#1a4b8c' : '#3a86ff';
+    const borderItem  = claro ? '#e2e8f0' : '#1e3050';
+    const colorNombre = claro ? '#0f172a' : '#f1f5f9';
+    const colorMeta   = claro ? '#475569' : '#64748b';
+    const hoverBg     = claro ? '#f1f5f9' : '#1c2541';
+
     const optsHtml = contactos.map((c, i) =>
         `<div class="mr-contacto-opt" data-idx="${i}"
-            style="padding:10px 14px; cursor:pointer; border-bottom:1px solid #1e3050;
-                   display:flex; flex-direction:column; gap:2px;"
-            onmouseover="this.style.background='#1c2541'"
+            style="padding:10px 14px; cursor:pointer; border-bottom:1px solid ${borderItem};
+                   display:flex; flex-direction:column; gap:2px; background:transparent;"
+            onmouseover="this.style.background='${hoverBg}'"
             onmouseout="this.style.background='transparent'">
-            <span style="font-size:13px; font-weight:600; color:#f1f5f9;">${c.nombre||'(Sin nombre)'}</span>
-            <span style="font-size:11px; color:#64748b;">${c.email||''} ${c.telefono ? '· '+c.telefono : ''}</span>
+            <span style="font-size:13px; font-weight:600; color:${colorNombre};">${c.nombre||'(Sin nombre)'}</span>
+            <span style="font-size:11px; color:${colorMeta};">${c.email||''} ${c.telefono ? '· '+c.telefono : ''}</span>
         </div>`
     ).join('');
 
-    contenedor.style.cssText = 'background:#0d1520; border:1px solid #3a86ff; border-radius:12px; overflow:hidden; margin-bottom:14px; box-shadow:0 8px 24px rgba(0,0,0,0.5);';
+    contenedor.style.cssText = `background:${bg}; border:1px solid ${border}; border-radius:12px; overflow:hidden; margin-bottom:14px; box-shadow:0 8px 24px rgba(0,0,0,0.3);`;
     contenedor.innerHTML = `
-        <div style="padding:8px 14px; background:#0f1a30; font-size:11px; color:#3a86ff; font-weight:700; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #1e3050;">
+        <div style="padding:8px 14px; background:${bgHeader}; font-size:11px; color:${colorHeader}; font-weight:700; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid ${borderItem};">
             Seleccioná el médico
         </div>
         ${optsHtml}
@@ -3428,7 +3449,6 @@ function _mrMostrarSelectorContactos(contactos, razonSocial) {
             const c = contactos[parseInt(this.dataset.idx)];
             _mrContactId = c.id;
             _mrRellenarContacto(c);
-            // Limpiar solo el selector, dejar badge y quedarse en Paso 1
             contenedor.innerHTML = '';
             contenedor.style.display = 'none';
             _mrSetBadge('🏢 <strong>' + (c.nombre||'(sin nombre)') + '</strong>' + (c.email ? ' · ' + c.email : ''), 'hubspot');
