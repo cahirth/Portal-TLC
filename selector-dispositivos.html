@@ -1284,7 +1284,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.13.53"; console.log("%c TLC Portal v2026.06.13.53 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.13.54"; console.log("%c TLC Portal v2026.06.13.54 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -4180,11 +4180,11 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         '  var URL_PUBLICA  = ' + JSON.stringify(linkPublico || '') + ';',
         '  var TEL          = ' + JSON.stringify(wspTelSanitizado) + ';',
         '  var SALUDO       = ' + JSON.stringify(wspSaludoFinal) + ';',
-        // GitHub API tiene CORS nativo — devuelve 200 si el archivo existe, 404 si no
-        // Ruta: /repos/{owner}/{repo}/contents/{path}
+        // raw.githubusercontent tiene CORS nativo, no consume rate limit de la API,
+        // y devuelve 200 con el contenido real o 404 limpio si el archivo no existe aún
         '  var FILE_PATH    = "cotizaciones/' + (linkPublico || '').split('/cotizaciones/').pop() + '";',
-        '  var API_URL      = "https://api.github.com/repos/cahirth/Portal-TLC/contents/" + FILE_PATH;',
-        '  var MAX_INTENTOS = 12;',  // 12 × 5s = 60s máx
+        '  var RAW_URL      = "https://raw.githubusercontent.com/cahirth/Portal-TLC/main/" + FILE_PATH;',
+        '  var MAX_INTENTOS = 12;',
         '  var INTERVALO_MS = 5000;',
         '  var intentos     = 0;',
         '  var timerId      = null;',
@@ -4212,16 +4212,9 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         '  function verificar(){',
         '    intentos++;',
         '    if(intentos > MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); return; }',
-        // GitHub API: GET /repos/{owner}/{repo}/contents/{path}
-        // → 200 JSON si el archivo existe en el repo
-        // → 404 JSON si todavía no fue pusheado
-        // Tiene CORS nativo — no necesita proxy
-        '    fetch(API_URL + "?_c=" + Date.now(), {',
-        '      method: "GET",',
-        '      mode: "cors",',
-        '      cache: "no-store",',
-        '      headers: { "Accept": "application/vnd.github.v3+json" }',
-        '    })',
+        // raw.githubusercontent: 200 = archivo existe, 404 = aún no pusheado
+        // Sin rate limit, sin base64, respuesta directa
+        '    fetch(RAW_URL + "?_c=" + Date.now(), { method:"HEAD", cache:"no-store" })',
         '      .then(function(res){',
         '        if(res.status === 200){ clearInterval(timerId); activarVerde(); }',
         '        else if(intentos >= MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); }',
