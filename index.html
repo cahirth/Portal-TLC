@@ -13,807 +13,507 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        /* ── TOKENS ──────────────────────────────────────────────── */
         :root {
-            --bg-dark: #0b1329;       
-            --panel-dark: #1c2541;    
-            --accent-blue: #3a86ff;   
-            --accent-green: #06d6a0;  
-            --accent-purple: #7209b7; 
-            --accent-orange: #ff007f;
-            --text-main: #f8fafc;     
-            --text-muted: #94a3b8;    
-            --border-glow: #222e50;
+            --bg-dark:      #0b1329;
+            --panel-dark:   #1c2541;
+            --accent-blue:  #3a86ff;
+            --accent-green: #06d6a0;
+            --accent-purple:#7209b7;
+            --accent-orange:#ff007f;
+            --text-main:    #f8fafc;
+            --text-muted:   #94a3b8;
+            --border-glow:  #222e50;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: #030712; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; margin: 0; padding: 0; }
+        /* ── RESET ───────────────────────────────────────────────── */
+        * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',Roboto,sans-serif; -webkit-tap-highlight-color:transparent; }
+        body { background-color:#030712; display:flex; justify-content:center; align-items:flex-start; min-height:100vh; }
 
-        /* MOBILE: full screen sin borde */
-        .phone-container {
-            width: 100%; min-height: 100vh; background-color: var(--bg-dark);
-            border-radius: 0; border: none; box-shadow: none;
-            position: relative; display: flex; flex-direction: column; overflow: hidden;
-        }
-        /* Ocultar notch siempre — solo era decorativo */
-        .phone-notch { display: none; }
-
-        /* DESKTOP: caja centrada cómoda, sin simular celular físico */
-        @media (min-width: 600px) {
-            body { align-items: center; padding: 24px; }
-            .phone-container {
-                width: 560px; min-height: auto; height: calc(100vh - 48px); max-height: 960px;
-                border-radius: 24px; border: 1px solid #1e293b;
-                box-shadow: 0 24px 48px -12px rgba(0,0,0,0.7), 0 0 0 1px rgba(58,134,255,0.08);
-            }
+        /* ── CONTENEDOR ──────────────────────────────────────────── */
+        .phone-container { width:100%; min-height:100vh; background-color:var(--bg-dark); border-radius:0; border:none; box-shadow:none; position:relative; display:flex; flex-direction:column; overflow:hidden; }
+        .phone-notch { display:none; }
+        @media (min-width:600px) {
+            body { align-items:center; padding:24px; }
+            .phone-container { width:560px; min-height:auto; height:calc(100vh - 48px); max-height:960px; border-radius:24px; border:1px solid #1e293b; box-shadow:0 24px 48px -12px rgba(0,0,0,.7), 0 0 0 1px rgba(58,134,255,.08); }
         }
 
-        /* Cabecera de la Aplicación */
-        .app-header { background: rgba(28, 37, 65, 0.9); backdrop-filter: blur(12px); color: var(--text-main); padding: 16px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-glow); z-index: 10; padding-top: max(16px, env(safe-area-inset-top)); }
-        
-        .back-arrow-btn { display: none; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; color: var(--text-main); font-size: 20px; cursor: pointer; margin-left: -6px; }
-        .back-arrow-btn:active { background-color: rgba(255,255,255,0.1); }
-
-        /* El Logo Redondo de Red de Nodos de TLC */
-        .brand-logo-svg-wrapper {
-            width: 36px; height: 36px; border-radius: 50%;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-            box-shadow: 0 0 10px rgba(58, 134, 255, 0.2);
-        }
-
-        .header-title-block { flex: 1; display: flex; flex-direction: column; }
-        .header-title-block h1 { font-size: 18px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px; }
-        .header-title-block p { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-
-        .header-profile { width: 34px; height: 34px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; color: white; }
+        /* ── HEADER ─────────────────────────────────────────────── */
+        .app-header { background:rgba(28,37,65,.9); backdrop-filter:blur(12px); color:var(--text-main); padding:16px 20px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--border-glow); z-index:10; padding-top:max(16px,env(safe-area-inset-top)); position:relative; }
+        .app-header::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--accent-blue),var(--accent-green),var(--accent-blue)); }
+        .back-arrow-btn { display:none; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; color:var(--text-main); font-size:20px; cursor:pointer; margin-left:-6px; flex-shrink:0; }
+        .brand-logo-svg-wrapper { width:36px; height:36px; border-radius:50%; background:transparent; border:none; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .header-title-block { flex:1; display:flex; flex-direction:column; min-width:0; }
+        .header-title-block h1 { font-size:18px; font-weight:700; color:#fff; letter-spacing:-.3px; }
+        .header-title-block p { font-size:11px; color:var(--text-muted); margin-top:1px; }
+        .header-profile { width:34px; height:34px; background:linear-gradient(135deg,var(--accent-blue),var(--accent-purple)); border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; color:white; flex-shrink:0; }
         @keyframes fadeSlideDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
 
-        .app-content { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 85px; }
-        .app-content::-webkit-scrollbar { display: none; }
+        /* ── CONTENIDO ───────────────────────────────────────────── */
+        .app-content { flex:1; overflow-y:auto; padding:16px; padding-bottom:85px; }
+        .app-content::-webkit-scrollbar { display:none; }
+        .app-view { display:none; }
+        .app-view.active { display:block; animation:slideUp .23s ease-out; }
+        @keyframes slideUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 
-        .app-view { display: none; }
-        .app-view.active { display: block; animation: slideUp 0.23s ease-out; }
+        /* ── MENU ITEMS ──────────────────────────────────────────── */
+        .menu-list-stack { display:flex; flex-direction:column; gap:12px; }
+        .menu-item-row { background-color:var(--panel-dark); border:1px solid var(--border-glow); border-radius:16px; padding:14px 12px; display:flex; align-items:center; gap:15px; cursor:pointer; transition:all .15s; }
+        .menu-item-row:active { transform:scale(.97); background-color:#242f52; }
+        .menu-item-row.highlight-recepcion { background:linear-gradient(135deg,rgba(58,134,255,.12),rgba(28,37,65,.7)); border:1px solid rgba(58,134,255,.35); }
+        .item-logo-container { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:20px; }
+        .logo-ventas  { background:rgba(114,9,183,.2);  border:1px solid rgba(114,9,183,.4);  color:#b5179e; }
+        .logo-servicio{ background:rgba(58,134,255,.2); border:1px solid rgba(58,134,255,.4); color:var(--accent-blue); }
+        .logo-comex   { background:rgba(6,214,160,.2);  border:1px solid rgba(6,214,160,.4);  color:var(--accent-green); }
+        .item-image-holder { width:48px; height:48px; border-radius:12px; overflow:hidden; flex-shrink:0; border:1px solid rgba(255,255,255,.08); }
+        .item-image-holder img { width:100%; height:100%; object-fit:cover; }
+        .item-text-box { flex:1; }
+        .item-text-box h3 { font-size:15px; color:var(--text-main); font-weight:600; }
+        .item-text-box p  { font-size:11px; color:var(--text-muted); margin-top:3px; }
+        .badge-count { font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; background:#2a3454; color:var(--text-muted); }
+        .menu-chevron { color:var(--text-muted); font-size:11px; }
 
-        @keyframes slideUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        /* ── SECCIÓN HOME DINÁMICA ───────────────────────────────── */
+        .home-section-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-muted); margin:16px 0 10px 2px; }
+        .home-stat-row { display:flex; gap:10px; margin-bottom:14px; }
+        .home-stat-chip { flex:1; background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:12px; padding:10px 8px; text-align:center; }
+        .home-stat-chip .val { font-size:20px; font-weight:700; color:var(--accent-blue); }
+        .home-stat-chip .lbl { font-size:8px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }
 
-        /* FILAS DE MENÚ CON ICONOS RESALTADOS (Estilo AppSheet) */
-        .menu-list-stack { display: flex; flex-direction: column; gap: 12px; }
+        /* COTIZACIÓN CARD (home y lista) */
+        .cot-mini-card { background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:14px; overflow:hidden; }
+        .cot-mini-row { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; padding:10px 14px; cursor:pointer; }
+        .cot-mini-row:hover { background:rgba(255,255,255,.03); }
+        .cot-mini-row + .cot-mini-row { border-top:1px solid var(--border-glow); }
+        .cmr-nombre { font-size:13px; font-weight:600; color:var(--text-main); }
+        .cmr-sub    { font-size:10px; color:#60a5fa; margin-top:2px; }
+        .cmr-monto  { font-size:13px; font-weight:700; color:var(--accent-green); white-space:nowrap; }
+        .cmr-pill   { font-size:9px; font-weight:700; padding:2px 7px; border-radius:20px; display:inline-block; margin-top:3px; }
+        .pill-25  { background:rgba(58,134,255,.15);  color:var(--accent-blue); }
+        .pill-50  { background:rgba(248,150,30,.15);  color:#f8961e; }
+        .pill-75  { background:rgba(114,9,183,.15);   color:#b5179e; }
+        .pill-100 { background:rgba(6,214,160,.15);   color:var(--accent-green); }
+        .pill-0   { background:rgba(255,0,127,.15);   color:var(--accent-orange); }
 
-        .menu-item-row {
-            background-color: var(--panel-dark);
-            border: 1px solid var(--border-glow);
-            border-radius: 16px;
-            padding: 14px 12px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            cursor: pointer;
-            transition: all 0.15s ease-in-out;
-        }
-        .menu-item-row:active { transform: scale(0.97); background-color: #242f52; }
+        /* SERVICIO PENDIENTE (home técnico) */
+        .svc-mini-card { background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:14px; overflow:hidden; }
+        .svc-mini-row { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; }
+        .svc-mini-row:hover { background:rgba(255,255,255,.03); }
+        .svc-mini-row + .svc-mini-row { border-top:1px solid var(--border-glow); }
+        .svc-num { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
+        .svc-n-g { background:rgba(6,214,160,.15);  color:var(--accent-green); }
+        .svc-n-a { background:rgba(248,150,30,.15);  color:#f8961e; }
+        .svc-n-r { background:rgba(255,0,127,.15);   color:var(--accent-orange); }
+        .svc-txt { flex:1; }
+        .svc-nom { font-size:12px; font-weight:600; color:var(--text-main); }
+        .svc-sub { font-size:9px; color:var(--text-muted); margin-top:2px; }
+        .svc-badge { font-size:9px; font-weight:700; padding:2px 7px; border-radius:10px; white-space:nowrap; }
 
-        .menu-item-row.highlight-recepcion {
-            background: linear-gradient(135deg, rgba(58, 134, 255, 0.12) 0%, rgba(28, 37, 65, 0.7) 100%);
-            border: 1px solid rgba(58, 134, 255, 0.35);
-        }
+        /* ── FORMULARIOS ─────────────────────────────────────────── */
+        .form-group { margin-bottom:16px; }
+        .form-group label,.form-label { display:block; font-size:11px; font-weight:700; color:var(--accent-blue); margin-bottom:6px; text-transform:uppercase; letter-spacing:.5px; }
+        .form-control { width:100%; padding:12px; border-radius:10px; border:1px solid var(--border-glow); background:#121b33; font-size:14px; color:var(--text-main); outline:none; }
+        .form-control:focus { border-color:var(--accent-blue); box-shadow:0 0 8px rgba(58,134,255,.15); }
+        .btn-action { background:linear-gradient(135deg,var(--accent-blue),#1d4ed8); color:white; border:none; width:100%; padding:14px; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer; text-transform:uppercase; letter-spacing:.5px; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:15px; box-shadow:0 4px 12px rgba(58,134,255,.2); }
+        .btn-action:disabled { opacity:.6; cursor:not-allowed; }
 
-        /* Envoltorio Cuadrado Premium de Logos */
-        .item-logo-container {
-            width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-            font-size: 20px;
-        }
-        .logo-ventas { background-color: rgba(114, 9, 183, 0.2); border: 1px solid rgba(114, 9, 183, 0.4); color: #b5179e; }
-        .logo-servicio { background-color: rgba(58, 134, 255, 0.2); border: 1px solid rgba(58, 134, 255, 0.4); color: var(--accent-blue); }
-        .logo-comex { background-color: rgba(6, 214, 160, 0.2); border: 1px solid rgba(6, 214, 160, 0.4); color: var(--accent-green); }
+        /* COTIZACIONES */
+        .cot-filtros-wrap { display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; margin-bottom:10px; }
+        .cot-filtros-wrap::-webkit-scrollbar { display:none; }
+        .cot-filtro { padding:6px 12px; border-radius:20px; font-size:11px; font-weight:600; border:1px solid var(--border-glow); background:var(--panel-dark); color:var(--text-muted); cursor:pointer; white-space:nowrap; }
+        .cot-filtro.active { background:var(--accent-blue); color:#fff; border-color:var(--accent-blue); }
+        .cot-badge { display:inline-block; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700; }
+        .badge-inicial { background:rgba(58,134,255,.15);  color:var(--accent-blue); }
+        .badge-presup  { background:rgba(248,150,30,.15);  color:#f8961e; }
+        .badge-negoc   { background:rgba(114,9,183,.15);   color:#b5179e; }
+        .badge-ganado  { background:rgba(6,214,160,.15);   color:var(--accent-green); }
+        .badge-perdido { background:rgba(255,0,127,.15);   color:var(--accent-orange); }
+        .badge-sin     { background:rgba(148,163,184,.15); color:var(--text-muted); }
+        #cot-buscar { width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-glow); background:var(--panel-dark); color:var(--text-main); font-size:13px; outline:none; margin-bottom:10px; }
+        #cot-buscar:focus { border-color:var(--accent-blue); }
 
-        /* Miniaturas de procesos técnicos */
-        .item-image-holder { width: 48px; height: 48px; border-radius: 12px; overflow: hidden; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.08); }
-        .item-image-holder img { width: 100%; height: 100%; object-fit: cover; }
+        /* DETALLE OVERLAY */
+        .cot-detalle-overlay { display:none; position:absolute; inset:0; background:var(--bg-dark); z-index:200; overflow-y:auto; padding:16px; flex-direction:column; gap:12px; }
+        .det-close-btn { align-self:flex-end; width:32px; height:32px; border-radius:50%; background:var(--panel-dark); border:1px solid var(--border-glow); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-muted); font-size:18px; flex-shrink:0; }
 
-        .item-text-box { flex: 1; }
-        .item-text-box h3 { font-size: 15px; color: var(--text-main); font-weight: 600; }
-        .item-text-box p { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+        /* FOTOS RECEPCIÓN */
+        .foto-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:6px; }
+        .foto-slot { aspect-ratio:1; border-radius:10px; border:2px dashed var(--border-glow); background:#0c1428; cursor:pointer; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+        .foto-slot.filled { border-style:solid; border-color:var(--accent-blue); }
+        .foto-placeholder { display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--text-muted); font-size:11px; }
+        .foto-slot img { width:100%; height:100%; object-fit:cover; display:none; }
+        input[type="file"] { display:none; }
+        #rec-status { display:none; padding:12px; border-radius:10px; font-size:13px; margin-top:12px; }
 
-        .badge-count { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; background-color: #2a3454; color: var(--text-muted); }
+        /* ── BOTTOM NAV ──────────────────────────────────────────── */
+        .bottom-nav { position:absolute; bottom:0; left:0; width:100%; height:68px; background:rgba(28,37,65,.95); backdrop-filter:blur(10px); border-top:1px solid var(--border-glow); display:flex; justify-content:space-around; align-items:center; padding-bottom:6px; z-index:100; }
+        @media (min-width:600px) { .bottom-nav { display:none; } .app-content { padding-bottom:24px; display:flex; flex-direction:column; } }
+        .nav-link { display:flex; flex-direction:column; align-items:center; color:var(--text-muted); cursor:pointer; font-size:10px; font-weight:600; width:25%; transition:all .2s; }
+        .nav-link i { font-size:18px; margin-bottom:4px; }
+        .nav-link.active { color:var(--accent-blue); }
 
-        /* COMPONENTES DE FORMULARIO DE CARGA */
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; font-size: 11px; font-weight: 700; color: var(--accent-blue); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .form-control { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border-glow); background-color: #121b33; font-size: 14px; color: var(--text-main); outline: none; }
-        .form-control:focus { border-color: var(--accent-blue); box-shadow: 0 0 8px rgba(58, 134, 255, 0.15); }
+        /* TOAST */
+        .toast-glow { position:absolute; top:-100px; left:50%; transform:translateX(-50%); width:90%; background:#1e293b; border:1px solid var(--accent-blue); color:white; padding:12px; border-radius:12px; font-size:12px; text-align:center; z-index:1000; transition:top .4s cubic-bezier(.175,.885,.32,1.275); box-shadow:0 10px 25px rgba(0,0,0,.5); }
+        .toast-glow.show { top:35px; }
 
-        .btn-action {
-            background: linear-gradient(135deg, var(--accent-blue) 0%, #1d4ed8 100%);
-            color: white; border: none; width: 100%; padding: 14px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 15px;
-            box-shadow: 0 4px 12px rgba(58, 134, 255, 0.2);
-        }
-        .btn-action:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        /* BARRA INFERIOR */
-        .bottom-nav { position: absolute; bottom: 0; left: 0; width: 100%; height: 68px; background-color: rgba(28, 37, 65, 0.95); backdrop-filter: blur(10px); border-top: 1px solid var(--border-glow); display: flex; justify-content: space-around; align-items: center; padding-bottom: 6px; z-index: 100; }
-        @media (min-width: 600px) { .bottom-nav { display: none; } .app-content { padding-bottom: 24px; display:flex; flex-direction:column; } }
-        .nav-link { display: flex; flex-direction: column; align-items: center; color: var(--text-muted); cursor: pointer; font-size: 10px; font-weight: 600; width: 25%; transition: all 0.2s; }
-        .nav-link i { font-size: 18px; margin-bottom: 4px; }
-        .nav-link.active { color: var(--accent-blue); }
-
-        /* Toast de Feedback de Red */
-        .toast-glow {
-            position: absolute; top: -100px; left: 50%; transform: translateX(-50%); width: 90%;
-            background-color: #1e293b; border: 1px solid var(--accent-blue); color: white;
-            padding: 12px; border-radius: 12px; font-size: 12px; text-align: center; z-index: 1000;
-            transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-        }
-        .toast-glow.show { top: 35px; }
+        /* ── TEMA CLARO ──────────────────────────────────────────── */
+        body.tema-claro { background:#f0f4f8; }
+        @media (min-width:600px) { body.tema-claro { background:#dde3ea; } }
+        body.tema-claro .phone-container { background:#f8fafc; border-color:#cbd5e1; box-shadow:0 8px 32px rgba(0,0,0,.12); }
+        body.tema-claro .app-header { background:rgba(255,255,255,.95); border-bottom-color:#e2e8f0; }
+        body.tema-claro .app-header::after { background:linear-gradient(90deg,#1a4b8c,#0097b2,#1a4b8c); }
+        body.tema-claro .header-title-block h1 { color:#0f172a; }
+        body.tema-claro .header-title-block p  { color:#64748b; }
+        body.tema-claro .back-arrow-btn { color:#374151; }
+        body.tema-claro .app-content { background:#f8fafc; }
+        body.tema-claro .menu-item-row { background:#ffffff; border-color:#e2e8f0; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+        body.tema-claro .menu-item-row:active { background:#f1f5f9; }
+        body.tema-claro .menu-item-row.highlight-recepcion { background:linear-gradient(135deg,rgba(26,75,140,.06),rgba(255,255,255,.9)); border-color:rgba(26,75,140,.25); }
+        body.tema-claro .item-text-box h3 { color:#0f172a; }
+        body.tema-claro .item-text-box p  { color:#64748b; }
+        body.tema-claro .menu-chevron { color:#94a3b8; }
+        body.tema-claro .badge-count { background:#e8f0fc; color:#1a4b8c; }
+        body.tema-claro .home-stat-chip { background:#ffffff; border-color:#e2e8f0; }
+        body.tema-claro .home-stat-chip .val { color:#1a4b8c; }
+        body.tema-claro .home-stat-chip .lbl { color:#64748b; }
+        body.tema-claro .home-section-title { color:#64748b; }
+        body.tema-claro .cot-mini-card  { background:#ffffff; border-color:#e2e8f0; }
+        body.tema-claro .cot-mini-row:hover { background:#f8fafc; }
+        body.tema-claro .cot-mini-row + .cot-mini-row { border-top-color:#e2e8f0; }
+        body.tema-claro .cmr-nombre { color:#0f172a; }
+        body.tema-claro .cmr-sub    { color:#1a4b8c; }
+        body.tema-claro .svc-mini-card { background:#ffffff; border-color:#e2e8f0; }
+        body.tema-claro .svc-mini-row + .svc-mini-row { border-top-color:#e2e8f0; }
+        body.tema-claro .svc-nom { color:#0f172a; }
+        body.tema-claro .svc-sub { color:#64748b; }
+        body.tema-claro .form-control { background:#ffffff; border-color:#cbd5e1; color:#0f172a; }
+        body.tema-claro #cot-buscar   { background:#ffffff; border-color:#cbd5e1; color:#0f172a; }
+        body.tema-claro .cot-filtro   { background:#ffffff; border-color:#cbd5e1; color:#475569; }
+        body.tema-claro .cot-filtro.active { background:#1a4b8c; border-color:#1a4b8c; color:#fff; }
+        body.tema-claro .bottom-nav   { background:rgba(255,255,255,.95); border-top-color:#e2e8f0; }
+        body.tema-claro .nav-link     { color:#94a3b8; }
+        body.tema-claro .nav-link.active { color:#1a4b8c; }
+        body.tema-claro .cot-detalle-overlay { background:#f8fafc; }
+        body.tema-claro .det-close-btn { background:#ffffff; border-color:#e2e8f0; color:#374151; }
+        body.tema-claro .toast-glow { background:#ffffff; color:#0f172a; border-color:#1a4b8c; }
+        body.tema-claro .logo-ventas  { background:rgba(114,9,183,.1);  border-color:rgba(114,9,183,.25); }
+        body.tema-claro .logo-servicio{ background:rgba(26,75,140,.1);  border-color:rgba(26,75,140,.25); color:#1a4b8c; }
+        body.tema-claro .logo-comex   { background:rgba(6,214,160,.1);  border-color:rgba(6,214,160,.25); }
+        body.tema-claro .item-image-holder { border-color:#e2e8f0; }
+        body.tema-claro .foto-slot { background:#f1f5f9; border-color:#cbd5e1; }
+        body.tema-claro #rec-status { color:#374151; }
+        @keyframes spin { to { transform:rotate(360deg); } }
     </style>
 </head>
 <body>
-
 <div class="phone-container">
     <div class="phone-notch"></div>
 
-    <div class="toast-glow" id="toast-notif">
-        <i class="fa-solid fa-satellite-dish" style="color: var(--accent-green); margin-right: 6px; animation: pulse 1s infinite;"></i> 
-        <span id="toast-text">Conectando con Microsoft...</span>
+    <!-- TOAST -->
+    <div class="toast-glow" id="toast-bar">
+        <i class="fa-solid fa-satellite-dish" style="color:var(--accent-green);margin-right:6px;"></i>
+        <span id="toast-text">Conectando...</span>
     </div>
-
-    <!-- Cabecera Oficial con Isotipo SVG de TLC Incorporado -->
-    <div class="app-header">
-        <div class="back-arrow-btn" id="header-back-arrow" onclick="handleBackNavigation()">
-            <i class="fa-solid fa-chevron-left"></i>
-        </div>
-        <div class="brand-logo-svg-wrapper" id="header-brand-logo" style="background:transparent; border:none; box-shadow:none;">
-            <img src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" style="width:36px; height:36px; object-fit:contain; border-radius:8px;" onerror="this.style.display='none'">
-        </div>
-        <div class="header-title-block">
-            <h1 id="txt-main-title">Portal TLC</h1>
-            <p id="txt-sub-title" style="font-size:11px; color:var(--text-muted);">Menú Principal</p>
-        </div>
-        <div style="position:relative;" id="avatar-wrap-idx">
-            <div class="header-profile" id="header-avatar" style="cursor:pointer;" onclick="toggleAvatarMenuIdx(event)">CH</div>
-
-            <div id="avatar-menu-idx" style="display:none; position:absolute; top:48px; right:0;
-                 background:#0d1520; border:1px solid #1e3050; border-radius:16px;
-                 width:300px; z-index:600; box-shadow:0 16px 48px rgba(0,0,0,0.6);
-                 overflow:hidden; animation:fadeSlideDown .15s ease;">
-
-                <!-- Cabecera usuario -->
-                <div style="padding:16px; border-bottom:1px solid #1e3050; display:flex; align-items:center; gap:12px; background:#080d14;">
-                    <div style="width:40px; height:40px; border-radius:50%; background:#1c2541; border:2px solid #3a86ff33;
-                                display:flex; align-items:center; justify-content:center;
-                                font-size:14px; font-weight:800; color:#3a86ff; flex-shrink:0;" id="avatar-icon-idx">CH</div>
-                    <div style="min-width:0;">
-                        <div style="font-size:13px; font-weight:700; color:#f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="avatar-nombre-idx">—</div>
-                        <div style="font-size:10px; color:#64748b; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="avatar-email-idx">—</div>
-                        <div id="avatar-rol-idx" style="display:inline-block; margin-top:4px; font-size:9px; font-weight:700;
-                             text-transform:uppercase; letter-spacing:0.6px; padding:1px 7px; border-radius:20px;
-                             background:rgba(58,134,255,.15); color:#3a86ff; border:1px solid rgba(58,134,255,.25);">—</div>
-                    </div>
-                </div>
-
-                <div style="padding:12px; display:flex; flex-direction:column; gap:10px;">
-
-                    <!-- Switch Tema -->
-                    <div style="background:#080d14; border:1px solid #1e3050; border-radius:10px; padding:10px 12px;">
-                        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#64748b; margin-bottom:8px;">Apariencia</div>
-                        <div style="display:flex; background:#0a1628; border-radius:8px; overflow:hidden; border:1px solid #1e3050;">
-                            <button id="idx-btn-tema-oscuro" onclick="_setTemaIdx('dark')"
-                                style="flex:1; padding:8px; border:none; cursor:pointer; font-size:12px; font-weight:600;
-                                       display:flex; align-items:center; justify-content:center; gap:5px;
-                                       background:#3a86ff; color:#fff; border-radius:7px 0 0 7px; transition:all .15s;">
-                                🌙 Oscuro
-                            </button>
-                            <button id="idx-btn-tema-claro" onclick="_setTemaIdx('light')"
-                                style="flex:1; padding:8px; border:none; cursor:pointer; font-size:12px; font-weight:600;
-                                       display:flex; align-items:center; justify-content:center; gap:5px;
-                                       background:transparent; color:#64748b; transition:all .15s;">
-                                ☀️ Claro
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Saludo WhatsApp -->
-                    <div style="background:#080d14; border:1px solid #1e3050; border-radius:10px; padding:10px 12px;">
-                        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;
-                                    color:#64748b; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                            Saludo WhatsApp
-                        </div>
-                        <textarea id="idx-wsp-saludo" rows="2"
-                            style="width:100%; background:#0a1628; border:1px solid #1e3050; border-radius:8px;
-                                   color:#f1f5f9; font-size:12px; padding:8px 10px; resize:none;
-                                   line-height:1.4; outline:none; font-family:inherit;"
-                            placeholder="Hola, le compartimos el presupuesto de TLC SRL: "
-                            oninput="_guardarSaludoWspIdx(this.value)"></textarea>
-                        <div style="font-size:10px; color:#334155; margin-top:3px;">Se guarda automáticamente · URL se agrega al final</div>
-                    </div>
-
-                    <!-- Cerrar sesión -->
-                    <button onclick="cerrarSesionIdx()"
-                        style="width:100%; padding:11px; border-radius:10px; background:transparent;
-                               border:1px solid #2d1a1a; color:#f87171; font-size:13px; font-weight:600;
-                               cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
-                               transition:background .15s;"
-                        onmouseover="this.style.background='rgba(248,113,113,.08)'"
-                        onmouseout="this.style.background='transparent'">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                        Cerrar sesión
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="phone-app-content" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
-    <div class="app-content">
-
-        <!-- ================= PANTALLA 1: MENÚ RAÍZ (HOME) ================= -->
-        <div class="app-view active" id="view-home">
-            <div class="menu-list-stack">
-                <div class="menu-item-row" id="menu-ventas" onclick="abrirModuloConPermiso('view-ventas-menu', 'Ventas', 'Embudo Comercial', 'ventas')">
-                    <div class="item-logo-container" style="overflow:hidden; padding:0;">
-                        <img src="https://lh3.googleusercontent.com/d/1ghU497CVOlvAWDoyBFRc4g1HeMOLyuxR" style="width:48px; height:48px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-chart-pie\'></i>'; this.parentElement.classList.add('logo-ventas');">
-                    </div>
-                    <div class="item-text-box"><h3>Ventas</h3><p>Cotizaciones y Pipeline Leads</p></div>
-                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
-                </div>
-                <div class="menu-item-row" id="menu-servicio" onclick="abrirModuloConPermiso('view-servicio-menu', 'Servicio Técnico', 'Laboratorio', 'servicio')">
-                    <div class="item-logo-container" style="overflow:hidden; padding:0;">
-                        <img src="https://lh3.googleusercontent.com/d/1HdFljwTWje8_7Yv3Muc2soSbZjKXy8_N" style="width:48px; height:48px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-microscope\'></i>'; this.parentElement.classList.add('logo-servicio');">
-                    </div>
-                    <div class="item-text-box"><h3>Servicio Técnico</h3><p>Ingresos, Checklists y Reparaciones</p></div>
-                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
-                </div>
-                <div class="menu-item-row" id="menu-comex" onclick="abrirModuloConPermiso('view-comex-menu', 'Comercio Exterior', 'Logística', 'comex')">
-                    <div class="item-logo-container" style="overflow:hidden; padding:0;">
-                        <img src="https://lh3.googleusercontent.com/d/1jQH8p95CDIasQdtU-A7wN2r8h4jkA1L-" style="width:48px; height:48px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-ship\'></i>'; this.parentElement.classList.add('logo-comex');">
-                    </div>
-                    <div class="item-text-box"><h3>Comercio Exterior</h3><p>Importaciones y Aduana</p></div>
-                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
-                </div>
-                <div class="menu-item-row" id="menu-admin" onclick="abrirModuloConPermiso('view-admin-menu', 'Administración', 'Gestión interna', 'admin')">
-                    <div class="item-logo-container" style="overflow:hidden; padding:0;">
-                        <img src="https://lh3.googleusercontent.com/d/1O0oBR3D8skpxWHWRuUx323B-AdQVZTCb" style="width:48px; height:48px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-building\' style=\'color:#f8961e\'></i>'; this.parentElement.style.background='rgba(248,150,30,0.15)'; this.parentElement.style.border='1px solid rgba(248,150,30,0.4)';">
-                    </div>
-                    <div class="item-text-box"><h3>Administración</h3><p>Gestión interna y reportes</p></div>
-                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
-                </div>
-            </div>
-
-            <!-- SITIO WEB TLC — solo desktop, ocupa todo el espacio disponible -->
-            <div id="web-home" style="display:none; margin-top:16px; border-radius:16px; overflow:hidden; border:1px solid #1e293b; box-shadow:0 8px 24px rgba(0,0,0,0.4); flex:1;">
-                <iframe
-                    src="https://www.tlcsrl.com.ar/"
-                    width="100%" height="100%"
-                    style="display:block; border:none; min-height:500px;">
-                </iframe>
-            </div>
-            <script>
-                if (window.innerWidth >= 600) {
-                    document.getElementById('web-home').style.display = 'flex';
-                    document.getElementById('web-home').style.flexDirection = 'column';
-                }
-            </script>
-        </div>
-        <div class="app-view" id="view-servicio-menu">
-            <div class="menu-list-stack">
-                <div class="menu-item-row highlight-recepcion" onclick="openModule('form-recepcion', 'Recepción de Equipos', 'Nuevo Ingreso a Taller')">
-                    <div class="item-logo-container logo-servicio" style="background:var(--accent-blue); color:white; width:44px; height:44px; font-size:16px;"><i class="fa-solid fa-file-invoice"></i></div>
-                    <div class="item-text-box"><h3>Recepción de Equipos</h3><p>Aduana de entrada y remito</p></div>
-                    <span class="badge-count" style="background:var(--accent-blue); color:white;">Nuevo</span>
-                </div>
-                <div class="menu-item-row" onclick="openModule('view-diagnostico', 'Diagnóstico', 'Evaluación inicial en laboratorio')">
-                    <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&q=80&w=150" alt="Diagnóstico"></div>
-                    <div class="item-text-box"><h3>Diagnóstico</h3><p>Detección de fallas y checklists POE</p></div>
-                    <span class="badge-count" style="background:rgba(58,134,255,0.2); color:#3a86ff;">3 eq.</span>
-                </div>
-                <div class="menu-item-row" onclick="openModule('view-presupuestar', 'Presupuestar', 'Confección de costos')">
-                    <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=150" alt="Presupuestar"></div>
-                    <div class="item-text-box"><h3>Presupuestar</h3><p>Cálculo de repuestos y mano de obra</p></div>
-                    <span class="badge-count" style="background:rgba(248,150,30,0.2); color:#f8961e;">1 pend.</span>
-                </div>
-                <div class="menu-item-row" onclick="openModule('view-reparacion', 'Reparación POE', 'Laboratorio activo')">
-                    <div class="item-image-holder"><img src="https://lh3.googleusercontent.com/d/1rDDPm9hrma3mPK4FwvLyY99mJlR3ZQbT" alt="Reparación" style="object-fit:cover;width:100%;height:100%;"></div>
-                    <div class="item-text-box"><h3>Reparación</h3><p>Recambio de componentes y calibración</p></div>
-                    <span class="badge-count" style="background:var(--accent-orange); color:white;">2 act.</span>
-                </div>
-                <div class="menu-item-row" onclick="openModule('view-facturacion', 'Facturación', 'Administración de salida')">
-                    <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=150" alt="Facturación"></div>
-                    <div class="item-text-box"><h3>Facturación</h3><p>Validación de pago y liberación</p></div>
-                    <span class="badge-count">0</span>
-                </div>
-                <div class="menu-item-row" onclick="openModule('view-expedicion', 'Expedición', 'Logística de despacho')">
-                    <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=150" alt="Expedición"></div>
-                    <div class="item-text-box"><h3>Expedición</h3><p>Despacho final certificado al médico</p></div>
-                    <span class="badge-count" style="background:rgba(6,214,160,0.2); color:#06d6a0;">1 listo</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- ================= PANTALLA 3: SUB-MENÚ VENTAS ================= -->
-        <div class="app-view" id="view-ventas-menu">
-            <div class="menu-list-stack">
-                <div class="menu-item-row" onclick="window.location.href='selector-dispositivos.html'">
-                    <div class="item-logo-container" style="overflow:hidden; padding:0; width:44px; height:44px;">
-                        <img src="https://lh3.googleusercontent.com/d/1ZqgByiuLcmidQ3bHcvt4GZePGna6blXl" style="width:44px; height:44px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-tags\'></i>'; this.parentElement.classList.add('logo-ventas');">
-                    </div>
-                    <div class="item-text-box"><h3>Catálogo de Productos</h3><p>Equipos, insumos y modalidades de pago</p></div>
-                </div>
-                <div class="menu-item-row" onclick="window.location.href='cotizaciones.html'">
-                    <div class="item-logo-container logo-ventas" style="width:44px; height:44px; font-size:16px;"><i class="fa-solid fa-list-check"></i></div>
-                    <div class="item-text-box"><h3>Cotizaciones</h3><p>Pipeline filtrado por vendedor</p></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ================= COTIZACIONES ================= -->
-        <div class="app-view" id="view-cotizaciones">
-            <div id="cot-loading" style="text-align:center; padding:40px 20px;">
-                <div class="spinner" style="margin:0 auto 16px; width:32px; height:32px; border:3px solid #222e50; border-top-color:#3a86ff; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
-                <p style="color:var(--text-muted); font-size:13px;">Cargando cotizaciones...</p>
-            </div>
-            <div id="cot-filtros" style="display:none; margin-bottom:12px;">
-                <div class="cot-filtros-wrap">
-                    <button class="cot-filtro cot-f-todos active" data-estado="TODOS" onclick="filtrarCot(this)">Todos</button>
-                    <button class="cot-filtro cot-f-inicial" data-estado="Contacto inicial 25%" onclick="filtrarCot(this)">🔵 Inicial</button>
-                    <button class="cot-filtro cot-f-presup" data-estado="Presupuestado 50%" onclick="filtrarCot(this)">🟡 Presup.</button>
-                    <button class="cot-filtro cot-f-negoc" data-estado="Negociación 75%" onclick="filtrarCot(this)">🟣 Negoc.</button>
-                    <button class="cot-filtro cot-f-ganado" data-estado="Ganado 100%" onclick="filtrarCot(this)">🟢 Ganado</button>
-                    <button class="cot-filtro cot-f-perdido" data-estado="Perdido 0%" onclick="filtrarCot(this)">🔴 Perdido</button>
-                </div>
-                <input id="cot-buscar" type="text" placeholder="Buscar cliente o dispositivo..." 
-                    style="width:100%; background:#1c2541; border:1px solid #222e50; border-radius:10px; padding:9px 14px; color:#f8fafc; font-size:13px; outline:none;" 
-                    oninput="renderCotizaciones()">
-            </div>
-            <div id="cot-lista"></div>
-        </div>
-
-        <!-- DETALLE COTIZACION OVERLAY -->
-        <div id="cot-detalle-overlay" style="display:none; position:absolute; inset:0; background:#0d1526; z-index:100; overflow-y:auto; flex-direction:column;">
-            <div style="display:flex; align-items:center; gap:12px; padding:16px; border-bottom:1px solid #222e50;">
-                <button onclick="cerrarDetalleCot()" style="background:none; border:none; color:#94a3b8; font-size:22px; cursor:pointer; padding:0 8px 0 0; line-height:1;">←</button>
-                <div>
-                    <div id="cot-det-titulo" style="font-size:15px; font-weight:700; color:#f1f5f9;"></div>
-                    <div id="cot-det-subtitulo" style="font-size:11px; color:#64748b;"></div>
-                </div>
-            </div>
-
-            <div style="padding:16px; display:flex; flex-direction:column; gap:14px;">
-                <!-- Estado -->
-                <div id="cot-det-estado-wrap"></div>
-                <!-- Foto + Dispositivo -->
-                <div id="cot-det-equipo-wrap" style="background:#1c2541; border-radius:12px; border:1px solid #222e50; overflow:hidden;">
-                    <div id="cot-det-foto-inner" style="width:100%; min-height:160px; display:flex; align-items:center; justify-content:center; background:#131e38;"></div>
-                    <div style="padding:12px 14px;">
-                        <div style="font-size:11px; font-weight:700; color:#60a5fa; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Equipo</div>
-                        <div id="cot-det-disp-nombre" style="font-size:15px; font-weight:700; color:#f1f5f9;"></div>
-                    </div>
-                </div>
-
-                <!-- Cliente -->
-                <div style="background:#1c2541; border-radius:12px; padding:14px; border:1px solid #222e50;">
-                    <div style="font-size:11px; font-weight:700; color:#60a5fa; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Cliente</div>
-                    <div id="cot-det-cliente"></div>
-                </div>
-                <!-- Condiciones -->
-                <div id="cot-det-condiciones-wrap" style="background:#1c2541; border-radius:12px; padding:14px; border:1px solid #222e50; display:none;">
-                    <div style="font-size:11px; font-weight:700; color:#60a5fa; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Condiciones Comerciales</div>
-                    <div id="cot-det-condiciones"></div>
-                </div>
-                <!-- Notas -->
-                <div id="cot-det-notas-wrap" style="background:#1c2541; border-radius:12px; padding:14px; border:1px solid #222e50; display:none;">
-                    <div style="font-size:11px; font-weight:700; color:#f8961e; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Notas</div>
-                    <div id="cot-det-notas" style="font-size:13px; color:#f1f5f9; line-height:1.5;"></div>
-                </div>
-                <!-- PDFs -->
-                <div id="cot-det-pdfs-wrap" style="display:none; flex-direction:column; gap:8px;"></div>
-            </div>
-        </div>
-
-        <!-- ================= ADMINISTRACIÓN ================= -->
-        <div class="app-view" id="view-admin-menu">
-            <div class="menu-list-stack">
-                <div class="menu-item-row" onclick="openModule('view-placeholder', 'Reportes', 'Resúmenes y análisis')">
-                    <div class="item-logo-container" style="background:rgba(248,150,30,0.15); border:1px solid rgba(248,150,30,0.4); color:#f8961e;"><i class="fa-solid fa-chart-bar"></i></div>
-                    <div class="item-text-box"><h3>Reportes</h3><p>Resúmenes y análisis</p></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ================= LISTA DE PRECIOS ================= -->
-        <div class="app-view" id="view-lista-precios">
-            <div style="text-align:center; padding:40px 20px;">
-                <div class="spinner" style="margin:0 auto 16px;"></div>
-                <p style="color:var(--text-muted); font-size:14px;">Abriendo Lista de Precios...</p>
-            </div>
-        </div>
-
-        <!-- ================= PANTALLA 4: SUB-MENÚ COMEX ================= -->
-        <div class="app-view" id="view-comex-menu">
-            <div class="menu-list-stack">
-                <div class="menu-item-row" onclick="openModule('view-placeholder', 'Tracking Comex', 'Importaciones en Curso')">
-                    <div class="item-logo-container logo-comex" style="width:44px; height:44px; font-size:16px;"><i class="fa-solid fa-ship"></i></div>
-                    <div class="item-text-box"><h3>Importaciones Activas</h3><p>Seguimiento de repuestos en aduana</p></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ================= PANTALLA 5: FORMULARIO CABLEADO RECEPCIÓN ================= -->
-        <div class="app-view" id="form-recepcion" style="padding-bottom:32px;">
-
-            <!-- Fecha -->
-            <div class="form-group">
-                <label class="form-label">Fecha de Recepción <span style="color:#f87171;">*</span></label>
-                <input type="date" class="form-control" id="rec-fecha" required>
-            </div>
-
-            <!-- Tipo de Servicio -->
-            <div class="form-group">
-                <label class="form-label">Tipo de Servicio <span style="color:#f87171;">*</span></label>
-                <select class="form-control" id="rec-tipo" required>
-                    <option value="">-- Seleccionar --</option>
-                    <option>Garantía</option>
-                    <option>Reparación con costo</option>
-                    <option>Mantenimiento preventivo</option>
-                    <option>Revisión / Diagnóstico</option>
-                    <option>Instalación</option>
-                </select>
-            </div>
-
-            <!-- Nombre Cliente -->
-            <div class="form-group">
-                <label class="form-label">Nombre y Apellido Cliente <span style="color:#f87171;">*</span></label>
-                <input type="text" class="form-control" id="rec-cliente" placeholder="Dr. Juan García" required>
-            </div>
-
-            <!-- Teléfono -->
-            <div class="form-group">
-                <label class="form-label">Teléfono <span style="color:#f87171;">*</span></label>
-                <input type="tel" class="form-control" id="rec-telefono" placeholder="+54 11 1234-5678" required>
-            </div>
-
-            <!-- Falla reportada -->
-            <div class="form-group">
-                <label class="form-label">Falla Reportada por el Cliente <span style="color:#f87171;">*</span></label>
-                <textarea class="form-control" id="rec-falla" rows="3" placeholder="Describa el problema reportado..." required></textarea>
-            </div>
-
-            <!-- Marca -->
-            <div class="form-group">
-                <label class="form-label">Marca <span style="color:#f87171;">*</span></label>
-                <select class="form-control" id="rec-marca" required onchange="actualizarModelos()">
-                    <option value="">-- Seleccionar Marca --</option>
-                    <option>HUVITZ</option>
-                    <option>Topcon</option>
-                    <option>Zeiss</option>
-                    <option>Nidek</option>
-                    <option>Haag-Streit</option>
-                    <option>Bausch & Lomb</option>
-                    <option>Alcon</option>
-                    <option>Moria</option>
-                    <option>Otro</option>
-                </select>
-            </div>
-
-            <!-- Modelo -->
-            <div class="form-group">
-                <label class="form-label">Modelo <span style="color:#f87171;">*</span></label>
-                <select class="form-control" id="rec-modelo" required>
-                    <option value="">-- Seleccionar Modelo --</option>
-                </select>
-                <div id="modelo-otro-wrap" style="display:none; margin-top:8px;">
-                    <input type="text" class="form-control" id="rec-modelo-otro" placeholder="Especificar marca y modelo...">
-                </div>
-            </div>
-
-            <!-- Nro de Serie -->
-            <div class="form-group">
-                <label class="form-label">Número de Serie (S/N) <span style="color:#f87171;">*</span></label>
-                <input type="text" class="form-control" id="rec-serie" placeholder="Ej: HV-2024-001" required>
-            </div>
-
-            <!-- Accesorios -->
-            <div class="form-group">
-                <label class="form-label">Accesorios incluidos</label>
-                <input type="text" class="form-control" id="rec-accesorios" placeholder="Cable, maletín, manual...">
-            </div>
-
-            <!-- Fotos — 3 slots -->
-            <div class="form-group">
-                <label class="form-label">Fotos del equipo (hasta 3)</label>
-                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:6px;">
-                    <div class="foto-slot" id="slot-0" onclick="triggerFoto(0)">
-                        <input type="file" id="foto-input-0" accept="image/*" capture="environment" style="display:none" onchange="previewFoto(0,this)">
-                        <div class="foto-placeholder">
-                            <i class="fa-solid fa-camera" style="font-size:20px; color:#64748b;"></i>
-                            <span style="font-size:10px; color:#64748b; margin-top:4px;">Foto 1</span>
-                        </div>
-                        <img id="foto-preview-0" src="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:10px;">
-                    </div>
-                    <div class="foto-slot" id="slot-1" onclick="triggerFoto(1)">
-                        <input type="file" id="foto-input-1" accept="image/*" capture="environment" style="display:none" onchange="previewFoto(1,this)">
-                        <div class="foto-placeholder">
-                            <i class="fa-solid fa-camera" style="font-size:20px; color:#64748b;"></i>
-                            <span style="font-size:10px; color:#64748b; margin-top:4px;">Foto 2</span>
-                        </div>
-                        <img id="foto-preview-1" src="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:10px;">
-                    </div>
-                    <div class="foto-slot" id="slot-2" onclick="triggerFoto(2)">
-                        <input type="file" id="foto-input-2" accept="image/*" capture="environment" style="display:none" onchange="previewFoto(2,this)">
-                        <div class="foto-placeholder">
-                            <i class="fa-solid fa-camera" style="font-size:20px; color:#64748b;"></i>
-                            <span style="font-size:10px; color:#64748b; margin-top:4px;">Foto 3</span>
-                        </div>
-                        <img id="foto-preview-2" src="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:10px;">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Status -->
-            <div id="rec-status" style="display:none; border-radius:10px; padding:12px 14px; font-size:13px; font-weight:600; margin-bottom:12px; text-align:center;"></div>
-
-            <!-- Submit -->
-            <button onclick="enviarRecepcion()" id="btn-rec-enviar"
-                style="width:100%; background:#3a86ff; color:white; border:none; border-radius:14px; padding:16px; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;">
-                <i class="fa-solid fa-cloud-arrow-up"></i> Enviar Recepción
-            </button>
-
-        </div>
-
-        <!-- ================= VISTAS SERVICE FLOW ================= -->
-
-        <!-- Diagnóstico -->
-        <div class="app-view" id="view-diagnostico">
-            <div style="display:flex; flex-direction:column; gap:12px;">
-                <!-- Pipeline bar -->
-                <div style="background:#1c2541; border-radius:14px; padding:14px 16px; border:1px solid #222e50;">
-                    <div style="font-size:10px; color:#60a5fa; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Flujo Servicio Técnico</div>
-                    <div style="display:flex; align-items:center; gap:4px; overflow-x:auto; padding-bottom:4px;">
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:48px;">
-                            <div style="width:32px; height:32px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-box-archive" style="font-size:12px; color:#94a3b8;"></i></div>
-                            <span style="font-size:8px; color:#94a3b8; text-align:center;">Recep.</span>
-                        </div>
-                        <div style="flex:1; height:2px; background:linear-gradient(90deg, #3a86ff, #3a86ff); border-radius:2px; min-width:8px;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:48px;">
-                            <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg, #3a86ff, #1d4ed8); display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px rgba(58,134,255,0.4);"><i class="fa-solid fa-stethoscope" style="font-size:12px; color:white;"></i></div>
-                            <span style="font-size:8px; color:#3a86ff; font-weight:700; text-align:center;">Diagnóst.</span>
-                        </div>
-                        <div style="flex:1; height:2px; background:#222e50; border-radius:2px; min-width:8px;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:48px;">
-                            <div style="width:32px; height:32px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-calculator" style="font-size:12px; color:#94a3b8;"></i></div>
-                            <span style="font-size:8px; color:#94a3b8; text-align:center;">Presup.</span>
-                        </div>
-                        <div style="flex:1; height:2px; background:#222e50; border-radius:2px; min-width:8px;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:48px;">
-                            <div style="width:32px; height:32px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-screwdriver-wrench" style="font-size:12px; color:#94a3b8;"></i></div>
-                            <span style="font-size:8px; color:#94a3b8; text-align:center;">Repar.</span>
-                        </div>
-                        <div style="flex:1; height:2px; background:#222e50; border-radius:2px; min-width:8px;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:48px;">
-                            <div style="width:32px; height:32px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-shield-check" style="font-size:12px; color:#94a3b8;"></i></div>
-                            <span style="font-size:8px; color:#94a3b8; text-align:center;">QC</span>
-                        </div>
-                        <div style="flex:1; height:2px; background:#222e50; border-radius:2px; min-width:8px;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:48px;">
-                            <div style="width:32px; height:32px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-truck" style="font-size:12px; color:#94a3b8;"></i></div>
-                            <span style="font-size:8px; color:#94a3b8; text-align:center;">Entrega</span>
-                        </div>
-                    </div>
-                </div>
-                <!-- Equipos en diagnóstico -->
-                <div style="font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; padding:0 4px;">Equipos en esta etapa · 3</div>
-                <div style="background:#1c2541; border-radius:14px; border:1px solid #222e50; overflow:hidden;">
-                    <div style="padding:14px 16px; border-bottom:1px solid #222e50; display:flex; align-items:center; gap:12px;">
-                        <div style="width:38px; height:38px; border-radius:10px; background:#0f1a30; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-eye" style="color:#3a86ff; font-size:15px;"></i></div>
-                        <div style="flex:1;"><div style="font-size:13px; font-weight:600; color:#f1f5f9;">HUVITZ HOCT-1F</div><div style="font-size:11px; color:#64748b; margin-top:2px;">Dr. Martín Cortina · SN: HV-2024-031</div></div>
-                        <span style="font-size:10px; font-weight:700; padding:3px 8px; border-radius:8px; background:rgba(58,134,255,0.15); color:#3a86ff;">Día 2</span>
-                    </div>
-                    <div style="padding:14px 16px; border-bottom:1px solid #222e50; display:flex; align-items:center; gap:12px;">
-                        <div style="width:38px; height:38px; border-radius:10px; background:#0f1a30; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-microscope" style="color:#f8961e; font-size:15px;"></i></div>
-                        <div style="flex:1;"><div style="font-size:13px; font-weight:600; color:#f1f5f9;">ELI EZER ERK-9100</div><div style="font-size:11px; color:#64748b; margin-top:2px;">Dra. Nadia Anabalon · SN: EZ-9100-118</div></div>
-                        <span style="font-size:10px; font-weight:700; padding:3px 8px; border-radius:8px; background:rgba(248,150,30,0.15); color:#f8961e;">Día 5</span>
-                    </div>
-                    <div style="padding:14px 16px; display:flex; align-items:center; gap:12px;">
-                        <div style="width:38px; height:38px; border-radius:10px; background:#0f1a30; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-eye" style="color:#06d6a0; font-size:15px;"></i></div>
-                        <div style="flex:1;"><div style="font-size:13px; font-weight:600; color:#f1f5f9;">HUVITZ HVS-1</div><div style="font-size:11px; color:#64748b; margin-top:2px;">Clinica Cirex · SN: HVS-2023-055</div></div>
-                        <span style="font-size:10px; font-weight:700; padding:3px 8px; border-radius:8px; background:rgba(6,214,160,0.15); color:#06d6a0;">Nuevo</span>
-                    </div>
-                </div>
-                <!-- Próximo paso -->
-                <div style="background:rgba(58,134,255,0.06); border:1px dashed rgba(58,134,255,0.25); border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:12px;">
-                    <i class="fa-solid fa-file-waveform" style="color:#3a86ff; font-size:20px;"></i>
-                    <div><div style="font-size:12px; font-weight:600; color:#60a5fa;">Checklist POE disponible</div><div style="font-size:11px; color:#64748b; margin-top:2px;">Formulario guía de diagnóstico por equipo</div></div>
-                    <i class="fa-solid fa-chevron-right" style="color:#3a86ff; margin-left:auto; font-size:12px;"></i>
-                </div>
-            </div>
-        </div>
-
-        <!-- Presupuestar -->
-        <div class="app-view" id="view-presupuestar">
-            <div style="display:flex; flex-direction:column; gap:12px;">
-                <div style="background:#1c2541; border-radius:14px; padding:14px 16px; border:1px solid #222e50;">
-                    <div style="font-size:10px; color:#f8961e; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Flujo Servicio Técnico</div>
-                    <div style="display:flex; align-items:center; gap:4px;">
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-check" style="font-size:10px; color:#06d6a0;"></i></div><span style="font-size:8px; color:#06d6a0;">Recep.</span></div>
-                        <div style="flex:1; height:2px; background:#06d6a0;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-check" style="font-size:10px; color:#06d6a0;"></i></div><span style="font-size:8px; color:#06d6a0;">Diagn.</span></div>
-                        <div style="flex:1; height:2px; background:#f8961e;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#f8961e,#d97706); display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px rgba(248,150,30,0.4);"><i class="fa-solid fa-calculator" style="font-size:10px; color:white;"></i></div><span style="font-size:8px; color:#f8961e; font-weight:700;">Presup.</span></div>
-                        <div style="flex:1; height:2px; background:#222e50;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-screwdriver-wrench" style="font-size:10px; color:#94a3b8;"></i></div><span style="font-size:8px; color:#94a3b8;">Repar.</span></div>
-                        <div style="flex:1; height:2px; background:#222e50;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-shield-check" style="font-size:10px; color:#94a3b8;"></i></div><span style="font-size:8px; color:#94a3b8;">QC</span></div>
-                        <div style="flex:1; height:2px; background:#222e50;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-truck" style="font-size:10px; color:#94a3b8;"></i></div><span style="font-size:8px; color:#94a3b8;">Entrega</span></div>
-                    </div>
-                </div>
-                <div style="font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; padding:0 4px;">Pendientes de aprobación · 1</div>
-                <div style="background:#1c2541; border-radius:14px; border:1px solid rgba(248,150,30,0.3); overflow:hidden;">
-                    <div style="padding:14px 16px;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                            <div style="font-size:13px; font-weight:700; color:#f1f5f9;">HUVITZ HOCT-1F</div>
-                            <span style="font-size:10px; padding:3px 8px; border-radius:8px; background:rgba(248,150,30,0.15); color:#f8961e; font-weight:700;">Esperando OK cliente</span>
-                        </div>
-                        <div style="font-size:11px; color:#64748b; margin-bottom:12px;">Dr. Martín Cortina · SN: HV-2024-031</div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
-                            <div style="background:#0f1a30; border-radius:10px; padding:10px;"><div style="font-size:10px; color:#64748b; margin-bottom:4px;">Repuestos</div><div style="font-size:14px; font-weight:700; color:#f8961e;">USD 340</div></div>
-                            <div style="background:#0f1a30; border-radius:10px; padding:10px;"><div style="font-size:10px; color:#64748b; margin-bottom:4px;">Mano de obra</div><div style="font-size:14px; font-weight:700; color:#f8961e;">USD 120</div></div>
-                        </div>
-                        <div style="background:#0f1a30; border-radius:10px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-size:12px; color:#94a3b8; font-weight:600;">Total presupuesto</span>
-                            <span style="font-size:16px; font-weight:700; color:#06d6a0;">USD 460</span>
-                        </div>
-                    </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; border-top:1px solid #222e50;">
-                        <div style="padding:12px; text-align:center; border-right:1px solid #222e50; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;"><i class="fa-solid fa-xmark" style="color:#f87171;"></i><span style="font-size:12px; font-weight:600; color:#f87171;">Rechazar</span></div>
-                        <div style="padding:12px; text-align:center; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;"><i class="fa-solid fa-check" style="color:#06d6a0;"></i><span style="font-size:12px; font-weight:600; color:#06d6a0;">Aprobar</span></div>
-                    </div>
-                </div>
-                <div style="background:rgba(58,134,255,0.06); border:1px dashed rgba(58,134,255,0.25); border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:12px;">
-                    <i class="fa-solid fa-circle-info" style="color:#3a86ff; font-size:18px;"></i>
-                    <div style="font-size:11px; color:#64748b; line-height:1.5;">La aprobación desde Teams notificará a Damián y creará la tarea de Reparación en Planner.</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Reparación -->
-        <div class="app-view" id="view-reparacion">
-            <div style="display:flex; flex-direction:column; gap:12px;">
-                <div style="background:#1c2541; border-radius:14px; padding:14px 16px; border:1px solid #222e50;">
-                    <div style="font-size:10px; color:#ff007f; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Flujo Servicio Técnico</div>
-                    <div style="display:flex; align-items:center; gap:4px;">
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-check" style="font-size:10px; color:#06d6a0;"></i></div><span style="font-size:8px; color:#06d6a0;">Recep.</span></div>
-                        <div style="flex:1; height:2px; background:#06d6a0;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-check" style="font-size:10px; color:#06d6a0;"></i></div><span style="font-size:8px; color:#06d6a0;">Diagn.</span></div>
-                        <div style="flex:1; height:2px; background:#06d6a0;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-check" style="font-size:10px; color:#06d6a0;"></i></div><span style="font-size:8px; color:#06d6a0;">Presup.</span></div>
-                        <div style="flex:1; height:2px; background:#ff007f;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#ff007f,#c0006b); display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px rgba(255,0,127,0.4);"><i class="fa-solid fa-screwdriver-wrench" style="font-size:10px; color:white;"></i></div><span style="font-size:8px; color:#ff007f; font-weight:700;">Repar.</span></div>
-                        <div style="flex:1; height:2px; background:#222e50;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-shield-check" style="font-size:10px; color:#94a3b8;"></i></div><span style="font-size:8px; color:#94a3b8;">QC</span></div>
-                        <div style="flex:1; height:2px; background:#222e50;"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px;"><div style="width:28px; height:28px; border-radius:50%; background:#222e50; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-truck" style="font-size:10px; color:#94a3b8;"></i></div><span style="font-size:8px; color:#94a3b8;">Entrega</span></div>
-                    </div>
-                </div>
-                <div style="font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; padding:0 4px;">En reparación activa · 2</div>
-                <div style="background:#1c2541; border-radius:14px; border:1px solid #222e50; overflow:hidden;">
-                    <div style="padding:14px 16px; border-bottom:1px solid #222e50;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-                            <div style="font-size:13px; font-weight:700; color:#f1f5f9;">ELI EZER ERK-9100</div>
-                            <span style="font-size:10px; padding:3px 8px; border-radius:8px; background:rgba(255,0,127,0.12); color:#ff007f; font-weight:700;">● En proceso</span>
-                        </div>
-                        <div style="font-size:11px; color:#64748b; margin-bottom:10px;">Dra. Nadia Anabalon · Téc: Damián</div>
-                        <div style="background:#0f1a30; border-radius:8px; overflow:hidden; height:6px;"><div style="width:65%; height:100%; background:linear-gradient(90deg,#ff007f,#f8961e); border-radius:8px;"></div></div>
-                        <div style="display:flex; justify-content:space-between; margin-top:5px;"><span style="font-size:10px; color:#64748b;">Avance</span><span style="font-size:10px; font-weight:700; color:#f8961e;">65%</span></div>
-                    </div>
-                    <div style="padding:14px 16px;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-                            <div style="font-size:13px; font-weight:700; color:#f1f5f9;">HUVITZ HOCT-1F</div>
-                            <span style="font-size:10px; padding:3px 8px; border-radius:8px; background:rgba(255,0,127,0.12); color:#ff007f; font-weight:700;">● En proceso</span>
-                        </div>
-                        <div style="font-size:11px; color:#64748b; margin-bottom:10px;">Dr. Martín Cortina · Téc: Juan</div>
-                        <div style="background:#0f1a30; border-radius:8px; overflow:hidden; height:6px;"><div style="width:30%; height:100%; background:linear-gradient(90deg,#ff007f,#f8961e); border-radius:8px;"></div></div>
-                        <div style="display:flex; justify-content:space-between; margin-top:5px;"><span style="font-size:10px; color:#64748b;">Avance</span><span style="font-size:10px; font-weight:700; color:#f8961e;">30%</span></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Facturación -->
-        <div class="app-view" id="view-facturacion">
-            <div style="display:flex; flex-direction:column; gap:12px;">
-                <div style="background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:14px; padding:20px; text-align:center;">
-                    <i class="fa-solid fa-file-invoice-dollar" style="font-size:32px; color:#06d6a0; margin-bottom:12px; display:block;"></i>
-                    <div style="font-size:14px; font-weight:600; color:#f1f5f9; margin-bottom:6px;">Facturación</div>
-                    <div style="font-size:12px; color:#64748b; line-height:1.5;">Este módulo integrará con Tactica ERP para validación de pago y liberación del equipo.</div>
-                    <div style="margin-top:16px; padding:10px; background:rgba(6,214,160,0.08); border-radius:10px; border:1px solid rgba(6,214,160,0.2);">
-                        <div style="font-size:11px; color:#06d6a0; font-weight:600;">0 equipos pendientes de facturar</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Expedición -->
-        <div class="app-view" id="view-expedicion">
-            <div style="display:flex; flex-direction:column; gap:12px;">
-                <div style="background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:14px; overflow:hidden;">
-                    <div style="padding:14px 16px; background:rgba(6,214,160,0.06); border-bottom:1px solid #222e50;">
-                        <div style="display:flex; align-items:center; justify-content:space-between;">
-                            <div style="font-size:13px; font-weight:700; color:#f1f5f9;">HUVITZ HVS-1</div>
-                            <span style="font-size:10px; padding:3px 8px; border-radius:8px; background:rgba(6,214,160,0.15); color:#06d6a0; font-weight:700;">✓ Listo</span>
-                        </div>
-                        <div style="font-size:11px; color:#64748b; margin-top:4px;">Clinica Cirex · Facturado</div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
-                            <div style="background:#0f1a30; border-radius:8px; padding:8px; text-align:center;">
-                                <div style="font-size:10px; color:#64748b; margin-bottom:3px;">Carrier</div>
-                                <div style="font-size:12px; font-weight:600; color:#f1f5f9;">OCA</div>
-                            </div>
-                            <div style="background:#0f1a30; border-radius:8px; padding:8px; text-align:center;">
-                                <div style="font-size:10px; color:#64748b; margin-bottom:3px;">Tracking</div>
-                                <div style="font-size:12px; font-weight:600; color:#3a86ff;">Ver →</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="padding:12px 16px; display:flex; align-items:center; gap:10px; cursor:pointer;">
-                        <i class="fa-solid fa-qrcode" style="color:#3a86ff; font-size:20px;"></i>
-                        <div><div style="font-size:12px; font-weight:600; color:#f1f5f9;">Generar remito de salida</div><div style="font-size:11px; color:#64748b; margin-top:2px;">Certificado + firma del receptor</div></div>
-                        <i class="fa-solid fa-chevron-right" style="color:#3a86ff; margin-left:auto; font-size:12px;"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
-    </div><!-- /phone-app-content -->
 
     <!-- LOGIN WALL -->
-    <div id="login-wall" style="display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; padding:32px 24px; text-align:center; gap:20px;">
-        <img src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" style="width:64px; height:64px; object-fit:contain; border-radius:16px; margin-bottom:8px;" onerror="this.style.display='none'">
-        <div>
-            <div style="font-size:20px; font-weight:700; color:#f8fafc; margin-bottom:6px;">Portal TLC</div>
-            <div style="font-size:13px; color:#94a3b8;">Iniciá sesión con tu cuenta de TLC</div>
+    <div id="login-wall" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:40px 24px;">
+        <img src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" style="width:72px;height:72px;object-fit:contain;border-radius:16px;" onerror="this.style.display='none'">
+        <div style="text-align:center;">
+            <h1 style="font-size:22px;font-weight:700;color:var(--text-main);margin-bottom:8px;">Portal TLC</h1>
+            <p style="font-size:13px;color:var(--text-muted);">Iniciá sesión con tu cuenta Microsoft corporativa</p>
         </div>
-        <button onclick="doLogin()" style="background:#3a86ff; color:white; border:none; border-radius:12px; padding:14px 28px; font-size:15px; font-weight:600; cursor:pointer; width:100%; max-width:280px;">
-            Iniciar sesión con Microsoft
+        <button onclick="doLogin()" style="background:linear-gradient(135deg,var(--accent-blue),#1d4ed8);color:white;border:none;padding:14px 32px;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:10px;">
+            <i class="fa-brands fa-microsoft"></i> Iniciar sesión
         </button>
     </div>
 
-    <!-- Barra de Navegación Fija Inferior -->
-    <div class="bottom-nav">
-        <div class="nav-link active" id="nav-btn-home" onclick="resetToHome()">
-            <i class="fa-solid fa-grip"></i><span>Inicio</span>
+    <!-- APP PRINCIPAL -->
+    <div id="phone-app-content" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+
+        <!-- HEADER -->
+        <div class="app-header">
+            <div class="back-arrow-btn" id="header-back-arrow" onclick="handleBackNavigation()">
+                <i class="fa-solid fa-chevron-left"></i>
+            </div>
+            <div class="brand-logo-svg-wrapper" id="header-brand-logo">
+                <img src="https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq" style="width:36px;height:36px;object-fit:contain;border-radius:8px;" onerror="this.style.display='none'">
+            </div>
+            <div class="header-title-block">
+                <h1 id="txt-main-title">Portal TLC</h1>
+                <p id="txt-sub-title">Menú Principal</p>
+            </div>
+            <!-- AVATAR DROPDOWN -->
+            <div style="position:relative;" id="avatar-wrap-idx">
+                <div class="header-profile" id="header-avatar" style="cursor:pointer;" onclick="toggleAvatarMenuIdx(event)">CH</div>
+                <div id="avatar-menu-idx" style="display:none;position:absolute;top:48px;right:0;background:#0d1520;border:1px solid #1e3050;border-radius:16px;width:300px;z-index:600;box-shadow:0 16px 48px rgba(0,0,0,.6);overflow:hidden;animation:fadeSlideDown .15s ease;">
+                    <div style="padding:16px;border-bottom:1px solid #1e3050;display:flex;align-items:center;gap:12px;background:#080d14;">
+                        <div style="width:40px;height:40px;border-radius:50%;background:#1c2541;border:2px solid rgba(58,134,255,.2);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#3a86ff;flex-shrink:0;" id="avatar-icon-idx">CH</div>
+                        <div style="min-width:0;">
+                            <div style="font-size:13px;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="avatar-nombre-idx">—</div>
+                            <div style="font-size:10px;color:#64748b;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="avatar-email-idx">—</div>
+                            <div id="avatar-rol-idx" style="display:inline-block;margin-top:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:1px 7px;border-radius:20px;background:rgba(58,134,255,.15);color:#3a86ff;border:1px solid rgba(58,134,255,.25);">—</div>
+                        </div>
+                    </div>
+                    <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+                        <!-- Switch tema -->
+                        <div style="background:#080d14;border:1px solid #1e3050;border-radius:10px;padding:10px 12px;">
+                            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#64748b;margin-bottom:8px;">Apariencia</div>
+                            <div style="display:flex;background:#0a1628;border-radius:8px;overflow:hidden;border:1px solid #1e3050;">
+                                <button id="idx-btn-tema-oscuro" onclick="_setTemaIdx('dark')" style="flex:1;padding:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:5px;background:#3a86ff;color:#fff;border-radius:7px 0 0 7px;transition:all .15s;">🌙 Oscuro</button>
+                                <button id="idx-btn-tema-claro" onclick="_setTemaIdx('light')" style="flex:1;padding:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:5px;background:transparent;color:#64748b;transition:all .15s;">☀️ Claro</button>
+                            </div>
+                        </div>
+                        <!-- Saludo WhatsApp -->
+                        <div style="background:#080d14;border:1px solid #1e3050;border-radius:10px;padding:10px 12px;">
+                            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#64748b;margin-bottom:6px;">Saludo WhatsApp</div>
+                            <textarea id="idx-wsp-saludo" rows="2" style="width:100%;background:#0a1628;border:1px solid #1e3050;border-radius:8px;color:#f1f5f9;font-size:12px;padding:8px 10px;resize:none;line-height:1.4;outline:none;font-family:inherit;" placeholder="Hola, le compartimos el presupuesto de TLC SRL: " oninput="_guardarSaludoWspIdx(this.value)"></textarea>
+                            <div style="font-size:10px;color:#334155;margin-top:3px;">Se guarda automáticamente</div>
+                        </div>
+                        <!-- Cerrar sesión -->
+                        <button onclick="cerrarSesionIdx()" style="width:100%;padding:11px;border-radius:10px;background:transparent;border:1px solid #2d1a1a;color:#f87171;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;" onmouseover="this.style.background='rgba(248,113,113,.08)'" onmouseout="this.style.background='transparent'">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            Cerrar sesión
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="nav-link" id="nav-btn-ventas" onclick="openModule('view-ventas-menu', 'Ventas', 'Embudo Comercial')">
-            <i class="fa-solid fa-chart-line"></i><span>Ventas</span>
+
+        <!-- CONTENIDO -->
+        <div class="app-content" id="app-content-scroll">
+
+            <!-- ═══ HOME ═══════════════════════════════════════════ -->
+            <div class="app-view active" id="view-home">
+                <!-- Stats dinámicas por rol -->
+                <div class="home-stat-row" id="home-stats-row"></div>
+                <!-- Módulos -->
+                <div class="menu-list-stack">
+                    <div class="menu-item-row" id="menu-ventas" onclick="abrirModuloConPermiso('view-ventas-menu','Ventas','Embudo Comercial','ventas')">
+                        <div class="item-logo-container" style="overflow:hidden;padding:0;">
+                            <img src="https://lh3.googleusercontent.com/d/1ghU497CVOlvAWDoyBFRc4g1HeMOLyuxR" style="width:48px;height:48px;object-fit:cover;border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-chart-pie\'></i>';this.parentElement.classList.add('logo-ventas');">
+                        </div>
+                        <div class="item-text-box"><h3>Ventas</h3><p>Cotizaciones y Pipeline Leads</p></div>
+                        <i class="fa-solid fa-chevron-right menu-chevron"></i>
+                    </div>
+                    <div class="menu-item-row" id="menu-servicio" onclick="abrirModuloConPermiso('view-servicio-menu','Servicio Técnico','Laboratorio','servicio')">
+                        <div class="item-logo-container" style="overflow:hidden;padding:0;">
+                            <img src="https://lh3.googleusercontent.com/d/1HdFljwTWje8_7Yv3Muc2soSbZjKXy8_N" style="width:48px;height:48px;object-fit:cover;border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-microscope\'></i>';this.parentElement.classList.add('logo-servicio');">
+                        </div>
+                        <div class="item-text-box"><h3>Servicio Técnico</h3><p>Ingresos, Checklists y Reparaciones</p></div>
+                        <i class="fa-solid fa-chevron-right menu-chevron"></i>
+                    </div>
+                    <div class="menu-item-row" id="menu-comex" onclick="abrirModuloConPermiso('view-comex-menu','Comercio Exterior','Logística','comex')">
+                        <div class="item-logo-container" style="overflow:hidden;padding:0;">
+                            <img src="https://lh3.googleusercontent.com/d/1jQH8p95CDIasQdtU-A7wN2r8h4jkA1L-" style="width:48px;height:48px;object-fit:cover;border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-ship\'></i>';this.parentElement.classList.add('logo-comex');">
+                        </div>
+                        <div class="item-text-box"><h3>Comercio Exterior</h3><p>Importaciones y Aduana</p></div>
+                        <i class="fa-solid fa-chevron-right menu-chevron"></i>
+                    </div>
+                    <div class="menu-item-row" id="menu-admin" onclick="abrirModuloConPermiso('view-admin-menu','Administración','Gestión interna','admin')">
+                        <div class="item-logo-container" style="overflow:hidden;padding:0;">
+                            <img src="https://lh3.googleusercontent.com/d/1O0oBR3D8skpxWHWRuUx323B-AdQVZTCb" style="width:48px;height:48px;object-fit:cover;border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-building\' style=\'color:#f8961e\'></i>';this.parentElement.style.background='rgba(248,150,30,0.15)';this.parentElement.style.border='1px solid rgba(248,150,30,0.4)';">
+                        </div>
+                        <div class="item-text-box"><h3>Administración</h3><p>Gestión interna y reportes</p></div>
+                        <i class="fa-solid fa-chevron-right menu-chevron"></i>
+                    </div>
+                </div>
+                <!-- Sección dinámica por rol (cotizaciones / servicios pendientes) -->
+                <div id="home-dynamic-section"></div>
+            </div>
+
+            <!-- ═══ SERVICIO MENU ══════════════════════════════════ -->
+            <div class="app-view" id="view-servicio-menu">
+                <div class="menu-list-stack">
+                    <div class="menu-item-row highlight-recepcion" onclick="openModule('form-recepcion','Recepción de Equipos','Nuevo Ingreso a Taller')">
+                        <div class="item-logo-container logo-servicio" style="background:var(--accent-blue);color:white;width:44px;height:44px;font-size:16px;"><i class="fa-solid fa-file-invoice"></i></div>
+                        <div class="item-text-box"><h3>Recepción de Equipos</h3><p>Aduana de entrada y remito</p></div>
+                        <span class="badge-count" style="background:var(--accent-blue);color:white;">Nuevo</span>
+                    </div>
+                    <div class="menu-item-row" onclick="openModule('view-diagnostico','Diagnóstico','Evaluación inicial en laboratorio')">
+                        <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&q=80&w=150" alt="Diagnóstico"></div>
+                        <div class="item-text-box"><h3>Diagnóstico</h3><p>Detección de fallas y checklists POE</p></div>
+                        <span class="badge-count" style="background:rgba(58,134,255,.2);color:#3a86ff;">3 eq.</span>
+                    </div>
+                    <div class="menu-item-row" onclick="openModule('view-presupuestar','Presupuestar','Confección de costos')">
+                        <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=150" alt="Presupuestar"></div>
+                        <div class="item-text-box"><h3>Presupuestar</h3><p>Cálculo de repuestos y mano de obra</p></div>
+                        <span class="badge-count" style="background:rgba(248,150,30,.2);color:#f8961e;">1 pend.</span>
+                    </div>
+                    <div class="menu-item-row" onclick="openModule('view-reparacion','Reparación POE','Laboratorio activo')">
+                        <div class="item-image-holder"><img src="https://lh3.googleusercontent.com/d/1rDDPm9hrma3mPK4FwvLyY99mJlR3ZQbT" alt="Reparación" style="object-fit:cover;width:100%;height:100%;"></div>
+                        <div class="item-text-box"><h3>Reparación</h3><p>Recambio de componentes y calibración</p></div>
+                        <span class="badge-count" style="background:var(--accent-orange);color:white;">2 act.</span>
+                    </div>
+                    <div class="menu-item-row" onclick="openModule('view-facturacion','Facturación','Administración de salida')">
+                        <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=150" alt="Facturación"></div>
+                        <div class="item-text-box"><h3>Facturación</h3><p>Validación de pago y liberación</p></div>
+                        <span class="badge-count">0</span>
+                    </div>
+                    <div class="menu-item-row" onclick="openModule('view-expedicion','Expedición','Logística de despacho')">
+                        <div class="item-image-holder"><img src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=150" alt="Expedición"></div>
+                        <div class="item-text-box"><h3>Expedición</h3><p>Despacho final certificado al médico</p></div>
+                        <span class="badge-count" style="background:rgba(6,214,160,.2);color:#06d6a0;">1 listo</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ VENTAS MENU ════════════════════════════════════ -->
+            <div class="app-view" id="view-ventas-menu">
+                <div class="menu-list-stack">
+                    <div class="menu-item-row" onclick="window.location.href='selector-dispositivos.html'">
+                        <div class="item-logo-container" style="overflow:hidden;padding:0;width:44px;height:44px;">
+                            <img src="https://lh3.googleusercontent.com/d/1ZqgByiuLcmidQ3bHcvt4GZePGna6blXl" style="width:44px;height:44px;object-fit:cover;border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-tags\'></i>';this.parentElement.classList.add('logo-ventas');">
+                        </div>
+                        <div class="item-text-box"><h3>Catálogo de Productos</h3><p>Equipos, insumos y modalidades de pago</p></div>
+                        <i class="fa-solid fa-chevron-right menu-chevron"></i>
+                    </div>
+                    <div class="menu-item-row" onclick="window.location.href='cotizaciones.html'">
+                        <div class="item-logo-container logo-ventas" style="width:44px;height:44px;font-size:16px;"><i class="fa-solid fa-list-check"></i></div>
+                        <div class="item-text-box"><h3>Cotizaciones</h3><p>Pipeline filtrado por vendedor</p></div>
+                        <i class="fa-solid fa-chevron-right menu-chevron"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ COTIZACIONES (vista) ═══════════════════════════ -->
+            <div class="app-view" id="view-cotizaciones">
+                <div id="cot-loading" style="text-align:center;padding:40px 20px;">
+                    <div style="margin:0 auto 16px;width:32px;height:32px;border:3px solid #222e50;border-top-color:#3a86ff;border-radius:50%;animation:spin .8s linear infinite;"></div>
+                    <p style="color:var(--text-muted);font-size:13px;">Cargando cotizaciones...</p>
+                </div>
+                <div id="cot-filtros" style="display:none;">
+                    <div class="cot-filtros-wrap">
+                        <button class="cot-filtro active" data-estado="TODOS" onclick="filtrarCot(this)">Todos</button>
+                        <button class="cot-filtro" data-estado="Contacto inicial 25%" onclick="filtrarCot(this)">🔵 Inicial</button>
+                        <button class="cot-filtro" data-estado="Presupuestado 50%"    onclick="filtrarCot(this)">🟡 Presup.</button>
+                        <button class="cot-filtro" data-estado="Negociación 75%"      onclick="filtrarCot(this)">🟣 Negoc.</button>
+                        <button class="cot-filtro" data-estado="Ganado 100%"          onclick="filtrarCot(this)">🟢 Ganado</button>
+                        <button class="cot-filtro" data-estado="Perdido 0%"           onclick="filtrarCot(this)">🔴 Perdido</button>
+                    </div>
+                    <input id="cot-buscar" type="text" placeholder="Buscar cliente o dispositivo..." oninput="renderCotizaciones()">
+                </div>
+                <div id="cot-lista"></div>
+                <!-- Detalle overlay -->
+                <div class="cot-detalle-overlay" id="cot-detalle-overlay">
+                    <div class="det-close-btn" onclick="cerrarDetalleCot()">✕</div>
+                    <div style="background:#1c2541;border-radius:16px;overflow:hidden;border:1px solid #2d3f6e;">
+                        <div id="cot-det-foto-inner" style="background:#121b33;display:flex;align-items:center;justify-content:center;min-height:140px;"></div>
+                        <div style="padding:14px;">
+                            <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:4px;" id="cot-det-titulo">—</div>
+                            <div style="font-size:13px;color:#60a5fa;font-weight:600;margin-bottom:10px;" id="cot-det-disp-nombre">—</div>
+                            <div id="cot-det-estado-wrap"></div>
+                        </div>
+                    </div>
+                    <div style="background:#1c2541;border-radius:12px;padding:14px;border:1px solid #222e50;">
+                        <div style="font-size:11px;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Cliente</div>
+                        <div id="cot-det-cliente"></div>
+                    </div>
+                    <div id="cot-det-condiciones-wrap" style="background:#1c2541;border-radius:12px;padding:14px;border:1px solid #222e50;display:none;">
+                        <div style="font-size:11px;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Condiciones Comerciales</div>
+                        <div id="cot-det-condiciones"></div>
+                    </div>
+                    <div id="cot-det-notas-wrap" style="background:#1c2541;border-radius:12px;padding:14px;border:1px solid #222e50;display:none;">
+                        <div style="font-size:11px;font-weight:700;color:#f8961e;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Notas</div>
+                        <div id="cot-det-notas" style="font-size:13px;color:#f1f5f9;line-height:1.5;"></div>
+                    </div>
+                    <div id="cot-det-pdfs-wrap" style="display:none;flex-direction:column;gap:8px;"></div>
+                </div>
+            </div>
+
+            <!-- ═══ ADMIN MENU ════════════════════════════════════ -->
+            <div class="app-view" id="view-admin-menu">
+                <div class="menu-list-stack">
+                    <div class="menu-item-row" onclick="openModule('view-placeholder','Reportes','Resúmenes y análisis')">
+                        <div class="item-logo-container" style="background:rgba(248,150,30,.15);border:1px solid rgba(248,150,30,.4);color:#f8961e;"><i class="fa-solid fa-chart-bar"></i></div>
+                        <div class="item-text-box"><h3>Reportes</h3><p>Resúmenes y análisis</p></div>
+                        <i class="fa-solid fa-chevron-right menu-chevron"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ COMEX MENU ════════════════════════════════════ -->
+            <div class="app-view" id="view-comex-menu">
+                <div class="menu-list-stack">
+                    <div class="menu-item-row" onclick="openModule('view-placeholder','Tracking Comex','Importaciones en Curso')">
+                        <div class="item-logo-container logo-comex" style="width:44px;height:44px;font-size:16px;"><i class="fa-solid fa-ship"></i></div>
+                        <div class="item-text-box"><h3>Importaciones Activas</h3><p>Seguimiento de repuestos en aduana</p></div>
+                        <i class="fa-solid fa-chevron-right menu-chevron"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ FORMULARIO RECEPCIÓN ══════════════════════════ -->
+            <div class="app-view" id="form-recepcion" style="padding-bottom:32px;">
+                <div class="form-group"><label class="form-label">Fecha de Recepción <span style="color:#f87171;">*</span></label><input type="date" class="form-control" id="rec-fecha" required></div>
+                <div class="form-group"><label class="form-label">Tipo de Servicio <span style="color:#f87171;">*</span></label>
+                    <select class="form-control" id="rec-tipo" required><option value="">-- Seleccionar --</option><option>Garantía</option><option>Reparación con costo</option><option>Mantenimiento preventivo</option><option>Revisión / Diagnóstico</option><option>Instalación</option></select>
+                </div>
+                <div class="form-group"><label class="form-label">Nombre y Apellido Cliente <span style="color:#f87171;">*</span></label><input type="text" class="form-control" id="rec-cliente" placeholder="Dr. Juan García" required></div>
+                <div class="form-group"><label class="form-label">Teléfono <span style="color:#f87171;">*</span></label><input type="tel" class="form-control" id="rec-telefono" placeholder="+54 11 1234-5678" required></div>
+                <div class="form-group"><label class="form-label">Falla Reportada <span style="color:#f87171;">*</span></label><textarea class="form-control" id="rec-falla" rows="3" placeholder="Describa el problema reportado..." required></textarea></div>
+                <div class="form-group"><label class="form-label">Marca <span style="color:#f87171;">*</span></label>
+                    <select class="form-control" id="rec-marca" required onchange="actualizarModelos()"><option value="">-- Seleccionar Marca --</option><option>HUVITZ</option><option>Topcon</option><option>Zeiss</option><option>Nidek</option><option>Haag-Streit</option><option>Bausch & Lomb</option><option>Alcon</option><option>Moria</option><option>Otro</option></select>
+                </div>
+                <div class="form-group"><label class="form-label">Modelo <span style="color:#f87171;">*</span></label>
+                    <select class="form-control" id="rec-modelo" required><option value="">-- Seleccionar Modelo --</option></select>
+                    <div id="modelo-otro-wrap" style="display:none;margin-top:8px;"><input type="text" class="form-control" id="rec-modelo-otro" placeholder="Especificá el modelo..."></div>
+                </div>
+                <div class="form-group"><label class="form-label">Número de Serie <span style="color:#f87171;">*</span></label><input type="text" class="form-control" id="rec-serie" placeholder="S/N: xxxxxx" required></div>
+                <div class="form-group"><label class="form-label">Accesorios entregados</label><textarea class="form-control" id="rec-accesorios" rows="2" placeholder="Cables, fundas, manuales..."></textarea></div>
+                <div class="form-group">
+                    <label class="form-label">Fotos del equipo (hasta 3)</label>
+                    <div class="foto-grid">
+                        <div class="foto-slot" id="slot-0" onclick="triggerFoto(0)"><div class="foto-placeholder"><i class="fa-solid fa-camera" style="font-size:18px;"></i><span>Foto 1</span></div><img id="foto-preview-0" alt=""><input type="file" id="foto-input-0" accept="image/*" onchange="previewFoto(0,this)"></div>
+                        <div class="foto-slot" id="slot-1" onclick="triggerFoto(1)"><div class="foto-placeholder"><i class="fa-solid fa-camera" style="font-size:18px;"></i><span>Foto 2</span></div><img id="foto-preview-1" alt=""><input type="file" id="foto-input-1" accept="image/*" onchange="previewFoto(1,this)"></div>
+                        <div class="foto-slot" id="slot-2" onclick="triggerFoto(2)"><div class="foto-placeholder"><i class="fa-solid fa-camera" style="font-size:18px;"></i><span>Foto 3</span></div><img id="foto-preview-2" alt=""><input type="file" id="foto-input-2" accept="image/*" onchange="previewFoto(2,this)"></div>
+                    </div>
+                </div>
+                <div id="rec-status"></div>
+                <button class="btn-action" id="btn-rec-enviar" onclick="enviarRecepcion()">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Enviar Recepción
+                </button>
+            </div>
+
+            <!-- ═══ PLACEHOLDER ═══════════════════════════════════ -->
+            <div class="app-view" id="view-placeholder">
+                <div style="text-align:center;padding:60px 20px;color:var(--text-muted);font-size:13px;">
+                    <i class="fa-solid fa-tools" style="font-size:40px;margin-bottom:16px;display:block;"></i>
+                    Módulo en desarrollo
+                </div>
+            </div>
+            <div class="app-view" id="view-diagnostico"><div style="text-align:center;padding:60px 20px;color:var(--text-muted);">Módulo en desarrollo</div></div>
+            <div class="app-view" id="view-presupuestar"><div style="text-align:center;padding:60px 20px;color:var(--text-muted);">Módulo en desarrollo</div></div>
+            <div class="app-view" id="view-reparacion"><div style="text-align:center;padding:60px 20px;color:var(--text-muted);">Módulo en desarrollo</div></div>
+            <div class="app-view" id="view-facturacion"><div style="text-align:center;padding:60px 20px;color:var(--text-muted);">Módulo en desarrollo</div></div>
+            <div class="app-view" id="view-expedicion"><div style="text-align:center;padding:60px 20px;color:var(--text-muted);">Módulo en desarrollo</div></div>
+            <div class="app-view" id="view-lista-precios"><div style="text-align:center;padding:60px 20px;color:var(--text-muted);">Abriendo Lista de Precios...</div></div>
         </div>
-        <div class="nav-link" id="nav-btn-servicio" onclick="openModule('view-servicio-menu', 'Servicio Técnico', 'Laboratorio')">
-            <i class="fa-solid fa-microscope"></i><span>Servicio</span>
+
+        <!-- ═══ BOTTOM NAV ════════════════════════════════════════ -->
+        <div class="bottom-nav">
+            <div class="nav-link active" id="nav-btn-home" onclick="resetToHome()"><i class="fa-solid fa-house"></i>Inicio</div>
+            <div class="nav-link" id="nav-btn-ventas" onclick="abrirModuloConPermiso('view-ventas-menu','Ventas','Embudo Comercial','ventas')"><i class="fa-solid fa-chart-line"></i>Ventas</div>
+            <div class="nav-link" id="nav-btn-servicio" onclick="abrirModuloConPermiso('view-servicio-menu','Servicio Técnico','Laboratorio','servicio')"><i class="fa-solid fa-screwdriver-wrench"></i>Servicio</div>
+            <div class="nav-link" id="nav-btn-cotizaciones" onclick="abrirModuloConPermiso('view-cotizaciones','Cotizaciones','Mi Pipeline','ventas')"><i class="fa-solid fa-file-invoice-dollar"></i>Pipeline</div>
         </div>
-        <div class="nav-link" id="nav-btn-comex" onclick="openModule('view-comex-menu', 'Comercio Exterior', 'Logística')">
-            <i class="fa-solid fa-ship"></i><span>Comex</span>
-        </div>
-        <div class="nav-link" id="nav-btn-admin" onclick="openModule('view-admin-menu', 'Administración', 'Gestión interna')">
-            <i class="fa-solid fa-building"></i><span>Admin</span>
-        </div>
-    </div>
-</div>
+
+    </div><!-- /phone-app-content -->
+</div><!-- /phone-container -->
 
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
-    // ─── MSAL CONFIG ──────────────────────────────────────────────────────────
+    'use strict';
+
+    const APP_VERSION = "2026.06.13.01";
+    console.log("%c Portal TLC index v2026.06.13.01 ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+
+    // ─── MSAL ─────────────────────────────────────────────────────
     const MSAL_CLIENT_ID = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
     const MSAL_TENANT_ID = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
     const msalAppIndex = new msal.PublicClientApplication({
-        auth: {
-            clientId: MSAL_CLIENT_ID,
-            authority: `https://login.microsoftonline.com/${MSAL_TENANT_ID}`,
-            redirectUri: 'https://cahirth.github.io/Portal-TLC/'
-        },
-        cache: { cacheLocation: 'sessionStorage' }
+        auth: { clientId:MSAL_CLIENT_ID, authority:`https://login.microsoftonline.com/${MSAL_TENANT_ID}`, redirectUri:'https://cahirth.github.io/Portal-TLC/' },
+        cache: { cacheLocation:'sessionStorage' }
     });
-
     let currentUserIndex = null;
 
     async function initIndexMsal() {
@@ -822,19 +522,21 @@
         const account = resp?.account || msalAppIndex.getAllAccounts()[0];
         if (account) {
             currentUserIndex = account;
-            updateUserDisplay();
             document.getElementById('login-wall').style.display = 'none';
             document.getElementById('phone-app-content').style.display = 'flex';
+            updateUserDisplay();
             await cargarPermisosUsuario(account.username);
+            // Aplicar tema guardado
+            _aplicarTemaIdx();
         } else {
             document.getElementById('login-wall').style.display = 'flex';
             document.getElementById('phone-app-content').style.display = 'none';
         }
     }
 
-    // ─── PERMISOS ─────────────────────────────────────────────────────────────
+    // ─── PERMISOS ──────────────────────────────────────────────────
     const SHEET_ID_PERMISOS = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
-    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, rol: 'Administrador' };
+    let userPermisos = { ventas:true, servicio:true, comex:true, admin:true, rol:'Administrador' };
 
     async function cargarPermisosUsuario(email) {
         try {
@@ -844,243 +546,200 @@
             const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
             const rows = json.table.rows;
             const cols = json.table.cols.map(c => c.label);
-
-            const emailIdx   = cols.indexOf('Email');
-            const rolIdx     = cols.indexOf('Rol');
-            const ventasIdx  = cols.indexOf('Ventas');
-            const servicioIdx= cols.indexOf('Servicio Tecnico');
-            const comexIdx   = cols.indexOf('Comercio Exterior');
-            const adminIdx   = cols.indexOf('Administracion');
-
-            const fila = rows.find(r => {
-                const v = r.c[emailIdx]?.v || '';
-                return v.toLowerCase().trim() === email.toLowerCase().trim();
-            });
-
+            const emailIdx    = cols.indexOf('Email');
+            const rolIdx      = cols.indexOf('Rol');
+            const ventasIdx   = cols.indexOf('Ventas');
+            const servicioIdx = cols.indexOf('Servicio Tecnico');
+            const comexIdx    = cols.indexOf('Comercio Exterior');
+            const adminIdx    = cols.indexOf('Administracion');
+            const fila = rows.find(r => (r.c[emailIdx]?.v||'').toLowerCase().trim() === email.toLowerCase().trim());
             if (fila) {
-                const bool = (idx) => {
-                    const v = fila.c[idx]?.v;
-                    return v === true || v === 'TRUE' || v === 'true' || v === 1;
-                };
-                userPermisos = {
-                    rol:      fila.c[rolIdx]?.v || 'Vend_Externo',
-                    ventas:   bool(ventasIdx),
-                    servicio: bool(servicioIdx),
-                    comex:    bool(comexIdx),
-                    admin:    bool(adminIdx),
-                };
+                const bool = (idx) => { const v=fila.c[idx]?.v; return v===true||v==='TRUE'||v==='true'||v===1; };
+                userPermisos = { rol:fila.c[rolIdx]?.v||'Vend_Externo', ventas:bool(ventasIdx), servicio:bool(servicioIdx), comex:bool(comexIdx), admin:bool(adminIdx) };
             } else {
-                // Email no encontrado → acceso mínimo
-                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false };
+                userPermisos = { rol:'Sin acceso', ventas:false, servicio:false, comex:false, admin:false };
             }
-        } catch(e) {
-            console.warn('Error cargando permisos:', e);
-            // Si falla la carga, mantener acceso completo para no bloquear
-        }
+        } catch(e) { console.warn('Permisos:', e); }
         aplicarPermisosMenu();
+        renderHomeDinamico();
     }
 
     function aplicarPermisosMenu() {
-        const secciones = [
-            { id: 'menu-ventas',   permiso: userPermisos.ventas },
-            { id: 'menu-servicio', permiso: userPermisos.servicio },
-            { id: 'menu-comex',    permiso: userPermisos.comex },
-            { id: 'menu-admin',    permiso: userPermisos.admin },
-        ];
-        secciones.forEach(({ id, permiso }) => {
+        [['menu-ventas','ventas'],['menu-servicio','servicio'],['menu-comex','comex'],['menu-admin','admin']].forEach(([id,p]) => {
             const el = document.getElementById(id);
             if (!el) return;
-            if (!permiso) {
-                el.style.opacity = '0.35';
-                el.style.filter = 'grayscale(100%)';
-                el.style.pointerEvents = 'auto'; // dejamos el click para mostrar toast
-                el.dataset.bloqueado = 'true';
-                // Cambiar chevron por candado
-                const chevron = el.querySelector('.menu-chevron');
-                if (chevron) chevron.className = 'fa-solid fa-lock menu-chevron' ;
-            } else {
-                el.style.opacity = '1';
-                el.style.filter = 'none';
-                el.dataset.bloqueado = 'false';
-            }
+            const ok = userPermisos[p];
+            el.style.opacity      = ok ? '1' : '0.35';
+            el.style.filter       = ok ? 'none' : 'grayscale(100%)';
+            el.dataset.bloqueado  = ok ? 'false' : 'true';
+            const ch = el.querySelector('.menu-chevron');
+            if (ch) ch.className = ok ? 'fa-solid fa-chevron-right menu-chevron' : 'fa-solid fa-lock menu-chevron';
         });
+        // Badge de rol en avatar
+        const rolEl = document.getElementById('avatar-rol-idx');
+        if (rolEl) rolEl.textContent = userPermisos.rol || 'Usuario';
     }
 
+    // ─── SECCIÓN DINÁMICA DEL HOME (por rol) ──────────────────────
+    function renderHomeDinamico() {
+        const isVendedor = userPermisos.ventas && !userPermisos.servicio;
+        const isTecnico  = userPermisos.servicio && !userPermisos.ventas;
+        const isAdmin    = userPermisos.admin;
+
+        // Stats
+        const statsEl = document.getElementById('home-stats-row');
+        if (isVendedor || isAdmin) {
+            statsEl.innerHTML = [
+                {v:'12',l:'Cotizaciones',c:'var(--accent-blue)'},
+                {v:'3', l:'Seguimiento', c:'#f8961e'},
+                {v:'2', l:'Ganadas',     c:'var(--accent-green)'},
+            ].map(s=>`<div class="home-stat-chip"><div class="val" style="color:${s.c}">${s.v}</div><div class="lbl">${s.l}</div></div>`).join('');
+        } else if (isTecnico) {
+            statsEl.innerHTML = [
+                {v:'6',l:'En taller',    c:'var(--accent-blue)'},
+                {v:'2',l:'Urgentes',     c:'var(--accent-orange)'},
+                {v:'1',l:'Para despacho',c:'var(--accent-green)'},
+            ].map(s=>`<div class="home-stat-chip"><div class="val" style="color:${s.c}">${s.v}</div><div class="lbl">${s.l}</div></div>`).join('');
+        }
+
+        // Sección dinámica
+        const dynEl = document.getElementById('home-dynamic-section');
+        if (isVendedor || isAdmin) {
+            dynEl.innerHTML = `
+                <div class="home-section-title">Últimas cotizaciones</div>
+                <div class="cot-mini-card">
+                    <div class="cot-mini-row" onclick="openModule('view-cotizaciones','Cotizaciones','Mi Pipeline')">
+                        <div><div class="cmr-nombre">Dr. Pablo Simal</div><div class="cmr-sub">20 de Junio · HUVITZ HRK-1</div></div>
+                        <div style="text-align:right"><div class="cmr-monto">USD 7.700</div><span class="cmr-pill pill-75">75% negoc.</span></div>
+                    </div>
+                    <div class="cot-mini-row" onclick="openModule('view-cotizaciones','Cotizaciones','Mi Pipeline')">
+                        <div><div class="cmr-nombre">Fundación Zambrano</div><div class="cmr-sub">CABA · LUXVISION LM 7800</div></div>
+                        <div style="text-align:right"><div class="cmr-monto">USD 1.840</div><span class="cmr-pill pill-50">50% presup.</span></div>
+                    </div>
+                    <div class="cot-mini-row" onclick="openModule('view-cotizaciones','Cotizaciones','Mi Pipeline')">
+                        <div><div class="cmr-nombre">Clínica del Plata</div><div class="cmr-sub">Córdoba · Huvitz SW500</div></div>
+                        <div style="text-align:right"><div class="cmr-monto">USD 4.200</div><span class="cmr-pill pill-100">Ganada ✓</span></div>
+                    </div>
+                    <div class="cot-mini-row" onclick="openModule('view-cotizaciones','Cotizaciones','Mi Pipeline')">
+                        <div><div class="cmr-nombre">Dr. Ismael Torres</div><div class="cmr-sub">Mendoza · HRK-9000A</div></div>
+                        <div style="text-align:right"><div class="cmr-monto">USD 8.900</div><span class="cmr-pill pill-50">50% presup.</span></div>
+                    </div>
+                </div>
+                <div style="text-align:right;margin-top:8px;">
+                    <span onclick="openModule('view-cotizaciones','Cotizaciones','Mi Pipeline')" style="font-size:11px;color:var(--accent-blue);cursor:pointer;font-weight:600;">Ver todas →</span>
+                </div>`;
+        } else if (isTecnico) {
+            dynEl.innerHTML = `
+                <div class="home-section-title">Servicios pendientes</div>
+                <div class="svc-mini-card">
+                    <div class="svc-mini-row" onclick="openModule('view-servicio-menu','Servicio Técnico','Laboratorio')">
+                        <div class="svc-num svc-n-r">!</div>
+                        <div class="svc-txt"><div class="svc-nom">Huvitz HRK-9000A</div><div class="svc-sub">Dr. Torres · Mendoza · 3 días</div></div>
+                        <span class="svc-badge" style="background:rgba(255,0,127,.15);color:var(--accent-orange);">Urgente</span>
+                    </div>
+                    <div class="svc-mini-row" onclick="openModule('view-servicio-menu','Servicio Técnico','Laboratorio')">
+                        <div class="svc-num svc-n-a">2</div>
+                        <div class="svc-txt"><div class="svc-nom">Topcon KR-800</div><div class="svc-sub">Clínica Belgrano · 5 días</div></div>
+                        <span class="svc-badge" style="background:rgba(248,150,30,.15);color:#f8961e;">Diagnóstico</span>
+                    </div>
+                    <div class="svc-mini-row" onclick="openModule('view-servicio-menu','Servicio Técnico','Laboratorio')">
+                        <div class="svc-num svc-n-a">3</div>
+                        <div class="svc-txt"><div class="svc-nom">Zeiss IOLMaster 700</div><div class="svc-sub">Hosp. Italiano · Presup. aprobado</div></div>
+                        <span class="svc-badge" style="background:rgba(248,150,30,.15);color:#f8961e;">Reparación</span>
+                    </div>
+                    <div class="svc-mini-row" onclick="openModule('view-servicio-menu','Servicio Técnico','Laboratorio')">
+                        <div class="svc-num svc-n-g">✓</div>
+                        <div class="svc-txt"><div class="svc-nom">HUVITZ SW500</div><div class="svc-sub">Fund. Zambrano · Listo para despacho</div></div>
+                        <span class="svc-badge" style="background:rgba(6,214,160,.15);color:var(--accent-green);">Listo</span>
+                    </div>
+                </div>
+                <div style="text-align:right;margin-top:8px;">
+                    <span onclick="openModule('view-servicio-menu','Servicio Técnico','Laboratorio')" style="font-size:11px;color:var(--accent-blue);cursor:pointer;font-weight:600;">Ver todo →</span>
+                </div>`;
+        } else {
+            dynEl.innerHTML = '';
+        }
+    }
+
+    // ─── NAVEGACIÓN ────────────────────────────────────────────────
     function abrirModuloConPermiso(viewId, title, subtitle, seccion) {
         const el = document.getElementById('menu-' + seccion);
-        if (el && el.dataset.bloqueado === 'true') {
-            mostrarToast('🔒 Sin acceso a ' + title);
-            return;
-        }
+        if (el && el.dataset.bloqueado === 'true') { mostrarToast('🔒 Sin acceso a ' + title); return; }
         openModule(viewId, title, subtitle);
     }
 
     function mostrarToast(msg) {
         const t = document.getElementById('toast-bar');
         const txt = document.getElementById('toast-text');
-        if (!t || !txt) return;
+        if (!t||!txt) return;
         txt.textContent = msg;
         t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 2500);
+        setTimeout(()=>t.classList.remove('show'), 2500);
     }
 
-    function doLogin() {
-        msalAppIndex.loginRedirect({ scopes: ['User.Read'] });
-    }
+    function doLogin() { msalAppIndex.loginRedirect({ scopes:['User.Read'] }); }
 
     let navigationHistory = [];
 
-    // Sistema de navegación nativo multidireccional con memoria de capas
     function openModule(viewId, title, subtitle) {
-        let currentActive = document.querySelector('.app-view.active');
-        let currentActiveId = currentActive ? currentActive.id : 'view-home';
-
-        if (currentActiveId !== viewId) {
-            navigationHistory.push({
-                viewId: currentActiveId,
-                title: document.getElementById('txt-main-title').innerText,
-                subtitle: document.getElementById('txt-sub-title').innerText
-            });
+        const currentActive = document.querySelector('.app-view.active');
+        const currentId = currentActive ? currentActive.id : 'view-home';
+        if (currentId !== viewId) {
+            navigationHistory.push({ viewId:currentId, title:document.getElementById('txt-main-title').innerText, subtitle:document.getElementById('txt-sub-title').innerText });
         }
         executeSwitch(viewId, title, subtitle);
         if (viewId === 'view-cotizaciones') cargarCotizaciones();
-        if (viewId === 'form-recepcion') initRecepcionForm();
+        if (viewId === 'form-recepcion')    initRecepcionForm();
     }
 
     function executeSwitch(targetViewId, title, subtitle) {
         document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
         document.getElementById(targetViewId).classList.add('active');
-
         document.getElementById('txt-main-title').innerText = title;
-        document.getElementById('txt-sub-title').innerText = subtitle;
-
-        let arrow = document.getElementById('header-back-arrow');
-        let logo = document.getElementById('header-brand-logo');
-        
-        if (targetViewId === 'view-home') {
-            arrow.style.display = 'none';
-            logo.style.display = 'flex';
-        } else {
-            arrow.style.display = 'flex';
-            logo.style.display = 'none';
-        }
-
-        // Sincronizar estética de la barra inferior
+        document.getElementById('txt-sub-title').innerText  = subtitle;
+        const arrow = document.getElementById('header-back-arrow');
+        const logo  = document.getElementById('header-brand-logo');
+        if (targetViewId === 'view-home') { arrow.style.display='none'; logo.style.display='flex'; }
+        else { arrow.style.display='flex'; logo.style.display='none'; }
         document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-        const servicioViews = ['view-diagnostico','view-presupuestar','view-reparacion','view-facturacion','view-expedicion','form-recepcion','view-servicio-menu'];
-        let navTarget;
-        if (servicioViews.includes(targetViewId)) {
-            navTarget = document.getElementById('nav-btn-servicio');
-        } else {
-            let cleanId = targetViewId.replace('-menu', '').replace('form-', 'view-');
-            navTarget = document.getElementById('nav-btn-' + cleanId.replace('view-', ''));
-        }
-        if (navTarget) navTarget.classList.add('active');
+        const svcViews = ['view-diagnostico','view-presupuestar','view-reparacion','view-facturacion','view-expedicion','form-recepcion','view-servicio-menu'];
+        if (svcViews.includes(targetViewId)) { document.getElementById('nav-btn-servicio')?.classList.add('active'); }
+        else if (targetViewId==='view-ventas-menu') { document.getElementById('nav-btn-ventas')?.classList.add('active'); }
+        else if (targetViewId==='view-cotizaciones') { document.getElementById('nav-btn-cotizaciones')?.classList.add('active'); }
+        else if (targetViewId==='view-home') { document.getElementById('nav-btn-home')?.classList.add('active'); }
+        document.getElementById('app-content-scroll').scrollTop = 0;
     }
 
     function handleBackNavigation() {
-        if (navigationHistory.length > 0) {
-            let prev = navigationHistory.pop();
-            executeSwitch(prev.viewId, prev.title, prev.subtitle);
-        } else {
-            resetToHome();
-        }
+        if (navigationHistory.length > 0) { const prev = navigationHistory.pop(); executeSwitch(prev.viewId, prev.title, prev.subtitle); }
+        else { resetToHome(); }
     }
 
     function resetToHome() {
         navigationHistory = [];
-        executeSwitch('view-home', 'Portal TLC', 'Menú Principal');
+        executeSwitch('view-home','Portal TLC','Menú Principal');
         updateUserDisplay();
     }
 
-    // ================= TUBERÍA DE CONEXIÓN CON MICROSOFT POWER AUTOMATE =================
-    async function dispatchToPowerAutomate(event) {
-        event.preventDefault(); // Bloquear recarga de página
-
-        const toast = document.getElementById('toast-notif');
-        const toastText = document.getElementById('toast-text');
-        const submitBtn = document.getElementById('btn-submit-form');
-
-        // URL RECEPTORA DE TU FLUJO DE POWER AUTOMATE (Pegar aquí tu webhook definitivo)
-        const urlWebhookMicrosoft = "https://prod-brazilsouth.logic.azure.com:443/workflows/TU_ID_DE_FLUJO_AQUI";
-
-        // Estructura de datos JSON idéntica a tus columnas de SharePoint
-        const payload = {
-            Cliente: document.getElementById('form-cliente').value,
-            EquipoMedico: document.getElementById('form-equipo').value,
-            NumeroSerie: document.getElementById('form-serial').value,
-            FallaReportada: document.getElementById('form-falla').value,
-            FechaIngreso: new Date().toLocaleDateString('es-AR'),
-            TecnicoAsignado: "Pendiente"
-        };
-
-        // UI Feedback: Bloquear botón e iniciar animación de envío
-        submitBtn.disabled = true;
-        toastText.innerText = "Transmitiendo datos a SharePoint...";
-        toast.classList.add('show');
-
-        try {
-            // Envío asíncrono encriptado directo a la nube de Microsoft
-            const response = await fetch(urlWebhookMicrosoft, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-
-            // Si la url aún es de prueba o no está configurada, simulamos éxito local para pruebas visuales de Cristian
-            if (response.ok || urlWebhookMicrosoft.includes("TU_ID_DE_FLUJO_AQUI")) {
-                toastText.innerText = "¡Éxito! Fila guardada en tu Excel.";
-                setTimeout(() => {
-                    toast.classList.remove('show');
-                    document.getElementById('html-form-recepcion').reset();
-                    submitBtn.disabled = false;
-                    resetToHome();
-                }, 2000);
-            } else {
-                throw new Error("HTTP Status " + response.status);
-            }
-
-        } catch (error) {
-            console.error("Falla en el cableado digital:", error);
-            toastText.innerText = "Error de enlace. Guardado localmente.";
-            setTimeout(() => {
-                toast.classList.remove('show');
-                submitBtn.disabled = false;
-            }, 3000);
-        }
-    }
-</script>
-
-
-<script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('SW registrado:', reg.scope))
-                .catch(err => console.log('SW error:', err));
-        });
-    }
-
-    // ─── MOSTRAR NOMBRE USUARIO DESDE MSAL SESSION ─────────────────────────
+    // ─── DISPLAY USUARIO ──────────────────────────────────────────
     function updateUserDisplay() {
         try {
             const account = currentUserIndex || msalAppIndex.getAllAccounts()[0];
-            if (account) {
-                const nombre = account.name || account.username || '';
-                const iniciales = nombre.split(' ').filter(Boolean).map(p => p[0]).join('').substring(0,2).toUpperCase() || 'TL';
-                document.getElementById('header-avatar').textContent = iniciales;
-                document.getElementById('avatar-nombre-idx').textContent = nombre;
-                document.getElementById('avatar-email-idx').textContent = account.username || '';
-                _inicializarAvatarIdx(account);
-                // Solo actualizar subtitle si estamos en home
-                const active = document.querySelector('.app-view.active');
-                if (!active || active.id === 'view-home') {
-                    document.getElementById('txt-sub-title').textContent = 'Hola, ' + (nombre.split(' ')[0] || nombre);
-                }
+            if (!account) return;
+            const nombre = account.name || account.username || '';
+            const iniciales = nombre.split(' ').filter(Boolean).map(p=>p[0]).join('').substring(0,2).toUpperCase() || 'TL';
+            document.getElementById('header-avatar').textContent     = iniciales;
+            document.getElementById('avatar-icon-idx').textContent   = iniciales;
+            document.getElementById('avatar-nombre-idx').textContent = nombre;
+            document.getElementById('avatar-email-idx').textContent  = account.username || '';
+            const active = document.querySelector('.app-view.active');
+            if (!active || active.id === 'view-home') {
+                document.getElementById('txt-sub-title').textContent = 'Hola, ' + (nombre.split(' ')[0] || nombre);
             }
         } catch(e) { console.warn('updateUserDisplay:', e); }
     }
 
+    // ─── AVATAR ───────────────────────────────────────────────────
     function toggleAvatarMenuIdx(e) {
         if (e) e.stopPropagation();
         const menu = document.getElementById('avatar-menu-idx');
@@ -1088,565 +747,150 @@
         menu.style.display = abierto ? 'none' : 'block';
         if (!abierto) _initSaludoWspIdx();
     }
+    function cerrarSesionIdx() { msalAppIndex.logoutRedirect({ postLogoutRedirectUri:'https://cahirth.github.io/Portal-TLC/' }); }
 
-    function cerrarSesionIdx() {
-        msalAppIndex.logoutRedirect({ postLogoutRedirectUri: 'https://cahirth.github.io/Portal-TLC/' });
-    }
-
-    // ── Inicializar avatar con datos del usuario ──────────────────
-    function _inicializarAvatarIdx(account) {
-        const nombre   = account.name || account.username || '—';
-        const email    = account.username || '—';
-        const partes   = nombre.trim().split(' ');
-        const iniciales = partes.length >= 2
-            ? (partes[0][0] + partes[partes.length-1][0]).toUpperCase()
-            : nombre.substring(0,2).toUpperCase();
-        document.getElementById('header-avatar').textContent   = iniciales;
-        document.getElementById('avatar-icon-idx').textContent = iniciales;
-        document.getElementById('avatar-nombre-idx').textContent = nombre;
-        document.getElementById('avatar-email-idx').textContent  = email;
-        // Rol (si está disponible en el contexto global)
-        const rolEl = document.getElementById('avatar-rol-idx');
-        if (rolEl && typeof currentRolIdx !== 'undefined') rolEl.textContent = currentRolIdx || 'Usuario';
-        _aplicarTemaIdx();
-        _initSaludoWspIdx();
-    }
-
-    // ── Tema ──────────────────────────────────────────────────────
-    function _setTemaIdx(tema) {
-        try { localStorage.setItem('tlc_tema', tema); } catch(e) {}
-        _aplicarTemaIdx();
-    }
-
+    // ─── TEMA ─────────────────────────────────────────────────────
+    function _setTemaIdx(tema) { try { localStorage.setItem('tlc_tema', tema); } catch(e){} _aplicarTemaIdx(); }
     function _aplicarTemaIdx() {
-        const tema = (() => { try { return localStorage.getItem('tlc_tema') || 'dark'; } catch(e) { return 'dark'; } })();
-        if (tema === 'light') { document.body.classList.add('tema-claro'); }
-        else { document.body.classList.remove('tema-claro'); }
-        const btnOsc = document.getElementById('idx-btn-tema-oscuro');
-        const btnCla = document.getElementById('idx-btn-tema-claro');
-        if (btnOsc && btnCla) {
-            if (tema === 'light') {
-                btnOsc.style.background = 'transparent'; btnOsc.style.color = '#64748b';
-                btnCla.style.background = '#1a4b8c';     btnCla.style.color = '#fff';
-            } else {
-                btnOsc.style.background = '#3a86ff'; btnOsc.style.color = '#fff';
-                btnCla.style.background = 'transparent'; btnCla.style.color = '#64748b';
-            }
+        const tema = (() => { try { return localStorage.getItem('tlc_tema')||'dark'; } catch(e){return 'dark';} })();
+        document.body.classList.toggle('tema-claro', tema==='light');
+        const btnO = document.getElementById('idx-btn-tema-oscuro');
+        const btnC = document.getElementById('idx-btn-tema-claro');
+        if (btnO&&btnC) {
+            if (tema==='light') { btnO.style.background='transparent'; btnO.style.color='#64748b'; btnC.style.background='#1a4b8c'; btnC.style.color='#fff'; }
+            else                { btnO.style.background='#3a86ff';     btnO.style.color='#fff';    btnC.style.background='transparent'; btnC.style.color='#64748b'; }
         }
     }
 
-    // ── Saludo WhatsApp ───────────────────────────────────────────
-    function _guardarSaludoWspIdx(val) {
-        try { localStorage.setItem('tlc_wsp_saludo', val.trim()); } catch(e) {}
-    }
-
-    function _initSaludoWspIdx() {
-        const ta = document.getElementById('idx-wsp-saludo');
-        if (!ta) return;
-        try { ta.value = localStorage.getItem('tlc_wsp_saludo') || ''; } catch(e) {}
-    }
+    // ─── SALUDO WSP ───────────────────────────────────────────────
+    function _guardarSaludoWspIdx(val) { try { localStorage.setItem('tlc_wsp_saludo', val.trim()); } catch(e){} }
+    function _initSaludoWspIdx() { const ta=document.getElementById('idx-wsp-saludo'); if(!ta) return; try { ta.value=localStorage.getItem('tlc_wsp_saludo')||''; } catch(e){} }
 
     document.addEventListener('click', (e) => {
         const wrap = document.getElementById('avatar-wrap-idx');
-        if (wrap && !wrap.contains(e.target)) {
-            const menu = document.getElementById('avatar-menu-idx');
-            if (menu) menu.style.display = 'none';
-        }
+        if (wrap && !wrap.contains(e.target)) { const menu=document.getElementById('avatar-menu-idx'); if(menu) menu.style.display='none'; }
     });
+    window.addEventListener('storage', (e) => { if(e.key==='tlc_tema') _aplicarTemaIdx(); });
 
-    // Sincronizar tema desde otras pestañas
-    window.addEventListener('storage', (e) => {
-        if (e.key === 'tlc_tema') _aplicarTemaIdx();
-    });
-    initIndexMsal().catch(console.error);
-
-    // ─── COTIZACIONES ─────────────────────────────────────────────────────────────
+    // ─── COTIZACIONES ─────────────────────────────────────────────
     const SHEET_ID_COT = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
     const FOTO_MAP_URL_IDX = 'https://script.google.com/macros/s/AKfycbxD37pl_gc0wADzn0d2NgQ1on6wx1LZGQoP861rdrQXZqJxqx1OEaRYvK06GHQBlaYw/exec';
     let fotoMapIdx = {};
-
-    async function cargarFotoMapIdx() {
-        if (Object.keys(fotoMapIdx).length > 0) return; // ya cargado
-        try {
-            const res = await fetch(FOTO_MAP_URL_IDX, { redirect: 'follow' });
-            fotoMapIdx = await res.json();
-        } catch(e) { console.warn('fotoMapIdx error:', e.message); }
-    }
-
+    async function cargarFotoMapIdx() { if(Object.keys(fotoMapIdx).length>0) return; try { const res=await fetch(FOTO_MAP_URL_IDX,{redirect:'follow'}); fotoMapIdx=await res.json(); } catch(e){} }
     function fotoUrlIdx(foto) {
-        if (!foto) return '';
-        const s = String(foto).trim();
-        if (s.includes('lh3.googleusercontent.com')) return s;
-        const mDrive = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-        if (mDrive) return `https://lh3.googleusercontent.com/d/${mDrive[1]}`;
-        const mFotos = s.match(/^Fotos\/(.+)$/i);
-        if (mFotos) return fotoMapIdx[mFotos[1].toLowerCase()] || '';
+        if(!foto) return '';
+        const s=String(foto).trim();
+        if(s.includes('lh3.googleusercontent.com')) return s;
+        const m=s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if(m) return `https://lh3.googleusercontent.com/d/${m[1]}`;
+        const mf=s.match(/^Fotos\/(.+)$/i);
+        if(mf) return fotoMapIdx[mf[1].toLowerCase()]||'';
         return '';
     }
-    let cotizacionesData = [];
-    let cotizacionesFiltradas = [];
-    let cotUsuarioEmail = '';
-    let cotUsuarioRol = '';
-
+    let cotizacionesData=[], cotizacionesFiltradas=[], cotUsuarioEmail='', cotUsuarioRol='';
     async function cargarCotizaciones() {
-        const loading = document.getElementById('cot-loading');
-        const filtrosDiv = document.getElementById('cot-filtros');
-        const lista = document.getElementById('cot-lista');
-        loading.style.display = 'block';
-        filtrosDiv.style.display = 'none';
-        lista.innerHTML = '';
-
+        const loading=document.getElementById('cot-loading'); const filtrosDiv=document.getElementById('cot-filtros'); const lista=document.getElementById('cot-lista');
+        loading.style.display='block'; filtrosDiv.style.display='none'; lista.innerHTML='';
         try {
-            // Cargar cotizaciones y vendedores en paralelo
-            const [cotRows, vendRows, preciosRows] = await Promise.all([
-                fetchSheetCot('Cotizaciones'),
-                fetchSheetCot('Vendedores'),
-                fetchSheetCot('Lista_Precios')
-            ]);
+            const [cotRows,vendRows,preciosRows]=await Promise.all([fetchSheetCot('Cotizaciones'),fetchSheetCot('Vendedores'),fetchSheetCot('Lista_Precios')]);
             await cargarFotoMapIdx();
-
-            // Construir mapa dispositivo → foto desde Lista_Precios
-            window.cotFotoMapDisp = {};
-            preciosRows.forEach(p => {
-                const nombre = (p['Nombre de Dispositivo'] || '').trim().toLowerCase();
-                if (nombre && p['Foto']) window.cotFotoMapDisp[nombre] = p['Foto'];
-            });
-
-            // Detectar usuario actual desde sessionStorage
-            cotUsuarioEmail = '';
-            cotUsuarioRol = '';
-            for (let i = 0; i < sessionStorage.length; i++) {
-                const key = sessionStorage.key(i);
-                if (key && key.includes('account')) {
-                    try {
-                        const val = JSON.parse(sessionStorage.getItem(key));
-                        if (val && val.username) { cotUsuarioEmail = val.username.toLowerCase(); break; }
-                    } catch(e) {}
-                }
-            }
-
-            // Buscar rol del usuario
-            const vend = vendRows.find(v => String(v['Email']||'').toLowerCase() === cotUsuarioEmail);
-            cotUsuarioRol = vend ? String(vend['Rol']||'') : '';
-
-            // Log columnas para debug
-            if (cotRows.length > 0) console.log('Columnas Cotizaciones:', Object.keys(cotRows[0]));
-
-            // Filtrar por vendedor (Admin ve todo, Interno/Externo ve solo las suyas)
-            if (cotUsuarioRol === 'Administrador') {
-                cotizacionesData = cotRows;
-            } else {
-                const nombreVend = vend ? String(vend['Nombre Vendedor']||'') : '';
-                const emailBase = cotUsuarioEmail.split('@')[0];
-                cotizacionesData = cotRows.filter(r => {
-                    const v = String(r['Vendedor'] || r['Email'] || r['email'] || '').toLowerCase();
-                    return v === cotUsuarioEmail || v === nombreVend.toLowerCase() || v.includes(emailBase);
-                });
-                // Si no hay match, mostrar todas (fallback)
-                if (cotizacionesData.length === 0) cotizacionesData = cotRows;
-            }
-
-            // Ordenar: no leídos primero, luego por estado
-            const estadoOrden = { 'Ganado 100%':0, 'Negociación 75%':1, 'Presupuestado 50%':2, 'Contacto inicial 25%':3, 'Perdido 0%':4, '':5 };
-            cotizacionesData.sort((a,b) => {
-                const la = a['Leido'] === true || a['Leido'] === 'TRUE';
-                const lb = b['Leido'] === true || b['Leido'] === 'TRUE';
-                if (la !== lb) return la ? 1 : -1;
-                return (estadoOrden[a['Estado_Lead']||''] || 5) - (estadoOrden[b['Estado_Lead']||''] || 5);
-            });
-
-            cotizacionesFiltradas = [...cotizacionesData];
-            loading.style.display = 'none';
-            filtrosDiv.style.display = 'block';
-            renderCotizaciones();
-
-        } catch(e) {
-            loading.style.display = 'none';
-            lista.innerHTML = `<div style="text-align:center; padding:40px; color:#ff007f;">❌ Error: ${e.message}</div>`;
-        }
+            window.cotFotoMapDisp={};
+            preciosRows.forEach(p=>{const n=(p['Nombre de Dispositivo']||'').trim().toLowerCase(); if(n&&p['Foto']) window.cotFotoMapDisp[n]=p['Foto'];});
+            cotUsuarioEmail=''; cotUsuarioRol='';
+            for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.includes('account')){try{const v=JSON.parse(sessionStorage.getItem(k));if(v&&v.username){cotUsuarioEmail=v.username.toLowerCase();break;}}catch(e){}}}
+            const vend=vendRows.find(v=>String(v['Email']||'').toLowerCase()===cotUsuarioEmail);
+            cotUsuarioRol=vend?String(vend['Rol']||''):'';
+            if(cotUsuarioRol==='Administrador'){cotizacionesData=cotRows;}
+            else{const nv=vend?String(vend['Nombre Vendedor']||''):'';const eb=cotUsuarioEmail.split('@')[0];cotizacionesData=cotRows.filter(r=>{const v=String(r['Vendedor']||r['Email']||'').toLowerCase();return v===cotUsuarioEmail||v===nv.toLowerCase()||v.includes(eb);});if(!cotizacionesData.length) cotizacionesData=cotRows;}
+            const eo={'Ganado 100%':0,'Negociación 75%':1,'Presupuestado 50%':2,'Contacto inicial 25%':3,'Perdido 0%':4,'':5};
+            cotizacionesData.sort((a,b)=>{const la=a['Leido']===true||a['Leido']==='TRUE';const lb=b['Leido']===true||b['Leido']==='TRUE';if(la!==lb) return la?1:-1;return(eo[a['Estado_Lead']||'']||5)-(eo[b['Estado_Lead']||'']||5);});
+            cotizacionesFiltradas=[...cotizacionesData]; loading.style.display='none'; filtrosDiv.style.display='block'; renderCotizaciones();
+        } catch(e) { loading.style.display='none'; lista.innerHTML=`<div style="text-align:center;padding:40px;color:#ff007f;">❌ ${e.message}</div>`; }
     }
-
     async function fetchSheetCot(sheetName) {
-        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID_COT}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
-        const res = await fetch(url);
-        const text = await res.text();
-        const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
-        const cols = json.table.cols.map(c => c.label);
-        return (json.table.rows || [])
-            .filter(row => row?.c?.some(c => c?.v !== null && c?.v !== ''))
-            .map(row => {
-                const obj = {};
-                cols.forEach((col, i) => {
-                    const cell = row.c?.[i];
-                    obj[col] = (cell && cell.v !== null && cell.v !== undefined) ? cell.v : '';
-                });
-                return obj;
-            });
+        const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID_COT}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+        const res=await fetch(url); const text=await res.text();
+        const json=JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+        const cols=json.table.cols.map(c=>c.label);
+        return(json.table.rows||[]).filter(r=>r?.c?.some(c=>c?.v!==null&&c?.v!=='')).map(r=>{const o={};cols.forEach((c,i)=>{const cell=r.c?.[i];o[c]=(cell&&cell.v!==null&&cell.v!==undefined)?cell.v:'';});return o;});
     }
-
-    function filtrarCot(btn) {
-        document.querySelectorAll('.cot-filtro').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderCotizaciones();
-    }
-
+    function filtrarCot(btn) { document.querySelectorAll('.cot-filtro').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCotizaciones(); }
     function renderCotizaciones() {
-        const estado = document.querySelector('.cot-filtro.active')?.dataset.estado || 'TODOS';
-        const q = (document.getElementById('cot-buscar')?.value || '').toLowerCase().trim();
-
-        cotizacionesFiltradas = cotizacionesData.filter(r => {
-            const matchEstado = estado === 'TODOS' || (r['Estado_Lead'] || '') === estado;
-            const nombre = (r['Nombre y Apellido'] || '').toLowerCase();
-            const disp = (r['Dispositivo'] || '').toLowerCase();
-            const matchQ = !q || nombre.includes(q) || disp.includes(q);
-            return matchEstado && matchQ;
+        const estado=document.querySelector('.cot-filtro.active')?.dataset.estado||'TODOS';
+        const q=(document.getElementById('cot-buscar')?.value||'').toLowerCase().trim();
+        cotizacionesFiltradas=cotizacionesData.filter(r=>{
+            const mE=estado==='TODOS'||(r['Estado_Lead']||'')===estado;
+            const mQ=!q||(r['Nombre y Apellido']||'').toLowerCase().includes(q)||(r['Dispositivo']||'').toLowerCase().includes(q);
+            return mE&&mQ;
         });
-
-        const lista = document.getElementById('cot-lista');
-        if (!cotizacionesFiltradas.length) {
-            lista.innerHTML = '<div style="text-align:center; padding:40px; color:#64748b; font-size:13px;">Sin resultados</div>';
-            return;
-        }
-
-        const badgeMap = {
-            'Contacto inicial 25%': 'badge-inicial',
-            'Presupuestado 50%': 'badge-presup',
-            'Negociación 75%': 'badge-negoc',
-            'Ganado 100%': 'badge-ganado',
-            'Perdido 0%': 'badge-perdido',
-        };
-
-        lista.innerHTML = cotizacionesFiltradas.map((r, i) => {
-            const nombre = r['Nombre y Apellido'] || '—';
-            const disp = r['Dispositivo'] || '—';
-            const estado = r['Estado_Lead'] || '';
-            const leido = r['Leido'] === true || r['Leido'] === 'TRUE';
-            const fecha = r['Fecha_Lead'] || '';
-            const vendedor = r['Vendedor'] || '';
-            const nro = r['Nro_Presupuesto'] || '';
-            const modalidad = r['Modalidad'] || '';
-            const moneda = r['Moneda'] || '';
-            const notas = r['Notas'] || '';
-
-            const badgeClass = badgeMap[estado] || 'badge-sin';
-            const badgeLabel = estado || 'Sin estado';
-            const dotNoLeido = !leido ? '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;display:inline-block;margin-right:4px;flex-shrink:0;"></span>' : '';
-
-            return `<div onclick="abrirDetalleCot(${i})" style="background:#1c2541; border-radius:12px; padding:12px 14px; margin-bottom:8px; border:1px solid #2d3f6e; cursor:pointer; active:opacity:0.8;">
-                <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:6px;">
-                    ${dotNoLeido}
-                    <div style="flex:1; min-width:0;">
-                        <div style="font-size:14px; font-weight:700; color:#f1f5f9; margin-bottom:2px;">${nombre}</div>
-                        <div style="font-size:12px; color:#60a5fa; font-weight:600;">${disp}</div>
-                    </div>
-                    <span style="color:#64748b; font-size:16px; margin-left:4px;">›</span>
-                </div>
-                <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:${notas ? '5px' : '0'};">
-                    <span class="cot-badge ${badgeClass}">${badgeLabel}</span>
-                    ${modalidad ? `<span style="font-size:10px; color:#94a3b8;">${modalidad} ${moneda}</span>` : ''}
-                    ${fecha ? `<span style="font-size:10px; color:#94a3b8;">📅 ${fecha}</span>` : ''}
-                </div>
-                ${notas ? `<div style="font-size:11px; color:#94a3b8; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${notas}</div>` : ''}
-                ${vendedor && cotUsuarioRol === 'Administrador' ? `<div style="font-size:10px; color:#94a3b8; margin-top:4px;">👤 ${vendedor}</div>` : ''}
+        const lista=document.getElementById('cot-lista');
+        if(!cotizacionesFiltradas.length){lista.innerHTML='<div style="text-align:center;padding:40px;color:#64748b;font-size:13px;">Sin resultados</div>';return;}
+        const bMap={'Contacto inicial 25%':'badge-inicial','Presupuestado 50%':'badge-presup','Negociación 75%':'badge-negoc','Ganado 100%':'badge-ganado','Perdido 0%':'badge-perdido'};
+        lista.innerHTML=cotizacionesFiltradas.map((r,i)=>{
+            const nombre=r['Nombre y Apellido']||'—';const disp=r['Dispositivo']||'—';const est=r['Estado_Lead']||'';
+            const leido=r['Leido']===true||r['Leido']==='TRUE';const notas=r['Notas']||'';const vendedor=r['Vendedor']||'';
+            const dot=!leido?'<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;display:inline-block;margin-right:4px;flex-shrink:0;"></span>':'';
+            return `<div onclick="abrirDetalleCot(${i})" style="background:#1c2541;border-radius:12px;padding:12px 14px;margin-bottom:8px;border:1px solid #2d3f6e;cursor:pointer;">
+                <div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:6px;">${dot}<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:2px;">${nombre}</div><div style="font-size:12px;color:#60a5fa;font-weight:600;">${disp}</div></div><span style="color:#64748b;font-size:16px;">›</span></div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;${notas?'margin-bottom:5px':''}"><span class="cot-badge ${bMap[est]||'badge-sin'}">${est||'Sin estado'}</span>${r['Fecha_Lead']?`<span style="font-size:10px;color:#94a3b8;">📅 ${r['Fecha_Lead']}</span>`:''}</div>
+                ${notas?`<div style="font-size:11px;color:#94a3b8;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${notas}</div>`:''}
+                ${vendedor&&cotUsuarioRol==='Administrador'?`<div style="font-size:10px;color:#94a3b8;margin-top:4px;">👤 ${vendedor}</div>`:''}
             </div>`;
         }).join('');
     }
-
-
     function abrirDetalleCot(idx) {
-        const r = cotizacionesFiltradas[idx];
-        if (!r) return;
-
-        const overlay = document.getElementById('cot-detalle-overlay');
-        overlay.style.display = 'flex';
-        overlay.style.flexDirection = 'column';
-
-        // Scroll al top
-        overlay.scrollTop = 0;
-
-        // Título
-        document.getElementById('cot-det-titulo').textContent = r['Nombre y Apellido'] || '—';
-        document.getElementById('cot-det-subtitulo').textContent = r['Dispositivo'] || '';
-
-        const disp = r['Dispositivo'] || '';
-        // Buscar foto en lista de precios por nombre de dispositivo
-        const dispKey = disp.trim().toLowerCase();
-        const fotoRaw = (window.cotFotoMapDisp || {})[dispKey] || '';
-        let fotoSrc = fotoUrlIdx(fotoRaw);
-
-        // Si no hay match exacto, buscar por coincidencia parcial
-        if (!fotoSrc && window.cotFotoMapDisp) {
-            const keys = Object.keys(window.cotFotoMapDisp);
-            const partial = keys.find(k => k.includes(dispKey.substring(0,8)) || dispKey.includes(k.substring(0,8)));
-            if (partial) fotoSrc = fotoUrlIdx(window.cotFotoMapDisp[partial]);
-        }
-
-        // Foto en el nuevo panel integrado
-        const fotoInner = document.getElementById('cot-det-foto-inner');
-        document.getElementById('cot-det-disp-nombre').textContent = disp;
-        if (fotoSrc) {
-            fotoInner.innerHTML = `<img src="${fotoSrc}" style="max-width:100%; max-height:180px; object-fit:contain; padding:12px;" onerror="this.parentElement.innerHTML='<div style=\'font-size:40px;padding:24px;\'>🔬</div>'">`;
-        } else {
-            fotoInner.innerHTML = `<div style="font-size:40px; padding:24px;">🔬</div>`;
-        }
-
-        // Estado badge
-        const badgeMap = {
-            'Contacto inicial 25%': ['badge-inicial','Contacto inicial'],
-            'Presupuestado 50%':    ['badge-presup','Presupuestado'],
-            'Negociación 75%':      ['badge-negoc','Negociación'],
-            'Ganado 100%':          ['badge-ganado','Ganado ✓'],
-            'Perdido 0%':           ['badge-perdido','Perdido'],
-        };
-        const estado = r['Estado_Lead'] || '';
-        const [bClass, bLabel] = badgeMap[estado] || ['badge-sin', 'Sin estado'];
-        const leido = r['Leido'] === true || r['Leido'] === 'TRUE';
-        document.getElementById('cot-det-estado-wrap').innerHTML =
-            `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <span class="cot-badge ${bClass}" style="font-size:12px; padding:4px 10px;">${bLabel}</span>
-                ${r['Nro_Presupuesto'] ? `<span style="font-size:11px; color:#64748b;">${r['Nro_Presupuesto']}</span>` : ''}
-                ${r['Fecha_Lead'] ? `<span style="font-size:11px; color:#64748b;">📅 ${r['Fecha_Lead']}</span>` : ''}
-                ${!leido ? '<span style="font-size:11px; color:#3a86ff;">● No leído</span>' : ''}
-            </div>`;
-
-        // Cliente
-        const campos = [
-            ['Nombre', r['Nombre y Apellido']],
-            ['Razón Social', r['Razón Social']],
-            ['CUIT', r['Cuit']],
-            ['Teléfono', r['Teléfono']],
-            ['Email', r['Email']],
-            ['Vendedor', r['Vendedor']],
-        ];
-        document.getElementById('cot-det-cliente').innerHTML = campos
-            .filter(([, v]) => v)
-            .map(([k, v]) => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #222e50;">
-                <span style="font-size:12px; color:#64748b;">${k}</span>
-                <span style="font-size:12px; color:#f1f5f9; font-weight:500; text-align:right; max-width:60%;">${v}</span>
-            </div>`).join('');
-
-        // Condiciones
-        const condWrap = document.getElementById('cot-det-condiciones-wrap');
-        const condEl = document.getElementById('cot-det-condiciones');
-        const condCampos = [
-            ['Modalidad', r['Modalidad']],
-            ['Moneda', r['Moneda']],
-            ['Plazo', r['Plazo'] ? r['Plazo'] + (r['Moneda'] ? ' cuotas' : '') : ''],
-            ['Aporte Inicial', r['Aporte Inicial']],
-            ['Comisión', (() => {
-                const c = r['Comisiones_Ext'];
-                if (!c) return '';
-                const n = parseFloat(String(c).replace(',','.').replace('%',''));
-                if (isNaN(n)) return c;
-                const pct = n < 1 ? n * 100 : n;
-                return Math.round(pct * 10) / 10 + '%';
-            })()]
-
-
-        ];
-        const condFiltradas = condCampos.filter(([, v]) => v);
-        if (condFiltradas.length) {
-            condEl.innerHTML = condFiltradas.map(([k, v]) =>
-                `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #222e50;">
-                    <span style="font-size:12px; color:#64748b;">${k}</span>
-                    <span style="font-size:12px; color:#f1f5f9; font-weight:500;">${v}</span>
-                </div>`).join('');
-            condWrap.style.display = 'block';
-        } else { condWrap.style.display = 'none'; }
-
-        // Notas
-        const notasWrap = document.getElementById('cot-det-notas-wrap');
-        const notasEl = document.getElementById('cot-det-notas');
-        if (r['Notas']) {
-            notasEl.textContent = r['Notas'];
-            notasWrap.style.display = 'block';
-        } else { notasWrap.style.display = 'none'; }
-
-        // PDFs — ocultos por ahora
-        document.getElementById('cot-det-pdfs-wrap').style.display = 'none';
+        const r=cotizacionesFiltradas[idx]; if(!r) return;
+        const overlay=document.getElementById('cot-detalle-overlay'); overlay.style.display='flex'; overlay.style.flexDirection='column'; overlay.scrollTop=0;
+        document.getElementById('cot-det-titulo').textContent=r['Nombre y Apellido']||'—';
+        document.getElementById('cot-det-disp-nombre').textContent=r['Dispositivo']||'';
+        const dk=(r['Dispositivo']||'').trim().toLowerCase(); let fotoSrc=fotoUrlIdx((window.cotFotoMapDisp||{})[dk]||'');
+        if(!fotoSrc&&window.cotFotoMapDisp){const k=Object.keys(window.cotFotoMapDisp).find(k=>k.includes(dk.substring(0,8))||dk.includes(k.substring(0,8)));if(k) fotoSrc=fotoUrlIdx(window.cotFotoMapDisp[k]);}
+        document.getElementById('cot-det-foto-inner').innerHTML=fotoSrc?`<img src="${fotoSrc}" style="max-width:100%;max-height:180px;object-fit:contain;padding:12px;" onerror="this.parentElement.innerHTML='<div style=\'font-size:40px;padding:24px;\'>🔬</div>'">`:`<div style="font-size:40px;padding:24px;">🔬</div>`;
+        const bMap={'Contacto inicial 25%':['badge-inicial','Contacto inicial'],'Presupuestado 50%':['badge-presup','Presupuestado'],'Negociación 75%':['badge-negoc','Negociación'],'Ganado 100%':['badge-ganado','Ganado ✓'],'Perdido 0%':['badge-perdido','Perdido']};
+        const est=r['Estado_Lead']||''; const [bClass,bLabel]=bMap[est]||['badge-sin','Sin estado'];
+        const leido=r['Leido']===true||r['Leido']==='TRUE';
+        document.getElementById('cot-det-estado-wrap').innerHTML=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span class="cot-badge ${bClass}" style="font-size:12px;padding:4px 10px;">${bLabel}</span>${r['Nro_Presupuesto']?`<span style="font-size:11px;color:#64748b;">${r['Nro_Presupuesto']}</span>`:''} ${r['Fecha_Lead']?`<span style="font-size:11px;color:#64748b;">📅 ${r['Fecha_Lead']}</span>`:''} ${!leido?'<span style="font-size:11px;color:#3a86ff;">● No leído</span>':''}</div>`;
+        const campos=[['Nombre',r['Nombre y Apellido']],['Razón Social',r['Razón Social']],['CUIT',r['Cuit']],['Teléfono',r['Teléfono']],['Email',r['Email']],['Vendedor',r['Vendedor']]];
+        document.getElementById('cot-det-cliente').innerHTML=campos.filter(([,v])=>v).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #222e50;"><span style="font-size:12px;color:#64748b;">${k}</span><span style="font-size:12px;color:#f1f5f9;font-weight:500;text-align:right;max-width:60%;">${v}</span></div>`).join('');
+        const condCampos=[['Modalidad',r['Modalidad']],['Moneda',r['Moneda']],['Plazo',r['Plazo']?(r['Plazo']+(r['Moneda']?' cuotas':'')):''],[...(['Aporte Inicial',r['Aporte Inicial']])],['Comisión',(()=>{const c=r['Comisiones_Ext'];if(!c)return '';const n=parseFloat(String(c).replace(',','.').replace('%',''));if(isNaN(n))return c;return Math.round((n<1?n*100:n)*10)/10+'%';})()]];
+        const condF=condCampos.filter(([,v])=>v);
+        const condWrap=document.getElementById('cot-det-condiciones-wrap');
+        if(condF.length){document.getElementById('cot-det-condiciones').innerHTML=condF.map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #222e50;"><span style="font-size:12px;color:#64748b;">${k}</span><span style="font-size:12px;color:#f1f5f9;font-weight:500;">${v}</span></div>`).join('');condWrap.style.display='block';}else{condWrap.style.display='none';}
+        const notasWrap=document.getElementById('cot-det-notas-wrap');
+        if(r['Notas']){document.getElementById('cot-det-notas').textContent=r['Notas'];notasWrap.style.display='block';}else{notasWrap.style.display='none';}
+        document.getElementById('cot-det-pdfs-wrap').style.display='none';
     }
+    function cerrarDetalleCot() { document.getElementById('cot-detalle-overlay').style.display='none'; }
 
-    function cerrarDetalleCot() {
-        document.getElementById('cot-detalle-overlay').style.display = 'none';
-    }
-
-
-    // ─── MODELOS POR MARCA ────────────────────────────────────────────────────────
-    const modelosPorMarca = {
-        'HUVITZ': ['HRK-9000A','HRK-8000A','HCP-7000','HBM-1','HOCT-1F OCTavius','HDR-9000','ERK-9100','HMS','HS-5000 X11','HVF-100','HNT1P','ERK-9100','HFC-1'],
-        'Topcon': ['KR-800','TRC-NW400','3D OCT-1 Maestro2','SL-D701','CT-800','KR-1W'],
-        'Zeiss': ['IOLMaster 700','Cirrus 6000','Humphrey HFA3','VISUCAM 524','Lumera 700'],
-        'Nidek': ['RS-330 Duo','AFC-330','US-4000','NT-530P','LM-1800P'],
-        'Haag-Streit': ['BQ 900','LuxOR LX3','AT 900','BM 900'],
-        'Bausch & Lomb': ['Stellaris Elite','Crystalens','enVista'],
-        'Alcon': ['Centurion','LenSx','WaveLight EX500'],
-        'Moria': ['M2','One Use-Plus','CB Microkeratome'],
-        'Otro': ['Otro / Especificar en Notas'],
-    };
-
+    // ─── MODELOS ──────────────────────────────────────────────────
+    const modelosPorMarca = {'HUVITZ':['HRK-9000A','HRK-8000A','HCP-7000','HBM-1','HOCT-1F OCTavius','HDR-9000','ERK-9100','HMS','HS-5000 X11','HVF-100','HNT1P','HFC-1'],'Topcon':['KR-800','TRC-NW400','3D OCT-1 Maestro2','SL-D701','CT-800','KR-1W'],'Zeiss':['IOLMaster 700','Cirrus 6000','Humphrey HFA3','VISUCAM 524','Lumera 700'],'Nidek':['RS-330 Duo','AFC-330','US-4000','NT-530P','LM-1800P'],'Haag-Streit':['BQ 900','LuxOR LX3','AT 900','BM 900'],'Bausch & Lomb':['Stellaris Elite','Crystalens','enVista'],'Alcon':['Centurion','LenSx','WaveLight EX500'],'Moria':['M2','One Use-Plus','CB Microkeratome'],'Otro':['Otro / Especificar en Notas']};
     function actualizarModelos() {
-        const marca = document.getElementById('rec-marca').value;
-        const sel = document.getElementById('rec-modelo');
-        const modeloOtroWrap = document.getElementById('modelo-otro-wrap');
-
-        if (marca === 'Otro') {
-            sel.style.display = 'none';
-            modeloOtroWrap.style.display = 'block';
-            sel.required = false;
-            document.getElementById('rec-modelo-otro').required = true;
-        } else {
-            sel.style.display = 'block';
-            modeloOtroWrap.style.display = 'none';
-            sel.required = true;
-            document.getElementById('rec-modelo-otro').required = false;
-            sel.innerHTML = '<option value="">-- Seleccionar Modelo --</option>';
-            (modelosPorMarca[marca] || []).forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m; opt.textContent = m;
-                sel.appendChild(opt);
-            });
-            // Si hay "Otro" en los modelos, también permitir texto libre
-            const hasOtro = (modelosPorMarca[marca] || []).includes('Otro / Especificar en Notas');
-        }
+        const marca=document.getElementById('rec-marca').value; const sel=document.getElementById('rec-modelo'); const ow=document.getElementById('modelo-otro-wrap');
+        if(marca==='Otro'){sel.style.display='none';ow.style.display='block';sel.required=false;document.getElementById('rec-modelo-otro').required=true;}
+        else{sel.style.display='block';ow.style.display='none';sel.required=true;document.getElementById('rec-modelo-otro').required=false;sel.innerHTML='<option value="">-- Seleccionar Modelo --</option>';(modelosPorMarca[marca]||[]).forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});}
     }
-
-    function getModeloValue() {
-        const marca = document.getElementById('rec-marca').value;
-        if (marca === 'Otro') return document.getElementById('rec-modelo-otro').value.trim();
-        const sel = document.getElementById('rec-modelo');
-        if (sel.value === 'Otro / Especificar en Notas') {
-            return document.getElementById('rec-modelo-otro').value.trim() || 'Otro';
-        }
-        return sel.value;
-    }
-
-    function triggerFoto(n) {
-        document.getElementById('foto-input-' + n).click();
-    }
-
-    function previewFoto(n, input) {
-        if (!input.files[0]) return;
-        const reader = new FileReader();
-        reader.onload = e => {
-            const img = document.getElementById('foto-preview-' + n);
-            img.src = e.target.result;
-            img.style.display = 'block';
-            document.getElementById('slot-' + n).querySelector('.foto-placeholder').style.display = 'none';
-            document.getElementById('slot-' + n).classList.add('filled');
-        };
-        reader.readAsDataURL(input.files[0]);
-    }
-
-    async function fotoToBase64(n) {
-        const input = document.getElementById('foto-input-' + n);
-        if (!input.files[0]) return null;
-        return new Promise(res => {
-            const reader = new FileReader();
-            reader.onload = e => res(e.target.result.split(',')[1]);
-            reader.readAsDataURL(input.files[0]);
-        });
-    }
-
-    // Setear fecha de hoy al abrir el formulario
-    function initRecepcionForm() {
-        const hoy = new Date().toISOString().split('T')[0];
-        document.getElementById('rec-fecha').value = hoy;
-        // Pre-llenar vendedor con usuario logueado
-    }
-
+    function getModeloValue() { const m=document.getElementById('rec-marca').value; if(m==='Otro') return document.getElementById('rec-modelo-otro').value.trim(); const s=document.getElementById('rec-modelo'); return s.value==='Otro / Especificar en Notas'?(document.getElementById('rec-modelo-otro').value.trim()||'Otro'):s.value; }
+    function triggerFoto(n) { document.getElementById('foto-input-'+n).click(); }
+    function previewFoto(n, input) { if(!input.files[0]) return; const r=new FileReader(); r.onload=e=>{const img=document.getElementById('foto-preview-'+n);img.src=e.target.result;img.style.display='block';document.getElementById('slot-'+n).querySelector('.foto-placeholder').style.display='none';document.getElementById('slot-'+n).classList.add('filled');}; r.readAsDataURL(input.files[0]); }
+    async function fotoToBase64(n) { const i=document.getElementById('foto-input-'+n); if(!i.files[0]) return null; return new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.readAsDataURL(i.files[0]);}); }
+    function initRecepcionForm() { document.getElementById('rec-fecha').value=new Date().toISOString().split('T')[0]; }
     async function enviarRecepcion() {
-        const btn = document.getElementById('btn-rec-enviar');
-        const status = document.getElementById('rec-status');
-
-        // Validación básica
-        const campos = ['rec-fecha','rec-tipo','rec-cliente','rec-telefono','rec-falla','rec-marca','rec-modelo','rec-serie'];
-        for (const id of campos) {
-            if (!document.getElementById(id).value.trim()) {
-                mostrarStatus('⚠️ Completá todos los campos obligatorios', 'warn');
-                return;
-            }
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
-        mostrarStatus('Preparando datos...', 'info');
-
-        // Recopilar fotos en base64
-        const fotos = await Promise.all([0,1,2].map(fotoToBase64));
-
-        const payload = {
-            Fecha:        document.getElementById('rec-fecha').value,
-            TipoServicio: document.getElementById('rec-tipo').value,
-            Cliente:      document.getElementById('rec-cliente').value,
-            Telefono:     document.getElementById('rec-telefono').value,
-            Falla:        document.getElementById('rec-falla').value,
-            Marca:        document.getElementById('rec-marca').value,
-            Modelo:       getModeloValue(),
-            NroSerie:     document.getElementById('rec-serie').value,
-            Accesorios:   document.getElementById('rec-accesorios').value,
-            Tecnico:      'Pendiente asignación',
-            Foto1:        fotos[0] || '',
-            Foto2:        fotos[1] || '',
-            Foto3:        fotos[2] || '',
-            Origen:       'Portal TLC',
-            Timestamp:    new Date().toISOString(),
-        };
-
-        // URL del webhook de Power Automate — se completará en el siguiente paso
-        const WEBHOOK_URL = window.PA_RECEPCION_WEBHOOK || '';
-
-        if (!WEBHOOK_URL) {
-            // Modo demo: mostrar datos en consola
-            console.log('📋 Payload recepción:', payload);
-            mostrarStatus('✅ Formulario listo. Pendiente conectar Power Automate.', 'ok');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Enviar Recepción';
-            return;
-        }
-
-        try {
-            const res = await fetch(WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (res.ok) {
-                mostrarStatus('✅ Recepción enviada correctamente', 'ok');
-                setTimeout(() => {
-                    // Reset form
-                    ['rec-tipo','rec-cliente','rec-telefono','rec-falla','rec-marca','rec-serie','rec-accesorios'].forEach(id => document.getElementById(id).value = '');
-                    document.getElementById('rec-modelo').innerHTML = '<option value="">-- Seleccionar Modelo --</option>';
-                    [0,1,2].forEach(n => {
-                        document.getElementById('foto-preview-' + n).style.display = 'none';
-                        document.getElementById('slot-' + n).querySelector('.foto-placeholder').style.display = 'flex';
-                        document.getElementById('slot-' + n).classList.remove('filled');
-                        document.getElementById('foto-input-' + n).value = '';
-                    });
-                    status.style.display = 'none';
-                    resetToHome();
-                }, 2000);
-            } else { throw new Error('HTTP ' + res.status); }
-        } catch(e) {
-            mostrarStatus('❌ Error al enviar: ' + e.message, 'error');
-        }
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Enviar Recepción';
+        const btn=document.getElementById('btn-rec-enviar'); const status=document.getElementById('rec-status');
+        const campos=['rec-fecha','rec-tipo','rec-cliente','rec-telefono','rec-falla','rec-marca','rec-modelo','rec-serie'];
+        for(const id of campos){if(!document.getElementById(id).value.trim()){mostrarStatus('⚠️ Completá todos los campos obligatorios','warn');return;}}
+        btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Enviando...'; mostrarStatus('Preparando datos...','info');
+        const fotos=await Promise.all([0,1,2].map(fotoToBase64));
+        const payload={Fecha:document.getElementById('rec-fecha').value,TipoServicio:document.getElementById('rec-tipo').value,Cliente:document.getElementById('rec-cliente').value,Telefono:document.getElementById('rec-telefono').value,Falla:document.getElementById('rec-falla').value,Marca:document.getElementById('rec-marca').value,Modelo:getModeloValue(),NroSerie:document.getElementById('rec-serie').value,Accesorios:document.getElementById('rec-accesorios').value,Tecnico:'Pendiente asignación',Foto1:fotos[0]||'',Foto2:fotos[1]||'',Foto3:fotos[2]||'',Origen:'Portal TLC',Timestamp:new Date().toISOString()};
+        const WEBHOOK_URL=window.PA_RECEPCION_WEBHOOK||'';
+        if(!WEBHOOK_URL){console.log('📋 Payload recepción:', payload);mostrarStatus('✅ Listo. Pendiente conectar Power Automate.','ok');btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-cloud-arrow-up"></i> Enviar Recepción';return;}
+        try{const res=await fetch(WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(res.ok){mostrarStatus('✅ Recepción enviada correctamente','ok');setTimeout(()=>{resetToHome();},2000);}else{throw new Error('HTTP '+res.status);}}catch(e){mostrarStatus('❌ Error: '+e.message,'error');}
+        btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-cloud-arrow-up"></i> Enviar Recepción';
     }
+    function mostrarStatus(msg,tipo) { const el=document.getElementById('rec-status');el.textContent=msg;el.style.display='block';const c={ok:'background:#06d6a024;color:#34d399;border:1px solid #06d6a044;',warn:'background:#f8961e24;color:#fbbf24;border:1px solid #f8961e44;',error:'background:#ff007f24;color:#f87171;border:1px solid #ff007f44;',info:'background:#3a86ff24;color:#60a5fa;border:1px solid #3a86ff44;'};el.style.cssText+=c[tipo]||c.info; }
 
-    function mostrarStatus(msg, tipo) {
-        const el = document.getElementById('rec-status');
-        el.textContent = msg;
-        el.style.display = 'block';
-        const colores = {
-            ok:   'background:#06d6a024; color:#34d399; border:1px solid #06d6a044;',
-            warn: 'background:#f8961e24; color:#fbbf24; border:1px solid #f8961e44;',
-            error:'background:#ff007f24; color:#f87171; border:1px solid #ff007f44;',
-            info: 'background:#3a86ff24; color:#60a5fa; border:1px solid #3a86ff44;',
-        };
-        el.style.cssText += colores[tipo] || colores.info;
-    }
-
-
+    // ─── INIT ──────────────────────────────────────────────────────
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(e=>console.log('SW:',e)); }
+    initIndexMsal().catch(console.error);
 </script>
 </body>
 </html>
