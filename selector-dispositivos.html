@@ -254,6 +254,12 @@
         background:#080d14; border:1px solid #1e3050; border-radius:12px;
         padding:14px; margin-bottom:10px;
     }
+    /* ── NOMBRE DEL ÍTEM — clase fija, no depende de JS calculando tema ──
+       Default = modo oscuro (color claro). Se sobreescribe en .tema-claro.
+       Esto elimina cualquier carrera de inicialización: el navegador
+       resuelve el color en base a la cascada CSS pura, sin JS de por medio. */
+    .mr-item-nombre { color: #f1f5f9; }
+    body.tema-claro .mr-item-nombre { color: #0f172a !important; }
     /* ══════════════════════════════════════════════════════════════
        TEMA CLARO — sobreescritura global
        Aplica cuando body.tema-claro está activo.
@@ -494,11 +500,10 @@
         box-shadow: 0 1px 3px rgba(0,0,0,.06);
     }
     /* ── FIX DEFINITIVO: nombre del ítem en modal nueva cotización ──
-       Triple selector + !important para ganar a cualquier style inline.
-       Cubre .mr-item-card (modal resumen paso 2) y .carrito-item-nombre
-       (overlay del carrito). Independiente del JS de render.
-       NUCLEAR: cubre TODOS los casos posibles, incluso si el JS
-       detectó mal el tema y puso el color oscuro (#f1f5f9) por error. */
+       .mr-item-nombre es la clase fija (ver definición base más arriba).
+       Estos selectores de respaldo cubren cualquier resto de HTML viejo
+       en caché del browser que no tenga la clase nueva todavía.        */
+    body.tema-claro .mr-item-nombre,
     body.tema-claro .mr-item-card div[style*="font-weight:700"],
     body.tema-claro .mr-item-card div[style*="font-weight: 700"],
     body.tema-claro #mr-paso2-items div[style*="font-weight:700"],
@@ -1297,7 +1302,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.16.55"; console.log("%c TLC Portal v2026.06.16.55 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.20.56"; console.log("%c TLC Portal v2026.06.20.56 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
 const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -3218,8 +3223,6 @@ function _mrRenderPaso2() {
             : Math.max(0, bruto - dVal);
         const hayDesc = dVal > 0;
         const sinIva  = ivaPct === null;
-        const claro   = document.body.classList.contains('tema-claro');
-        const colorNombre = claro ? '#0f172a' : '#f1f5f9';
 
         return `<div class="mr-item-card" id="mr-item-card-${idx}">
 
@@ -3227,7 +3230,7 @@ function _mrRenderPaso2() {
             <div style="display:flex; align-items:flex-start; gap:10px;">
                 ${item.foto ? `<img src="${item.foto}" style="width:44px;height:44px;border-radius:8px;object-fit:contain;background:#0f1a30;flex-shrink:0;" onerror="this.style.display='none'">` : ''}
                 <div style="flex:1; min-width:0;">
-                    <div style="font-size:13px; font-weight:700; color:${colorNombre}; line-height:1.3;">${item.nombre}</div>
+                    <div class="mr-item-nombre" style="font-size:13px; font-weight:700; line-height:1.3;">${item.nombre}</div>
                     <div style="font-size:11px; color:#64748b; margin-top:2px;">
                         ${fmtUSD(base)} lista
                         ${hayDesc ? `<span style="color:#f8961e;"> · −${dTipo==='%' ? dVal+'%' : fmtUSD(dVal)}</span>` : ''}
