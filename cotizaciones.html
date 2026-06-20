@@ -523,19 +523,16 @@
     <p style="color:#475569;font-size:13px;">Cargando cotizaciones...</p>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.13.34";
+const APP_VERSION = "2026.06.20.36";
 console.log("%c TLC Cotizaciones v2026.06.09.29 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
-const CLIENT_ID   = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
-const TENANT_ID   = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
-const HISTORICO_URL   = 'https://raw.githubusercontent.com/cahirth/Portal-TLC/main/historico.json';
+const HISTORICO_URL   = 'https://api.github.com/repos/cahirth/Portal-TLC/contents/historico.json';
 const PRECIOS_URL     = 'https://cahirth.github.io/Portal-TLC/precios.json';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 
@@ -603,12 +600,10 @@ function _getPermisos(rol) {
 }
 
 // ─── ESTADO GLOBAL ───────────────────────────────────────────────
-const msalConfig = {
-    auth: { clientId:CLIENT_ID, authority:`https://login.microsoftonline.com/${TENANT_ID}`, redirectUri:'https://cahirth.github.io/Portal-TLC/cotizaciones.html' },
-    cache: { cacheLocation:'sessionStorage' }
-};
+// Sesión compartida con selector-dispositivos.html / index.html
+// (login por email + código OTP, ver selector-dispositivos.html)
+const SESSION_KEY = 'tlc_session_v1';
 
-let msal_app          = null;
 let currentUser       = null;
 let currentUserNombre = '';
 let currentUserRol    = 'Vend_Externo';
@@ -624,17 +619,33 @@ let filtroEstado      = 'TODOS';
 let vendedorActivo    = null; // null = el propio usuario; string = nombre elegido por admin
 
 // ─── INIT ────────────────────────────────────────────────────────
+function _leerSesionCompartida() {
+    try {
+        const raw = localStorage.getItem(SESSION_KEY);
+        if (!raw) return null;
+        const payload = JSON.parse(raw);
+        if (!payload.expira || Date.now() > payload.expira) {
+            localStorage.removeItem(SESSION_KEY);
+            return null;
+        }
+        return payload.account;
+    } catch(e) { return null; }
+}
+
 async function init() {
-    msal_app = new msal.PublicClientApplication(msalConfig);
-    await msal_app.initialize();
-    const resp    = await msal_app.handleRedirectPromise();
-    const account = resp?.account || msal_app.getAllAccounts()[0];
-    if (!account) { msal_app.loginRedirect({ scopes:['User.Read'] }); return; }
+    const account = _leerSesionCompartida();
+    if (!account) {
+        // Sin sesión válida — redirigir al login de index.html
+        window.location.href = 'index.html';
+        return;
+    }
     currentUser        = account;
     currentUserNombre  = account.name || account.username || '';
+    currentUserRol      = account.rol || 'Vend_Externo';
+    permisos            = _getPermisos(currentUserRol);
     document.getElementById('user-label').textContent = currentUserNombre.split(' ')[0];
 
-    // Cargar roles y vendedores desde Sheet
+    // Cargar roles y vendedores desde Sheet (por si hay cambios desde el login)
     await _cargarVendedores(account.username?.toLowerCase() || '');
 
     // Configurar dropdown según permisos
@@ -682,9 +693,11 @@ async function _cargarVendedores(emailLogueado) {
         });
     }
 
-    // Determinar rol del usuario logueado
+    // Re-confirmar rol del usuario logueado (por si cambió en el Sheet
+    // desde que se generó la sesión). Si no se encuentra, se mantiene
+    // el rol que ya vino validado desde el login OTP.
     const match = listaVendedores.find(v => v.email === emailLogueado);
-    if (match) currentUserRol = match.rol || 'Vend_Externo';
+    if (match) currentUserRol = match.rol || currentUserRol;
     permisos = _getPermisos(currentUserRol);
 }
 
@@ -740,10 +753,14 @@ async function cargar(forzar = false) {
     document.getElementById('kanban-outer').classList.remove('visible');
 
     try {
-        // raw.githubusercontent devuelve el JSON directo, sin base64 ni headers especiales
-        const res  = await fetch(HISTORICO_URL + '?_c=' + Date.now(), { cache: 'no-store' });
+        // API GitHub devuelve el contenido en base64 — siempre fresco, sin caché CDN
+        const res  = await fetch(HISTORICO_URL, {
+            headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+        });
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        let data = await res.json();
+        const apiResp = await res.json();
+        const decoded = atob(apiResp.content.replace(/\n/g, ''));
+        let data = JSON.parse(decoded);
         if (!Array.isArray(data)) data = [];
 
         // Normalizar estados
@@ -851,7 +868,7 @@ function renderLista() {
         const id       = c.idCot || c.id_cotizacion || String(c.id || '') || '—';
         const cliente  = c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
         const equipos  = (c.carrito||[]).map(i => i.nombre).join(' · ') || '—';
-        const fecha    = _fmtFecha(c.fecha);
+        const fecha    = _fmtFechaHora(c.fecha);
         const monto    = _monto(c);
         const estadoCss = ESTADO_CSS[c.estado] || 'e-cotizacion';
         const estadoLabel = _estadoLabel(c.estado);
@@ -887,7 +904,7 @@ function renderKanban() {
             const id        = c.idCot || c.id_cotizacion || c.id || '—';
             const titulo    = _fixEncoding(c.nombreNegocio || c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—');
             const monto     = _monto(c);
-            const fecha     = _fmtFecha(c.fechaCreacion || c.fecha);
+            const fecha     = _fmtFechaHora(c.fechaCreacion || c.fecha);
             const linkPdf   = c.link && !c.link.startsWith('blob:') ? c.link : null;
 
             // Productos como badges con fix encoding
@@ -1374,9 +1391,13 @@ function _onDrop(e, nuevoEstado) {
 // Se dispara después de confirmar ok:true del GS — sin spinner, sin reset de UI
 async function _recargarHistoricoSilencioso() {
     try {
-        const res = await fetch(HISTORICO_URL + '?_c=' + Date.now(), { cache: 'no-store' });
+        const res = await fetch(HISTORICO_URL, {
+            headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+        });
         if (!res.ok) return;
-        let data = await res.json();
+        const apiResp = await res.json();
+        const decoded = atob(apiResp.content.replace(/\n/g, ''));
+        let data = JSON.parse(decoded);
         if (!Array.isArray(data)) return;
 
         // Normalizar estados igual que en cargar()
@@ -2220,7 +2241,8 @@ function _initSaludoWspCot() {
 
 // ── Cerrar sesión ─────────────────────────────────────────────────
 function _cerrarSesionCot() {
-    msal_app.logoutRedirect({ postLogoutRedirectUri: 'https://cahirth.github.io/Portal-TLC/cotizaciones.html' });
+    try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
+    window.location.href = 'index.html';
 }
 
 // ── Cerrar dropdown al click afuera ──────────────────────────────

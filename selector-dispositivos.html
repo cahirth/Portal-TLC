@@ -178,6 +178,8 @@
         .loading p { color: #94a3b8; font-size: 14px; }
         .empty { text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 14px; }
         .btn-primary { background: #3a86ff; color: white; width: 100%; max-width: 300px; padding: 14px 28px; border-radius: 12px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-secondary { width: 100%; padding: 12px 28px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
         #app-section { display: none; }
         .divider { border: none; border-top: 1px solid #222e50; margin: 20px 0; }
 
@@ -976,8 +978,35 @@
 <!-- LOGIN -->
 <div id="login-section">
     <h2>Portal TLC</h2>
-    <p>Iniciá sesión con tu cuenta de TLC para continuar</p>
-    <button class="btn-primary" id="btn-login">Iniciar sesión con Microsoft</button>
+    <p id="login-subtitle">Ingresá tu email de TLC para continuar</p>
+
+    <!-- PASO 1: Email -->
+    <div id="login-step-email" style="width:100%; max-width:320px; display:flex; flex-direction:column; gap:12px;">
+        <input type="email" id="login-email" class="form-input" placeholder="tu.nombre@tlcsrl.com.ar"
+               style="text-align:center;" autocomplete="email"
+               onkeydown="if(event.key==='Enter') solicitarCodigoLogin();">
+        <button class="btn-primary" id="btn-login" onclick="solicitarCodigoLogin()">Enviar código</button>
+        <div id="login-email-status" style="font-size:13px; color:#f87171; min-height:18px;"></div>
+    </div>
+
+    <!-- PASO 2: Código OTP -->
+    <div id="login-step-code" style="display:none; width:100%; max-width:320px; flex-direction:column; gap:12px;">
+        <p style="font-size:13px; color:#94a3b8; margin:-8px 0 4px;">
+            Te enviamos un código a <strong id="login-email-display" style="color:#f1f5f9;"></strong>
+        </p>
+        <input type="text" id="login-code" class="form-input" placeholder="Código de 6 dígitos"
+               maxlength="6" inputmode="numeric" style="text-align:center; font-size:22px; letter-spacing:6px;"
+               onkeydown="if(event.key==='Enter') verificarCodigoLogin();">
+        <button class="btn-primary" id="btn-verificar-codigo" onclick="verificarCodigoLogin()">Ingresar</button>
+        <button class="btn-secondary" onclick="volverPasoEmail()"
+                style="background:transparent; border:1px solid #222e50; color:#94a3b8;">
+            ← Cambiar email
+        </button>
+        <div id="login-code-status" style="font-size:13px; color:#f87171; min-height:18px;"></div>
+        <div id="login-reenviar" style="font-size:12px; color:#64748b;">
+            ¿No te llegó? <span onclick="solicitarCodigoLogin(true)" style="color:#3a86ff; cursor:pointer; text-decoration:underline;">Reenviar código</span>
+        </div>
+    </div>
 </div>
 
 <!-- APP -->
@@ -1340,27 +1369,14 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.20.60"; console.log("%c TLC Portal v2026.06.20.60 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
-const CLIENT_ID    = '59d36de7-90e9-41ce-9566-27bcb563b5ab';
-const TENANT_ID    = 'bbd111b8-0522-4e3d-9f43-78d1ca0e71cf';
+const APP_VERSION = "2026.06.20.61"; console.log("%c TLC Portal v2026.06.20.61 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
-const SCOPES       = ['User.Read'];
 
 // Mapa nombre_archivo → URL lh3 (cargado desde Apps Script)
 const FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 let fotoMap = {};
-
-const msalConfig = {
-    auth: {
-        clientId: CLIENT_ID,
-        authority: `https://login.microsoftonline.com/${TENANT_ID}`,
-        redirectUri: 'https://cahirth.github.io/Portal-TLC/selector-dispositivos.html'
-    },
-    cache: { cacheLocation: 'sessionStorage' }
-};
 
 // Modalidades — el descKey es el GATILLO: si está vacío, no se muestra el botón
 // Orden visual: Contado | Crédito / Dir 6AR | Dir 12AR / Dir 6USD | Dir 12USD / Lea$ | LeaUSD
@@ -1388,7 +1404,6 @@ const MODALIDADES = [
     { key: 'LEASINGUSD',label: 'Leasing 36c USD', triggerKey: 'Descripcion_L_USD_36',       precioKey: 'Adelanto_L_USD_36',     cuotaKey: 'Cuota_L_USD_36',        descKey: 'Descripcion_L_USD_36',       moneda: 'USD' },
 ];
 
-let msal_app = null;
 let currentUser = null;
 let currentUserRol = 'Vend_Externo';
 let dispositivos = [];
@@ -1406,22 +1421,155 @@ async function _fetchTcBNA() {
 _fetchTcBNA();
 setInterval(_fetchTcBNA, 15 * 60 * 1000); // actualizar cada 15 min
 
-// ─── MSAL ─────────────────────────────────────────────────────────────────────
-async function initMsal() {
-    msal_app = new msal.PublicClientApplication(msalConfig);
-    await msal_app.initialize();
-    const resp = await msal_app.handleRedirectPromise();
-    if (resp?.account) { await mostrarApp(resp.account); return; }
-    const accounts = msal_app.getAllAccounts();
-    if (accounts.length > 0) { await mostrarApp(accounts[0]); }
+// ─── LOGIN POR EMAIL + CÓDIGO OTP ──────────────────────────────────────────────
+// Reemplaza MSAL. Flujo: el usuario escribe su email → se valida que exista
+// en la hoja "Vendedores" del Sheet → el GAS genera un código de 6 dígitos,
+// lo guarda con expiración y lo envía por mail → el usuario lo ingresa →
+// el GAS lo valida → se guarda la sesión en localStorage (30 días).
+const SESSION_KEY = 'tlc_session_v1';
+const SESSION_DIAS = 30;
+
+function _emailValido(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+async function solicitarCodigoLogin(reenvio = false) {
+    const emailInput = document.getElementById('login-email');
+    const email = (reenvio ? document.getElementById('login-email-display').textContent : emailInput.value).trim().toLowerCase();
+    const statusEl = document.getElementById('login-email-status');
+    const codeStatusEl = document.getElementById('login-code-status');
+
+    if (!_emailValido(email)) {
+        statusEl.textContent = 'Ingresá un email válido';
+        return;
+    }
+
+    const btn = document.getElementById('btn-login');
+    const btnOriginal = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Enviando...';
+    statusEl.textContent = ''; if (codeStatusEl) codeStatusEl.textContent = '';
+
+    try {
+        const resp = await fetch(FOTO_MAP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ accion: 'solicitarCodigoLogin', email }),
+        });
+        const data = await resp.json();
+
+        if (!data.ok) {
+            statusEl.textContent = data.error === 'no_existe'
+                ? 'Ese email no está registrado. Contactá a un administrador.'
+                : (data.mensaje || 'No pudimos enviar el código. Probá de nuevo.');
+            btn.disabled = false; btn.textContent = btnOriginal;
+            return;
+        }
+
+        // Pasar al paso 2
+        document.getElementById('login-email-display').textContent = email;
+        document.getElementById('login-step-email').style.display = 'none';
+        document.getElementById('login-step-code').style.display = 'flex';
+        document.getElementById('login-subtitle').textContent = 'Revisá tu correo';
+        if (codeStatusEl) codeStatusEl.textContent = reenvio ? '✅ Código reenviado' : '';
+        const codeInput = document.getElementById('login-code');
+        codeInput.value = '';
+        codeInput.focus();
+    } catch (e) {
+        statusEl.textContent = 'Error de conexión. Probá de nuevo.';
+    }
+    btn.disabled = false; btn.textContent = btnOriginal;
+}
+
+async function verificarCodigoLogin() {
+    const email = document.getElementById('login-email-display').textContent.trim().toLowerCase();
+    const codigo = document.getElementById('login-code').value.trim();
+    const statusEl = document.getElementById('login-code-status');
+    const btn = document.getElementById('btn-verificar-codigo');
+
+    if (codigo.length !== 6) {
+        statusEl.textContent = 'El código tiene 6 dígitos';
+        return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Verificando...';
+    statusEl.textContent = '';
+
+    try {
+        const resp = await fetch(FOTO_MAP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ accion: 'verificarCodigoLogin', email, codigo }),
+        });
+        const data = await resp.json();
+
+        if (!data.ok) {
+            statusEl.textContent = data.error === 'codigo_incorrecto' ? 'Código incorrecto'
+                : data.error === 'codigo_expirado' ? 'El código expiró. Pedí uno nuevo.'
+                : 'No pudimos verificar el código.';
+            btn.disabled = false; btn.textContent = 'Ingresar';
+            return;
+        }
+
+        // Login OK — guardar sesión y entrar
+        const account = {
+            name: data.nombre || email,
+            username: email,
+            rol: data.rol || 'Vend_Externo',
+        };
+        _guardarSesion(account);
+        await mostrarApp(account);
+    } catch (e) {
+        statusEl.textContent = 'Error de conexión. Probá de nuevo.';
+        btn.disabled = false; btn.textContent = 'Ingresar';
+    }
+}
+
+function volverPasoEmail() {
+    document.getElementById('login-step-code').style.display = 'none';
+    document.getElementById('login-step-email').style.display = 'flex';
+    document.getElementById('login-subtitle').textContent = 'Ingresá tu email de TLC para continuar';
+    document.getElementById('login-email-status').textContent = '';
+}
+
+function _guardarSesion(account) {
+    try {
+        const payload = { account, expira: Date.now() + SESSION_DIAS * 24 * 60 * 60 * 1000 };
+        localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+    } catch(e) {}
+}
+
+function _leerSesion() {
+    try {
+        const raw = localStorage.getItem(SESSION_KEY);
+        if (!raw) return null;
+        const payload = JSON.parse(raw);
+        if (!payload.expira || Date.now() > payload.expira) {
+            localStorage.removeItem(SESSION_KEY);
+            return null;
+        }
+        return payload.account;
+    } catch(e) { return null; }
+}
+
+function cerrarSesion() {
+    try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
+    location.reload();
+}
+
+// ─── INIT ───────────────────────────────────────────────────────────────────
+async function initLogin() {
+    const account = _leerSesion();
+    if (account) { await mostrarApp(account); return; }
+    document.getElementById('login-section').style.display = 'flex';
 }
 
 async function mostrarApp(account) {
     currentUser = account;
+    currentUserRol = account.rol || 'Vend_Externo';
     document.getElementById('login-section').style.display = 'none';
     document.getElementById('app-section').style.display = 'block';
-    const nombre = account.name || account.idTokenClaims?.name || account.username;
-    console.log('Account info:', JSON.stringify({name: account.name, user: account.username, claims: account.idTokenClaims}));
+    const nombre = account.name || account.username;
+    console.log('Account info:', JSON.stringify({name: account.name, user: account.username, rol: account.rol}));
     document.getElementById('user-greeting').textContent = `Hola, ${nombre}`;
     document.getElementById('btn-carrito').style.display = 'flex';
 
@@ -1769,9 +1917,8 @@ async function cargarTodo() {
 
         dispositivos = dispRows.filter(d => d['Nombre de Dispositivo']?.toString().trim());
 
-        const email    = currentUser?.username?.toLowerCase() || '';
-        const vendedor = vendRows.find(v => v['Email']?.toLowerCase() === email);
-        currentUserRol = vendedor?.['Rol'] || 'Vend_Externo';
+        // currentUserRol ya viene seteado desde mostrarApp() — validado por el
+        // GAS en el login OTP contra la hoja Vendedores. No se recalcula acá.
 
         // Renderizar categorías
         renderCategorias();
@@ -4562,8 +4709,7 @@ setInterval(() => {
 }, 10 * 60 * 1000); // cada 10 minutos
 
 // ─── ARRANCAR ─────────────────────────────────────────────────────────────────
-document.getElementById('btn-login').addEventListener('click', () => msal_app.loginRedirect({ scopes: SCOPES }));
-initMsal().catch(console.error);
+initLogin().catch(console.error);
     function abrirLightbox(src) {
         const lb = document.getElementById('lightbox');
         document.getElementById('lightbox-img').src = src;
