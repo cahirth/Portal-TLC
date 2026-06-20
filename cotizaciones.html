@@ -528,7 +528,7 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.20.36";
+const APP_VERSION = "2026.06.20.37";
 console.log("%c TLC Cotizaciones v2026.06.09.29 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -578,20 +578,23 @@ const ROLES = {
         verTodo:          true,   // ve cotizaciones de todos
         dropdownVendedor: true,   // puede cambiar vendedor activo
         verVendedorEnCard:true,   // muestra "👤 Vendedor" en tarjetas
+        verComisiones:    true,   // default — se sobreescribe por vendedor individual (columna "Ver Comisiones")
     },
     Vendedor: {
         verTodo:          false,
         dropdownVendedor: false,
         verVendedorEnCard:false,
+        verComisiones:    false,
     },
     // Futuros roles — descomentar y configurar cuando aplique:
-    // Servicio:     { verTodo:false, dropdownVendedor:false, verVendedorEnCard:false },
-    // Facturacion:  { verTodo:false, dropdownVendedor:false, verVendedorEnCard:false },
-    // Expedicion:   { verTodo:false, dropdownVendedor:false, verVendedorEnCard:false },
+    // Servicio:     { verTodo:false, dropdownVendedor:false, verVendedorEnCard:false, verComisiones:false },
+    // Facturacion:  { verTodo:false, dropdownVendedor:false, verVendedorEnCard:false, verComisiones:false },
+    // Expedicion:   { verTodo:false, dropdownVendedor:false, verVendedorEnCard:false, verComisiones:false },
     Vend_Externo: {
         verTodo:          false,
         dropdownVendedor: false,
         verVendedorEnCard:false,
+        verComisiones:    false,
     },
 };
 
@@ -671,12 +674,16 @@ async function _cargarVendedores(emailLogueado) {
         const text = await res.text();
         const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
         const cols = json.table.cols.map(c => c.label);
+        const bool = v => v === true || v === 'TRUE' || v === 'true' || v === 1;
         listaVendedores = (json.table.rows || []).map(row => {
             const obj = {}; cols.forEach((col, i) => { obj[col] = row.c?.[i]?.v ?? ''; }); return obj;
         }).map(v => ({
             email:  String(v['Email'] || '').toLowerCase().trim(),
-            nombre: String(v['Nombre'] || v['nombre'] || '').trim(),
+            nombre: String(v['Nombre Vendedor'] || v['Nombre'] || v['nombre'] || '').trim(),
             rol:    String(v['Rol']    || '').trim(),
+            // Permiso individual por vendedor — columna "Ver Comisiones" del Sheet.
+            // undefined si la columna no existe todavía → usamos el default del ROL.
+            verComisiones: cols.includes('Ver Comisiones') ? bool(v['Ver Comisiones']) : undefined,
         })).filter(v => v.email || v.nombre);
     } catch(e) {
         console.warn('Vendedores Sheet falló, usando fallback:', e);
@@ -699,6 +706,12 @@ async function _cargarVendedores(emailLogueado) {
     const match = listaVendedores.find(v => v.email === emailLogueado);
     if (match) currentUserRol = match.rol || currentUserRol;
     permisos = _getPermisos(currentUserRol);
+
+    // El permiso de comisiones es individual por vendedor — si la columna
+    // existe en el Sheet, pisa el default del rol. Si no, queda el default.
+    if (match && match.verComisiones !== undefined) {
+        permisos = { ...permisos, verComisiones: match.verComisiones };
+    }
 }
 
 // ─── DROPDOWN VENDEDOR ───────────────────────────────────────────
