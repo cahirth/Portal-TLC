@@ -379,6 +379,8 @@
         border-top-color: #e2e8f0 !important; background: #f8fafc !important;
     }
     body.tema-claro .precio-desc { color: #475569 !important; }
+    body.tema-claro #preview-comision-pct,
+    body.tema-claro #preview-subtotal span[style*="color:#94a3b8"] { color: #64748b !important; }
 
     /* ── Carrito overlay ─────────────────────────────────────────── */
     body.tema-claro .carrito-item {
@@ -1058,6 +1060,16 @@
         <div class="detalle-titulo" id="detalle-titulo"></div>
     </div>
     <div class="detalle-foto-wrap" id="detalle-foto-wrap"></div>
+
+    <!-- BOTONES DE ACCIÓN — arriba, junto a la foto, visibles sin scroll -->
+    <div style="padding:0 20px; margin-top:14px;">
+        <button class="btn-cotizar" id="btn-cotizar" style="background:linear-gradient(135deg,#ff007f,#c0006b); margin-bottom:10px;">🛒 Agregar al Carrito</button>
+        <div style="display:flex; gap:8px;">
+            <a class="btn-folleto" id="btn-folleto" target="_blank" style="display:none; flex:1; margin-bottom:0;">📄 Folleto</a>
+            <a class="btn-folleto" id="btn-video" target="_blank" style="display:none; flex:1; margin-bottom:0; border-color:#f87171; color:#f87171;">▶️ Video</a>
+        </div>
+    </div>
+
     <div class="detalle-body">
         <div class="detalle-nombre" id="detalle-nombre"></div>
         <div class="detalle-desc" id="detalle-desc"></div>
@@ -1099,6 +1111,10 @@
                     <span style="font-size:12px; color:#94a3b8;">Subtotal</span>
                     <span style="font-size:13px; font-weight:600; color:#f1f5f9;" id="preview-neto">—</span>
                 </div>
+                <div id="preview-comision-row" style="display:none; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-size:12px; color:#94a3b8;">Comisión <span id="preview-comision-pct"></span></span>
+                    <span style="font-size:13px; color:#06d6a0;" id="preview-comision">—</span>
+                </div>
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                     <span style="font-size:12px; color:#94a3b8;">IVA 10,5%</span>
                     <span style="font-size:13px; color:#f8961e;" id="preview-iva">—</span>
@@ -1108,11 +1124,6 @@
                     <span style="font-size:15px; font-weight:800; color:#3a86ff;" id="preview-total">—</span>
                 </div>
             </div>
-        </div>
-        <button class="btn-cotizar" id="btn-cotizar" style="background:linear-gradient(135deg,#ff007f,#c0006b); margin-bottom:10px;">🛒 Agregar al Carrito</button>
-        <div style="display:flex; gap:8px; margin-bottom:10px;">
-            <a class="btn-folleto" id="btn-folleto" target="_blank" style="display:none; flex:1; margin-bottom:0;">📄 Folleto</a>
-            <a class="btn-folleto" id="btn-video" target="_blank" style="display:none; flex:1; margin-bottom:0; border-color:#f87171; color:#f87171;">▶️ Video</a>
         </div>
     </div>
 </div>
@@ -1371,7 +1382,7 @@
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.20.61"; console.log("%c TLC Portal v2026.06.20.61 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.20.62"; console.log("%c TLC Portal v2026.06.20.62 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 
 // Mapa nombre_archivo → URL lh3 (cargado desde Apps Script)
@@ -3350,6 +3361,22 @@ function actualizarPreviewSubtotal() {
     document.getElementById('preview-neto').textContent  = fmtUSD(neto);
     document.getElementById('preview-iva').textContent   = fmtUSD(iva);
     document.getElementById('preview-total').textContent = fmtUSD(total);
+
+    // Comisión — solo visible para Administrador y Vend_Externo
+    const comRow = document.getElementById('preview-comision-row');
+    if (verComision()) {
+        const comData = fmtComision(d['COMISIONES'], neto);
+        if (comData) {
+            document.getElementById('preview-comision-pct').textContent = '(' + comData.pct + ')';
+            document.getElementById('preview-comision').textContent = comData.monto || '—';
+            comRow.style.display = 'flex';
+        } else {
+            comRow.style.display = 'none';
+        }
+    } else {
+        comRow.style.display = 'none';
+    }
+
     if (prevEl) prevEl.style.display = 'block';
 }
 
