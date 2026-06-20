@@ -892,7 +892,7 @@
 </div>
 
 <script>
-    const APP_VERSION_IDX = "2026.06.20.03"; console.log("%c Portal TLC index v2026.06.20.03 ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+    const APP_VERSION_IDX = "2026.06.20.04"; console.log("%c Portal TLC index v2026.06.20.04 ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
     // ─── LOGIN POR EMAIL + CÓDIGO OTP ───────────────────────────────────────────
     // Sesión compartida con selector-dispositivos.html y cotizaciones.html.
@@ -1033,7 +1033,10 @@
 
     // ─── PERMISOS ─────────────────────────────────────────────────────────────
     const SHEET_ID_PERMISOS = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
-    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, verComisiones: true, rol: 'Administrador' };
+    // Placeholder de arranque (mientras carga el Sheet) — el valor real y
+    // definitivo de verComisiones viene SIEMPRE de la columna "Ver Comisiones"
+    // en cargarPermisosUsuario(), independiente del rol.
+    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, verComisiones: false, rol: 'Administrador' };
 
     async function cargarPermisosUsuario(email) {
         try {

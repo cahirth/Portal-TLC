@@ -235,6 +235,18 @@
         .mr-item-card .item-descuento-row { margin-top:0; }
     }
 
+    /* ── Fila superior del ítem (foto + nombre + precio) — responsiva ──
+       Por defecto (mobile/tablet angosto): precio se apila debajo del
+       nombre si no entra en la misma línea, nunca se superpone.
+       Desde ~480px: vuelve al layout horizontal nombre/precio lado a lado. */
+    .mr-item-top { display:flex; flex-wrap:wrap; align-items:flex-start; gap:10px; }
+    .mr-item-info { flex:1 1 160px; min-width:0; }
+    .mr-item-nombre { overflow-wrap:break-word; word-break:break-word; }
+    .mr-item-precio-box { text-align:right; flex:0 0 auto; margin-left:auto; }
+    @media (max-width: 360px) {
+        .mr-item-precio-box { flex-basis:100%; margin-left:0; text-align:left; margin-top:4px; }
+    }
+
     /* ── Descuento por ítem (Pantalla Comercial) ── */
     .item-descuento-row { display:flex; align-items:center; gap:8px; margin-top:10px; }
     .item-descuento-input {
@@ -1382,7 +1394,7 @@
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.20.63"; console.log("%c TLC Portal v2026.06.20.63 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.20.64"; console.log("%c TLC Portal v2026.06.20.64 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 
 // Mapa nombre_archivo → URL lh3 (cargado desde Apps Script)
@@ -1417,6 +1429,12 @@ const MODALIDADES = [
 
 let currentUser = null;
 let currentUserRol = 'Vend_Externo';
+// Permiso individual de comisiones — viene SOLO de la columna "Ver Comisiones"
+// del Sheet (hoja Vendedores), independiente del rol. Se setea en cargarTodo().
+let currentUserVerComisiones = false;
+function _boolSheet(v) {
+    return v === true || v === 'TRUE' || v === 'true' || v === 1;
+}
 let dispositivos = [];
 let dispositivoActual = null;
 let modalidadActual = null;
@@ -1930,6 +1948,13 @@ async function cargarTodo() {
 
         // currentUserRol ya viene seteado desde mostrarApp() — validado por el
         // GAS en el login OTP contra la hoja Vendedores. No se recalcula acá.
+
+        // Ver Comisiones — permiso individual por vendedor, columna "Ver Comisiones"
+        // del Sheet. NO depende del rol. Si la columna no existe o está vacía,
+        // se considera false (no ve comisiones).
+        const emailLogueado = (currentUser?.username || '').toLowerCase().trim();
+        const filaVendedor  = vendRows.find(v => String(v['Email'] || '').toLowerCase().trim() === emailLogueado);
+        currentUserVerComisiones = filaVendedor ? _boolSheet(filaVendedor['Ver Comisiones']) : false;
 
         // Renderizar categorías
         renderCategorias();
@@ -2938,9 +2963,10 @@ function getFinOpt(key) {
     return MODAL_CARRITO.find(m => m.key === key) || MODAL_CARRITO.find(m => m.key === 'LEASING');
 }
 
-// ─── Comisiones: visible para Administrador y Vend_Externo ────────
+// ─── Comisiones: visible SOLO si "Ver Comisiones" = true en el Sheet ──
+// (permiso individual por vendedor, independiente del rol)
 function verComision() {
-    return currentUserRol === 'Administrador' || currentUserRol === 'Vend_Externo';
+    return currentUserVerComisiones === true;
 }
 
 // Devuelve el % de adelanto del plan activo del carrito extrayéndolo del campo Descripcion del ítem
@@ -3298,7 +3324,7 @@ function renderCarrito() {
         totalesHtml += `<div style="font-size:11px; color:#f8961e; margin-top:8px; text-align:center;">⚠️ Algunos ítems no tienen valores para esta modalidad</div>`;
     }
 
-    // Comisiones — solo para Administrador y Vend_Externo
+    // Comisiones — visible solo si "Ver Comisiones" = true para este vendedor
     if (verComision()) {
         let comisionTotal = 0;
         let hayComision = false;
@@ -3319,7 +3345,7 @@ function renderCarrito() {
             <div style="margin-top:10px; background:#0a1628; border:1px solid #f8961e44; border-radius:10px; padding:10px 12px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                     <span style="font-size:10px; color:#f8961e; text-transform:uppercase; letter-spacing:1px; font-weight:700;">🔥 Comisión estimada</span>
-                    <span style="font-size:9px; color:#64748b; font-style:italic;">Solo administradores y vend. externos</span>
+                    <span style="font-size:9px; color:#64748b; font-style:italic;">Visible solo para vos</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
                     <span style="color:#94a3b8;">Sobre Neto Lista Base</span>
@@ -3468,16 +3494,16 @@ function _mrRenderPaso2() {
         return `<div class="mr-item-card" id="mr-item-card-${idx}">
 
             <!-- Fila superior: foto + nombre + precio neto -->
-            <div style="display:flex; align-items:flex-start; gap:10px;">
+            <div class="mr-item-top">
                 ${item.foto ? `<img src="${item.foto}" style="width:44px;height:44px;border-radius:8px;object-fit:contain;background:#0f1a30;flex-shrink:0;" onerror="this.style.display='none'">` : ''}
-                <div style="flex:1; min-width:0;">
+                <div class="mr-item-info">
                     <div class="mr-item-nombre" style="font-size:13px; font-weight:700; line-height:1.3;">${item.nombre}</div>
                     <div style="font-size:11px; color:#64748b; margin-top:2px;">
                         ${fmtUSD(base)} lista
                         ${hayDesc ? `<span style="color:#f8961e;"> · −${dTipo==='%' ? dVal+'%' : fmtUSD(dVal)}</span>` : ''}
                     </div>
                 </div>
-                <div style="text-align:right; flex-shrink:0;">
+                <div class="mr-item-precio-box">
                     ${hayDesc ? `<div style="font-size:11px; color:#64748b; text-decoration:line-through;">${fmtUSD(bruto)}</div>` : ''}
                     <div style="font-size:15px; font-weight:800; color:#06d6a0;">${fmtUSD(neto)}</div>
                 </div>
@@ -4634,7 +4660,7 @@ function abrirFormulario() {
     // Vendedor = nombre completo del usuario logueado
     document.getElementById('f-vendedor').value = currentUser?.name || currentUser?.username || '';
 
-    // Comisión para externos y administrador (internos no la ven)
+    // Comisión — visible solo si "Ver Comisiones" = true para este vendedor
     const comGrp = document.getElementById('f-comision-group');
     const comVal = document.getElementById('f-comision-valor');
     if (verComision() && tieneValor(d['COMISIONES'])) {

@@ -528,8 +528,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.20.37";
-console.log("%c TLC Cotizaciones v2026.06.09.29 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.20.38";
+console.log("%c TLC Cotizaciones v2026.06.20.38 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 const HISTORICO_URL   = 'https://api.github.com/repos/cahirth/Portal-TLC/contents/historico.json';
@@ -573,18 +573,21 @@ const ESTADO_CSS = {
 
 // ─── DEFINICIÓN DE ROLES ─────────────────────────────────────────
 // Escalable: agregar nuevos roles aquí sin tocar la lógica de filtrado
+// NOTA: verComisiones definido acá es solo un valor de arranque (placeholder).
+// El valor real y definitivo viene SIEMPRE de la columna "Ver Comisiones"
+// del Sheet (hoja Vendedores), seteado en _cargarVendedores(). No depende del rol.
 const ROLES = {
     Administrador: {
         verTodo:          true,   // ve cotizaciones de todos
         dropdownVendedor: true,   // puede cambiar vendedor activo
         verVendedorEnCard:true,   // muestra "👤 Vendedor" en tarjetas
-        verComisiones:    true,   // default — se sobreescribe por vendedor individual (columna "Ver Comisiones")
+        verComisiones:    false,  // placeholder — pisado por columna individual del Sheet
     },
     Vendedor: {
         verTodo:          false,
         dropdownVendedor: false,
         verVendedorEnCard:false,
-        verComisiones:    false,
+        verComisiones:    false,  // placeholder — pisado por columna individual del Sheet
     },
     // Futuros roles — descomentar y configurar cuando aplique:
     // Servicio:     { verTodo:false, dropdownVendedor:false, verVendedorEnCard:false, verComisiones:false },
@@ -594,7 +597,7 @@ const ROLES = {
         verTodo:          false,
         dropdownVendedor: false,
         verVendedorEnCard:false,
-        verComisiones:    false,
+        verComisiones:    false,  // placeholder — pisado por columna individual del Sheet
     },
 };
 
@@ -707,11 +710,10 @@ async function _cargarVendedores(emailLogueado) {
     if (match) currentUserRol = match.rol || currentUserRol;
     permisos = _getPermisos(currentUserRol);
 
-    // El permiso de comisiones es individual por vendedor — si la columna
-    // existe en el Sheet, pisa el default del rol. Si no, queda el default.
-    if (match && match.verComisiones !== undefined) {
-        permisos = { ...permisos, verComisiones: match.verComisiones };
-    }
+    // Ver Comisiones — permiso individual por vendedor, SOLO la columna
+    // "Ver Comisiones" del Sheet. NO depende del rol ni tiene fallback:
+    // si la columna no existe o está vacía para este vendedor, es false.
+    permisos = { ...permisos, verComisiones: match ? match.verComisiones === true : false };
 }
 
 // ─── DROPDOWN VENDEDOR ───────────────────────────────────────────
