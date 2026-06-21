@@ -537,7 +537,7 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.21.41";
+const APP_VERSION = "2026.06.21.43";
 console.log("%c TLC Cotizaciones v2026.06.20.38 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1030,6 +1030,26 @@ function abrirDetalle(idx) {
     });
 }
 
+// Fotos de equipos en el header del detalle. _buscarPrecio() es síncrona y
+// depende de _preciosCache, que carga en background (fire-and-forget) desde
+// el arranque de la app — si el detalle se abre ANTES de que termine esa
+// carga, _buscarPrecio devuelve null sin avisar y no hay foto que mostrar
+// todavía. Por eso esta función se llama dos veces: una al renderizar (con
+// lo que haya en caché en ese momento) y otra cuando _getPrecios() resuelve,
+// re-pintando solo el contenedor de fotos sin tocar el resto del detalle.
+function _renderFotosEquipos(carrito) {
+    if (!carrito.length) return '';
+    const fotos = carrito.slice(0, 6).map(i => {
+        const fotoSrc = i.foto || _buscarPrecio(i.nombre)?.['Foto'] || _buscarPrecio(i.nombre)?.['foto'] || '';
+        return fotoSrc
+            ? `<img src="${fotoSrc}" title="${_fixEncoding(i.nombre)}"
+                 style="width:56px;height:56px;object-fit:contain;border-radius:8px;background:#f8fafc;
+                        border:1px solid #e2e8f0;" onerror="this.style.display='none'">`
+            : '';
+    }).join('');
+    return fotos ? `<div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">${fotos}</div>` : '';
+}
+
 function _renderDetalle(c) {
     const id      = c.idCot || c.id_cotizacion || String(c.id || '') || '—';
     const cliente = c.razonSocial || c.empresa?.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
@@ -1063,16 +1083,7 @@ function _renderDetalle(c) {
         `<option value="${k.key}" ${k.key === c.estado ? 'selected' : ''}>${k.label} (${k.prob})</option>`
     ).join('');
     html += `<div class="det-hero" style="padding:20px 16px 12px;">
-        ${carrito.length ? `<div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
-            ${carrito.slice(0, 6).map(i => {
-                const fotoSrc = i.foto || _buscarPrecio(i.nombre)?.['Foto'] || _buscarPrecio(i.nombre)?.['foto'] || '';
-                return fotoSrc
-                    ? `<img src="${fotoSrc}" title="${_fixEncoding(i.nombre)}"
-                         style="width:56px;height:56px;object-fit:contain;border-radius:8px;background:#f8fafc;
-                                border:1px solid #e2e8f0;" onerror="this.style.display='none'">`
-                    : '';
-            }).join('')}
-        </div>` : ''}
+        <div id="det-fotos-equipos">${_renderFotosEquipos(carrito)}</div>
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;">
             <div>
                 <div style="font-size:11px;color:#475569;margin-bottom:4px;">MONTO TOTAL c/IVA</div>
@@ -1081,7 +1092,7 @@ function _renderDetalle(c) {
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
                 <select class="det-hero-badge-select" style="${badgeStyle}"
-                    onchange="_mutarEstadoCotizacion('${id}', this.value); _renderDetalle((typeof historicoCompleto!=='undefined'?historicoCompleto:todasLasCot).find(x=>String(x.idCot||x.id_cotizacion||x.id||'')==='${id}')||cotActual);">
+                    onchange="_cambiarEstadoDesdeDetalle('${id}', this.value)">
                     ${etapasOptsHero}
                 </select>
                 ${puedeGestionar ? `<button id="btn-borrar-deal" onclick="_confirmarBorrarDeal('${id}')"
@@ -1371,6 +1382,16 @@ function _renderDetalle(c) {
     html += `</div>`;
 
     document.getElementById('det-body').innerHTML = html;
+
+    // Si _preciosCache todavía no estaba listo al pintar arriba, esperamos
+    // a que termine de cargar y re-pintamos SOLO el contenedor de fotos
+    // (sin tocar el resto del detalle ya renderizado).
+    if (!_preciosCache && carrito.length) {
+        _getPrecios().then(() => {
+            const cont = document.getElementById('det-fotos-equipos');
+            if (cont) cont.innerHTML = _renderFotosEquipos(carrito);
+        });
+    }
 }
 
 // ─── BORRAR NEGOCIO — confirmación + persistencia ──────────────────
@@ -1454,6 +1475,23 @@ function _mutarEstadoCotizacion(id, nuevoEstado) {
         })
         .catch(e => console.warn('Persistencia estado:', e))
     );
+}
+
+// Wrapper para el <select> de estado DENTRO del overlay de detalle.
+// _renderDetalle reemplaza el HTML completo de #det-body — incluyendo el
+// propio <select> que disparó el onchange. Hacer eso de forma SÍNCRONA
+// dentro del mismo evento corta el procesamiento del onchange en el medio
+// (el navegador termina de aplicar el evento sobre un nodo que ya no existe
+// en el DOM), y el cambio de etapa queda sin efecto visible. Se difiere el
+// re-render con setTimeout(0) para que el onchange termine de procesarse
+// normalmente antes de reconstruir el DOM.
+function _cambiarEstadoDesdeDetalle(id, nuevoEstado) {
+    _mutarEstadoCotizacion(id, nuevoEstado);
+    setTimeout(() => {
+        const c = (typeof historicoCompleto !== 'undefined' ? historicoCompleto : todasLasCot)
+            .find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id)) || cotActual;
+        if (c) _renderDetalle(c);
+    }, 0);
 }
 
 // ─── REASIGNAR VENDEDOR ──────────────────────────────────────────
