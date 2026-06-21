@@ -106,11 +106,12 @@
         .det-hero-badge { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; margin-top:8px; }
         .det-hero-badge-select {
             appearance:none; -webkit-appearance:none; border:1px solid currentColor; border-radius:20px;
-            padding:5px 26px 5px 12px; font-size:11px; font-weight:700; font-family:inherit; cursor:pointer;
-            background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="%23888" d="M2.5 4.5l3.5 3.5 3.5-3.5z"/></svg>');
-            background-repeat:no-repeat; background-position:right 8px center; background-size:10px;
-            max-width:160px; flex-shrink:0;
+            padding:5px 28px 5px 12px; font-size:11px; font-weight:700; font-family:inherit; cursor:pointer;
+            background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="%23475569" d="M2.5 4.5l3.5 3.5 3.5-3.5z"/></svg>');
+            background-repeat:no-repeat; background-position:right 9px center; background-size:11px;
+            max-width:170px; flex-shrink:0; transition:box-shadow .15s ease;
         }
+        .det-hero-badge-select:hover { box-shadow:0 0 0 2px rgba(58,134,255,0.25); }
         body.tema-claro .det-hero-badge-select { background-color:white; }
 
         /* GRID 2 COLS */
@@ -442,11 +443,11 @@
         </select>
     </div>
     <button class="filtro-btn active" data-estado="TODOS"   onclick="selFiltro(this)">Todos</button>
-    <button class="filtro-btn" data-estado="10%"            onclick="selFiltro(this)">🌱 Oportunidad</button>
-    <button class="filtro-btn" data-estado="25%"            onclick="selFiltro(this)">🔵 Calificación</button>
-    <button class="filtro-btn" data-estado="50%"            onclick="selFiltro(this)">📋 Cotización</button>
-    <button class="filtro-btn" data-estado="75%"            onclick="selFiltro(this)">🟣 Negociación</button>
-    <button class="filtro-btn" data-estado="90%"            onclick="selFiltro(this)">🔶 Cierre</button>
+    <button class="filtro-btn" data-estado="10%"            onclick="selFiltro(this)">🌱 (10%) Oportunidad</button>
+    <button class="filtro-btn" data-estado="25%"            onclick="selFiltro(this)">🔵 (25%) Calificación</button>
+    <button class="filtro-btn" data-estado="50%"            onclick="selFiltro(this)">📋 (50%) Cotización</button>
+    <button class="filtro-btn" data-estado="75%"            onclick="selFiltro(this)">🟣 (75%) Negociación</button>
+    <button class="filtro-btn" data-estado="90%"            onclick="selFiltro(this)">🔶 (90%) Cierre</button>
     <button class="filtro-btn" data-estado="Ganada"         onclick="selFiltro(this)">✅ Ganada</button>
     <button class="filtro-btn" data-estado="Perdida"        onclick="selFiltro(this)">❌ Perdida</button>
 </div>
@@ -536,8 +537,8 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.21.40";
-console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.21.41";
+console.log("%c TLC Cotizaciones v2026.06.20.38 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 const HISTORICO_URL   = 'https://api.github.com/repos/cahirth/Portal-TLC/contents/historico.json';
@@ -1078,10 +1079,18 @@ function _renderDetalle(c) {
                 <div class="det-hero-monto">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
                 ${neto !== monto ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">Neto USD ${Math.round(neto).toLocaleString('es-AR')} · IVA USD ${Math.round(iva).toLocaleString('es-AR')}</div>` : ''}
             </div>
-            <select class="det-hero-badge-select" style="${badgeStyle}"
-                onchange="_mutarEstadoCotizacion('${id}', this.value); _renderDetalle((typeof historicoCompleto!=='undefined'?historicoCompleto:todasLasCot).find(x=>String(x.idCot||x.id_cotizacion||x.id||'')==='${id}')||cotActual);">
-                ${etapasOptsHero}
-            </select>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+                <select class="det-hero-badge-select" style="${badgeStyle}"
+                    onchange="_mutarEstadoCotizacion('${id}', this.value); _renderDetalle((typeof historicoCompleto!=='undefined'?historicoCompleto:todasLasCot).find(x=>String(x.idCot||x.id_cotizacion||x.id||'')==='${id}')||cotActual);">
+                    ${etapasOptsHero}
+                </select>
+                ${puedeGestionar ? `<button id="btn-borrar-deal" onclick="_confirmarBorrarDeal('${id}')"
+                    style="width:100%;max-width:170px;padding:5px 12px;border-radius:20px;background:transparent;
+                           border:1px solid #dc2626;color:#dc2626;font-size:11px;font-weight:700;
+                           cursor:pointer;white-space:nowrap;">
+                    🗑️ Borrar negocio
+                </button>` : ''}
+            </div>
         </div>
         ${linkPdf ? `<a href="${linkPdf}" target="_blank"
             style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;
@@ -1360,20 +1369,6 @@ function _renderDetalle(c) {
         html += `<div style="font-size:12px;color:#334155;padding:4px 0;">Sin otros negocios con este cliente.</div>`;
     }
     html += `</div>`;
-
-    // ── BORRAR NEGOCIO ───────────────────────────────────────────
-    // Mismo permiso compartido (puedeGestionar) que vendedor/teléfono.
-    const idParaBorrar = c.idCot || c.id_cotizacion || String(c.id || '');
-    if (puedeGestionar && idParaBorrar) {
-        html += `<div style="padding:8px 16px 24px;">
-            <button id="btn-borrar-deal" onclick="_confirmarBorrarDeal('${idParaBorrar}')"
-                style="width:100%;padding:11px;border-radius:10px;background:transparent;
-                       border:1px solid #5b1d2c;color:#f87171;font-size:13px;font-weight:600;
-                       cursor:pointer;">
-                🗑️ Borrar negocio
-            </button>
-        </div>`;
-    }
 
     document.getElementById('det-body').innerHTML = html;
 }
