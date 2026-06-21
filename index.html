@@ -113,6 +113,73 @@
 
         .item-text-box { flex: 1; }
         .item-text-box h3 { font-size: 15px; color: var(--text-main); font-weight: 600; }
+
+        /* ═══ TLC RADAR — Métricas + Pendientes (home) ═══ */
+        .radar-metricas {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+            margin-bottom: 16px;
+        }
+        .radar-metrica-card {
+            background: var(--panel-dark); border: 1px solid var(--border-glow);
+            border-radius: 14px; padding: 12px 8px; text-align: center;
+        }
+        .radar-metrica-num { font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -0.5px; }
+        .radar-metrica-lbl { font-size: 9.5px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;
+                              letter-spacing: 0.4px; margin-top: 5px; line-height: 1.25; }
+        .radar-metrica-card.tono-rojo  .radar-metrica-num { color: #ff4d6d; }
+        .radar-metrica-card.tono-naranja .radar-metrica-num { color: #ff9f1c; }
+        .radar-metrica-card.tono-azul  .radar-metrica-num { color: var(--accent-blue); }
+
+        @media (max-width: 360px) {
+            .radar-metrica-num { font-size: 22px; }
+            .radar-metrica-lbl { font-size: 8.5px; }
+        }
+
+        .radar-pendientes-titulo {
+            display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700;
+            color: var(--text-main); text-transform: uppercase; letter-spacing: 0.4px;
+            margin: 18px 0 10px;
+        }
+        .radar-pendientes-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+
+        .radar-card {
+            display: flex; align-items: center; gap: 10px;
+            background: var(--panel-dark); border: 1px solid var(--border-glow);
+            border-radius: 12px; padding: 10px 12px; text-decoration: none;
+            transition: transform .12s ease, border-color .12s ease;
+        }
+        .radar-card:active { transform: scale(0.98); }
+        .radar-card.prio-90 { border-left: 3px solid #ff4d6d; }
+        .radar-card.prio-75 { border-left: 3px solid #ff9f1c; }
+        .radar-card.prio-resto { border-left: 3px solid #3a86ff; }
+
+        .radar-card-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .radar-card.prio-90 .radar-card-dot { background: #ff4d6d; }
+        .radar-card.prio-75 .radar-card-dot { background: #ff9f1c; }
+        .radar-card.prio-resto .radar-card-dot { background: #3a86ff; }
+
+        .radar-card-body { flex: 1; min-width: 0; }
+        .radar-card-cliente { font-size: 12.5px; font-weight: 700; color: var(--text-main);
+                               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .radar-card-equipo { font-size: 10.5px; color: var(--text-muted); margin-top: 1px;
+                              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .radar-card-monto { font-size: 12px; font-weight: 700; color: var(--accent-green); flex-shrink: 0; white-space: nowrap; }
+        .radar-card-chevron { color: var(--text-muted); font-size: 10px; flex-shrink: 0; }
+
+        .radar-empty { font-size: 12px; color: var(--text-muted); text-align: center; padding: 18px 0; }
+        .radar-skeleton { display: flex; flex-direction: column; gap: 8px; }
+        .radar-skeleton-row { height: 52px; border-radius: 12px; background: var(--panel-dark);
+                               border: 1px solid var(--border-glow); opacity: 0.5; animation: radarPulse 1.2s ease-in-out infinite; }
+        @keyframes radarPulse { 0%,100% { opacity: 0.35; } 50% { opacity: 0.6; } }
+
+        body.tema-claro .radar-metrica-card { background:#ffffff; border-color:#e2e8f0; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+        body.tema-claro .radar-metrica-lbl  { color:#64748b; }
+        body.tema-claro .radar-pendientes-titulo { color:#0f172a; }
+        body.tema-claro .radar-card { background:#ffffff; border-color:#e2e8f0; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+        body.tema-claro .radar-card-cliente { color:#0f172a; }
+        body.tema-claro .radar-card-equipo  { color:#64748b; }
+        body.tema-claro .radar-empty { color:#64748b; }
+        body.tema-claro .radar-skeleton-row { background:#f1f5f9; border-color:#e2e8f0; }
         .item-text-box p { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 
         .badge-count { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; background-color: #2a3454; color: var(--text-muted); }
@@ -309,6 +376,23 @@
 
         <!-- ================= PANTALLA 1: MENÚ RAÍZ (HOME) ================= -->
         <div class="app-view active" id="view-home">
+
+            <!-- TLC RADAR — Métricas clave -->
+            <div id="radar-metricas" class="radar-metricas">
+                <div class="radar-metrica-card tono-rojo">
+                    <div class="radar-metrica-num" id="radar-num-90">—</div>
+                    <div class="radar-metrica-lbl">Cierre 90%</div>
+                </div>
+                <div class="radar-metrica-card tono-naranja">
+                    <div class="radar-metrica-num" id="radar-num-75">—</div>
+                    <div class="radar-metrica-lbl">Negociación 75%</div>
+                </div>
+                <div class="radar-metrica-card tono-azul">
+                    <div class="radar-metrica-num" id="radar-num-total">—</div>
+                    <div class="radar-metrica-lbl">Total histórico</div>
+                </div>
+            </div>
+
             <div class="menu-list-stack">
                 <div class="menu-item-row" id="menu-ventas" onclick="abrirModuloConPermiso('view-ventas-menu', 'Ventas', 'Embudo Comercial', 'ventas')">
                     <div class="item-logo-container" style="overflow:hidden; padding:0;">
@@ -339,6 +423,20 @@
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
             </div>
+
+            <!-- TLC RADAR — Mis pendientes críticos -->
+            <div class="radar-pendientes-titulo">
+                <i class="fa-solid fa-bullseye" style="color:var(--accent-blue); font-size:12px;"></i>
+                Mis Pendientes Críticos
+            </div>
+            <div id="radar-pendientes">
+                <div class="radar-skeleton">
+                    <div class="radar-skeleton-row"></div>
+                    <div class="radar-skeleton-row"></div>
+                    <div class="radar-skeleton-row"></div>
+                </div>
+            </div>
+
 
             <!-- SITIO WEB TLC — solo desktop, ocupa todo el espacio disponible -->
             <div id="web-home" style="display:none; margin-top:16px; border-radius:16px; overflow:hidden; border:1px solid #1e293b; box-shadow:0 8px 24px rgba(0,0,0,0.4); flex:1;">
@@ -892,7 +990,7 @@
 </div>
 
 <script>
-    const APP_VERSION_IDX = "2026.06.20.04"; console.log("%c Portal TLC index v2026.06.20.04 ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+    const APP_VERSION_IDX = "2026.06.21.05"; console.log("%c Portal TLC index v" + APP_VERSION_IDX + " ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
     // ─── LOGIN POR EMAIL + CÓDIGO OTP ───────────────────────────────────────────
     // Sesión compartida con selector-dispositivos.html y cotizaciones.html.
@@ -1109,6 +1207,141 @@
                 el.dataset.bloqueado = 'false';
             }
         });
+        cargarRadar();
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // TLC RADAR — Métricas clave + Mis Pendientes Críticos (home)
+    // Fuente de datos: historico.json sobre GitHub, MISMA fuente que usa
+    // cotizaciones.html (vía API de GitHub, no raw.githubusercontent, para
+    // evitar caché de CDN y tener siempre el estado más fresco). No usa
+    // RTDB para esto: RTDB solo guarda el JSON liviano del presupuesto
+    // público (cotizaciones/{idCot}/presupuesto), no tiene estado de
+    // pipeline ni email del vendedor.
+    // ════════════════════════════════════════════════════════════════
+    const RADAR_HISTORICO_URL = 'https://api.github.com/repos/cahirth/Portal-TLC/contents/historico.json';
+
+    function _radarMonto(c) {
+        return parseFloat((c.totales || {}).total_con_iva || c.totalConIva || c.montoUSD || 0);
+    }
+
+    function _radarNormalizarEstado(c) {
+        if (!c.estado) return 'Enviada';
+        const e = String(c.estado).trim();
+        if (['Enviada', 'Cotización', 'presentationscheduled'].includes(e)) return '50%';
+        if (['En seguimiento', 'decisionmakerboughtin'].includes(e))        return '75%';
+        if (['Ganada', 'closedwon'].includes(e))                            return 'Ganada';
+        if (['Perdida', 'closedlost'].includes(e))                          return 'Perdida';
+        return e;
+    }
+
+    async function cargarRadar() {
+        const contMetricas   = document.getElementById('radar-metricas');
+        const contPendientes = document.getElementById('radar-pendientes');
+        if (!contMetricas || !contPendientes) return; // pantalla home no está en el DOM todavía
+
+        // Técnico (permiso de Servicio, sin permiso de Ventas): el Kanban de
+        // Servicio Técnico todavía no existe — no hay de dónde leer
+        // pendientes técnicos todavía. Mostramos el estado real en vez de
+        // simular datos que no existen.
+        if (userPermisos.servicio && !userPermisos.ventas) {
+            contMetricas.innerHTML = `
+                <div class="radar-metrica-card tono-azul" style="grid-column:1/-1;">
+                    <div class="radar-metrica-lbl" style="margin-top:0;font-size:11px;">
+                        El Kanban de Servicio Técnico todavía no está conectado al Radar — próximamente.
+                    </div>
+                </div>`;
+            contPendientes.innerHTML = '<div class="radar-empty">Sin datos de Servicio Técnico todavía.</div>';
+            return;
+        }
+
+        if (!userPermisos.ventas) {
+            contMetricas.style.display   = 'none';
+            contPendientes.style.display = 'none';
+            return;
+        }
+
+        try {
+            const res = await fetch(RADAR_HISTORICO_URL, {
+                headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const apiResp = await res.json();
+            const decoded = atob(apiResp.content.replace(/\n/g, ''));
+            let data = JSON.parse(decoded);
+            if (!Array.isArray(data)) data = [];
+            data.forEach(c => { c.estado = _radarNormalizarEstado(c); });
+
+            // Filtrar por vendedor logueado — Administrador ve todo el pipeline,
+            // el resto solo lo propio (mismo criterio que cotizaciones.html).
+            const esAdmin = userPermisos.rol === 'Administrador';
+            const primerNombre = (currentUserIndex?.name || '').split(' ')[0].toLowerCase();
+            const misCot = esAdmin
+                ? data
+                : data.filter(c => String(c.vendedor || '').toLowerCase().includes(primerNombre));
+
+            // ── Métricas ──────────────────────────────────────────────
+            const activas = misCot.filter(c => c.estado !== 'Ganada' && c.estado !== 'Perdida');
+            const n90  = activas.filter(c => c.estado === '90%').length;
+            const n75  = activas.filter(c => c.estado === '75%').length;
+            const total = misCot.length;
+
+            document.getElementById('radar-num-90').textContent    = n90;
+            document.getElementById('radar-num-75').textContent    = n75;
+            document.getElementById('radar-num-total').textContent = total;
+            contMetricas.style.display = 'grid';
+
+            // ── Pendientes: 90% arriba, 75% en medio, resto al final ───
+            const prio90  = activas.filter(c => c.estado === '90%')
+                .sort((a, b) => _radarMonto(b) - _radarMonto(a));
+            const prio75  = activas.filter(c => c.estado === '75%')
+                .sort((a, b) => _radarMonto(b) - _radarMonto(a));
+            const resto   = activas.filter(c => c.estado !== '90%' && c.estado !== '75%')
+                .sort((a, b) => _radarMonto(b) - _radarMonto(a));
+
+            const ordenadas = [
+                ...prio90.map(c  => ({ c, prio: 'prio-90' })),
+                ...prio75.map(c  => ({ c, prio: 'prio-75' })),
+                ...resto.slice(0, 8).map(c => ({ c, prio: 'prio-resto' })), // tope para no saturar el home
+            ];
+
+            if (!ordenadas.length) {
+                contPendientes.innerHTML = '<div class="radar-empty">Sin pendientes activos. 🎉</div>';
+                contPendientes.style.display = 'block';
+                return;
+            }
+
+            contPendientes.innerHTML = `<div class="radar-pendientes-lista">${
+                ordenadas.map(({ c, prio }) => {
+                    const idCot    = c.idCot || c.id_cotizacion || String(c.id || '');
+                    const cliente  = c.razonSocial || c.empresa?.razonSocial || c.nombreMedico || 'Sin nombre';
+                    const equipo   = (c.carrito || []).map(i => i.nombre).join(' · ')
+                                   || (Array.isArray(c.productos) ? c.productos.join(' · ') : '') || '—';
+                    const monto    = _radarMonto(c);
+                    const link     = idCot ? `https://cahirth.github.io/Portal-TLC/presupuesto.html?id=${encodeURIComponent(idCot)}` : '#';
+                    return `<a class="radar-card ${prio}" href="${link}" target="_blank" rel="noopener noreferrer">
+                        <span class="radar-card-dot"></span>
+                        <div class="radar-card-body">
+                            <div class="radar-card-cliente">${cliente}</div>
+                            <div class="radar-card-equipo">${equipo}</div>
+                        </div>
+                        <div class="radar-card-monto">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
+                        <i class="fa-solid fa-chevron-right radar-card-chevron"></i>
+                    </a>`;
+                }).join('')
+            }</div>`;
+            contPendientes.style.display = 'block';
+
+        } catch(e) {
+            console.warn('TLC Radar: error cargando historico.json', e);
+            contMetricas.innerHTML = `
+                <div class="radar-metrica-card tono-azul" style="grid-column:1/-1;">
+                    <div class="radar-metrica-lbl" style="margin-top:0;font-size:11px;">
+                        No se pudo cargar el Radar. Reintentá más tarde.
+                    </div>
+                </div>`;
+            contPendientes.innerHTML = '';
+        }
     }
 
     function abrirModuloConPermiso(viewId, title, subtitle, seccion) {
