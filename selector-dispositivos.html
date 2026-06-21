@@ -1394,7 +1394,7 @@
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.21.65"; console.log("%c TLC Portal v2026.06.21.65 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.21.66"; console.log("%c TLC Portal v2026.06.21.66 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 
 // Mapa nombre_archivo → URL lh3 (cargado desde Apps Script)
@@ -4460,65 +4460,24 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         '.badge-novalido { border:1px solid #94a3b8; padding:3px 10px; font-size:10px; color:#64748b; font-family:Arial,sans-serif; }',
         '@media print { body{background:white;} .page{margin:0;box-shadow:none;padding:24px 28px;} .no-print{display:none!important;} }',
         '@media (max-width:600px) { .page{padding:12px;} .hi{display:block!important;} .hi td{display:block;width:100%!important;text-align:left!important;padding-bottom:10px;} }',
-        // CSS del semáforo + IIFE embebido — tags escapados con concatenación
-        // para que el parser HTML del archivo fuente no los vea como tags reales
-        '.btn-accion{padding:8px 18px;border:none;border-radius:6px;color:white;font-size:12px;font-family:Arial,sans-serif;display:inline-flex;align-items:center;gap:6px;transition:background .4s ease,opacity .4s ease,box-shadow .3s ease;}',
-        '.btn-pdf{background:#0f172a;cursor:pointer;}',
+        // v57: ya NO hay semáforo — linkPublico apunta a presupuesto.html, que
+        // existe siempre (no se sube un archivo nuevo por cotización), así que
+        // el botón de WhatsApp se activa directo, sin esperar ni hacer polling.
+        '.btn-accion{padding:8px 18px;border:none;border-radius:6px;color:white;font-size:12px;font-family:Arial,sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:background .25s ease,opacity .25s ease,box-shadow .25s ease;}',
+        '.btn-pdf{background:#0f172a;}',
         '.btn-pdf:hover{background:#1e293b;}',
-        '.btn-ws-disabled{background:#94a3b8;cursor:not-allowed;opacity:0.70;}',
-        '.btn-ws-active{background:#25D366;cursor:pointer;opacity:1;box-shadow:0 4px 14px rgba(37,211,102,0.40);}',
+        '.btn-ws-active{background:#25D366;opacity:1;box-shadow:0 4px 14px rgba(37,211,102,0.40);}',
         '.btn-ws-active:hover{background:#1ebe5d;}',
-        '.btn-ws-contingencia{background:#f8961e;cursor:pointer;opacity:1;}',
         '<\/style>',
 
-        // IIFE semáforo — datos serializados en tiempo de generación
         '<' + 'script>',
         '(function(){',
         '  var URL_PUBLICA  = ' + JSON.stringify(linkPublico || '') + ';',
         '  var TEL          = ' + JSON.stringify(wspTelSanitizado) + ';',
         '  var SALUDO       = ' + JSON.stringify(wspSaludoFinal) + ';',
-        // raw.githubusercontent tiene CORS nativo, no consume rate limit de la API,
-        // y devuelve 200 con el contenido real o 404 limpio si el archivo no existe aún
-        '  var FILE_PATH    = "cotizaciones/' + (linkPublico || '').split('/cotizaciones/').pop() + '";',
-        '  var RAW_URL      = "https://raw.githubusercontent.com/cahirth/Portal-TLC/main/" + FILE_PATH;',
-        '  var MAX_INTENTOS = 12;',
-        '  var INTERVALO_MS = 5000;',
-        '  var intentos     = 0;',
-        '  var timerId      = null;',
         '  function buildLinkWsp(){',
         '    var msg = encodeURIComponent(SALUDO + "\\n" + URL_PUBLICA);',
         '    return TEL ? "https://wa.me/" + TEL + "?text=" + msg : "https://wa.me/?text=" + msg;',
-        '  }',
-        '  function activarVerde(){',
-        '    var b = document.getElementById("btn-whatsapp");',
-        '    if(!b) return;',
-        '    b.disabled = false;',
-        '    b.className = "btn-accion btn-ws-active";',
-        '    b.textContent = "\uD83D\uDCAC Enviar por WhatsApp";',
-        '    b.onclick = function(e){ e.preventDefault(); window.open(buildLinkWsp(),"_blank","noopener,noreferrer"); };',
-        '  }',
-        '  function activarContingencia(){',
-        '    var b = document.getElementById("btn-whatsapp");',
-        '    if(!b) return;',
-        '    b.disabled = false;',
-        '    b.className = "btn-accion btn-ws-contingencia";',
-        '    b.textContent = "\u26A0\uFE0F Enviar (enlace en proceso)";',
-        '    b.title = "El enlace puede tardar unos segundos m\u00E1s en activarse.";',
-        '    b.onclick = function(e){ e.preventDefault(); window.open(buildLinkWsp(),"_blank","noopener,noreferrer"); };',
-        '  }',
-        '  function verificar(){',
-        '    intentos++;',
-        '    if(intentos > MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); return; }',
-        // raw.githubusercontent: 200 = archivo existe, 404 = aún no pusheado
-        // Sin rate limit, sin base64, respuesta directa
-        '    fetch(RAW_URL + "?_c=" + Date.now(), { method:"HEAD", cache:"no-store" })',
-        '      .then(function(res){',
-        '        if(res.status === 200){ clearInterval(timerId); activarVerde(); }',
-        '        else if(intentos >= MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); }',
-        '      })',
-        '      .catch(function(){',
-        '        if(intentos >= MAX_INTENTOS){ clearInterval(timerId); activarContingencia(); }',
-        '      });',
         '  }',
         '  function guardarPDF(){',
         '    var np=document.querySelector(".no-print");',
@@ -4528,7 +4487,9 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         '  }',
         '  window.guardarPDF = guardarPDF;',
         '  document.addEventListener("DOMContentLoaded",function(){',
-        '    setTimeout(function(){ verificar(); timerId=setInterval(verificar,INTERVALO_MS); }, 8000);',
+        '    var b = document.getElementById("btn-whatsapp");',
+        '    if(!b) return;',
+        '    b.onclick = function(e){ e.preventDefault(); window.open(buildLinkWsp(),"_blank","noopener,noreferrer"); };',
         '  });',
         '})();',
         '<' + '/script>',
@@ -4536,10 +4497,10 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         '<body>',
         '<div class="page">',
 
-        // BOTONES: PDF + semáforo WhatsApp
+        // BOTONES: PDF + WhatsApp (activo de entrada, sin semáforo)
         '<div class="no-print" style="text-align:right;margin-bottom:16px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">',
         '<button class="btn-accion btn-pdf" onclick="guardarPDF()">&#8595; Guardar PDF<\/button>',
-        linkPublico ? '<button id="btn-whatsapp" disabled class="btn-accion btn-ws-disabled">&#9203; Verificando enlace...<\/button>' : '',
+        linkPublico ? '<button id="btn-whatsapp" class="btn-accion btn-ws-active">\uD83D\uDCAC Enviar por WhatsApp<\/button>' : '',
         '<\/div>',
 
         // HEADER: logo + datos del doc — flexbox responsive
