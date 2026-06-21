@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Presupuesto — Tecnología Láser Corneal</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"Times New Roman",Times,serif; background:#f1f5f9; color:#0f172a; font-size:13px; }
+  .page { max-width:780px; margin:20px auto; background:white; box-shadow:0 4px 32px rgba(0,0,0,0.12); padding:32px 36px; min-height:200px; }
+  table { border-collapse:collapse; width:100%; }
+  .badge-novalido { border:1px solid #94a3b8; padding:3px 10px; font-size:10px; color:#64748b; font-family:Arial,sans-serif; }
+  @media print { body{background:white;} .page{margin:0;box-shadow:none;padding:24px 28px;} .no-print{display:none!important;} }
+  @media (max-width:600px) { .page{padding:12px;} }
+
+  .btn-accion{padding:8px 18px;border:none;border-radius:6px;color:white;font-size:12px;font-family:Arial,sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:background .25s ease,opacity .25s ease,box-shadow .25s ease;}
+  .btn-pdf{background:#0f172a;}
+  .btn-pdf:hover{background:#1e293b;}
+  .btn-ws-active{background:#25D366;box-shadow:0 4px 14px rgba(37,211,102,0.40);}
+  .btn-ws-active:hover{background:#1ebe5d;}
+
+  .estado-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 20px; text-align:center; font-family:Arial,sans-serif; }
+  .spinner { width:40px; height:40px; border:3px solid #e2e8f0; border-top-color:#0f172a; border-radius:50%; animation:girar 0.8s linear infinite; margin-bottom:20px; }
+  @keyframes girar { to { transform:rotate(360deg); } }
+  .estado-titulo { font-size:15px; font-weight:700; color:#0f172a; margin-bottom:6px; }
+  .estado-msg { font-size:13px; color:#64748b; max-width:340px; line-height:1.5; }
+  .estado-icono { font-size:36px; margin-bottom:14px; }
+  .btn-reintentar { margin-top:18px; padding:9px 20px; background:#0f172a; color:white; border:none; border-radius:6px; font-size:13px; cursor:pointer; font-family:Arial,sans-serif; }
+  .btn-reintentar:hover { background:#1e293b; }
+</style>
+</head>
+<body>
+
+<div class="page" id="page-root">
+  <div class="estado-wrap" id="estado-cargando">
+    <div class="spinner"></div>
+    <div class="estado-titulo">Cargando presupuesto…</div>
+    <div class="estado-msg">Un momento, estamos trayendo los datos.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var FIREBASE_DB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+  var LOGO_URL = 'https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25';
+  var MAX_INTENTOS = 6;
+  var INTERVALO_MS = 1200;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
+
+  function getIdFromUrl() {
+    var params = new URLSearchParams(window.location.search);
+    return (params.get('id') || '').trim();
+  }
+
+  function mostrarError(titulo, mensaje, conReintento) {
+    var root = document.getElementById('page-root');
+    root.innerHTML =
+      '<div class="estado-wrap">' +
+        '<div class="estado-icono">⚠️</div>' +
+        '<div class="estado-titulo">' + esc(titulo) + '</div>' +
+        '<div class="estado-msg">' + esc(mensaje) + '</div>' +
+        (conReintento ? '<button class="btn-reintentar" onclick="location.reload()">Reintentar</button>' : '') +
+      '</div>';
+  }
+
+  function buildFilasProductos(carrito) {
+    if (!Array.isArray(carrito) || !carrito.length) return '';
+    return carrito.map(function(i) {
+      var qty = i.cantidad || 1;
+      var base = i.precioLista || i.precioNeto || 0;
+      var bruto = base * qty;
+      var dVal = parseFloat(i.descuentoValor) || 0;
+      var dTipo = i.descuentoTipo || '%';
+      var neto = (i.precioNeto != null) ? (i.precioNeto * qty) : (dTipo === '%' ? Math.max(0, bruto - bruto*(dVal/100)) : Math.max(0, bruto - dVal));
+      var descMonto = bruto - neto;
+      var hayDesc = dVal > 0 && descMonto > 0.01;
+      var fotoSrc = i.foto || '';
+      var fotoHtml = fotoSrc
+        ? '<img src="' + esc(fotoSrc) + '" style="width:56px;height:56px;object-fit:contain;border-radius:4px;background:#f8fafc;display:block;" onerror="this.style.display=\'none\'">'
+        : '';
+
+      return (
+        '<tr style="border-bottom:1px solid #e2e8f0;">' +
+        '<td style="padding:14px 10px;text-align:center;font-size:13px;color:#374151;vertical-align:top;width:52px;">' + qty + '</td>' +
+        '<td style="padding:14px 10px;vertical-align:top;">' +
+          '<div style="display:flex;gap:12px;align-items:flex-start;">' +
+            (fotoHtml ? '<div style="flex-shrink:0;">' + fotoHtml + '</div>' : '') +
+            '<div>' +
+              '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:3px;">' + esc(i.nombre) + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</td>' +
+        '<td style="padding:14px 10px;text-align:right;vertical-align:top;width:130px;">' +
+          '<div style="font-size:13px;color:#374151;">USD &nbsp;' + Math.round(base).toLocaleString('es-AR') + '</div>' +
+          (hayDesc ? '<div style="font-size:11px;color:#64748b;">Descuento ' + (dTipo==='%' ? dVal.toFixed(0)+',00 %' : 'USD ' + dVal.toFixed(2)) + '</div>' : '') +
+        '</td>' +
+        '<td style="padding:14px 10px;text-align:right;vertical-align:top;width:130px;">' +
+          '<div style="font-size:13px;font-weight:600;color:#0f172a;">USD &nbsp;' + Math.round(bruto).toLocaleString('es-AR') + '</div>' +
+          (hayDesc ? '<div style="font-size:12px;color:#dc2626;">USD &nbsp;−' + Math.round(descMonto).toLocaleString('es-AR') + '</div>' : '') +
+        '</td>' +
+        '</tr>'
+      );
+    }).join('');
+  }
+
+  function formatearTelefonoWsp(raw) {
+    var d = String(raw || '').replace(/\D/g, '');
+    if (!d) return '';
+    if (d.charAt(0) === '0' && d.length > 10) d = d.slice(1);
+    if (d.indexOf('5499') === 0) d = '549' + d.slice(4);
+    if (d.indexOf('549') === 0) {
+      d = '549' + d.slice(3).replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2');
+    } else if (d.length <= 10) {
+      d = '549' + d.replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2');
+    }
+    return d;
+  }
+
+  function renderPresupuesto(idCot, p) {
+    var c = p.carrito || [];
+    var totales = p.totales || {};
+    var netoTotal = totales.subtotal_neto != null ? totales.subtotal_neto : 0;
+    var ivaTotal  = totales.iva_total     != null ? totales.iva_total     : 0;
+    var totalCIva = totales.total_con_iva != null ? totales.total_con_iva : (netoTotal + ivaTotal);
+
+    var fecha = '';
+    try {
+      var fechaObj = p.fecha ? new Date(p.fecha) : new Date();
+      fecha = fechaObj.toLocaleDateString('es-AR', { day:'2-digit', month:'long', year:'numeric' });
+    } catch(e) { fecha = ''; }
+
+    var urlActual = window.location.href;
+    var telWsp = formatearTelefonoWsp(p.telefono);
+    var saludo = 'Hola, le compartimos el presupuesto de Tecnología Láser Corneal SRL';
+    var linkWsp = (function() {
+      var msg = encodeURIComponent(saludo + ':\n' + urlActual + '\n(Ref: ' + idCot + ')');
+      return telWsp ? ('https://wa.me/' + telWsp + '?text=' + msg) : ('https://wa.me/?text=' + msg);
+    })();
+
+    var bancosHtml =
+      '<tr><td colspan="4" style="padding:6px 10px;font-size:11px;color:#374151;">' +
+      '<strong>Credicoop AR$:</strong> CC$ 191-218-015278/6 &nbsp;·&nbsp; CBU: 19102182-55021801527864 &nbsp;·&nbsp; Alias: jade.lado.persa' +
+      '</td></tr>' +
+      '<tr><td colspan="4" style="padding:6px 10px;font-size:11px;color:#374151;">' +
+      '<strong>Credicoop USD:</strong> CA USD 191-218-019730/3 &nbsp;·&nbsp; CBU: 191021825522180197303 &nbsp;·&nbsp; Alias: TLC.CREDICOOP.USD' +
+      '</td></tr>' +
+      '<tr><td colspan="4" style="padding:6px 10px 10px;font-size:11px;color:#374151;">' +
+      '<strong>Galicia AR$:</strong> CC$ Nº 4739-5 306-1 &nbsp;·&nbsp; CBU: 0070306020000004739511 &nbsp;·&nbsp; Alias: TLC.BUENOS.AIRES' +
+      '</td></tr>';
+
+    var html =
+      '<div class="no-print" style="text-align:right;margin-bottom:16px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">' +
+        '<button class="btn-accion btn-pdf" onclick="window.print()">&#8595; Guardar PDF</button>' +
+        '<a href="' + linkWsp + '" target="_blank" rel="noopener noreferrer" class="btn-accion btn-ws-active" style="text-decoration:none;">💬 Enviar por WhatsApp</a>' +
+      '</div>' +
+
+      '<div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px;">' +
+        '<img src="' + LOGO_URL + '" alt="TLC" style="max-width:200px;width:50%;height:auto;" onerror="this.style.display=\'none\'">' +
+        '<div style="text-align:right;flex:1;min-width:160px;">' +
+          '<div style="margin-bottom:6px;"><span class="badge-novalido">Documento No Válido como Factura</span></div>' +
+          '<div style="font-size:13px;font-weight:600;font-family:Arial,sans-serif;color:#0f172a;">Presupuesto Nº: ' + esc(idCot) + '</div>' +
+          '<div style="font-size:12px;color:#374151;margin-top:4px;font-family:Arial,sans-serif;">Fecha: ' + esc(fecha) + '</div>' +
+          '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;">Validez de la oferta: &nbsp; 15 Días</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="text-align:right;font-size:11px;color:#64748b;font-family:Arial,sans-serif;margin-bottom:16px;">Hoja 1 de 1</div>' +
+
+      '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:20px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);">' +
+        '<div style="font-size:13px;font-family:Arial,sans-serif;"><strong>Señores:</strong> ' + esc(p.nombreMedico) + '</div>' +
+        (p.razonSocial ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Institución:</strong> ' + esc(p.razonSocial) + '</div>' : '') +
+        (p.cuit ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>CUIT:</strong> ' + esc(p.cuit) + '</div>' : '') +
+        (p.telefono ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Teléfono:</strong> ' + esc(p.telefono) + '</div>' : '') +
+      '</div>' +
+
+      '<p style="font-size:12px;color:#374151;margin-bottom:14px;font-family:Arial,sans-serif;">Por medio de la presente tengo el agrado de hacerle llegar la siguiente propuesta comercial:</p>' +
+
+      '<table style="margin-bottom:20px;">' +
+        '<thead>' +
+          '<tr style="background:#0f172a;color:white;">' +
+            '<th style="padding:8px 10px;text-align:center;font-size:12px;font-family:Arial,sans-serif;width:52px;">Cantidad</th>' +
+            '<th style="padding:8px 10px;text-align:left;font-size:12px;font-family:Arial,sans-serif;">Descripción</th>' +
+            '<th style="padding:8px 10px;text-align:right;font-size:12px;font-family:Arial,sans-serif;width:130px;">Precio Unitario</th>' +
+            '<th style="padding:8px 10px;text-align:right;font-size:12px;font-family:Arial,sans-serif;width:130px;">Precio Total</th>' +
+          '</tr>' +
+        '</thead>' +
+        '<tbody>' + buildFilasProductos(c) + '</tbody>' +
+      '</table>' +
+
+      (p.notas ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:10px 14px;margin-bottom:12px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#92400e;margin-bottom:4px;font-family:Arial,sans-serif;">Notas</div><div style="font-size:12px;color:#78350f;line-height:1.5;">' + esc(p.notas) + '</div></div>' : '') +
+
+      '<div style="display:flex;justify-content:flex-end;margin-bottom:16px;">' +
+        '<table style="border-collapse:collapse;min-width:260px;">' +
+          '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">Subtotal</td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>USD</strong> &nbsp;' + Math.round(netoTotal).toLocaleString('es-AR') + '</td></tr>' +
+          '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">IVA</td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>USD</strong> &nbsp;' + Math.round(ivaTotal).toLocaleString('es-AR') + '</td></tr>' +
+          '<tr style="border-top:2px solid #0f172a;"><td style="padding:8px 8px;font-size:14px;font-weight:700;">Total</td><td style="padding:8px 8px;text-align:right;font-size:14px;font-weight:700;"><strong>USD</strong> &nbsp;' + Math.round(totalCIva).toLocaleString('es-AR') + '</td></tr>' +
+        '</table>' +
+      '</div>' +
+
+      '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:24px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">' +
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:10px;font-family:Arial,sans-serif;">Condiciones Comerciales</div>' +
+        '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;line-height:1.9;">' +
+          (p.condicionesComerciales ? '<strong>Condición de Pago:</strong> ' + esc(p.condicionesComerciales) + '<br>' : '') +
+          (p.detalleFinanciacion ? '<strong>Detalle de Financiación:</strong> ' + esc(p.detalleFinanciacion) + '<br>' : '') +
+          '<strong>Forma de Pago:</strong> Transferencia o depósito bancario. Valores expresados en dólares oficiales Banco Nación con el tipo de cambio del día de acreditación de cada pago.<br>' +
+          '<strong>Lugar de Entrega:</strong> Se entrega en nuestra oficina en Del Carmen 716 PB CABA.' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="text-align:right;font-size:12px;font-family:Arial,sans-serif;color:#374151;margin-bottom:24px;">' +
+        'Atentamente,<br>' +
+        '<strong>' + esc(p.vendedor || 'Tecnología Láser Corneal') + '</strong><br>' +
+        'info@tlcsrl.com.ar' +
+      '</div>' +
+
+      '<div style="border-top:1px solid #e2e8f0;padding-top:12px;margin-bottom:20px;">' +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;font-family:Arial,sans-serif;margin-bottom:8px;">Datos Bancarios</div>' +
+        '<table><tbody>' + bancosHtml + '</tbody></table>' +
+      '</div>' +
+
+      '<div style="border-top:2px solid #0f172a;padding-top:12px;display:flex;align-items:center;gap:16px;">' +
+        '<img src="' + LOGO_URL + '" alt="TLC" style="width:80px;height:auto;flex-shrink:0;" onerror="this.style.display=\'none\'">' +
+        '<div style="font-size:11px;color:#0f172a;font-family:Arial,sans-serif;line-height:1.6;">' +
+          '<strong>TECNOLOGÍA LÁSER CORNEAL S.R.L.</strong><br>' +
+          'Pasaje del Carmen 716 LOCAL PB C1019AAB · Buenos Aires, Argentina' +
+        '</div>' +
+      '</div>';
+
+    document.title = 'Presupuesto TLC — ' + (p.nombreMedico || '') + ' — ' + idCot;
+    document.getElementById('page-root').innerHTML = html;
+  }
+
+  function buscarConReintento(idCot, intento) {
+    intento = intento || 0;
+    var url = FIREBASE_DB_URL + '/cotizaciones/' + encodeURIComponent(idCot) + '/presupuesto.json?_=' + Date.now();
+
+    fetch(url, { cache: 'no-store' })
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(data) {
+        if (data) {
+          renderPresupuesto(idCot, data);
+          return;
+        }
+        if (intento < MAX_INTENTOS) {
+          setTimeout(function(){ buscarConReintento(idCot, intento + 1); }, INTERVALO_MS);
+        } else {
+          mostrarError(
+            'Presupuesto no encontrado',
+            'No pudimos encontrar este presupuesto. Verificá el link o pedile al vendedor que te lo reenvíe.',
+            true
+          );
+        }
+      })
+      .catch(function(err) {
+        if (intento < MAX_INTENTOS) {
+          setTimeout(function(){ buscarConReintento(idCot, intento + 1); }, INTERVALO_MS);
+        } else {
+          mostrarError(
+            'No se pudo cargar el presupuesto',
+            'Hubo un problema de conexión. Revisá tu internet y volvé a intentar.',
+            true
+          );
+        }
+      });
+  }
+
+  var idCot = getIdFromUrl();
+  if (!idCot) {
+    mostrarError('Link incompleto', 'Este link no incluye un presupuesto válido para mostrar.', false);
+  } else {
+    buscarConReintento(idCot, 0);
+  }
+})();
+</script>
+
+</body>
+</html>

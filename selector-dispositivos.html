@@ -1394,7 +1394,7 @@
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.06.20.64"; console.log("%c TLC Portal v2026.06.20.64 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.06.21.65"; console.log("%c TLC Portal v2026.06.21.65 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 
 // Mapa nombre_archivo → URL lh3 (cargado desde Apps Script)
@@ -3974,25 +3974,21 @@ async function generarPropuesta() {
     mostrarMrStatus('⏳ Subiendo presupuesto...', '');
 
     try {
-        // Calcular la URL pública GitHub Pages ANTES de generar el HTML
-        // para poder incrustarla en el botón WhatsApp del presupuesto
-        const linkFinal = 'https://cahirth.github.io/Portal-TLC/cotizaciones/' + _idCotActual + '.html';
+        // v57: linkFinal ahora apunta al visor dinámico único (presupuesto.html),
+        // que lee el id de la URL y consulta RTDB al vuelo. Como presupuesto.html
+        // YA EXISTE en el repo (no se genera un archivo nuevo por cotización),
+        // el link está disponible al instante — sin esperar propagación de GitHub
+        // Pages. El JSON real del presupuesto se manda a RTDB en 'registrarCotizacion'.
+        const linkFinal = 'https://cahirth.github.io/Portal-TLC/presupuesto.html?id=' + _idCotActual;
 
         const htmlPresup = await generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot: _idCotActual, plazoEntrega, lugarEntrega, linkPublico: linkFinal });
 
-        // ── PASO 1: Blob URL instantáneo — 0ms, sin esperar GitHub ──────────
+        // ── Vista instantánea para el VENDEDOR via Blob URL — 0ms ───────────
+        // (el cliente recibe linkFinal → presupuesto.html, que lee de RTDB)
         const blobInstant = new Blob([htmlPresup], { type: 'text/html;charset=utf-8' });
         _blobUrlActual    = URL.createObjectURL(blobInstant);
         setTimeout(() => URL.revokeObjectURL(_blobUrlActual), 600000);
-        // ── PASO 2: Subir a GitHub en background (fire-and-forget) ──────────
-        mostrarMrStatus('✅ Presupuesto listo · Publicando en segundo plano...', '');
-        fetch(FOTO_MAP_URL, {
-            method:  'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body:    JSON.stringify({ accion: 'subirCotizacion', idCot: _idCotActual, html: htmlPresup })
-        }).then(r => r.json())
-          .then(r => { if (r.ok) console.log('✅ GitHub:', r.link); else console.warn('⚠️ GitHub:', r.error); })
-          .catch(e => console.warn('⚠️ GitHub error:', e));
+        mostrarMrStatus('✅ Presupuesto listo · Sincronizando...', '');
 
         // Calcular datos del carrito
         const c   = calcularCarrito();
@@ -4009,7 +4005,28 @@ async function generarPropuesta() {
             ? 'Precio contado USD. Anticipado 100% + IVA 10,5%.'
             : mod.label + '. Precio de lista + IVA 10,5%.' + (mod.cuotas > 0 ? ' Financiación sujeta a aprobación crediticia.' : '');
 
-        // Registrar en Google Sheets (fire-and-forget)
+        // Calcular carrito detallado (igual lógica que se usa para HubSpot,
+        // reutilizada acá para que presupuesto.html tenga el desglose completo)
+        const carritoDetallado = carrito.map(i => {
+            const qty       = i.cantidad || 1;
+            const esContado = (mod.key === 'CONTADO');
+            const base      = esContado ? (i.precioCNO || i.precioLista || 0) : (i.precioLista || 0);
+            const bruto     = base * qty;
+            const dVal      = esContado ? 0 : (parseFloat(i.descuentoValor) || 0);
+            const dTipo     = i.descuentoTipo || '%';
+            const neto      = esContado ? bruto : (dTipo === '%' ? Math.max(0, bruto - bruto * (dVal / 100)) : Math.max(0, bruto - dVal));
+            return {
+                nombre:         i.nombre,
+                precioLista:    base,
+                descuentoTipo:  esContado ? '%' : dTipo,
+                descuentoValor: esContado ? 0   : dVal,
+                precioNeto:     Math.round((neto / qty) * 100) / 100,
+                cantidad:       qty,
+                ivaPct:         i.ivaPct !== null && i.ivaPct !== undefined ? i.ivaPct : 10.5,
+            };
+        });
+
+        // Registrar en Google Sheets + push a RTDB para presupuesto.html (fire-and-forget)
         fetch(FOTO_MAP_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
@@ -4030,6 +4047,7 @@ async function generarPropuesta() {
                 notas:                  notas,
                 vendedor:               vendedor,
                 linkPdf:                linkFinal,
+                carrito:                carritoDetallado,
             })
         }).then(r => r.json()).then(reg => {
             if (reg.status === 'SUCCESS') console.log('✅ Sheets:', reg.id, '— fila', reg.fila);
@@ -4076,32 +4094,8 @@ async function generarPropuesta() {
                 cuit:     cuit     || '',
                 equipos:  equiposStr,
                 // equiposDetalle: array para Line Items en HubSpot con precios netos reales
-                equiposDetalle: carrito.map(i => {
-                    const qty       = i.cantidad || 1;
-                    const esContado = (mod.key === 'CONTADO');
-                    // CONTADO → precio base = CNO (precio contado bonificado)
-                    // FINANCIADO → precio base = precioLista puro (sin bonificación contado)
-                    const base      = esContado
-                        ? (i.precioCNO || i.precioLista || 0)
-                        : (i.precioLista || 0);
-                    const bruto     = base * qty;
-                    const dVal      = esContado ? 0 : (parseFloat(i.descuentoValor) || 0);
-                    const dTipo     = i.descuentoTipo || '%';
-                    const neto      = esContado
-                        ? bruto  // contado: el precio CNO ya es el neto final
-                        : (dTipo === '%'
-                            ? Math.max(0, bruto - bruto * (dVal / 100))
-                            : Math.max(0, bruto - dVal));
-                    return {
-                        nombre:         i.nombre,
-                        precioLista:    base,
-                        descuentoTipo:  esContado ? '%'  : dTipo,
-                        descuentoValor: esContado ? 0    : dVal,
-                        precioNeto:     Math.round((neto / qty) * 100) / 100,
-                        cantidad:       qty,
-                        ivaPct:         i.ivaPct !== null && i.ivaPct !== undefined ? i.ivaPct : 10.5,
-                    };
-                }),
+                // (reutiliza carritoDetallado ya calculado arriba para registrarCotizacion)
+                equiposDetalle: carritoDetallado,
                 totalUSD:    Math.round(c.netoBase * 100) / 100,
                 totalConIva: Math.round(c.total    * 100) / 100,
                 estado:    'Enviada',
