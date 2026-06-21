@@ -104,6 +104,14 @@
         .det-hero-monto { font-size:36px; font-weight:900; color:#06d6a0; line-height:1; letter-spacing:-1px; }
         .det-hero-sub { font-size:12px; color:#475569; margin-top:4px; }
         .det-hero-badge { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; margin-top:8px; }
+        .det-hero-badge-select {
+            appearance:none; -webkit-appearance:none; border:1px solid currentColor; border-radius:20px;
+            padding:5px 26px 5px 12px; font-size:11px; font-weight:700; font-family:inherit; cursor:pointer;
+            background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="%23888" d="M2.5 4.5l3.5 3.5 3.5-3.5z"/></svg>');
+            background-repeat:no-repeat; background-position:right 8px center; background-size:10px;
+            max-width:160px; flex-shrink:0;
+        }
+        body.tema-claro .det-hero-badge-select { background-color:white; }
 
         /* GRID 2 COLS */
         .det-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px 16px; }
@@ -528,7 +536,7 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.20.38";
+const APP_VERSION = "2026.06.21.40";
 console.log("%c TLC Cotizaciones v2026.06.20.38 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1031,6 +1039,13 @@ function _renderDetalle(c) {
     const linkPdf = c.link && !c.link.startsWith('blob:') ? c.link : null;
     const colData = KANBAN_COLS.find(k => k.key === c.estado) || {};
 
+    // Permiso compartido para acciones de "dueño": reasignar vendedor,
+    // editar teléfono, borrar negocio. Administrador siempre puede;
+    // el vendedor dueño actual del negocio también.
+    const primerNombreUsuario = (currentUserNombre || '').split(' ')[0].toLowerCase();
+    const esDueño = primerNombreUsuario && String(c.vendedor || '').toLowerCase().includes(primerNombreUsuario);
+    const puedeGestionar = permisos.verTodo || esDueño;
+
     document.getElementById('det-titulo').textContent = cliente;
 
     // ── Estado badge color ────────────────────────────────────────
@@ -1043,14 +1058,30 @@ function _renderDetalle(c) {
     let html = '';
 
     // ── HERO ─────────────────────────────────────────────────────
+    const etapasOptsHero = KANBAN_COLS.map(k =>
+        `<option value="${k.key}" ${k.key === c.estado ? 'selected' : ''}>${k.label} (${k.prob})</option>`
+    ).join('');
     html += `<div class="det-hero" style="padding:20px 16px 12px;">
+        ${carrito.length ? `<div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+            ${carrito.slice(0, 6).map(i => {
+                const fotoSrc = i.foto || _buscarPrecio(i.nombre)?.['Foto'] || _buscarPrecio(i.nombre)?.['foto'] || '';
+                return fotoSrc
+                    ? `<img src="${fotoSrc}" title="${_fixEncoding(i.nombre)}"
+                         style="width:56px;height:56px;object-fit:contain;border-radius:8px;background:#f8fafc;
+                                border:1px solid #e2e8f0;" onerror="this.style.display='none'">`
+                    : '';
+            }).join('')}
+        </div>` : ''}
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;">
             <div>
                 <div style="font-size:11px;color:#475569;margin-bottom:4px;">MONTO TOTAL c/IVA</div>
                 <div class="det-hero-monto">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
                 ${neto !== monto ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">Neto USD ${Math.round(neto).toLocaleString('es-AR')} · IVA USD ${Math.round(iva).toLocaleString('es-AR')}</div>` : ''}
             </div>
-            <span class="det-hero-badge" style="${badgeStyle}">${_estadoLabel(c.estado)}</span>
+            <select class="det-hero-badge-select" style="${badgeStyle}"
+                onchange="_mutarEstadoCotizacion('${id}', this.value); _renderDetalle((typeof historicoCompleto!=='undefined'?historicoCompleto:todasLasCot).find(x=>String(x.idCot||x.id_cotizacion||x.id||'')==='${id}')||cotActual);">
+                ${etapasOptsHero}
+            </select>
         </div>
         ${linkPdf ? `<a href="${linkPdf}" target="_blank"
             style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;
@@ -1072,7 +1103,12 @@ function _renderDetalle(c) {
         </div>
         <div class="det-card">
             <div class="det-card-label">Vendedor</div>
-            <div class="det-card-val">${c.vendedor || '—'}</div>
+            ${puedeGestionar ? `
+            <select class="det-vendedor-select" data-id="${id}" onchange="_mutarVendedorCotizacion('${id}', this.value)"
+                style="width:100%;font-size:12px;font-weight:600;color:#0f172a;background:white;border:1px solid #cbd5e1;
+                       border-radius:6px;padding:5px 6px;font-family:inherit;">
+                ${listaVendedores.map(v => `<option value="${v.nombre}" ${v.nombre === c.vendedor ? 'selected' : ''}>${v.nombre}</option>`).join('')}
+            </select>` : `<div class="det-card-val">${c.vendedor || '—'}</div>`}
         </div>
         <div class="det-card">
             <div class="det-card-label">Contacto</div>
@@ -1082,10 +1118,17 @@ function _renderDetalle(c) {
             <div class="det-card-label">CUIT</div>
             <div class="det-card-val">${c.cuit || c.empresa?.cuit}</div>
         </div>` : ''}
-        ${c.telefono || c.contacto?.telefono ? `<div class="det-card">
+        <div class="det-card">
             <div class="det-card-label">Teléfono</div>
-            <div class="det-card-val">${c.telefono || c.contacto?.telefono}</div>
-        </div>` : ''}
+            ${puedeGestionar ? `
+            <input type="tel" class="det-telefono-input" id="det-telefono-${id}"
+                value="${c.telefono || c.contacto?.telefono || ''}" placeholder="Sin teléfono"
+                onblur="_guardarTelefonoSiCambio('${id}', this)"
+                onkeydown="if(event.key==='Enter') this.blur();"
+                style="width:100%;font-size:12px;font-weight:600;color:#0f172a;background:white;border:1px solid #cbd5e1;
+                       border-radius:6px;padding:5px 6px;font-family:inherit;">
+            ` : `<div class="det-card-val">${c.telefono || c.contacto?.telefono || '—'}</div>`}
+        </div>
     </div>`;
 
     // ── EQUIPOS ───────────────────────────────────────────────────
@@ -1139,17 +1182,7 @@ function _renderDetalle(c) {
         </div>`;
     }
 
-    // ── CAMBIAR ETAPA ─────────────────────────────────────────────
-    const etapasOpts = KANBAN_COLS.map(k =>
-        `<option value="${k.key}" ${k.key === c.estado ? 'selected' : ''}>${k.label} (${k.prob})</option>`
-    ).join('');
-    html += `<div class="etapa-wrap">
-        <div class="etapa-label">Cambiar etapa</div>
-        <select class="cambio-etapa-select"
-            onchange="_mutarEstadoCotizacion('${id}', this.value); cerrarDetalle();">
-            ${etapasOpts}
-        </select>
-    </div>`;
+    // (Cambio de etapa ahora vive en el dropdown compacto del HERO, arriba)
 
     // ── NOTAS ─────────────────────────────────────────────────────
     const notas = (c.notas_papiro || c.Notas_Papiro || []);
@@ -1328,8 +1361,67 @@ function _renderDetalle(c) {
     }
     html += `</div>`;
 
+    // ── BORRAR NEGOCIO ───────────────────────────────────────────
+    // Mismo permiso compartido (puedeGestionar) que vendedor/teléfono.
+    const idParaBorrar = c.idCot || c.id_cotizacion || String(c.id || '');
+    if (puedeGestionar && idParaBorrar) {
+        html += `<div style="padding:8px 16px 24px;">
+            <button id="btn-borrar-deal" onclick="_confirmarBorrarDeal('${idParaBorrar}')"
+                style="width:100%;padding:11px;border-radius:10px;background:transparent;
+                       border:1px solid #5b1d2c;color:#f87171;font-size:13px;font-weight:600;
+                       cursor:pointer;">
+                🗑️ Borrar negocio
+            </button>
+        </div>`;
+    }
+
     document.getElementById('det-body').innerHTML = html;
 }
+
+// ─── BORRAR NEGOCIO — confirmación + persistencia ──────────────────
+function _confirmarBorrarDeal(idCot) {
+    const ok = confirm(
+        'Vas a borrar este negocio del portal.\n\n' +
+        'El presupuesto se archiva en HubSpot (queda recuperable, no se ve más en las listas activas) ' +
+        'y desaparece del Kanban acá.\n\nEsta acción no se puede deshacer desde el portal. ¿Confirmás?'
+    );
+    if (!ok) return;
+    _ejecutarBorradoDeal(idCot);
+}
+
+async function _ejecutarBorradoDeal(idCot) {
+    const btn = document.getElementById('btn-borrar-deal');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Borrando...';
+        btn.style.opacity = '0.6';
+    }
+    try {
+        const resp = await fetch(APPS_SCRIPT_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    JSON.stringify({ accion: 'eliminarDeal', idCot }),
+        });
+        const r = await resp.json();
+        if (!r.ok) {
+            alert('No se pudo borrar: ' + (r.error || 'error desconocido'));
+            if (btn) { btn.disabled = false; btn.textContent = '🗑️ Borrar negocio'; btn.style.opacity = '1'; }
+            return;
+        }
+        // Éxito: sacar de memoria, cerrar overlay, refrescar kanban
+        todasLasCot = todasLasCot.filter(x => String(x.idCot || x.id_cotizacion || x.id || '') !== String(idCot));
+        if (typeof historicoCompleto !== 'undefined') {
+            historicoCompleto = historicoCompleto.filter(x => String(x.idCot || x.id_cotizacion || x.id || '') !== String(idCot));
+        }
+        cerrarDetalle();
+        if (typeof aplicarFiltros === 'function') aplicarFiltros();
+        console.log('✅ Negocio borrado' + (r.hubspotArchivado ? ' y archivado en HubSpot' : ' (sin deal en HubSpot asociado)'));
+    } catch(e) {
+        alert('Error de conexión al borrar: ' + e.message);
+        if (btn) { btn.disabled = false; btn.textContent = '🗑️ Borrar negocio'; btn.style.opacity = '1'; }
+    }
+}
+
 function cerrarDetalle() {
     document.getElementById('detalle-overlay').classList.remove('open');
 }
@@ -1366,6 +1458,72 @@ function _mutarEstadoCotizacion(id, nuevoEstado) {
             } catch(e) {}
         })
         .catch(e => console.warn('Persistencia estado:', e))
+    );
+}
+
+// ─── REASIGNAR VENDEDOR ──────────────────────────────────────────
+function _mutarVendedorCotizacion(id, nuevoVendedor) {
+    if (!nuevoVendedor) return;
+    // Paso A: actualizar en memoria a 0ms
+    [historicoCompleto, todasLasCot].forEach(arr => {
+        const c = arr.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id));
+        if (c) c.vendedor = nuevoVendedor;
+    });
+    if (cotActual && String(cotActual.idCot || cotActual.id_cotizacion || cotActual.id || '') === String(id)) {
+        cotActual.vendedor = nuevoVendedor;
+    }
+    aplicarFiltros();
+
+    // Paso B: encolar escritura serializada (mismo patrón que estado)
+    _mutacionQueue = _mutacionQueue.then(() =>
+        fetch(APPS_SCRIPT_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    JSON.stringify({ accion: 'reasignarVendedor', idCot: id, vendedor: nuevoVendedor }),
+        })
+        .then(r => r.text()).then(t => {
+            try {
+                const r = JSON.parse(t);
+                if (r.ok) console.log('Vendedor reasignado ✅', r.vendedorAnterior, '→', r.vendedorNuevo);
+                else console.warn('Reasignar vendedor ⚠️', r.error);
+            } catch(e) {}
+        })
+        .catch(e => console.warn('Persistencia vendedor:', e))
+    );
+}
+
+// ─── EDITAR TELÉFONO (inline, sincroniza a Contact en HubSpot) ──────
+function _guardarTelefonoSiCambio(id, inputEl) {
+    const nuevoTelefono = inputEl.value.trim();
+    const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id))
+           || historicoCompleto.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id));
+    const telefonoActual = (c && (c.telefono || c.contacto?.telefono)) || '';
+    if (nuevoTelefono === telefonoActual) return; // sin cambios, no llamar al backend
+
+    // Paso A: actualizar en memoria
+    [historicoCompleto, todasLasCot].forEach(arr => {
+        const x = arr.find(y => String(y.idCot || y.id_cotizacion || y.id || '') === String(id));
+        if (x) {
+            x.telefono = nuevoTelefono;
+            if (x.contacto) x.contacto.telefono = nuevoTelefono;
+        }
+    });
+
+    // Paso B: persistir + sincronizar a HubSpot Contact (backend)
+    _mutacionQueue = _mutacionQueue.then(() =>
+        fetch(APPS_SCRIPT_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    JSON.stringify({ accion: 'actualizarTelefono', idCot: id, telefono: nuevoTelefono }),
+        })
+        .then(r => r.text()).then(t => {
+            try {
+                const r = JSON.parse(t);
+                if (r.ok) console.log('Teléfono persistido ✅' + (r.hubspotSincronizado ? ' (sincronizado a HubSpot)' : ''));
+                else console.warn('Teléfono ⚠️', r.error);
+            } catch(e) {}
+        })
+        .catch(e => console.warn('Persistencia teléfono:', e))
     );
 }
 
