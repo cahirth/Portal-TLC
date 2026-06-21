@@ -990,7 +990,7 @@
 </div>
 
 <script>
-    const APP_VERSION_IDX = "2026.06.21.05"; console.log("%c Portal TLC index v" + APP_VERSION_IDX + " ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+    const APP_VERSION_IDX = "2026.06.21.06"; console.log("%c Portal TLC index v" + APP_VERSION_IDX + " ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
     // ─── LOGIN POR EMAIL + CÓDIGO OTP ───────────────────────────────────────────
     // Sesión compartida con selector-dispositivos.html y cotizaciones.html.
@@ -1272,13 +1272,18 @@
             if (!Array.isArray(data)) data = [];
             data.forEach(c => { c.estado = _radarNormalizarEstado(c); });
 
-            // Filtrar por vendedor logueado — Administrador ve todo el pipeline,
-            // el resto solo lo propio (mismo criterio que cotizaciones.html).
+            // Filtrar por vendedor logueado — Administrador ve todo el pipeline
+            // (confirmado), el resto SIEMPRE solo lo propio. Guarda explícita:
+            // si no se puede determinar el nombre del vendedor logueado, no
+            // mostrar nada en vez de mostrar todo por accidente (un string
+            // vacío en .includes() matchea cualquier cosa).
             const esAdmin = userPermisos.rol === 'Administrador';
-            const primerNombre = (currentUserIndex?.name || '').split(' ')[0].toLowerCase();
+            const primerNombre = (currentUserIndex?.name || '').trim().split(' ')[0].toLowerCase();
             const misCot = esAdmin
                 ? data
-                : data.filter(c => String(c.vendedor || '').toLowerCase().includes(primerNombre));
+                : (primerNombre
+                    ? data.filter(c => String(c.vendedor || '').toLowerCase().includes(primerNombre))
+                    : []);
 
             // ── Métricas ──────────────────────────────────────────────
             const activas = misCot.filter(c => c.estado !== 'Ganada' && c.estado !== 'Perdida');
@@ -1318,7 +1323,7 @@
                     const equipo   = (c.carrito || []).map(i => i.nombre).join(' · ')
                                    || (Array.isArray(c.productos) ? c.productos.join(' · ') : '') || '—';
                     const monto    = _radarMonto(c);
-                    const link     = idCot ? `https://cahirth.github.io/Portal-TLC/presupuesto.html?id=${encodeURIComponent(idCot)}` : '#';
+                    const link     = idCot ? `https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=${encodeURIComponent(idCot)}` : '#';
                     return `<a class="radar-card ${prio}" href="${link}" target="_blank" rel="noopener noreferrer">
                         <span class="radar-card-dot"></span>
                         <div class="radar-card-body">

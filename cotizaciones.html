@@ -537,7 +537,7 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.21.43";
+const APP_VERSION = "2026.06.21.44";
 console.log("%c TLC Cotizaciones v2026.06.20.38 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -825,6 +825,10 @@ async function cargar(forzar = false) {
         setVista('kanban'); // arrancar en kanban
         mostrarStats();
 
+        // Deep-link: si la URL trae ?id=TLC-XXX (ej: desde "Mis Pendientes"
+        // del Radar en index.html), abrir directo el detalle de ese negocio.
+        _abrirDetallePorIdEnUrl();
+
     } catch(e) {
         document.getElementById('loading-inicial').innerHTML =
             `<div class="empty">❌ Error: ${e.message}<br>
@@ -1028,6 +1032,26 @@ function abrirDetalle(idx) {
         const actualizado = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === id);
         if (actualizado) _renderDetalle(actualizado);
     });
+}
+
+// Deep-link desde fuera de esta pantalla (ej: "Mis Pendientes" en index.html
+// linkea a cotizaciones.html?id=TLC-XXX). Busca el idCot en todasLasCot ya
+// cargado y abre su detalle directo, sin que el vendedor tenga que buscarlo
+// a mano en el Kanban/Lista.
+function _abrirDetallePorIdEnUrl() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const idBuscado = (params.get('id') || '').trim();
+        if (!idBuscado) return;
+        const idx = todasLasCot.findIndex(x =>
+            String(x.idCot || x.id_cotizacion || x.id || '') === idBuscado
+        );
+        if (idx !== -1) {
+            abrirDetalle(idx);
+        } else {
+            console.warn('Deep-link: negocio no encontrado en la vista actual:', idBuscado);
+        }
+    } catch(e) { console.warn('_abrirDetallePorIdEnUrl:', e); }
 }
 
 // Fotos de equipos en el header del detalle. _buscarPrecio() es síncrona y
