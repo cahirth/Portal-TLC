@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#080d14">
+<title>Servicio Técnico — TLC</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+/* ── VARIABLES (misma paleta que index.html / cotizaciones.html) ── */
+:root {
+  --bg:#080d14; --panel-dark:#0f1a30; --border-glow:#1e3050;
+  --text-main:#f1f5f9; --text-muted:#475569;
+  --accent-blue:#3a86ff; --accent-green:#06d6a0;
+  --header-bg:rgba(8,13,20,0.95);
+}
+body.tema-claro {
+  --bg:#f0f4f8; --panel-dark:#ffffff; --border-glow:#e2e8f0;
+  --text-main:#0f172a; --text-muted:#64748b;
+  --header-bg:rgba(255,255,255,0.95);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text-main);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;min-height:100vh;}
+
+/* ── HEADER ── */
+.st-header{position:sticky;top:0;z-index:100;background:var(--header-bg);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border-glow);padding:10px 14px;display:flex;align-items:center;gap:10px;}
+.st-header-logo{height:28px;width:auto;}
+.st-header-title{font-size:14px;font-weight:700;flex:1;}
+.st-header-sub{font-size:10px;color:var(--text-muted);}
+.btn-icon{width:34px;height:34px;border-radius:50%;background:var(--panel-dark);border:1px solid var(--border-glow);
+  color:var(--text-main);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.btn-icon:hover{border-color:var(--accent-blue);}
+
+/* ── BARRA DE FILTROS ── */
+.st-filtros{display:flex;gap:6px;overflow-x:auto;padding:10px 14px;border-bottom:1px solid var(--border-glow);
+  scrollbar-width:none;background:var(--panel-dark);}
+.st-filtros::-webkit-scrollbar{display:none;}
+.filtro-chip{white-space:nowrap;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;
+  border:1px solid var(--border-glow);background:transparent;color:var(--text-muted);cursor:pointer;}
+.filtro-chip.activo{background:var(--accent-blue);border-color:var(--accent-blue);color:#fff;}
+.filtro-chip select{background:transparent;border:none;color:inherit;font-size:11px;font-weight:600;cursor:pointer;outline:none;}
+
+/* ── BUSCADOR ── */
+.st-search-wrap{padding:8px 14px;background:var(--bg);}
+.st-search{width:100%;padding:8px 12px;border-radius:10px;background:var(--panel-dark);border:1px solid var(--border-glow);
+  color:var(--text-main);font-size:13px;outline:none;}
+.st-search::placeholder{color:var(--text-muted);}
+.st-search:focus{border-color:var(--accent-blue);}
+
+/* ── KANBAN ── */
+.st-kanban-outer{overflow-x:auto;padding:10px 14px 100px;scrollbar-width:thin;scrollbar-color:var(--border-glow) transparent;}
+.st-kanban-grid{display:flex;gap:10px;min-width:max-content;}
+.st-col{width:240px;flex-shrink:0;display:flex;flex-direction:column;gap:0;}
+@media(max-width:599px){.st-col{width:210px;} .st-kanban-outer{padding:8px 8px 100px;} .st-kanban-grid{gap:7px;}}
+
+.st-col-header{padding:10px 12px;border-radius:10px 10px 0 0;border:1px solid transparent;border-bottom:none;}
+.st-col-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;}
+.st-col-meta{display:flex;gap:6px;align-items:center;margin-top:4px;}
+.st-col-count{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(0,0,0,.2);}
+.st-col-total-usd{font-size:11px;font-weight:700;}
+.st-cards{background:var(--bg);border:1px solid var(--border-glow);border-top:none;border-radius:0 0 10px 10px;
+  padding:6px;display:flex;flex-direction:column;gap:5px;min-height:60px;}
+.st-cards.drag-over{border-color:var(--accent-blue);background:rgba(58,134,255,0.05);}
+
+/* ── TARJETA DE TICKET ── */
+.st-ticket{background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:10px;padding:10px;
+  cursor:pointer;transition:border-color .15s,transform .1s;user-select:none;}
+.st-ticket:hover{border-color:var(--accent-blue);}
+.st-ticket.dragging{opacity:0.5;transform:scale(0.97);}
+.st-ticket-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:6px;}
+.st-ticket-modelo{font-size:12px;font-weight:700;color:var(--text-main);line-height:1.3;}
+.st-ticket-cliente{font-size:11px;color:var(--text-muted);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.st-ticket-serie{font-size:10px;color:var(--text-muted);font-family:monospace;}
+.st-ticket-footer{display:flex;align-items:center;gap:5px;margin-top:7px;flex-wrap:wrap;}
+.badge-prio{font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;text-transform:uppercase;}
+.badge-prio.urgente   {background:rgba(239,68,68,.2);color:#ef4444;}
+.badge-prio.importante{background:rgba(249,115,22,.2);color:#f97316;}
+.badge-prio.media     {background:rgba(234,179,8,.2); color:#eab308;}
+.badge-prio.baja      {background:rgba(100,116,139,.2);color:#94a3b8;}
+.badge-estado{font-size:9px;font-weight:600;padding:2px 7px;border-radius:8px;}
+.badge-estado.atrasada   {background:rgba(239,68,68,.15);color:#ef4444;}
+.badge-estado.no_iniciada{background:rgba(100,116,139,.15);color:#94a3b8;}
+.badge-estado.en_curso   {background:rgba(58,134,255,.15);color:#3a86ff;}
+.badge-estado.completada {background:rgba(6,214,160,.15);color:#06d6a0;}
+.avatar-tecnico{width:20px;height:20px;border-radius:50%;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:auto;}
+.fecha-venc{font-size:9px;font-weight:600;}
+.fecha-venc.vencida{color:#ef4444;}
+.fecha-venc.hoy{color:#f97316;}
+.fecha-venc.proxima{color:#eab308;}
+.fecha-venc.ok{color:#06d6a0;}
+.st-empty-col{font-size:11px;color:var(--text-muted);text-align:center;padding:16px 8px;
+  border:1px dashed var(--border-glow);border-radius:8px;}
+
+/* ── BOTÓN NUEVO TICKET ── */
+.btn-nuevo-ticket{position:fixed;bottom:20px;right:16px;z-index:200;
+  background:var(--accent-blue);color:#fff;border:none;border-radius:50%;
+  width:52px;height:52px;font-size:22px;cursor:pointer;box-shadow:0 4px 20px rgba(58,134,255,.5);
+  display:flex;align-items:center;justify-content:center;transition:transform .15s;}
+.btn-nuevo-ticket:hover{transform:scale(1.08);}
+
+/* ── MODALES ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;display:none;align-items:flex-end;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:var(--panel-dark);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:540px;
+  max-height:90vh;overflow-y:auto;border-top:1px solid var(--border-glow);}
+@media(min-width:600px){
+  .modal-overlay{align-items:center;}
+  .modal-box{border-radius:16px;max-height:80vh;}
+}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;}
+.modal-close{background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;}
+.form-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:4px;display:block;}
+.form-input,.form-select,.form-textarea{width:100%;padding:9px 12px;border-radius:10px;
+  background:var(--bg);border:1px solid var(--border-glow);color:var(--text-main);
+  font-size:13px;font-family:inherit;margin-bottom:12px;outline:none;}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent-blue);}
+.form-textarea{min-height:70px;resize:vertical;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media(max-width:400px){.form-row{grid-template-columns:1fr;}}
+.btn-primary{width:100%;padding:12px;border-radius:10px;background:var(--accent-blue);
+  color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;}
+.btn-primary:hover{background:#2a76ef;}
+.btn-peligro{background:transparent;border:1px solid #ef4444;color:#ef4444;
+  width:100%;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;}
+
+/* ── DETALLE OVERLAY ── */
+.detalle-overlay{position:fixed;inset:0;background:var(--bg);z-index:250;display:none;overflow-y:auto;}
+.detalle-overlay.open{display:block;}
+.detalle-header{position:sticky;top:0;background:var(--header-bg);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border-glow);padding:10px 14px;
+  display:flex;align-items:center;gap:10px;z-index:10;}
+.detalle-body-wrap{max-width:780px;margin:0 auto;padding:0 14px 40px;}
+.det-section{margin:16px 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.5px;color:var(--text-muted);}
+.det-card{background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+.det-field{margin-bottom:10px;}
+.det-field:last-child{margin-bottom:0;}
+.det-field-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:3px;}
+.det-field-val{font-size:13px;color:var(--text-main);}
+.det-field-input,.det-field-select{width:100%;padding:7px 10px;border-radius:8px;background:var(--bg);
+  border:1px solid var(--border-glow);color:var(--text-main);font-size:12px;font-family:inherit;outline:none;}
+.det-field-input:focus,.det-field-select:focus{border-color:var(--accent-blue);}
+.nota-item{padding:10px 0;border-bottom:1px solid var(--border-glow);}
+.nota-item:last-child{border-bottom:none;}
+.nota-meta{font-size:10px;color:var(--text-muted);margin-bottom:3px;}
+.nota-texto{font-size:12px;color:var(--text-main);line-height:1.5;}
+.btn-guardar-nota{width:100%;padding:10px;border-radius:10px;background:var(--accent-blue);
+  color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;}
+.btn-orden{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:10px;
+  border-radius:10px;background:var(--panel-dark);border:1px solid var(--border-glow);
+  color:var(--text-main);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;text-decoration:none;}
+.btn-orden:hover{border-color:var(--accent-blue);}
+body.tema-claro .form-select, body.tema-claro .form-input, body.tema-claro .form-textarea,
+body.tema-claro .det-field-select, body.tema-claro .det-field-input { background:#f8fafc; }
+
+/* ── LOADING ── */
+.st-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:60px 20px;gap:12px;color:var(--text-muted);}
+.st-spinner{width:36px;height:36px;border:3px solid var(--border-glow);
+  border-top-color:var(--accent-blue);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="st-header">
+  <button class="btn-icon" id="btn-back" onclick="history.back()">←</button>
+  <div style="flex:1;">
+    <div class="st-header-title">Servicio Técnico</div>
+    <div class="st-header-sub" id="st-user-label">Cargando...</div>
+  </div>
+  <button class="btn-icon" id="btn-tema" onclick="_toggleTema()" title="Cambiar tema">🌓</button>
+  <button class="btn-icon" onclick="_recargarTickets()" title="Actualizar">↺</button>
+</header>
+
+<!-- FILTROS -->
+<div class="st-filtros">
+  <button class="filtro-chip activo" data-filtro="tecnico" data-val="todos" onclick="_selFiltro(this,'tecnico')">Todos</button>
+  <button class="filtro-chip" data-filtro="tecnico" data-val="juan_garro" onclick="_selFiltro(this,'tecnico')">Juan</button>
+  <button class="filtro-chip" data-filtro="tecnico" data-val="damian_sosa" onclick="_selFiltro(this,'tecnico')">Damián</button>
+  <button class="filtro-chip" data-filtro="tecnico" data-val="fernando_del_campo" onclick="_selFiltro(this,'tecnico')">Fernando</button>
+  <button class="filtro-chip" data-filtro="tecnico" data-val="sin_asignar" onclick="_selFiltro(this,'tecnico')">Sin asignar</button>
+  <span style="width:1px;background:var(--border-glow);flex-shrink:0;"></span>
+  <button class="filtro-chip" data-filtro="prio" data-val="todos" onclick="_selFiltro(this,'prio')" style="opacity:.5;">● Prio</button>
+  <button class="filtro-chip" data-filtro="prio" data-val="urgente" onclick="_selFiltro(this,'prio')">🔴 Urgente</button>
+  <button class="filtro-chip" data-filtro="prio" data-val="importante" onclick="_selFiltro(this,'prio')">🟠 Importante</button>
+  <button class="filtro-chip" data-filtro="prio" data-val="media" onclick="_selFiltro(this,'prio')">🟡 Media</button>
+  <span style="width:1px;background:var(--border-glow);flex-shrink:0;"></span>
+  <button class="filtro-chip" data-filtro="estado" data-val="todos" onclick="_selFiltro(this,'estado')" style="opacity:.5;">● Estado</button>
+  <button class="filtro-chip" data-filtro="estado" data-val="en_curso" onclick="_selFiltro(this,'estado')">En curso</button>
+  <button class="filtro-chip" data-filtro="estado" data-val="atrasada" onclick="_selFiltro(this,'estado')">Atrasada</button>
+  <button class="filtro-chip" data-filtro="estado" data-val="no_iniciada" onclick="_selFiltro(this,'estado')">No iniciada</button>
+</div>
+
+<!-- BUSCADOR -->
+<div class="st-search-wrap">
+  <input type="search" class="st-search" id="st-buscador" placeholder="Buscar cliente, modelo, serie..." oninput="_aplicarFiltros()">
+</div>
+
+<!-- KANBAN -->
+<div id="st-kanban-outer" class="st-kanban-outer">
+  <div class="st-loading" id="st-loading">
+    <div class="st-spinner"></div>
+    <span>Cargando tickets...</span>
+  </div>
+  <div class="st-kanban-grid" id="st-kanban-grid" style="display:none;"></div>
+</div>
+
+<!-- BTN NUEVO TICKET -->
+<button class="btn-nuevo-ticket" id="btn-nuevo-ticket" onclick="_abrirModalNuevo()" title="Nuevo ticket" style="display:none;">+</button>
+
+<!-- MODAL NUEVO TICKET -->
+<div class="modal-overlay" id="modal-nuevo">
+  <div class="modal-box">
+    <div class="modal-title">
+      Nuevo Ticket de Servicio
+      <button class="modal-close" onclick="_cerrarModalNuevo()">✕</button>
+    </div>
+    <label class="form-label">Cliente / Clínica</label>
+    <input type="text" class="form-input" id="nuevo-cliente" placeholder="Ej: Clínica de Ojos Norte">
+    <div class="form-row">
+      <div>
+        <label class="form-label">Modelo de equipo</label>
+        <input type="text" class="form-input" id="nuevo-modelo" placeholder="Ej: HOCT-1 HUVITZ">
+      </div>
+      <div>
+        <label class="form-label">Nº de serie</label>
+        <input type="text" class="form-input" id="nuevo-serie" placeholder="Ej: H100-2510074">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label class="form-label">Técnico asignado</label>
+        <select class="form-select" id="nuevo-tecnico">
+          <option value="sin_asignar">Sin asignar</option>
+          <option value="juan_garro">Juan Garro</option>
+          <option value="damian_sosa">Damián Sosa</option>
+          <option value="fernando_del_campo">Fernando Del Campo</option>
+          <option value="cristian_hirth">Cristian Hirth</option>
+          <option value="veronica_ribaita">Verónica Ribaita</option>
+          <option value="lourdes_davalos">Lourdes Dávalos</option>
+          <option value="lucio_raineri">Lucio Raineri</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Prioridad</label>
+        <select class="form-select" id="nuevo-prioridad">
+          <option value="media">Media</option>
+          <option value="urgente">🔴 Urgente</option>
+          <option value="importante">🟠 Importante</option>
+          <option value="baja">Baja</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label class="form-label">Depósito inicial</label>
+        <select class="form-select" id="nuevo-deposito">
+          <option value="en_laboratorio">En laboratorio</option>
+          <option value="diagnostico">Diagnóstico</option>
+          <option value="presupuesto">Presupuesto</option>
+          <option value="reparacion">Reparación</option>
+          <option value="preparacion_control_calidad">Preparación / CC</option>
+          <option value="para_facturar">Para facturar</option>
+          <option value="para_instalar">Para instalar</option>
+          <option value="seguimiento">Seguimiento</option>
+          <option value="servicio_remoto">Servicio remoto</option>
+          <option value="consignacion">Consignación</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Fecha de vencimiento</label>
+        <input type="date" class="form-input" id="nuevo-fecha">
+      </div>
+    </div>
+    <label class="form-label">Nota inicial (opcional)</label>
+    <textarea class="form-textarea" id="nuevo-nota" placeholder="Descripción del problema o contexto..."></textarea>
+    <button class="btn-primary" onclick="_crearTicket()">Crear Ticket</button>
+  </div>
+</div>
+
+<!-- OVERLAY DETALLE TICKET -->
+<div class="detalle-overlay" id="st-detalle-overlay">
+  <div class="detalle-header">
+    <button class="btn-icon" onclick="_cerrarDetalle()">←</button>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:700;" id="det-titulo">—</div>
+      <div style="font-size:10px;color:var(--text-muted);" id="det-id">—</div>
+    </div>
+    <a id="btn-orden-header" href="#" target="_blank" class="btn-icon" title="Ver orden de servicio">📄</a>
+  </div>
+  <div class="detalle-body-wrap" id="det-body"></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ── Config ────────────────────────────────────────────────────────
+var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+var RTDB_URL    = 'https://portal-tlc-default-rtdb.firebaseio.com';
+var SESSION_KEY = 'tlc_session_v1';
+var TEMA_KEY    = 'tlc_tema';
+var ORDEN_URL   = 'https://cahirth.github.io/Portal-TLC/orden-servicio.html?id=';
+
+// ── Columnas del Kanban ───────────────────────────────────────────
+var COLUMNAS = [
+  { key:'en_laboratorio',           label:'En Laboratorio',       color:'#60a5fa', bg:'rgba(96,165,250,.1)',  border:'rgba(96,165,250,.25)' },
+  { key:'diagnostico',              label:'Diagnóstico',           color:'#a78bfa', bg:'rgba(167,139,250,.1)', border:'rgba(167,139,250,.25)'},
+  { key:'presupuesto',              label:'Presupuesto',           color:'#fbbf24', bg:'rgba(251,191,36,.1)',  border:'rgba(251,191,36,.25)' },
+  { key:'reparacion',               label:'Reparación',            color:'#f87171', bg:'rgba(248,113,113,.1)', border:'rgba(248,113,113,.25)'},
+  { key:'preparacion_control_calidad',label:'Preparación / CC',   color:'#34d399', bg:'rgba(52,211,153,.1)',  border:'rgba(52,211,153,.25)' },
+  { key:'para_facturar',            label:'Para Facturar',         color:'#fb923c', bg:'rgba(251,146,60,.1)',  border:'rgba(251,146,60,.25)' },
+  { key:'para_instalar',            label:'Para Instalar',         color:'#38bdf8', bg:'rgba(56,189,248,.1)',  border:'rgba(56,189,248,.25)' },
+  { key:'seguimiento',              label:'Seguimiento',           color:'#a3e635', bg:'rgba(163,230,53,.1)',  border:'rgba(163,230,53,.25)' },
+  { key:'servicio_remoto',          label:'Servicio Remoto',       color:'#22d3ee', bg:'rgba(34,211,238,.1)',  border:'rgba(34,211,238,.25)' },
+  { key:'consignacion',             label:'Consignación',          color:'#e879f9', bg:'rgba(232,121,249,.1)', border:'rgba(232,121,249,.25)'},
+  { key:'finalizado',               label:'Finalizado ✓',          color:'#06d6a0', bg:'rgba(6,214,160,.1)',   border:'rgba(6,214,160,.25)'  },
+  { key:'cancelado',                label:'Cancelado',             color:'#94a3b8', bg:'rgba(148,163,184,.1)', border:'rgba(148,163,184,.2)' },
+];
+
+var TECNICO_LABEL = {
+  sin_asignar:'—', fernando_del_campo:'FC', cristian_hirth:'CH',
+  veronica_ribaita:'VR', lourdes_davalos:'LD', juan_garro:'JG',
+  damian_sosa:'DS', lucio_raineri:'LR'
+};
+var TECNICO_COLOR = {
+  sin_asignar:'#475569', fernando_del_campo:'#3a86ff', cristian_hirth:'#06d6a0',
+  veronica_ribaita:'#f472b6', lourdes_davalos:'#fb923c', juan_garro:'#a78bfa',
+  damian_sosa:'#fbbf24', lucio_raineri:'#34d399'
+};
+
+// ── Estado ────────────────────────────────────────────────────────
+var _session     = null;
+var _permisos    = { servicio:false, admin:false };
+var _tickets     = [];   // todos los tickets del RTDB
+var _filtros     = { tecnico:'todos', prio:'todos', estado:'todos' };
+var _ticketActual = null;
+
+// ── Arranque ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  _aplicarTema();
+  _cargarSesion();
+});
+
+function _cargarSesion() {
+  try {
+    var raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) { _redirigirLogin(); return; }
+    _session = JSON.parse(raw);
+    if (!_session || !_session.username) { _redirigirLogin(); return; }
+    document.getElementById('st-user-label').textContent = _session.name || _session.username;
+
+    // Permisos — el objeto de permisos puede venir guardado en la sesión
+    // o puede requerir una consulta al Sheet. Usamos lo que hay en la sesión
+    // y si no tiene el campo de permisos, asumimos acceso por haber llegado
+    // hasta acá (el menú de index.html ya bloqueó si no tenía permiso).
+    _permisos.servicio = true; // si llegó a esta pantalla, tiene permiso
+    _permisos.admin    = (_session.rol === 'Administrador');
+
+    if (_permisos.servicio) {
+      document.getElementById('btn-nuevo-ticket').style.display = 'flex';
+    }
+
+    _cargarTickets();
+  } catch(e) {
+    console.error('Error cargando sesión:', e);
+    _redirigirLogin();
+  }
+}
+
+function _redirigirLogin() {
+  window.location.href = 'index.html';
+}
+
+// ── Tema ──────────────────────────────────────────────────────────
+function _aplicarTema() {
+  var t = localStorage.getItem(TEMA_KEY) || 'dark';
+  document.body.classList.toggle('tema-claro', t === 'light');
+}
+window._toggleTema = function() {
+  var actual = localStorage.getItem(TEMA_KEY) || 'dark';
+  var nuevo  = actual === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(TEMA_KEY, nuevo);
+  document.body.classList.toggle('tema-claro', nuevo === 'light');
+};
+
+// ── Fetch a RTDB (lectura pública REST) ───────────────────────────
+async function _cargarTickets() {
+  document.getElementById('st-loading').style.display   = 'flex';
+  document.getElementById('st-kanban-grid').style.display = 'none';
+  try {
+    var res  = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now(), { cache:'no-store' });
+    var data = await res.json();
+    _tickets = data ? Object.values(data) : [];
+    _aplicarFiltros();
+    document.getElementById('st-loading').style.display   = 'none';
+    document.getElementById('st-kanban-grid').style.display = 'flex';
+  } catch(e) {
+    console.error('Error cargando tickets ST:', e);
+    document.getElementById('st-loading').innerHTML = '<span style="color:#ef4444">Error cargando datos. Reintentá.</span>';
+  }
+}
+window._recargarTickets = _cargarTickets;
+
+// ── Filtros ────────────────────────────────────────────────────────
+window._selFiltro = function(btn, tipo) {
+  document.querySelectorAll('[data-filtro="' + tipo + '"]').forEach(function(b) { b.classList.remove('activo'); });
+  btn.classList.add('activo');
+  _filtros[tipo] = btn.dataset.val;
+  _aplicarFiltros();
+};
+
+window._aplicarFiltros = function() {
+  var query = (document.getElementById('st-buscador').value || '').toLowerCase().trim();
+  var filtrados = _tickets.filter(function(t) {
+    if (_filtros.tecnico !== 'todos' && t.tecnico_asignado !== _filtros.tecnico) return false;
+    if (_filtros.prio    !== 'todos' && t.prioridad        !== _filtros.prio)    return false;
+    if (_filtros.estado  !== 'todos' && t.estado_progreso  !== _filtros.estado)  return false;
+    if (query) {
+      var haystack = [t.cliente, t.equipo_modelo, t.equipo_serie, t.id_ticket].join(' ').toLowerCase();
+      if (!haystack.includes(query)) return false;
+    }
+    return true;
+  });
+  _renderKanban(filtrados);
+};
+
+// ── Render Kanban ─────────────────────────────────────────────────
+function _renderKanban(tickets) {
+  var grid = document.getElementById('st-kanban-grid');
+  grid.innerHTML = COLUMNAS.map(function(col) {
+    var cols_tickets = tickets.filter(function(t) { return t.deposito === col.key; });
+    var headerStyle  = 'background:' + col.bg + ';border-color:' + col.border + ';';
+    var tarjetas     = cols_tickets.length
+      ? cols_tickets.map(_renderTarjeta).join('')
+      : '<div class="st-empty-col">Sin tickets</div>';
+
+    return '<div class="st-col">' +
+      '<div class="st-col-header" style="' + headerStyle + '">' +
+        '<div class="st-col-label" style="color:' + col.color + '">' + col.label + '</div>' +
+        '<div class="st-col-meta">' +
+          '<span class="st-col-count" style="color:' + col.color + '">' + cols_tickets.length + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="st-cards" id="col-' + col.key + '" data-col="' + col.key + '" ' +
+        'ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ' +
+        'ondragleave="this.classList.remove(\'drag-over\')" ' +
+        'ondrop="_onDrop(event,\'' + col.key + '\')">' +
+        tarjetas +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function _renderTarjeta(t) {
+  var tecLabel  = TECNICO_LABEL[t.tecnico_asignado] || '?';
+  var tecColor  = TECNICO_COLOR[t.tecnico_asignado] || '#475569';
+  var fechaHtml = _fechaHtml(t.fecha_vencimiento);
+  var puedeEditar = _permisos.servicio;
+
+  return '<div class="st-ticket" id="ticket-' + t.id_ticket + '" ' +
+    (puedeEditar ? 'draggable="true" ondragstart="_onDragStart(event,\'' + t.id_ticket + '\')" ' : '') +
+    'onclick="_abrirDetalle(\'' + t.id_ticket + '\')">' +
+    '<div class="st-ticket-top">' +
+      '<div class="st-ticket-modelo">' + _esc(t.equipo_modelo || '—') + '</div>' +
+    '</div>' +
+    '<div class="st-ticket-cliente">' + _esc(t.cliente || '—') + '</div>' +
+    (t.equipo_serie ? '<div class="st-ticket-serie">' + _esc(t.equipo_serie) + '</div>' : '') +
+    '<div class="st-ticket-footer">' +
+      '<span class="badge-prio ' + (t.prioridad||'media') + '">' + (t.prioridad||'media') + '</span>' +
+      '<span class="badge-estado ' + (t.estado_progreso||'no_iniciada') + '">' + _estadoLabel(t.estado_progreso) + '</span>' +
+      (fechaHtml || '') +
+      '<span class="avatar-tecnico" style="background:' + tecColor + '20;color:' + tecColor + '">' + tecLabel + '</span>' +
+    '</div>' +
+  '</div>';
+}
+
+function _estadoLabel(e) {
+  return { atrasada:'Atrasada', no_iniciada:'No iniciada', en_curso:'En curso', completada:'Completada' }[e] || e || '—';
+}
+
+function _fechaHtml(fechaStr) {
+  if (!fechaStr) return '';
+  try {
+    var parts = fechaStr.split('-');
+    var d = new Date(parts[2], parseInt(parts[1])-1, parseInt(parts[0]));
+    var hoy  = new Date(); hoy.setHours(0,0,0,0);
+    var diff = Math.floor((d - hoy) / 86400000);
+    var cls  = diff < 0 ? 'vencida' : diff === 0 ? 'hoy' : diff <= 3 ? 'proxima' : 'ok';
+    var lbl  = diff < 0 ? 'Vencida' : diff === 0 ? 'Hoy' : diff === 1 ? 'Mañana' : fechaStr;
+    return '<span class="fecha-venc ' + cls + '">📅 ' + lbl + '</span>';
+  } catch(e) { return ''; }
+}
+
+function _esc(s) {
+  return String(s||'').replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+// ── Drag & Drop ────────────────────────────────────────────────────
+var _dragId = null;
+window._onDragStart = function(e, id) {
+  _dragId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(function(){ var el = document.getElementById('ticket-' + id); if(el) el.classList.add('dragging'); }, 0);
+};
+window._onDrop = function(e, nuevaCol) {
+  e.preventDefault();
+  document.querySelectorAll('.st-cards').forEach(function(c){ c.classList.remove('drag-over'); });
+  if (!_dragId || !_permisos.servicio) return;
+  var id = _dragId; _dragId = null;
+  var el = document.getElementById('ticket-' + id); if (el) el.classList.remove('dragging');
+
+  // Optimistic update
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (t) t.deposito = nuevaCol;
+  _aplicarFiltros();
+
+  // Persistir vía GAS
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_actualizarDeposito', id_ticket:id, deposito:nuevaCol }) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){ if(!r.ok) { console.warn('Error actualizando depósito:', r.error); _cargarTickets(); } })
+  .catch(function(){ _cargarTickets(); });
+};
+
+// ── Detalle de ticket ─────────────────────────────────────────────
+window._abrirDetalle = function(id) {
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (!t) return;
+  _ticketActual = t;
+  _renderDetalle(t);
+  document.getElementById('st-detalle-overlay').classList.add('open');
+  document.getElementById('st-detalle-overlay').scrollTop = 0;
+};
+window._cerrarDetalle = function() {
+  document.getElementById('st-detalle-overlay').classList.remove('open');
+  _ticketActual = null;
+};
+
+function _renderDetalle(t) {
+  document.getElementById('det-titulo').textContent = t.cliente || '—';
+  document.getElementById('det-id').textContent     = t.id_ticket;
+  document.getElementById('btn-orden-header').href  = ORDEN_URL + encodeURIComponent(t.id_ticket);
+
+  var puedeEditar = _permisos.servicio;
+
+  var notasHtml = '';
+  if (t.notas_comentarios && t.notas_comentarios.length) {
+    notasHtml = t.notas_comentarios.map(function(n){
+      return '<div class="nota-item">' +
+        '<div class="nota-meta">' + _esc(n.autor||'—') + ' · ' + _formatFechaISO(n.fecha) + '</div>' +
+        '<div class="nota-texto">' + _esc(n.texto) + '</div>' +
+      '</div>';
+    }).join('');
+  } else {
+    notasHtml = '<div style="color:var(--text-muted);font-size:12px;padding:8px 0;">Sin notas todavía.</div>';
+  }
+
+  document.getElementById('det-body').innerHTML =
+    // ACCESO RÁPIDO
+    '<div style="padding-top:14px;">' +
+    '<a class="btn-orden" href="' + ORDEN_URL + encodeURIComponent(t.id_ticket) + '" target="_blank">' +
+      '<i class="fa-solid fa-file-lines"></i> Ver Orden de Servicio</a>' +
+    '</div>' +
+
+    // INFO PRINCIPAL
+    '<div class="det-section">Información del equipo</div>' +
+    '<div class="det-card">' +
+      '<div class="det-field">' +
+        '<div class="det-field-label">Cliente / Clínica</div>' +
+        (puedeEditar
+          ? '<input class="det-field-input" value="' + _esc(t.cliente||'') + '" onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'cliente\',this.value,\'' + _esc(t.cliente||'') + '\')">'
+          : '<div class="det-field-val">' + _esc(t.cliente||'—') + '</div>') +
+      '</div>' +
+      '<div class="form-row">' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Modelo</div>' +
+          (puedeEditar
+            ? '<input class="det-field-input" value="' + _esc(t.equipo_modelo||'') + '" onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'equipo_modelo\',this.value,\'' + _esc(t.equipo_modelo||'') + '\')">'
+            : '<div class="det-field-val">' + _esc(t.equipo_modelo||'—') + '</div>') +
+        '</div>' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Nº de Serie</div>' +
+          (puedeEditar
+            ? '<input class="det-field-input" value="' + _esc(t.equipo_serie||'') + '" onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'equipo_serie\',this.value,\'' + _esc(t.equipo_serie||'') + '\')">'
+            : '<div class="det-field-val">' + _esc(t.equipo_serie||'—') + '</div>') +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // ASIGNACIÓN Y ESTADO
+    '<div class="det-section">Asignación y estado</div>' +
+    '<div class="det-card">' +
+      '<div class="form-row">' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Depósito (etapa)</div>' +
+          (puedeEditar
+            ? '<select class="det-field-select" onchange="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'deposito_directo\',this.value,\'\')">' + _optsDeposito(t.deposito) + '</select>'
+            : '<div class="det-field-val">' + (t.deposito||'—') + '</div>') +
+        '</div>' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Técnico</div>' +
+          (puedeEditar
+            ? '<select class="det-field-select" onchange="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'tecnico_asignado\',this.value,\'\')">' + _optsTecnico(t.tecnico_asignado) + '</select>'
+            : '<div class="det-field-val">' + (TECNICO_LABEL[t.tecnico_asignado]||'—') + '</div>') +
+        '</div>' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Prioridad</div>' +
+          (puedeEditar
+            ? '<select class="det-field-select" onchange="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'prioridad\',this.value,\'\')">' + _optsPrio(t.prioridad) + '</select>'
+            : '<div class="det-field-val">' + (t.prioridad||'—') + '</div>') +
+        '</div>' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Estado progreso</div>' +
+          (puedeEditar
+            ? '<select class="det-field-select" onchange="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'estado_progreso\',this.value,\'\')">' + _optsEstado(t.estado_progreso) + '</select>'
+            : '<div class="det-field-val">' + _estadoLabel(t.estado_progreso) + '</div>') +
+        '</div>' +
+      '</div>' +
+      '<div class="det-field">' +
+        '<div class="det-field-label">Fecha de vencimiento</div>' +
+        (puedeEditar
+          ? '<input type="date" class="det-field-input" value="' + _fechaDDMMYYYYToISO(t.fecha_vencimiento) + '" onchange="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'fecha_vencimiento\',_fechaISOToDDMMYYYY(this.value),\'\')">'
+          : '<div class="det-field-val">' + (t.fecha_vencimiento||'—') + '</div>') +
+      '</div>' +
+    '</div>' +
+
+    // NOTAS
+    '<div class="det-section">Notas de seguimiento</div>' +
+    '<div class="det-card">' +
+      notasHtml +
+      (puedeEditar ? '<textarea class="form-textarea" id="det-nota-input" placeholder="Agregar nota..." style="margin-top:10px;margin-bottom:0;"></textarea>' +
+        '<button class="btn-guardar-nota" onclick="_guardarNota(\'' + t.id_ticket + '\')">💾 Guardar nota</button>' : '') +
+    '</div>' +
+
+    // PELIGRO
+    (puedeEditar ? '<div class="det-section">Zona de peligro</div>' +
+    '<button class="btn-peligro" onclick="_confirmarEliminar(\'' + t.id_ticket + '\')">🗑️ Eliminar ticket</button>' : '');
+}
+
+function _optsDeposito(sel) {
+  return [
+    {v:'en_laboratorio',l:'En Laboratorio'},{v:'diagnostico',l:'Diagnóstico'},
+    {v:'presupuesto',l:'Presupuesto'},{v:'reparacion',l:'Reparación'},
+    {v:'preparacion_control_calidad',l:'Preparación / CC'},{v:'para_facturar',l:'Para Facturar'},
+    {v:'para_instalar',l:'Para Instalar'},{v:'seguimiento',l:'Seguimiento'},
+    {v:'servicio_remoto',l:'Servicio Remoto'},{v:'consignacion',l:'Consignación'},
+    {v:'finalizado',l:'Finalizado'},{v:'cancelado',l:'Cancelado'},
+  ].map(function(o){ return '<option value="' + o.v + '"' + (o.v===sel?' selected':'') + '>' + o.l + '</option>'; }).join('');
+}
+function _optsTecnico(sel) {
+  return [
+    {v:'sin_asignar',l:'Sin asignar'},{v:'juan_garro',l:'Juan Garro'},
+    {v:'damian_sosa',l:'Damián Sosa'},{v:'fernando_del_campo',l:'Fernando Del Campo'},
+    {v:'cristian_hirth',l:'Cristian Hirth'},{v:'veronica_ribaita',l:'Verónica Ribaita'},
+    {v:'lourdes_davalos',l:'Lourdes Dávalos'},{v:'lucio_raineri',l:'Lucio Raineri'},
+  ].map(function(o){ return '<option value="' + o.v + '"' + (o.v===sel?' selected':'') + '>' + o.l + '</option>'; }).join('');
+}
+function _optsPrio(sel) {
+  return [{v:'urgente',l:'🔴 Urgente'},{v:'importante',l:'🟠 Importante'},{v:'media',l:'🟡 Media'},{v:'baja',l:'Baja'}]
+    .map(function(o){ return '<option value="' + o.v + '"' + (o.v===sel?' selected':'') + '>' + o.l + '</option>'; }).join('');
+}
+function _optsEstado(sel) {
+  return [{v:'no_iniciada',l:'No iniciada'},{v:'en_curso',l:'En curso'},{v:'atrasada',l:'Atrasada'},{v:'completada',l:'Completada'}]
+    .map(function(o){ return '<option value="' + o.v + '"' + (o.v===sel?' selected':'') + '>' + o.l + '</option>'; }).join('');
+}
+
+// Guarda un campo al cambiar — si campo === 'deposito_directo' usa st_actualizarDeposito
+window._guardarCampoSiCambio = function(id, campo, valor, valorAnterior) {
+  if (valorAnterior !== undefined && valorAnterior !== '' && valor === valorAnterior) return;
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (t) {
+    if (campo === 'deposito_directo') { t.deposito = valor; campo = 'deposito'; }
+    else t[campo] = valor;
+  }
+  _aplicarFiltros();
+
+  var body;
+  if (campo === 'deposito') {
+    body = { accion:'st_actualizarDeposito', id_ticket:id, deposito:valor };
+  } else {
+    body = { accion:'st_actualizarCampo', id_ticket:id, campo:campo, valor:valor };
+  }
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) })
+    .then(function(r){ return r.json(); })
+    .then(function(r){ if(!r.ok) console.warn('Error guardando campo:', r.error); })
+    .catch(function(e){ console.warn(e); });
+};
+
+window._guardarNota = function(id) {
+  var input = document.getElementById('det-nota-input');
+  var texto = (input ? input.value : '').trim();
+  if (!texto) return;
+  var autor = (_session && (_session.name || _session.username)) || 'Desconocido';
+  input.value = '';
+  input.disabled = true;
+
+  var nota = { texto:texto, autor:autor, fecha:new Date().toISOString() };
+  if (_ticketActual && _ticketActual.id_ticket === id) {
+    if (!Array.isArray(_ticketActual.notas_comentarios)) _ticketActual.notas_comentarios = [];
+    _ticketActual.notas_comentarios.unshift(nota);
+    _renderDetalle(_ticketActual);
+  }
+
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({ accion:'st_agregarNota', id_ticket:id, texto:texto, autor:autor }) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){
+    if (!r.ok) console.warn('Error guardando nota:', r.error);
+    else { var t = _tickets.find(function(x){ return x.id_ticket === id; }); if(t) t.notas_comentarios = _ticketActual ? _ticketActual.notas_comentarios : [nota]; }
+  })
+  .catch(function(e){ console.warn(e); })
+  .finally(function(){ if(input) input.disabled = false; });
+};
+
+window._confirmarEliminar = function(id) {
+  if (!confirm('¿Eliminar este ticket permanentemente? Esta acción no se puede deshacer.')) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({ accion:'st_eliminarTicket', id_ticket:id }) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){
+    if (r.ok) {
+      _tickets = _tickets.filter(function(t){ return t.id_ticket !== id; });
+      _cerrarDetalle();
+      _aplicarFiltros();
+    } else { alert('Error eliminando: ' + (r.error||'desconocido')); }
+  })
+  .catch(function(e){ alert('Error de conexión: ' + e.message); });
+};
+
+// ── Nuevo ticket ──────────────────────────────────────────────────
+window._abrirModalNuevo = function() {
+  if (!_permisos.servicio) return;
+  document.getElementById('modal-nuevo').classList.add('open');
+};
+window._cerrarModalNuevo = function() {
+  document.getElementById('modal-nuevo').classList.remove('open');
+};
+window._crearTicket = function() {
+  var cliente  = document.getElementById('nuevo-cliente').value.trim();
+  var modelo   = document.getElementById('nuevo-modelo').value.trim();
+  var serie    = document.getElementById('nuevo-serie').value.trim();
+  var tecnico  = document.getElementById('nuevo-tecnico').value;
+  var prio     = document.getElementById('nuevo-prioridad').value;
+  var deposito = document.getElementById('nuevo-deposito').value;
+  var fecha    = document.getElementById('nuevo-fecha').value;
+  var nota     = document.getElementById('nuevo-nota').value.trim();
+
+  if (!cliente || !modelo) { alert('Cliente y modelo son obligatorios.'); return; }
+
+  var payload = {
+    accion:           'st_crearTicket',
+    cliente:          cliente,
+    equipo_modelo:    modelo,
+    equipo_serie:     serie,
+    tecnico_asignado: tecnico,
+    prioridad:        prio,
+    deposito:         deposito,
+    fecha_vencimiento:fecha ? _fechaISOToDDMMYYYY(fecha) : '',
+    nota_inicial:     nota,
+    creado_por:       (_session && (_session.name || _session.username)) || '',
+  };
+
+  var btn = document.querySelector('#modal-nuevo .btn-primary');
+  btn.disabled = true; btn.textContent = 'Creando...';
+
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){
+    if (r.ok) {
+      _cerrarModalNuevo();
+      ['nuevo-cliente','nuevo-modelo','nuevo-serie','nuevo-nota'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+      _cargarTickets();
+    } else { alert('Error creando ticket: ' + (r.error||'desconocido')); }
+  })
+  .catch(function(e){ alert('Error de conexión: ' + e.message); })
+  .finally(function(){ btn.disabled = false; btn.textContent = 'Crear Ticket'; });
+};
+
+// ── Helpers de fecha ──────────────────────────────────────────────
+function _fechaDDMMYYYYToISO(s) {
+  if (!s || !s.includes('-')) return '';
+  var p = s.split('-');
+  if (p.length !== 3) return '';
+  return p[2] + '-' + p[1] + '-' + p[0]; // YYYY-MM-DD
+}
+window._fechaISOToDDMMYYYY = function(s) {
+  if (!s) return '';
+  var p = s.split('-');
+  if (p.length !== 3) return '';
+  return p[2] + '-' + p[1] + '-' + p[0]; // DD-MM-YYYY
+};
+function _formatFechaISO(iso) {
+  try { return new Date(iso).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}); }
+  catch(e){ return iso||''; }
+}
+
+})();
+</script>
+</body>
+</html>
