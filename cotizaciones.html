@@ -69,6 +69,14 @@
         .kanban-outer.visible { display:block; }
         .kanban-grid { display:flex; gap:10px; min-width:max-content; }
         .kanban-col { width:260px; display:flex; flex-direction:column; gap:0; flex-shrink:0; }
+        @media (max-width:599px) {
+            .kanban-outer { padding:8px 8px 100px; }
+            .kanban-grid  { gap:7px; }
+            .kanban-col   { width:210px; }
+        }
+        @media (min-width:600px) and (max-width:899px) {
+            .kanban-col { width:230px; }
+        }
         .kanban-col-header { border-radius:10px 10px 0 0; padding:12px 14px; border:1px solid transparent; border-bottom:none; }
         .kanban-col-label { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; line-height:1.2; }
         .kanban-col-meta  { display:flex; gap:8px; align-items:center; margin-top:5px; }
@@ -96,6 +104,15 @@
         .detalle-overlay { position:fixed; inset:0; background:#080d14; z-index:200; display:none; overflow-y:auto; }
         .detalle-overlay.open { display:block; }
         .detalle-header { padding:12px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid #0f1a30; position:sticky; top:0; background:rgba(8,13,20,0.95); backdrop-filter:blur(12px); z-index:10; }
+        /* En desktop: header centrado también */
+        @media (min-width:700px) {
+            .detalle-header { max-width:780px; margin:0 auto; width:100%; border-bottom:none; }
+            .detalle-overlay.open { display:flex; flex-direction:column; align-items:center; }
+        }
+        .det-body-wrap { width:100%; }
+        @media (min-width:700px) {
+            .det-body-wrap { max-width:780px; margin:0 auto; padding:0 16px 40px; }
+        }
         .btn-back { width:32px; height:32px; border-radius:50%; background:#1c2541; border:none; color:#f8fafc; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .det-titulo { font-size:15px; font-weight:700; flex:1; color:#f1f5f9; }
 
@@ -473,7 +490,9 @@
         <button class="btn-back" onclick="cerrarDetalle()">←</button>
         <div class="det-titulo" id="det-titulo">—</div>
     </div>
-    <div class="det-body" id="det-body"></div>
+    <div class="det-body-wrap">
+        <div class="det-body" id="det-body"></div>
+    </div>
 </div>
 
 <!-- PANTALLA COMERCIAL OVERLAY -->
@@ -537,7 +556,7 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.21.44";
+const APP_VERSION = "2026.06.21.45";
 console.log("%c TLC Cotizaciones v2026.06.20.38 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -822,7 +841,7 @@ async function cargar(forzar = false) {
         document.getElementById('loading-inicial').style.display = 'none';
         document.getElementById('filtros-wrap').style.display    = 'flex';
         document.getElementById('buscador-wrap').style.display   = 'block';
-        setVista('kanban'); // arrancar en kanban
+        setVista(window.innerWidth < 700 ? 'lista' : 'kanban'); // mobile→lista, desktop→kanban
         mostrarStats();
 
         // Deep-link: si la URL trae ?id=TLC-XXX (ej: desde "Mis Pendientes"
