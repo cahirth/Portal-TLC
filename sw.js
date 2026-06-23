@@ -1,4 +1,4 @@
-const CACHE_NAME = 'portal-tlc-v10';
+const CACHE_NAME = 'portal-tlc-v11';
 const ASSETS = [
     './',
     './index.html',
@@ -13,13 +13,10 @@ const ASSETS = [
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-brands-400.woff2'
 ];
 
-// Instalación: cachear assets críticos — si uno falla no bloquea el SW
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME).then(cache => {
-            console.log('Portal TLC v10: cacheando assets...');
-            // addAll falla si cualquier recurso da error; usamos add individual
-            // con catch para que íconos faltantes o recursos externos no rompan todo
+            console.log('Portal TLC v11: cacheando assets...');
             return Promise.allSettled(
                 ASSETS.map(url => cache.add(url).catch(e => console.warn('Cache skip:', url, e.message)))
             );
@@ -28,26 +25,22 @@ self.addEventListener('install', event => {
     self.skipWaiting();
 });
 
-// Activación: limpiar caches viejos
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(keys =>
-            Promise.all(
-                keys.filter(k => k !== CACHE_NAME).map(k => {
-                    console.log('Portal TLC: eliminando caché viejo:', k);
-                    return caches.delete(k);
-                })
-            )
+            Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
         )
     );
     self.clients.claim();
 });
 
-// Fetch: network-first para GAS/RTDB/GitHub API, cache-first para todo lo demás
 self.addEventListener('fetch', event => {
     const url = event.request.url;
 
-    // Siempre a la red: GAS, Firebase, GitHub API, Power Automate
+    // Ignorar esquemas no cacheables (extensiones de Chrome, etc.)
+    if (!url.startsWith('http://') && !url.startsWith('https://')) return;
+
+    // Siempre a la red: GAS, Firebase, GitHub API, HubSpot
     if (
         url.includes('script.google.com') ||
         url.includes('firebaseio.com') ||
@@ -59,7 +52,7 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Todo lo demás: cache primero, red como fallback
+    // Cache-first para todo lo demás
     event.respondWith(
         caches.match(event.request).then(cached => {
             return cached || fetch(event.request).then(response => {
