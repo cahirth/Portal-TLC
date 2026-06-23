@@ -349,15 +349,19 @@ function _cargarSesion() {
   try {
     var raw = localStorage.getItem(SESSION_KEY);
     if (!raw) { _redirigirLogin(); return; }
-    _session = JSON.parse(raw);
+    var payload = JSON.parse(raw);
+    // index.html guarda { account: {...}, expira: timestamp }
+    // Soportamos tanto el formato envuelto como el directo (por compatibilidad)
+    if (payload && payload.account) {
+      if (payload.expira && Date.now() > payload.expira) { localStorage.removeItem(SESSION_KEY); _redirigirLogin(); return; }
+      _session = payload.account;
+    } else {
+      _session = payload;
+    }
     if (!_session || !_session.username) { _redirigirLogin(); return; }
     document.getElementById('st-user-label').textContent = _session.name || _session.username;
 
-    // Permisos — el objeto de permisos puede venir guardado en la sesión
-    // o puede requerir una consulta al Sheet. Usamos lo que hay en la sesión
-    // y si no tiene el campo de permisos, asumimos acceso por haber llegado
-    // hasta acá (el menú de index.html ya bloqueó si no tenía permiso).
-    _permisos.servicio = true; // si llegó a esta pantalla, tiene permiso
+    _permisos.servicio = true;
     _permisos.admin    = (_session.rol === 'Administrador');
 
     if (_permisos.servicio) {
