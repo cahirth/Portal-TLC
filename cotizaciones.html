@@ -556,11 +556,11 @@
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.21.45";
+const APP_VERSION = "2026.06.22.46";
 console.log("%c TLC Cotizaciones v2026.06.20.38 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
-const HISTORICO_URL   = 'https://api.github.com/repos/cahirth/Portal-TLC/contents/historico.json';
+const HISTORICO_URL = 'https://raw.githubusercontent.com/cahirth/Portal-TLC/main/historico.json';
 const PRECIOS_URL     = 'https://cahirth.github.io/Portal-TLC/precios.json';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 
@@ -796,14 +796,10 @@ async function cargar(forzar = false) {
     document.getElementById('kanban-outer').classList.remove('visible');
 
     try {
-        // API GitHub devuelve el contenido en base64 — siempre fresco, sin caché CDN
-        const res  = await fetch(HISTORICO_URL, {
-            headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
-        });
+        // raw.githubusercontent: JSON directo, sin base64, sin rate limit de API
+        const res  = await fetch(HISTORICO_URL + '?_=' + Date.now(), { cache: 'no-store' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        const apiResp = await res.json();
-        const decoded = atob(apiResp.content.replace(/\n/g, ''));
-        let data = JSON.parse(decoded);
+        let data = await res.json();
         if (!Array.isArray(data)) data = [];
 
         // Normalizar estados
@@ -1640,13 +1636,9 @@ function _onDrop(e, nuevoEstado) {
 // Se dispara después de confirmar ok:true del GS — sin spinner, sin reset de UI
 async function _recargarHistoricoSilencioso() {
     try {
-        const res = await fetch(HISTORICO_URL, {
-            headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
-        });
+        const res = await fetch(HISTORICO_URL + '?_=' + Date.now(), { cache: 'no-store' });
         if (!res.ok) return;
-        const apiResp = await res.json();
-        const decoded = atob(apiResp.content.replace(/\n/g, ''));
-        let data = JSON.parse(decoded);
+        let data = await res.json();
         if (!Array.isArray(data)) return;
 
         // Normalizar estados igual que en cargar()

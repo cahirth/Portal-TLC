@@ -982,7 +982,7 @@
 </div>
 
 <script>
-    const APP_VERSION_IDX = "2026.06.22.10"; console.log("%c Portal TLC index v" + APP_VERSION_IDX + " ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+    const APP_VERSION_IDX = "2026.06.22.11"; console.log("%c Portal TLC index v" + APP_VERSION_IDX + " ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
     // ─── LOGIN POR EMAIL + CÓDIGO OTP ───────────────────────────────────────────
     // Sesión compartida con selector-dispositivos.html y cotizaciones.html.
@@ -1211,7 +1211,7 @@
     // público (cotizaciones/{idCot}/presupuesto), no tiene estado de
     // pipeline ni email del vendedor.
     // ════════════════════════════════════════════════════════════════
-    const RADAR_HISTORICO_URL = 'https://api.github.com/repos/cahirth/Portal-TLC/contents/historico.json';
+    const RADAR_HISTORICO_URL = 'https://raw.githubusercontent.com/cahirth/Portal-TLC/main/historico.json';
 
     function _radarMonto(c) {
         return parseFloat((c.totales || {}).total_con_iva || c.totalConIva || c.montoUSD || 0);
@@ -1254,13 +1254,9 @@
         }
 
         try {
-            const res = await fetch(RADAR_HISTORICO_URL, {
-                headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
-            });
+            const res = await fetch(RADAR_HISTORICO_URL + '?_=' + Date.now(), { cache: 'no-store' });
             if (!res.ok) throw new Error('HTTP ' + res.status);
-            const apiResp = await res.json();
-            const decoded = atob(apiResp.content.replace(/\n/g, ''));
-            let data = JSON.parse(decoded);
+            let data = await res.json();
             if (!Array.isArray(data)) data = [];
             data.forEach(c => { c.estado = _radarNormalizarEstado(c); });
 
