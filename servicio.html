@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.23.1 -->
+<!-- Portal TLC | servicio.html | v2026.06.23.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -34,13 +34,17 @@ body{background:var(--bg);color:var(--text-main);font-family:-apple-system,Blink
 .btn-icon:hover{border-color:var(--accent-blue);}
 
 /* ── BARRA DE FILTROS ── */
-.st-filtros{display:flex;gap:6px;overflow-x:auto;padding:10px 14px;border-bottom:1px solid var(--border-glow);
-  scrollbar-width:none;background:var(--panel-dark);}
-.st-filtros::-webkit-scrollbar{display:none;}
-.filtro-chip{white-space:nowrap;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;
-  border:1px solid var(--border-glow);background:transparent;color:var(--text-muted);cursor:pointer;}
-.filtro-chip.activo{background:var(--accent-blue);border-color:var(--accent-blue);color:#fff;}
-.filtro-chip select{background:transparent;border:none;color:inherit;font-size:11px;font-weight:600;cursor:pointer;outline:none;}
+.st-filtros{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border-glow);
+  background:var(--panel-dark);flex-wrap:wrap;}
+.filtro-dd-wrap{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.filtro-dd-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);padding-left:2px;}
+.filtro-dd{padding:6px 10px;border-radius:10px;font-size:12px;font-weight:600;
+  border:1px solid var(--border-glow);background:var(--bg);color:var(--text-main);
+  cursor:pointer;outline:none;min-width:130px;}
+.filtro-dd:focus{border-color:var(--accent-blue);}
+.filtro-dd.tiene-filtro{border-color:var(--accent-blue);color:var(--accent-blue);}
+/* Compat chips legacy — ocultos */
+.filtro-chip{display:none;}
 
 /* ── BUSCADOR ── */
 .st-search-wrap{padding:8px 14px;background:var(--bg);}
@@ -245,21 +249,37 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 
 <!-- FILTROS -->
 <div class="st-filtros">
-  <button class="filtro-chip activo" data-filtro="tecnico" data-val="todos" onclick="_selFiltro(this,'tecnico')">Todos</button>
-  <button class="filtro-chip" data-filtro="tecnico" data-val="juan_garro" onclick="_selFiltro(this,'tecnico')">Juan</button>
-  <button class="filtro-chip" data-filtro="tecnico" data-val="damian_sosa" onclick="_selFiltro(this,'tecnico')">Damián</button>
-  <button class="filtro-chip" data-filtro="tecnico" data-val="fernando_del_campo" onclick="_selFiltro(this,'tecnico')">Fernando</button>
-  <button class="filtro-chip" data-filtro="tecnico" data-val="sin_asignar" onclick="_selFiltro(this,'tecnico')">Sin asignar</button>
-  <span style="width:1px;background:var(--border-glow);flex-shrink:0;"></span>
-  <button class="filtro-chip" data-filtro="prio" data-val="todos" onclick="_selFiltro(this,'prio')" style="opacity:.5;">● Prio</button>
-  <button class="filtro-chip" data-filtro="prio" data-val="urgente" onclick="_selFiltro(this,'prio')">🔴 Urgente</button>
-  <button class="filtro-chip" data-filtro="prio" data-val="importante" onclick="_selFiltro(this,'prio')">🟠 Importante</button>
-  <button class="filtro-chip" data-filtro="prio" data-val="media" onclick="_selFiltro(this,'prio')">🟡 Media</button>
-  <span style="width:1px;background:var(--border-glow);flex-shrink:0;"></span>
-  <button class="filtro-chip" data-filtro="estado" data-val="todos" onclick="_selFiltro(this,'estado')" style="opacity:.5;">● Estado</button>
-  <button class="filtro-chip" data-filtro="estado" data-val="en_curso" onclick="_selFiltro(this,'estado')">En curso</button>
-  <button class="filtro-chip" data-filtro="estado" data-val="atrasada" onclick="_selFiltro(this,'estado')">Atrasada</button>
-  <button class="filtro-chip" data-filtro="estado" data-val="no_iniciada" onclick="_selFiltro(this,'estado')">No iniciada</button>
+  <!-- F: Asignación -->
+  <div class="filtro-dd-wrap">
+    <span class="filtro-dd-label">Asignación</span>
+    <select class="filtro-dd" id="dd-tecnico" onchange="_selFiltroDD('tecnico',this)">
+      <option value="todos">Todos</option>
+      <option value="__asignados_a_mi__">Asignados a mí</option>
+      <option value="sin_asignar">Sin asignar</option>
+      <option value="juan_garro">Juan Garro</option>
+      <option value="damian_sosa">Damián Sosa</option>
+      <option value="fernando_del_campo">Fernando Del Campo</option>
+      <option value="cristian_hirth">Cristian Hirth</option>
+    </select>
+  </div>
+  <!-- G: Etapa — se rellena dinámicamente por JS con COLUMNAS -->
+  <div class="filtro-dd-wrap">
+    <span class="filtro-dd-label">Etapa</span>
+    <select class="filtro-dd" id="dd-etapa" onchange="_selFiltroDD('etapa',this)">
+      <option value="todos">Todas</option>
+    </select>
+  </div>
+  <!-- H: Prioridad -->
+  <div class="filtro-dd-wrap">
+    <span class="filtro-dd-label">Prioridad</span>
+    <select class="filtro-dd" id="dd-prio" onchange="_selFiltroDD('prio',this)">
+      <option value="todos">Todas</option>
+      <option value="urgente">🔴 Urgente</option>
+      <option value="importante">🟠 Importante</option>
+      <option value="media">🟡 Media</option>
+      <option value="baja">Baja</option>
+    </select>
+  </div>
 </div>
 
 <!-- BUSCADOR -->
@@ -331,7 +351,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
       <div>
         <label class="form-label">Depósito inicial</label>
         <select class="form-select" id="nuevo-deposito">
-          <option value="en_laboratorio">En laboratorio</option>
+          <option value="recepcion">Recepción</option>
           <option value="diagnostico">Diagnóstico</option>
           <option value="presupuesto">Presupuesto</option>
           <option value="reparacion">Reparación</option>
@@ -379,20 +399,23 @@ var TEMA_KEY    = 'tlc_tema';
 var ORDEN_URL   = 'https://cahirth.github.io/Portal-TLC/orden-servicio.html?id=';
 
 // ── Columnas del Kanban ───────────────────────────────────────────
-var COLUMNAS = [
-  { key:'en_laboratorio',           label:'En Laboratorio',       color:'#60a5fa', bg:'rgba(96,165,250,.1)',  border:'rgba(96,165,250,.25)' },
-  { key:'diagnostico',              label:'Diagnóstico',           color:'#a78bfa', bg:'rgba(167,139,250,.1)', border:'rgba(167,139,250,.25)'},
-  { key:'presupuesto',              label:'Presupuesto',           color:'#fbbf24', bg:'rgba(251,191,36,.1)',  border:'rgba(251,191,36,.25)' },
-  { key:'reparacion',               label:'Reparación',            color:'#f87171', bg:'rgba(248,113,113,.1)', border:'rgba(248,113,113,.25)'},
-  { key:'preparacion_control_calidad',label:'Preparación / CC',   color:'#34d399', bg:'rgba(52,211,153,.1)',  border:'rgba(52,211,153,.25)' },
-  { key:'para_facturar',            label:'Para Facturar',         color:'#fb923c', bg:'rgba(251,146,60,.1)',  border:'rgba(251,146,60,.25)' },
-  { key:'para_instalar',            label:'Para Instalar',         color:'#38bdf8', bg:'rgba(56,189,248,.1)',  border:'rgba(56,189,248,.25)' },
-  { key:'seguimiento',              label:'Seguimiento',           color:'#a3e635', bg:'rgba(163,230,53,.1)',  border:'rgba(163,230,53,.25)' },
-  { key:'servicio_remoto',          label:'Servicio Remoto',       color:'#22d3ee', bg:'rgba(34,211,238,.1)',  border:'rgba(34,211,238,.25)' },
-  { key:'consignacion',             label:'Consignación',          color:'#e879f9', bg:'rgba(232,121,249,.1)', border:'rgba(232,121,249,.25)'},
-  { key:'finalizado',               label:'Finalizado ✓',          color:'#06d6a0', bg:'rgba(6,214,160,.1)',   border:'rgba(6,214,160,.25)'  },
-  { key:'cancelado',                label:'Cancelado',             color:'#94a3b8', bg:'rgba(148,163,184,.1)', border:'rgba(148,163,184,.2)' },
+// ── D: ID internos fijos — los labels se pueden editar desde RTDB /servicio_config/columnas ──
+var COLUMNAS_DEF = [
+  { key:'recepcion',                 label:'Recepción',             color:'#60a5fa', bg:'rgba(96,165,250,.1)',  border:'rgba(96,165,250,.25)' },
+  { key:'diagnostico',               label:'Diagnóstico',           color:'#a78bfa', bg:'rgba(167,139,250,.1)', border:'rgba(167,139,250,.25)'},
+  { key:'presupuesto',               label:'Presupuesto',           color:'#fbbf24', bg:'rgba(251,191,36,.1)',  border:'rgba(251,191,36,.25)' },
+  { key:'reparacion',                label:'Reparación',            color:'#f87171', bg:'rgba(248,113,113,.1)', border:'rgba(248,113,113,.25)'},
+  { key:'preparacion_control_calidad',label:'Preparación / CC',    color:'#34d399', bg:'rgba(52,211,153,.1)',  border:'rgba(52,211,153,.25)' },
+  { key:'para_facturar',             label:'Para Facturar',         color:'#fb923c', bg:'rgba(251,146,60,.1)',  border:'rgba(251,146,60,.25)' },
+  { key:'para_instalar',             label:'Para Instalar',         color:'#38bdf8', bg:'rgba(56,189,248,.1)',  border:'rgba(56,189,248,.25)' },
+  { key:'seguimiento',               label:'Seguimiento',           color:'#a3e635', bg:'rgba(163,230,53,.1)',  border:'rgba(163,230,53,.25)' },
+  { key:'servicio_remoto',           label:'Servicio Remoto',       color:'#22d3ee', bg:'rgba(34,211,238,.1)',  border:'rgba(34,211,238,.25)' },
+  { key:'consignacion',              label:'Consignación',          color:'#e879f9', bg:'rgba(232,121,249,.1)', border:'rgba(232,121,249,.25)'},
+  { key:'finalizado',                label:'Finalizado ✓',          color:'#06d6a0', bg:'rgba(6,214,160,.1)',   border:'rgba(6,214,160,.25)'  },
+  { key:'cancelado',                 label:'Cancelado',             color:'#94a3b8', bg:'rgba(148,163,184,.1)', border:'rgba(148,163,184,.2)' },
 ];
+// COLUMNAS se rellena en _cargarColumnas() mezclando COLUMNAS_DEF con labels del RTDB
+var COLUMNAS = COLUMNAS_DEF.slice();
 
 var TECNICO_LABEL = {
   sin_asignar:'—', fernando_del_campo:'FC', cristian_hirth:'CH',
@@ -409,7 +432,7 @@ var TECNICO_COLOR = {
 var _session     = null;
 var _permisos    = { servicio:false, admin:false };
 var _tickets     = [];   // todos los tickets del RTDB
-var _filtros     = { tecnico:'todos', prio:'todos', estado:'todos' };
+var _filtros     = { tecnico:'todos', prio:'todos', estado:'todos', etapa:'todos' };
 var _ticketActual = null;
 
 // ── Arranque ──────────────────────────────────────────────────────
@@ -536,6 +559,32 @@ window._setVista = function(vista, sinGuardar) {
   if (_tickets.length) _aplicarFiltros();
 };
 
+// ── D: Cargar labels de columnas desde RTDB (nombres editables) ─────
+async function _cargarColumnas() {
+  try {
+    var res  = await fetch(RTDB_URL + '/servicio_config/columnas.json', { cache:'no-store' });
+    var data = await res.json();
+    if (data && typeof data === 'object') {
+      COLUMNAS = COLUMNAS_DEF.map(function(col) {
+        var override = data[col.key];
+        return Object.assign({}, col, override ? { label: override } : {});
+      });
+    } else {
+      COLUMNAS = COLUMNAS_DEF.slice();
+    }
+  } catch(e) {
+    COLUMNAS = COLUMNAS_DEF.slice();
+  }
+  // Poblar dropdown etapa (G)
+  var ddEtapa = document.getElementById('dd-etapa');
+  if (ddEtapa) {
+    ddEtapa.innerHTML = '<option value="todos">Todas</option>' +
+      COLUMNAS.map(function(c){
+        return '<option value="' + c.key + '">' + c.label + '</option>';
+      }).join('');
+  }
+}
+
 // ── Fetch a RTDB (lectura pública REST) ───────────────────────────
 async function _cargarTickets() {
   var loading = document.getElementById('st-loading');
@@ -545,6 +594,7 @@ async function _cargarTickets() {
   if (kanban) kanban.style.display = 'none';
   if (lista)  lista.style.display  = 'none';
   try {
+    await _cargarColumnas();
     var res  = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now(), { cache:'no-store' });
     var data = await res.json();
     _tickets = data ? Object.values(data) : [];
@@ -559,19 +609,37 @@ async function _cargarTickets() {
 window._recargarTickets = _cargarTickets;
 
 // ── Filtros ────────────────────────────────────────────────────────
+// _selFiltro legacy — ya no se usa, mantenido por compatibilidad
 window._selFiltro = function(btn, tipo) {
-  document.querySelectorAll('[data-filtro="' + tipo + '"]').forEach(function(b) { b.classList.remove('activo'); });
-  btn.classList.add('activo');
   _filtros[tipo] = btn.dataset.val;
   _aplicarFiltros();
 };
 
+// F/G/H: handler para los 3 dropdowns
+window._selFiltroDD = function(tipo, sel) {
+  _filtros[tipo] = sel.value;
+  sel.classList.toggle('tiene-filtro', sel.value !== 'todos');
+  _aplicarFiltros();
+};
+
 window._aplicarFiltros = function() {
-  var query = (document.getElementById('st-buscador').value || '').toLowerCase().trim();
+  var query    = (document.getElementById('st-buscador').value || '').toLowerCase().trim();
+  var miUser   = _session ? (_session.username || '') : '';
   var filtrados = _tickets.filter(function(t) {
-    if (_filtros.tecnico !== 'todos' && t.tecnico_asignado !== _filtros.tecnico) return false;
-    if (_filtros.prio    !== 'todos' && t.prioridad        !== _filtros.prio)    return false;
-    if (_filtros.estado  !== 'todos' && t.estado_progreso  !== _filtros.estado)  return false;
+    // F: Asignación
+    var fTec = _filtros.tecnico || 'todos';
+    if (fTec === '__asignados_a_mi__') {
+      // Derivar clave interna del username de sesión (ej: cristian.hirth@... → cristian_hirth)
+      var miClave = _session ? (_session.tecnico_key || _session.username.split('@')[0].replace(/[^a-z0-9]/gi,'_').toLowerCase()) : '';
+      if (t.tecnico_asignado !== miClave) return false;
+    } else if (fTec !== 'todos') {
+      if (t.tecnico_asignado !== fTec) return false;
+    }
+    // G: Etapa
+    if (_filtros.etapa && _filtros.etapa !== 'todos' && t.deposito !== _filtros.etapa) return false;
+    // H: Prioridad
+    if (_filtros.prio && _filtros.prio !== 'todos' && t.prioridad !== _filtros.prio) return false;
+    // Buscador
     if (query) {
       var haystack = [t.cliente, t.equipo_modelo, t.equipo_serie, t.id_ticket].join(' ').toLowerCase();
       if (!haystack.includes(query)) return false;
@@ -841,7 +909,7 @@ function _renderDetalle(t) {
 
 function _optsDeposito(sel) {
   return [
-    {v:'en_laboratorio',l:'En Laboratorio'},{v:'diagnostico',l:'Diagnóstico'},
+    {v:'recepcion',l:'Recepción'},{v:'diagnostico',l:'Diagnóstico'},
     {v:'presupuesto',l:'Presupuesto'},{v:'reparacion',l:'Reparación'},
     {v:'preparacion_control_calidad',l:'Preparación / CC'},{v:'para_facturar',l:'Para Facturar'},
     {v:'para_instalar',l:'Para Instalar'},{v:'seguimiento',l:'Seguimiento'},
