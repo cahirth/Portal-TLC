@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.23.1 -->
+<!-- Portal TLC | servicio.html | v2026.06.23.5 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -157,6 +157,35 @@ body{background:var(--bg);color:var(--text-main);font-family:-apple-system,Blink
 .btn-orden:hover{border-color:var(--accent-blue);}
 body.tema-claro .form-select, body.tema-claro .form-input, body.tema-claro .form-textarea,
 body.tema-claro .det-field-select, body.tema-claro .det-field-input { background:#f8fafc; }
+
+/* ── GASTOS DEL SERVICIO ── */
+.gastos-tabla{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;}
+.gastos-tabla th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;
+  color:var(--text-muted);padding:4px 6px;text-align:left;border-bottom:1px solid var(--border-glow);}
+.gastos-tabla td{padding:6px 6px;border-bottom:1px solid var(--border-glow);color:var(--text-main);vertical-align:middle;}
+.gastos-tabla tr:last-child td{border-bottom:none;}
+.gastos-input{width:100%;padding:4px 6px;border-radius:6px;background:var(--bg);
+  border:1px solid var(--border-glow);color:var(--text-main);font-size:12px;font-family:inherit;outline:none;}
+.gastos-input:focus{border-color:var(--accent-blue);}
+.gastos-input[type="date"]{min-width:110px;}
+.gastos-input[type="number"]{min-width:80px;text-align:right;}
+.gastos-total{display:flex;justify-content:flex-end;align-items:center;gap:8px;
+  margin-top:10px;padding-top:8px;border-top:1px solid var(--border-glow);}
+.gastos-total-label{font-size:11px;font-weight:700;color:var(--text-muted);}
+.gastos-total-val{font-size:14px;font-weight:800;color:var(--accent-green);}
+.btn-add-gasto{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;
+  background:transparent;border:1px dashed var(--border-glow);color:var(--text-muted);
+  font-size:12px;font-weight:600;cursor:pointer;margin-top:8px;width:100%;justify-content:center;}
+.btn-add-gasto:hover{border-color:var(--accent-blue);color:var(--accent-blue);}
+.btn-del-gasto{background:none;border:none;color:#ef444460;cursor:pointer;font-size:14px;padding:2px 4px;}
+.btn-del-gasto:hover{color:#ef4444;}
+
+/* ── K: FINALIZADAS OCULTAS ── */
+.btn-mostrar-fin{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;
+  background:transparent;border:1px solid var(--border-glow);color:var(--text-muted);
+  font-size:11px;font-weight:600;cursor:pointer;margin:8px 14px 0;}
+.btn-mostrar-fin.activo{border-color:var(--accent-blue);color:var(--accent-blue);}
+.ticket-finalizado-dim{opacity:0.45;filter:grayscale(0.4);}
 
 /* ── LOADING ── */
 .st-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -318,6 +347,11 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 <div class="st-search-wrap">
   <input type="search" class="st-search" id="st-buscador" placeholder="Buscar cliente, modelo, serie..." oninput="_aplicarFiltros()">
 </div>
+
+<!-- K: Toggle mostrar finalizadas -->
+<button class="btn-mostrar-fin" id="btn-mostrar-fin" onclick="_toggleMostrarFin()">
+  <span id="icon-mostrar-fin">○</span> Mostrar finalizadas y canceladas
+</button>
 
 <!-- LOADING -->
 <div class="st-loading" id="st-loading" style="display:flex;">
@@ -505,6 +539,7 @@ function _cargarSesion() {
       vistaGuardada = window.innerWidth >= 768 ? 'kanban' : 'lista';
     }
     _setVista(vistaGuardada, true);
+    _actualizarBtnMostrarFin();
 
     _cargarTickets();
   } catch(e) {
@@ -702,7 +737,8 @@ window._aplicarFiltros = function() {
     var prefix = (_session.username || '').split('@')[0].toLowerCase();
     miClave = EMAIL_A_TECNICO[prefix] || prefix.replace(/\./g,'_');
   }
-  var filtrados = _tickets.filter(function(t) {
+  var base = _aplicarFiltroFin(_tickets);
+  var filtrados = base.filter(function(t) {
     var fTec = _filtros.tecnico || 'todos';
     if (fTec === '__asignados_a_mi__') {
       if (t.tecnico_asignado !== miClave) return false;
@@ -974,9 +1010,123 @@ function _renderDetalle(t) {
         '<button class="btn-guardar-nota" onclick="_guardarNota(\'' + t.id_ticket + '\')">💾 Guardar nota</button>' : '') +
     '</div>' +
 
+    // J: GASTOS DEL SERVICIO
+    '<div class="det-section">Gastos del servicio</div>' +
+    '<div class="det-card" id="det-gastos-card">' +
+      _renderGastos(t) +
+    '</div>' +
+
     // PELIGRO
     (puedeEditar ? '<div class="det-section">Zona de peligro</div>' +
     '<button class="btn-peligro" onclick="_confirmarEliminar(\'' + t.id_ticket + '\')">🗑️ Eliminar ticket</button>' : '');
+}
+
+// ── J: GASTOS DEL SERVICIO ───────────────────────────────────────
+function _renderGastos(t) {
+  var finalizado = (t.deposito === 'finalizado' || t.deposito === 'cancelado');
+  var gastos = (t.gastos && Array.isArray(t.gastos)) ? t.gastos : (t.gastos ? Object.values(t.gastos) : []);
+  var total  = gastos.reduce(function(s, g) { return s + (parseFloat(g.importe) || 0); }, 0);
+  var soloLectura = finalizado;
+
+  var filas = gastos.length ? gastos.map(function(g, i) {
+    if (soloLectura) {
+      return '<tr>' +
+        '<td>' + _esc(g.fecha || '—') + '</td>' +
+        '<td>' + _esc(g.descripcion || '—') + '</td>' +
+        '<td style="text-align:right">$ ' + (parseFloat(g.importe)||0).toLocaleString('es-AR') + '</td>' +
+        '<td></td>' +
+      '</tr>';
+    }
+    return '<tr>' +
+      '<td><input type="date" class="gastos-input" value="' + _esc(g.fecha||'') + '" onchange="_editarGasto(\'' + t.id_ticket + '\',' + i + ',\'fecha\',this.value)"></td>' +
+      '<td><input type="text" class="gastos-input" value="' + _esc(g.descripcion||'') + '" placeholder="Descripción..." onblur="_editarGasto(\'' + t.id_ticket + '\',' + i + ',\'descripcion\',this.value)"></td>' +
+      '<td><input type="number" class="gastos-input" value="' + (g.importe||'') + '" placeholder="0" onblur="_editarGasto(\'' + t.id_ticket + '\',' + i + ',\'importe\',this.value)" min="0" step="0.01"></td>' +
+      '<td><button class="btn-del-gasto" onclick="_eliminarGasto(\'' + t.id_ticket + '\',' + i + ')">✕</button></td>' +
+    '</tr>';
+  }).join('') : '<tr><td colspan="4" style="color:var(--text-muted);padding:10px 6px;text-align:center;">Sin gastos registrados</td></tr>';
+
+  return '<table class="gastos-tabla">' +
+    '<thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th><th></th></tr></thead>' +
+    '<tbody>' + filas + '</tbody>' +
+  '</table>' +
+  '<div class="gastos-total">' +
+    '<span class="gastos-total-label">Total:</span>' +
+    '<span class="gastos-total-val">$ ' + total.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</span>' +
+  '</div>' +
+  (!soloLectura ? '<button class="btn-add-gasto" onclick="_agregarGasto(\'' + t.id_ticket + '\')">+ Agregar gasto</button>' : '<div style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:center;">Solo lectura — ticket finalizado</div>');
+}
+
+window._agregarGasto = function(id) {
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (!t) return;
+  if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
+  var hoy = new Date().toISOString().split('T')[0];
+  t.gastos.push({ fecha: hoy, descripcion: '', importe: '' });
+  if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual = t;
+  _renderDetalle(t);
+  _guardarGastos(id, t.gastos);
+};
+
+window._editarGasto = function(id, idx, campo, valor) {
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (!t) return;
+  if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
+  if (!t.gastos[idx]) return;
+  t.gastos[idx][campo] = campo === 'importe' ? (parseFloat(valor)||0) : valor;
+  // Actualizar total sin re-render completo
+  var total = t.gastos.reduce(function(s,g){ return s+(parseFloat(g.importe)||0); }, 0);
+  var totalEl = document.querySelector('#det-gastos-card .gastos-total-val');
+  if (totalEl) totalEl.textContent = '$ ' + total.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  _guardarGastos(id, t.gastos);
+};
+
+window._eliminarGasto = function(id, idx) {
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (!t) return;
+  if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
+  t.gastos.splice(idx, 1);
+  if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual = t;
+  _renderDetalle(t);
+  _guardarGastos(id, t.gastos);
+};
+
+function _guardarGastos(id, gastos) {
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_actualizarCampo', id_ticket:id, campo:'gastos', valor:gastos }) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){ if(!r.ok) console.warn('Error guardando gastos:', r.error); })
+  .catch(function(e){ console.warn(e); });
+}
+
+// ── K: FINALIZADAS/CANCELADAS OCULTAS ────────────────────────────
+var _mostrarFin = (localStorage.getItem('tlc_st_mostrar_fin') === '1');
+
+function _actualizarBtnMostrarFin() {
+  var btn  = document.getElementById('btn-mostrar-fin');
+  var icon = document.getElementById('icon-mostrar-fin');
+  if (!btn) return;
+  if (_mostrarFin) {
+    btn.classList.add('activo');
+    if (icon) icon.textContent = '●';
+    btn.childNodes[1] && (btn.childNodes[1].textContent = ' Ocultar finalizadas y canceladas');
+  } else {
+    btn.classList.remove('activo');
+    if (icon) icon.textContent = '○';
+  }
+}
+
+window._toggleMostrarFin = function() {
+  _mostrarFin = !_mostrarFin;
+  localStorage.setItem('tlc_st_mostrar_fin', _mostrarFin ? '1' : '0');
+  _actualizarBtnMostrarFin();
+  _aplicarFiltros();
+};
+
+function _aplicarFiltroFin(tickets) {
+  if (_mostrarFin) return tickets;
+  return tickets.filter(function(t) {
+    return t.deposito !== 'finalizado' && t.deposito !== 'cancelado';
+  });
 }
 
 function _optsDeposito(sel) {
