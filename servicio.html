@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.23.5 -->
+<!-- Portal TLC | servicio.html | v2026.06.23.6 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -666,12 +666,17 @@ window._setVista = function(vista, sinGuardar) {
 async function _cargarColumnas() {
   try {
     var res  = await fetch(RTDB_URL + '/servicio_config/columnas.json', { cache:'no-store' });
-    var data = await res.json();
-    if (data && typeof data === 'object') {
-      COLUMNAS = COLUMNAS_DEF.map(function(col) {
-        return Object.assign({}, col, data[col.key] ? { label: data[col.key] } : {});
-      });
+    if (res.ok) {
+      var data = await res.json();
+      if (data && typeof data === 'object') {
+        COLUMNAS = COLUMNAS_DEF.map(function(col) {
+          return Object.assign({}, col, data[col.key] ? { label: data[col.key] } : {});
+        });
+      } else {
+        COLUMNAS = COLUMNAS_DEF.slice();
+      }
     } else {
+      // 401/403: reglas RTDB no configuradas — usar defaults sin error
       COLUMNAS = COLUMNAS_DEF.slice();
     }
   } catch(e) {
@@ -1016,9 +1021,8 @@ function _renderDetalle(t) {
       _renderGastos(t) +
     '</div>' +
 
-    // PELIGRO
-    (puedeEditar ? '<div class="det-section">Zona de peligro</div>' +
-    '<button class="btn-peligro" onclick="_confirmarEliminar(\'' + t.id_ticket + '\')">🗑️ Eliminar ticket</button>' : '');
+    // PELIGRO — botón eliminar removido (tickets son documentos permanentes)
+    '';
 }
 
 // ── J: GASTOS DEL SERVICIO ───────────────────────────────────────
@@ -1092,7 +1096,7 @@ window._eliminarGasto = function(id, idx) {
 
 function _guardarGastos(id, gastos) {
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'st_actualizarCampo', id_ticket:id, campo:'gastos', valor:gastos }) })
+    body: JSON.stringify({ accion:'st_actualizarGastos', id_ticket:id, gastos:gastos }) })
   .then(function(r){ return r.json(); })
   .then(function(r){ if(!r.ok) console.warn('Error guardando gastos:', r.error); })
   .catch(function(e){ console.warn(e); });
