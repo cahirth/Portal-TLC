@@ -160,6 +160,47 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 .st-spinner{width:36px;height:36px;border:3px solid var(--border-glow);
   border-top-color:var(--accent-blue);border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── AVATAR MENU ── */
+.avatar-wrap{position:relative;flex-shrink:0;}
+.avatar-btn{width:34px;height:34px;border-radius:50%;border:2px solid var(--accent-blue);
+  background:var(--accent-blue);color:#fff;font-size:12px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
+.avatar-menu{position:absolute;top:42px;right:0;background:var(--panel-dark);
+  border:1px solid var(--border-glow);border-radius:14px;padding:8px;
+  min-width:200px;z-index:500;display:none;box-shadow:0 8px 32px rgba(0,0,0,.4);}
+.avatar-menu.open{display:block;}
+.avatar-menu-user{padding:10px 12px 8px;border-bottom:1px solid var(--border-glow);margin-bottom:6px;}
+.avatar-menu-name{font-size:13px;font-weight:700;color:var(--text-main);}
+.avatar-menu-mail{font-size:10px;color:var(--text-muted);margin-top:2px;}
+.avatar-menu-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;
+  font-size:13px;color:var(--text-main);cursor:pointer;border:none;background:none;width:100%;text-align:left;}
+.avatar-menu-item:hover{background:var(--border-glow);}
+.avatar-menu-item.danger{color:#ef4444;}
+
+/* ── TOGGLE VISTA ── */
+.vista-toggle{display:flex;border:1px solid var(--border-glow);border-radius:8px;overflow:hidden;flex-shrink:0;}
+.vista-btn{padding:5px 10px;font-size:11px;font-weight:700;border:none;background:transparent;
+  color:var(--text-muted);cursor:pointer;transition:background .15s,color .15s;}
+.vista-btn.activo{background:var(--accent-blue);color:#fff;}
+
+/* ── VISTA LISTA ── */
+.st-lista-wrap{padding:10px 14px 100px;display:none;flex-direction:column;gap:6px;}
+.lista-grupo{margin-bottom:4px;}
+.lista-grupo-header{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;
+  cursor:pointer;margin-bottom:4px;border:1px solid transparent;}
+.lista-grupo-header:hover{opacity:.85;}
+.lista-grupo-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;}
+.lista-grupo-count{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(0,0,0,.2);}
+.lista-grupo-body{display:flex;flex-direction:column;gap:4px;}
+.lista-ticket{display:flex;align-items:center;gap:10px;background:var(--panel-dark);
+  border:1px solid var(--border-glow);border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s;}
+.lista-ticket:hover{border-color:var(--accent-blue);}
+.lista-ticket-main{flex:1;min-width:0;}
+.lista-ticket-modelo{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lista-ticket-cliente{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lista-ticket-badges{display:flex;gap:5px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
+.lista-col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -171,8 +212,34 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
     <div class="st-header-title">Servicio Técnico</div>
     <div class="st-header-sub" id="st-user-label">Cargando...</div>
   </div>
-  <button class="btn-icon" id="btn-tema" onclick="_toggleTema()" title="Cambiar tema">🌓</button>
+
+  <!-- Toggle Lista / Kanban -->
+  <div class="vista-toggle" id="vista-toggle">
+    <button class="vista-btn" id="btn-vista-lista" onclick="_setVista('lista')">☰</button>
+    <button class="vista-btn" id="btn-vista-kanban" onclick="_setVista('kanban')">⊞</button>
+  </div>
+
   <button class="btn-icon" onclick="_recargarTickets()" title="Actualizar">↺</button>
+
+  <!-- Avatar con menú -->
+  <div class="avatar-wrap" id="avatar-wrap">
+    <button class="avatar-btn" id="avatar-btn" onclick="_toggleAvatarMenu()">??</button>
+    <div class="avatar-menu" id="avatar-menu">
+      <div class="avatar-menu-user">
+        <div class="avatar-menu-name" id="avatar-nombre">—</div>
+        <div class="avatar-menu-mail" id="avatar-mail">—</div>
+      </div>
+      <button class="avatar-menu-item" onclick="_toggleTema();_cerrarAvatarMenu()">
+        <span id="avatar-tema-icon">🌓</span> <span id="avatar-tema-label">Cambiar tema</span>
+      </button>
+      <button class="avatar-menu-item" onclick="_abrirWhatsApp();_cerrarAvatarMenu()">
+        <span>💬</span> WhatsApp TLC
+      </button>
+      <button class="avatar-menu-item danger" onclick="_cerrarSesion()">
+        <span>🚪</span> Cerrar sesión
+      </button>
+    </div>
+  </div>
 </header>
 
 <!-- FILTROS -->
@@ -199,14 +266,19 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
   <input type="search" class="st-search" id="st-buscador" placeholder="Buscar cliente, modelo, serie..." oninput="_aplicarFiltros()">
 </div>
 
-<!-- KANBAN -->
-<div id="st-kanban-outer" class="st-kanban-outer">
-  <div class="st-loading" id="st-loading">
-    <div class="st-spinner"></div>
-    <span>Cargando tickets...</span>
-  </div>
-  <div class="st-kanban-grid" id="st-kanban-grid" style="display:none;"></div>
+<!-- LOADING -->
+<div class="st-loading" id="st-loading" style="display:flex;">
+  <div class="st-spinner"></div>
+  <span>Cargando tickets...</span>
 </div>
+
+<!-- KANBAN -->
+<div id="st-kanban-outer" class="st-kanban-outer" style="display:none;">
+  <div class="st-kanban-grid" id="st-kanban-grid"></div>
+</div>
+
+<!-- LISTA -->
+<div id="st-lista-outer" class="st-lista-wrap"></div>
 
 <!-- BTN NUEVO TICKET -->
 <button class="btn-nuevo-ticket" id="btn-nuevo-ticket" onclick="_abrirModalNuevo()" title="Nuevo ticket" style="display:none;">+</button>
@@ -350,8 +422,6 @@ function _cargarSesion() {
     var raw = localStorage.getItem(SESSION_KEY);
     if (!raw) { _redirigirLogin(); return; }
     var payload = JSON.parse(raw);
-    // index.html guarda { account: {...}, expira: timestamp }
-    // Soportamos tanto el formato envuelto como el directo (por compatibilidad)
     if (payload && payload.account) {
       if (payload.expira && Date.now() > payload.expira) { localStorage.removeItem(SESSION_KEY); _redirigirLogin(); return; }
       _session = payload.account;
@@ -359,7 +429,19 @@ function _cargarSesion() {
       _session = payload;
     }
     if (!_session || !_session.username) { _redirigirLogin(); return; }
-    document.getElementById('st-user-label').textContent = _session.name || _session.username;
+
+    // Label header
+    var nombre = _session.name || _session.username;
+    document.getElementById('st-user-label').textContent = nombre;
+
+    // Avatar
+    var iniciales = nombre.split(' ').map(function(p){ return p[0]||''; }).slice(0,2).join('').toUpperCase();
+    document.getElementById('avatar-btn').textContent = iniciales || 'U';
+    document.getElementById('avatar-nombre').textContent = nombre;
+    document.getElementById('avatar-mail').textContent = _session.username || '';
+
+    // Tema label
+    _actualizarTemaLabel();
 
     _permisos.servicio = true;
     _permisos.admin    = (_session.rol === 'Administrador');
@@ -367,6 +449,13 @@ function _cargarSesion() {
     if (_permisos.servicio) {
       document.getElementById('btn-nuevo-ticket').style.display = 'flex';
     }
+
+    // Vista default: mobile=lista, desktop=kanban
+    var vistaGuardada = localStorage.getItem('tlc_st_vista');
+    if (!vistaGuardada) {
+      vistaGuardada = window.innerWidth >= 768 ? 'kanban' : 'lista';
+    }
+    _setVista(vistaGuardada, true);
 
     _cargarTickets();
   } catch(e) {
@@ -384,27 +473,86 @@ function _aplicarTema() {
   var t = localStorage.getItem(TEMA_KEY) || 'dark';
   document.body.classList.toggle('tema-claro', t === 'light');
 }
+function _actualizarTemaLabel() {
+  var actual = localStorage.getItem(TEMA_KEY) || 'dark';
+  var icon  = document.getElementById('avatar-tema-icon');
+  var label = document.getElementById('avatar-tema-label');
+  if (icon)  icon.textContent  = actual === 'dark' ? '☀️' : '🌙';
+  if (label) label.textContent = actual === 'dark' ? 'Modo claro' : 'Modo oscuro';
+}
 window._toggleTema = function() {
   var actual = localStorage.getItem(TEMA_KEY) || 'dark';
   var nuevo  = actual === 'dark' ? 'light' : 'dark';
   localStorage.setItem(TEMA_KEY, nuevo);
   document.body.classList.toggle('tema-claro', nuevo === 'light');
+  _actualizarTemaLabel();
+};
+
+// ── Avatar menu ────────────────────────────────────────────────────
+window._toggleAvatarMenu = function() {
+  var m = document.getElementById('avatar-menu');
+  m.classList.toggle('open');
+};
+window._cerrarAvatarMenu = function() {
+  document.getElementById('avatar-menu').classList.remove('open');
+};
+document.addEventListener('click', function(e) {
+  var wrap = document.getElementById('avatar-wrap');
+  if (wrap && !wrap.contains(e.target)) _cerrarAvatarMenu();
+});
+window._abrirWhatsApp = function() {
+  window.open('https://wa.me/5491141479942', '_blank');
+};
+window._cerrarSesion = function() {
+  if (!confirm('¿Cerrar sesión?')) return;
+  localStorage.removeItem(SESSION_KEY);
+  window.location.href = 'index.html';
+};
+
+// ── Toggle vista Lista / Kanban ────────────────────────────────────
+var _vistaActual = 'kanban';
+window._setVista = function(vista, sinGuardar) {
+  _vistaActual = vista;
+  if (!sinGuardar) localStorage.setItem('tlc_st_vista', vista);
+
+  var kanbanOuter = document.getElementById('st-kanban-outer');
+  var listaOuter  = document.getElementById('st-lista-outer');
+  var btnLista    = document.getElementById('btn-vista-lista');
+  var btnKanban   = document.getElementById('btn-vista-kanban');
+
+  if (vista === 'lista') {
+    if (kanbanOuter) kanbanOuter.style.display = 'none';
+    if (listaOuter)  { listaOuter.style.display = 'flex'; }
+    if (btnLista)    btnLista.classList.add('activo');
+    if (btnKanban)   btnKanban.classList.remove('activo');
+  } else {
+    if (kanbanOuter) kanbanOuter.style.display = 'block';
+    if (listaOuter)  listaOuter.style.display  = 'none';
+    if (btnLista)    btnLista.classList.remove('activo');
+    if (btnKanban)   btnKanban.classList.add('activo');
+  }
+  // Re-render si ya hay datos
+  if (_tickets.length) _aplicarFiltros();
 };
 
 // ── Fetch a RTDB (lectura pública REST) ───────────────────────────
 async function _cargarTickets() {
-  document.getElementById('st-loading').style.display   = 'flex';
-  document.getElementById('st-kanban-grid').style.display = 'none';
+  var loading = document.getElementById('st-loading');
+  var kanban  = document.getElementById('st-kanban-outer');
+  var lista   = document.getElementById('st-lista-outer');
+  loading.style.display = 'flex';
+  if (kanban) kanban.style.display = 'none';
+  if (lista)  lista.style.display  = 'none';
   try {
     var res  = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now(), { cache:'no-store' });
     var data = await res.json();
     _tickets = data ? Object.values(data) : [];
+    loading.style.display = 'none';
+    _setVista(_vistaActual, true);
     _aplicarFiltros();
-    document.getElementById('st-loading').style.display   = 'none';
-    document.getElementById('st-kanban-grid').style.display = 'flex';
   } catch(e) {
     console.error('Error cargando tickets ST:', e);
-    document.getElementById('st-loading').innerHTML = '<span style="color:#ef4444">Error cargando datos. Reintentá.</span>';
+    loading.innerHTML = '<span style="color:#ef4444">Error cargando datos. Reintentá.</span>';
   }
 }
 window._recargarTickets = _cargarTickets;
@@ -429,8 +577,49 @@ window._aplicarFiltros = function() {
     }
     return true;
   });
-  _renderKanban(filtrados);
+  if (_vistaActual === 'lista') {
+    _renderLista(filtrados);
+  } else {
+    _renderKanban(filtrados);
+  }
 };
+
+// ── Render Lista ──────────────────────────────────────────────────
+function _renderLista(tickets) {
+  var outer = document.getElementById('st-lista-outer');
+  if (!outer) return;
+  var grupos = COLUMNAS.map(function(col) {
+    var items = tickets.filter(function(t){ return t.deposito === col.key; });
+    if (!items.length) return '';
+    var headerStyle = 'background:' + col.bg + ';border-color:' + col.border + ';';
+    var tarjetas = items.map(function(t) {
+      var tecLabel = TECNICO_LABEL[t.tecnico_asignado] || '?';
+      var tecColor = TECNICO_COLOR[t.tecnico_asignado] || '#475569';
+      var fechaHtml = _fechaHtml(t.fecha_vencimiento);
+      return '<div class="lista-ticket" onclick="_abrirDetalle(\'' + t.id_ticket + '\')">'
+        + '<span class="lista-col-dot" style="background:' + col.color + '"></span>'
+        + '<div class="lista-ticket-main">'
+          + '<div class="lista-ticket-modelo">' + _esc(t.equipo_modelo||'—') + '</div>'
+          + '<div class="lista-ticket-cliente">' + _esc(t.cliente||'—') + (t.equipo_serie ? ' · ' + _esc(t.equipo_serie) : '') + '</div>'
+        + '</div>'
+        + '<div class="lista-ticket-badges">'
+          + '<span class="badge-prio ' + (t.prioridad||'media') + '">' + (t.prioridad||'media') + '</span>'
+          + (fechaHtml || '')
+          + '<span class="avatar-tecnico" style="background:' + tecColor + '20;color:' + tecColor + '">' + tecLabel + '</span>'
+        + '</div>'
+      + '</div>';
+    }).join('');
+    return '<div class="lista-grupo">'
+      + '<div class="lista-grupo-header" style="' + headerStyle + '">'
+        + '<span class="lista-col-dot" style="background:' + col.color + '"></span>'
+        + '<span class="lista-grupo-label" style="color:' + col.color + '">' + col.label + '</span>'
+        + '<span class="lista-grupo-count" style="color:' + col.color + '">' + items.length + '</span>'
+      + '</div>'
+      + '<div class="lista-grupo-body">' + tarjetas + '</div>'
+    + '</div>';
+  }).join('');
+  outer.innerHTML = grupos || '<div class="st-empty-col" style="padding:30px;text-align:center;">Sin resultados</div>';
+}
 
 // ── Render Kanban ─────────────────────────────────────────────────
 function _renderKanban(tickets) {
