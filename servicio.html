@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.23.2 -->
+<!-- Portal TLC | servicio.html | v2026.06.23.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -34,17 +34,13 @@ body{background:var(--bg);color:var(--text-main);font-family:-apple-system,Blink
 .btn-icon:hover{border-color:var(--accent-blue);}
 
 /* ── BARRA DE FILTROS ── */
-.st-filtros{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border-glow);
-  background:var(--panel-dark);flex-wrap:wrap;}
-.filtro-dd-wrap{display:flex;flex-direction:column;gap:2px;min-width:0;}
-.filtro-dd-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);padding-left:2px;}
-.filtro-dd{padding:6px 10px;border-radius:10px;font-size:12px;font-weight:600;
-  border:1px solid var(--border-glow);background:var(--bg);color:var(--text-main);
-  cursor:pointer;outline:none;min-width:130px;}
-.filtro-dd:focus{border-color:var(--accent-blue);}
-.filtro-dd.tiene-filtro{border-color:var(--accent-blue);color:var(--accent-blue);}
-/* Compat chips legacy — ocultos */
-.filtro-chip{display:none;}
+.st-filtros{display:flex;gap:6px;overflow-x:auto;padding:10px 14px;border-bottom:1px solid var(--border-glow);
+  scrollbar-width:none;background:var(--panel-dark);}
+.st-filtros::-webkit-scrollbar{display:none;}
+.filtro-chip{white-space:nowrap;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;
+  border:1px solid var(--border-glow);background:transparent;color:var(--text-muted);cursor:pointer;}
+.filtro-chip.activo{background:var(--accent-blue);border-color:var(--accent-blue);color:#fff;}
+.filtro-chip select{background:transparent;border:none;color:inherit;font-size:11px;font-weight:600;cursor:pointer;outline:none;}
 
 /* ── BUSCADOR ── */
 .st-search-wrap{padding:8px 14px;background:var(--bg);}
@@ -166,22 +162,11 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
   border-top-color:var(--accent-blue);border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
-/* ── AVATAR MENU ── */
-.avatar-wrap{position:relative;flex-shrink:0;}
-.avatar-btn{width:34px;height:34px;border-radius:50%;border:2px solid var(--accent-blue);
-  background:var(--accent-blue);color:#fff;font-size:12px;font-weight:700;
-  cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
-.avatar-menu{position:absolute;top:42px;right:0;background:var(--panel-dark);
-  border:1px solid var(--border-glow);border-radius:14px;padding:8px;
-  min-width:200px;z-index:500;display:none;box-shadow:0 8px 32px rgba(0,0,0,.4);}
-.avatar-menu.open{display:block;}
-.avatar-menu-user{padding:10px 12px 8px;border-bottom:1px solid var(--border-glow);margin-bottom:6px;}
-.avatar-menu-name{font-size:13px;font-weight:700;color:var(--text-main);}
-.avatar-menu-mail{font-size:10px;color:var(--text-muted);margin-top:2px;}
-.avatar-menu-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;
-  font-size:13px;color:var(--text-main);cursor:pointer;border:none;background:none;width:100%;text-align:left;}
-.avatar-menu-item:hover{background:var(--border-glow);}
-.avatar-menu-item.danger{color:#ef4444;}
+/* ── AVATAR MENU (misma estética que index.html) ── */
+.st-header-profile{width:34px;height:34px;background:linear-gradient(135deg,#3a86ff,#7209b7);
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:11px;color:#fff;cursor:pointer;flex-shrink:0;}
+@keyframes fadeSlideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── TOGGLE VISTA ── */
 .vista-toggle{display:flex;border:1px solid var(--border-glow);border-radius:8px;overflow:hidden;flex-shrink:0;}
@@ -226,60 +211,92 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 
   <button class="btn-icon" onclick="_recargarTickets()" title="Actualizar">↺</button>
 
-  <!-- Avatar con menú -->
-  <div class="avatar-wrap" id="avatar-wrap">
-    <button class="avatar-btn" id="avatar-btn" onclick="_toggleAvatarMenu()">??</button>
-    <div class="avatar-menu" id="avatar-menu">
-      <div class="avatar-menu-user">
-        <div class="avatar-menu-name" id="avatar-nombre">—</div>
-        <div class="avatar-menu-mail" id="avatar-mail">—</div>
+  <!-- Avatar con menú — igual a index.html -->
+  <div style="position:relative;" id="avatar-wrap-st">
+    <div class="st-header-profile" id="st-header-avatar" onclick="_toggleAvatarMenuSt(event)">CH</div>
+    <div id="avatar-menu-st" style="display:none;position:absolute;top:48px;right:0;
+         background:#0d1520;border:1px solid #1e3050;border-radius:16px;
+         width:300px;z-index:600;box-shadow:0 16px 48px rgba(0,0,0,0.6);
+         overflow:hidden;animation:fadeSlideDown .15s ease;">
+      <!-- Cabecera usuario -->
+      <div style="padding:16px;border-bottom:1px solid #1e3050;display:flex;align-items:center;gap:12px;background:#080d14;">
+        <div style="width:40px;height:40px;border-radius:50%;background:#1c2541;border:2px solid #3a86ff33;
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:14px;font-weight:800;color:#3a86ff;flex-shrink:0;" id="avatar-icon-st">CH</div>
+        <div style="min-width:0;">
+          <div style="font-size:13px;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="avatar-nombre-st">—</div>
+          <div style="font-size:10px;color:#64748b;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="avatar-email-st">—</div>
+          <div id="avatar-rol-st" style="display:inline-block;margin-top:4px;font-size:9px;font-weight:700;
+               text-transform:uppercase;letter-spacing:0.6px;padding:1px 7px;border-radius:20px;
+               background:rgba(58,134,255,.15);color:#3a86ff;border:1px solid rgba(58,134,255,.25);">—</div>
+        </div>
       </div>
-      <button class="avatar-menu-item" onclick="_toggleTema();_cerrarAvatarMenu()">
-        <span id="avatar-tema-icon">🌓</span> <span id="avatar-tema-label">Cambiar tema</span>
-      </button>
-      <button class="avatar-menu-item" onclick="_abrirWhatsApp();_cerrarAvatarMenu()">
-        <span>💬</span> WhatsApp TLC
-      </button>
-      <button class="avatar-menu-item danger" onclick="_cerrarSesion()">
-        <span>🚪</span> Cerrar sesión
-      </button>
+      <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+        <!-- Apariencia -->
+        <div style="background:#080d14;border:1px solid #1e3050;border-radius:10px;padding:10px 12px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;margin-bottom:8px;">Apariencia</div>
+          <div style="display:flex;background:#0a1628;border-radius:8px;overflow:hidden;border:1px solid #1e3050;">
+            <button id="st-btn-tema-oscuro" onclick="_setTemaSt('dark')"
+              style="flex:1;padding:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;
+                     display:flex;align-items:center;justify-content:center;gap:5px;
+                     background:#3a86ff;color:#fff;border-radius:7px 0 0 7px;transition:all .15s;">
+              🌙 Oscuro
+            </button>
+            <button id="st-btn-tema-claro" onclick="_setTemaSt('light')"
+              style="flex:1;padding:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;
+                     display:flex;align-items:center;justify-content:center;gap:5px;
+                     background:transparent;color:#64748b;transition:all .15s;">
+              ☀️ Claro
+            </button>
+          </div>
+        </div>
+        <!-- Saludo WhatsApp -->
+        <div style="background:#080d14;border:1px solid #1e3050;border-radius:10px;padding:10px 12px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;
+                      color:#64748b;margin-bottom:6px;display:flex;align-items:center;gap:5px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+            Saludo WhatsApp
+          </div>
+          <textarea id="st-wsp-saludo" rows="2"
+            style="width:100%;background:#0a1628;border:1px solid #1e3050;border-radius:8px;
+                   color:#f1f5f9;font-size:12px;padding:8px 10px;resize:none;
+                   line-height:1.4;outline:none;font-family:inherit;"
+            placeholder="Hola, le compartimos el presupuesto de TLC SRL: "
+            oninput="_guardarSaludoWspSt(this.value)"></textarea>
+          <div style="font-size:10px;color:#334155;margin-top:3px;">Se guarda automáticamente · URL se agrega al final</div>
+        </div>
+        <!-- Cerrar sesión -->
+        <button onclick="_cerrarSesionSt()"
+          style="width:100%;padding:11px;border-radius:10px;background:transparent;
+                 border:1px solid #2d1a1a;color:#f87171;font-size:13px;font-weight:600;
+                 cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s;"
+          onmouseover="this.style.background='rgba(248,113,113,.08)'"
+          onmouseout="this.style.background='transparent'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Cerrar sesión
+        </button>
+      </div>
     </div>
   </div>
 </header>
 
 <!-- FILTROS -->
 <div class="st-filtros">
-  <!-- F: Asignación -->
-  <div class="filtro-dd-wrap">
-    <span class="filtro-dd-label">Asignación</span>
-    <select class="filtro-dd" id="dd-tecnico" onchange="_selFiltroDD('tecnico',this)">
-      <option value="todos">Todos</option>
-      <option value="__asignados_a_mi__">Asignados a mí</option>
-      <option value="sin_asignar">Sin asignar</option>
-      <option value="juan_garro">Juan Garro</option>
-      <option value="damian_sosa">Damián Sosa</option>
-      <option value="fernando_del_campo">Fernando Del Campo</option>
-      <option value="cristian_hirth">Cristian Hirth</option>
-    </select>
-  </div>
-  <!-- G: Etapa — se rellena dinámicamente por JS con COLUMNAS -->
-  <div class="filtro-dd-wrap">
-    <span class="filtro-dd-label">Etapa</span>
-    <select class="filtro-dd" id="dd-etapa" onchange="_selFiltroDD('etapa',this)">
-      <option value="todos">Todas</option>
-    </select>
-  </div>
-  <!-- H: Prioridad -->
-  <div class="filtro-dd-wrap">
-    <span class="filtro-dd-label">Prioridad</span>
-    <select class="filtro-dd" id="dd-prio" onchange="_selFiltroDD('prio',this)">
-      <option value="todos">Todas</option>
-      <option value="urgente">🔴 Urgente</option>
-      <option value="importante">🟠 Importante</option>
-      <option value="media">🟡 Media</option>
-      <option value="baja">Baja</option>
-    </select>
-  </div>
+  <button class="filtro-chip activo" data-filtro="tecnico" data-val="todos" onclick="_selFiltro(this,'tecnico')">Todos</button>
+  <button class="filtro-chip" data-filtro="tecnico" data-val="juan_garro" onclick="_selFiltro(this,'tecnico')">Juan</button>
+  <button class="filtro-chip" data-filtro="tecnico" data-val="damian_sosa" onclick="_selFiltro(this,'tecnico')">Damián</button>
+  <button class="filtro-chip" data-filtro="tecnico" data-val="fernando_del_campo" onclick="_selFiltro(this,'tecnico')">Fernando</button>
+  <button class="filtro-chip" data-filtro="tecnico" data-val="sin_asignar" onclick="_selFiltro(this,'tecnico')">Sin asignar</button>
+  <span style="width:1px;background:var(--border-glow);flex-shrink:0;"></span>
+  <button class="filtro-chip" data-filtro="prio" data-val="todos" onclick="_selFiltro(this,'prio')" style="opacity:.5;">● Prio</button>
+  <button class="filtro-chip" data-filtro="prio" data-val="urgente" onclick="_selFiltro(this,'prio')">🔴 Urgente</button>
+  <button class="filtro-chip" data-filtro="prio" data-val="importante" onclick="_selFiltro(this,'prio')">🟠 Importante</button>
+  <button class="filtro-chip" data-filtro="prio" data-val="media" onclick="_selFiltro(this,'prio')">🟡 Media</button>
+  <span style="width:1px;background:var(--border-glow);flex-shrink:0;"></span>
+  <button class="filtro-chip" data-filtro="estado" data-val="todos" onclick="_selFiltro(this,'estado')" style="opacity:.5;">● Estado</button>
+  <button class="filtro-chip" data-filtro="estado" data-val="en_curso" onclick="_selFiltro(this,'estado')">En curso</button>
+  <button class="filtro-chip" data-filtro="estado" data-val="atrasada" onclick="_selFiltro(this,'estado')">Atrasada</button>
+  <button class="filtro-chip" data-filtro="estado" data-val="no_iniciada" onclick="_selFiltro(this,'estado')">No iniciada</button>
 </div>
 
 <!-- BUSCADOR -->
@@ -351,7 +368,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
       <div>
         <label class="form-label">Depósito inicial</label>
         <select class="form-select" id="nuevo-deposito">
-          <option value="recepcion">Recepción</option>
+          <option value="en_laboratorio">En laboratorio</option>
           <option value="diagnostico">Diagnóstico</option>
           <option value="presupuesto">Presupuesto</option>
           <option value="reparacion">Reparación</option>
@@ -399,23 +416,20 @@ var TEMA_KEY    = 'tlc_tema';
 var ORDEN_URL   = 'https://cahirth.github.io/Portal-TLC/orden-servicio.html?id=';
 
 // ── Columnas del Kanban ───────────────────────────────────────────
-// ── D: ID internos fijos — los labels se pueden editar desde RTDB /servicio_config/columnas ──
-var COLUMNAS_DEF = [
-  { key:'recepcion',                 label:'Recepción',             color:'#60a5fa', bg:'rgba(96,165,250,.1)',  border:'rgba(96,165,250,.25)' },
-  { key:'diagnostico',               label:'Diagnóstico',           color:'#a78bfa', bg:'rgba(167,139,250,.1)', border:'rgba(167,139,250,.25)'},
-  { key:'presupuesto',               label:'Presupuesto',           color:'#fbbf24', bg:'rgba(251,191,36,.1)',  border:'rgba(251,191,36,.25)' },
-  { key:'reparacion',                label:'Reparación',            color:'#f87171', bg:'rgba(248,113,113,.1)', border:'rgba(248,113,113,.25)'},
-  { key:'preparacion_control_calidad',label:'Preparación / CC',    color:'#34d399', bg:'rgba(52,211,153,.1)',  border:'rgba(52,211,153,.25)' },
-  { key:'para_facturar',             label:'Para Facturar',         color:'#fb923c', bg:'rgba(251,146,60,.1)',  border:'rgba(251,146,60,.25)' },
-  { key:'para_instalar',             label:'Para Instalar',         color:'#38bdf8', bg:'rgba(56,189,248,.1)',  border:'rgba(56,189,248,.25)' },
-  { key:'seguimiento',               label:'Seguimiento',           color:'#a3e635', bg:'rgba(163,230,53,.1)',  border:'rgba(163,230,53,.25)' },
-  { key:'servicio_remoto',           label:'Servicio Remoto',       color:'#22d3ee', bg:'rgba(34,211,238,.1)',  border:'rgba(34,211,238,.25)' },
-  { key:'consignacion',              label:'Consignación',          color:'#e879f9', bg:'rgba(232,121,249,.1)', border:'rgba(232,121,249,.25)'},
-  { key:'finalizado',                label:'Finalizado ✓',          color:'#06d6a0', bg:'rgba(6,214,160,.1)',   border:'rgba(6,214,160,.25)'  },
-  { key:'cancelado',                 label:'Cancelado',             color:'#94a3b8', bg:'rgba(148,163,184,.1)', border:'rgba(148,163,184,.2)' },
+var COLUMNAS = [
+  { key:'en_laboratorio',           label:'En Laboratorio',       color:'#60a5fa', bg:'rgba(96,165,250,.1)',  border:'rgba(96,165,250,.25)' },
+  { key:'diagnostico',              label:'Diagnóstico',           color:'#a78bfa', bg:'rgba(167,139,250,.1)', border:'rgba(167,139,250,.25)'},
+  { key:'presupuesto',              label:'Presupuesto',           color:'#fbbf24', bg:'rgba(251,191,36,.1)',  border:'rgba(251,191,36,.25)' },
+  { key:'reparacion',               label:'Reparación',            color:'#f87171', bg:'rgba(248,113,113,.1)', border:'rgba(248,113,113,.25)'},
+  { key:'preparacion_control_calidad',label:'Preparación / CC',   color:'#34d399', bg:'rgba(52,211,153,.1)',  border:'rgba(52,211,153,.25)' },
+  { key:'para_facturar',            label:'Para Facturar',         color:'#fb923c', bg:'rgba(251,146,60,.1)',  border:'rgba(251,146,60,.25)' },
+  { key:'para_instalar',            label:'Para Instalar',         color:'#38bdf8', bg:'rgba(56,189,248,.1)',  border:'rgba(56,189,248,.25)' },
+  { key:'seguimiento',              label:'Seguimiento',           color:'#a3e635', bg:'rgba(163,230,53,.1)',  border:'rgba(163,230,53,.25)' },
+  { key:'servicio_remoto',          label:'Servicio Remoto',       color:'#22d3ee', bg:'rgba(34,211,238,.1)',  border:'rgba(34,211,238,.25)' },
+  { key:'consignacion',             label:'Consignación',          color:'#e879f9', bg:'rgba(232,121,249,.1)', border:'rgba(232,121,249,.25)'},
+  { key:'finalizado',               label:'Finalizado ✓',          color:'#06d6a0', bg:'rgba(6,214,160,.1)',   border:'rgba(6,214,160,.25)'  },
+  { key:'cancelado',                label:'Cancelado',             color:'#94a3b8', bg:'rgba(148,163,184,.1)', border:'rgba(148,163,184,.2)' },
 ];
-// COLUMNAS se rellena en _cargarColumnas() mezclando COLUMNAS_DEF con labels del RTDB
-var COLUMNAS = COLUMNAS_DEF.slice();
 
 var TECNICO_LABEL = {
   sin_asignar:'—', fernando_del_campo:'FC', cristian_hirth:'CH',
@@ -432,7 +446,7 @@ var TECNICO_COLOR = {
 var _session     = null;
 var _permisos    = { servicio:false, admin:false };
 var _tickets     = [];   // todos los tickets del RTDB
-var _filtros     = { tecnico:'todos', prio:'todos', estado:'todos', etapa:'todos' };
+var _filtros     = { tecnico:'todos', prio:'todos', estado:'todos' };
 var _ticketActual = null;
 
 // ── Arranque ──────────────────────────────────────────────────────
@@ -459,13 +473,7 @@ function _cargarSesion() {
     document.getElementById('st-user-label').textContent = nombre;
 
     // Avatar
-    var iniciales = nombre.split(' ').map(function(p){ return p[0]||''; }).slice(0,2).join('').toUpperCase();
-    document.getElementById('avatar-btn').textContent = iniciales || 'U';
-    document.getElementById('avatar-nombre').textContent = nombre;
-    document.getElementById('avatar-mail').textContent = _session.username || '';
-
-    // Tema label
-    _actualizarTemaLabel();
+    _inicializarAvatarSt(_session);
 
     _permisos.servicio = true;
     _permisos.admin    = (_session.rol === 'Administrador');
@@ -492,45 +500,88 @@ function _redirigirLogin() {
   window.location.href = 'index.html';
 }
 
-// ── Tema ──────────────────────────────────────────────────────────
+// ── Tema (igual a index.html) ─────────────────────────────────────
 function _aplicarTema() {
   var t = localStorage.getItem(TEMA_KEY) || 'dark';
   document.body.classList.toggle('tema-claro', t === 'light');
 }
-function _actualizarTemaLabel() {
-  var actual = localStorage.getItem(TEMA_KEY) || 'dark';
-  var icon  = document.getElementById('avatar-tema-icon');
-  var label = document.getElementById('avatar-tema-label');
-  if (icon)  icon.textContent  = actual === 'dark' ? '☀️' : '🌙';
-  if (label) label.textContent = actual === 'dark' ? 'Modo claro' : 'Modo oscuro';
+function _aplicarTemaSt() {
+  var tema = localStorage.getItem(TEMA_KEY) || 'dark';
+  document.body.classList.toggle('tema-claro', tema === 'light');
+  var btnOsc = document.getElementById('st-btn-tema-oscuro');
+  var btnCla = document.getElementById('st-btn-tema-claro');
+  if (btnOsc && btnCla) {
+    if (tema === 'light') {
+      btnOsc.style.background = 'transparent'; btnOsc.style.color = '#64748b';
+      btnCla.style.background = '#1a4b8c';     btnCla.style.color = '#fff';
+    } else {
+      btnOsc.style.background = '#3a86ff'; btnOsc.style.color = '#fff';
+      btnCla.style.background = 'transparent'; btnCla.style.color = '#64748b';
+    }
+  }
 }
+window._setTemaSt = function(tema) {
+  try { localStorage.setItem(TEMA_KEY, tema); } catch(e) {}
+  _aplicarTemaSt();
+};
+// Compat
 window._toggleTema = function() {
   var actual = localStorage.getItem(TEMA_KEY) || 'dark';
-  var nuevo  = actual === 'dark' ? 'light' : 'dark';
-  localStorage.setItem(TEMA_KEY, nuevo);
-  document.body.classList.toggle('tema-claro', nuevo === 'light');
-  _actualizarTemaLabel();
+  _setTemaSt(actual === 'dark' ? 'light' : 'dark');
 };
 
-// ── Avatar menu ────────────────────────────────────────────────────
-window._toggleAvatarMenu = function() {
-  var m = document.getElementById('avatar-menu');
-  m.classList.toggle('open');
+// ── Avatar menu (igual a index.html) ──────────────────────────────
+function _inicializarAvatarSt(session) {
+  var nombre   = session.name || session.username || '—';
+  var email    = session.username || '—';
+  var partes   = nombre.trim().split(' ');
+  var iniciales = partes.length >= 2
+    ? (partes[0][0] + partes[partes.length-1][0]).toUpperCase()
+    : nombre.substring(0,2).toUpperCase();
+  var el = document.getElementById('st-header-avatar');
+  var ic = document.getElementById('avatar-icon-st');
+  var nm = document.getElementById('avatar-nombre-st');
+  var em = document.getElementById('avatar-email-st');
+  var rl = document.getElementById('avatar-rol-st');
+  if (el) el.textContent = iniciales;
+  if (ic) ic.textContent = iniciales;
+  if (nm) nm.textContent = nombre;
+  if (em) em.textContent = email;
+  if (rl) rl.textContent = session.rol || 'Usuario';
+  _aplicarTemaSt();
+  _initSaludoWspSt();
+}
+
+window._toggleAvatarMenuSt = function(e) {
+  if (e) e.stopPropagation();
+  var menu   = document.getElementById('avatar-menu-st');
+  var abierto = menu.style.display !== 'none';
+  menu.style.display = abierto ? 'none' : 'block';
+  if (!abierto) _initSaludoWspSt();
 };
-window._cerrarAvatarMenu = function() {
-  document.getElementById('avatar-menu').classList.remove('open');
-};
+
 document.addEventListener('click', function(e) {
-  var wrap = document.getElementById('avatar-wrap');
-  if (wrap && !wrap.contains(e.target)) _cerrarAvatarMenu();
+  var wrap = document.getElementById('avatar-wrap-st');
+  if (wrap && !wrap.contains(e.target)) {
+    var menu = document.getElementById('avatar-menu-st');
+    if (menu) menu.style.display = 'none';
+  }
 });
-window._abrirWhatsApp = function() {
-  window.open('https://wa.me/5491141479942', '_blank');
-};
-window._cerrarSesion = function() {
+
+window._cerrarSesionSt = function() {
   if (!confirm('¿Cerrar sesión?')) return;
   localStorage.removeItem(SESSION_KEY);
   window.location.href = 'index.html';
+};
+
+// ── Saludo WhatsApp ───────────────────────────────────────────────
+window._guardarSaludoWspSt = function(val) {
+  try { localStorage.setItem('tlc_wsp_saludo', val.trim()); } catch(e) {}
+};
+function _initSaludoWspSt() {
+  var ta = document.getElementById('st-wsp-saludo');
+  if (!ta) return;
+  try { ta.value = localStorage.getItem('tlc_wsp_saludo') || ''; } catch(e) {}
 };
 
 // ── Toggle vista Lista / Kanban ────────────────────────────────────
@@ -559,32 +610,6 @@ window._setVista = function(vista, sinGuardar) {
   if (_tickets.length) _aplicarFiltros();
 };
 
-// ── D: Cargar labels de columnas desde RTDB (nombres editables) ─────
-async function _cargarColumnas() {
-  try {
-    var res  = await fetch(RTDB_URL + '/servicio_config/columnas.json', { cache:'no-store' });
-    var data = await res.json();
-    if (data && typeof data === 'object') {
-      COLUMNAS = COLUMNAS_DEF.map(function(col) {
-        var override = data[col.key];
-        return Object.assign({}, col, override ? { label: override } : {});
-      });
-    } else {
-      COLUMNAS = COLUMNAS_DEF.slice();
-    }
-  } catch(e) {
-    COLUMNAS = COLUMNAS_DEF.slice();
-  }
-  // Poblar dropdown etapa (G)
-  var ddEtapa = document.getElementById('dd-etapa');
-  if (ddEtapa) {
-    ddEtapa.innerHTML = '<option value="todos">Todas</option>' +
-      COLUMNAS.map(function(c){
-        return '<option value="' + c.key + '">' + c.label + '</option>';
-      }).join('');
-  }
-}
-
 // ── Fetch a RTDB (lectura pública REST) ───────────────────────────
 async function _cargarTickets() {
   var loading = document.getElementById('st-loading');
@@ -594,7 +619,6 @@ async function _cargarTickets() {
   if (kanban) kanban.style.display = 'none';
   if (lista)  lista.style.display  = 'none';
   try {
-    await _cargarColumnas();
     var res  = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now(), { cache:'no-store' });
     var data = await res.json();
     _tickets = data ? Object.values(data) : [];
@@ -609,37 +633,19 @@ async function _cargarTickets() {
 window._recargarTickets = _cargarTickets;
 
 // ── Filtros ────────────────────────────────────────────────────────
-// _selFiltro legacy — ya no se usa, mantenido por compatibilidad
 window._selFiltro = function(btn, tipo) {
+  document.querySelectorAll('[data-filtro="' + tipo + '"]').forEach(function(b) { b.classList.remove('activo'); });
+  btn.classList.add('activo');
   _filtros[tipo] = btn.dataset.val;
   _aplicarFiltros();
 };
 
-// F/G/H: handler para los 3 dropdowns
-window._selFiltroDD = function(tipo, sel) {
-  _filtros[tipo] = sel.value;
-  sel.classList.toggle('tiene-filtro', sel.value !== 'todos');
-  _aplicarFiltros();
-};
-
 window._aplicarFiltros = function() {
-  var query    = (document.getElementById('st-buscador').value || '').toLowerCase().trim();
-  var miUser   = _session ? (_session.username || '') : '';
+  var query = (document.getElementById('st-buscador').value || '').toLowerCase().trim();
   var filtrados = _tickets.filter(function(t) {
-    // F: Asignación
-    var fTec = _filtros.tecnico || 'todos';
-    if (fTec === '__asignados_a_mi__') {
-      // Derivar clave interna del username de sesión (ej: cristian.hirth@... → cristian_hirth)
-      var miClave = _session ? (_session.tecnico_key || _session.username.split('@')[0].replace(/[^a-z0-9]/gi,'_').toLowerCase()) : '';
-      if (t.tecnico_asignado !== miClave) return false;
-    } else if (fTec !== 'todos') {
-      if (t.tecnico_asignado !== fTec) return false;
-    }
-    // G: Etapa
-    if (_filtros.etapa && _filtros.etapa !== 'todos' && t.deposito !== _filtros.etapa) return false;
-    // H: Prioridad
-    if (_filtros.prio && _filtros.prio !== 'todos' && t.prioridad !== _filtros.prio) return false;
-    // Buscador
+    if (_filtros.tecnico !== 'todos' && t.tecnico_asignado !== _filtros.tecnico) return false;
+    if (_filtros.prio    !== 'todos' && t.prioridad        !== _filtros.prio)    return false;
+    if (_filtros.estado  !== 'todos' && t.estado_progreso  !== _filtros.estado)  return false;
     if (query) {
       var haystack = [t.cliente, t.equipo_modelo, t.equipo_serie, t.id_ticket].join(' ').toLowerCase();
       if (!haystack.includes(query)) return false;
@@ -909,7 +915,7 @@ function _renderDetalle(t) {
 
 function _optsDeposito(sel) {
   return [
-    {v:'recepcion',l:'Recepción'},{v:'diagnostico',l:'Diagnóstico'},
+    {v:'en_laboratorio',l:'En Laboratorio'},{v:'diagnostico',l:'Diagnóstico'},
     {v:'presupuesto',l:'Presupuesto'},{v:'reparacion',l:'Reparación'},
     {v:'preparacion_control_calidad',l:'Preparación / CC'},{v:'para_facturar',l:'Para Facturar'},
     {v:'para_instalar',l:'Para Instalar'},{v:'seguimiento',l:'Seguimiento'},
