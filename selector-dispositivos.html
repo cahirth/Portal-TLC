@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | selector-dispositivos.html | v2026.06.24.1 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -224,7 +225,7 @@
     .item-cantidad-input::-webkit-outer-spin-button, .item-cantidad-input::-webkit-inner-spin-button { -webkit-appearance:none; }
 
     /* ── Select IVA por ítem ── */
-    .item-iva-select { padding:6px 8px; background:#080d14; border:1px solid #1e3050; border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer; }
+    .item-iva-select { padding:6px 8px; background:#080d14; border:1px solid #1e3050; border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer; min-width:80px; }
     .item-iva-select.sin-seleccionar { border-color:#f8961e; color:#f8961e; }
     .item-iva-select:focus { border-color:#3a86ff; }
 
@@ -347,6 +348,10 @@
     body.tema-claro .dispositivo-card {
         background: #ffffff !important; border-color: #e2e8f0 !important;
         box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    body.tema-claro .dispositivo-card:hover {
+        background: #f1f5f9 !important; border-color: #cbd5e1 !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,.08) !important;
     }
     body.tema-claro .dispositivo-card:active { opacity: .9; }
     body.tema-claro .card-nombre  { color: #0f172a !important; }
@@ -3509,11 +3514,14 @@ function _mrRenderPaso2() {
                 </div>
             </div>
 
-            <!-- Fila controles: cantidad + descuento + IVA + quitar -->
-            <div class="item-descuento-row" style="flex-wrap:wrap; gap:8px;">
+            <!-- Fila controles: 2 filas para evitar wrap en mobile -->
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+
+              <!-- Fila 1: Cantidad + Descuento -->
+              <div class="item-descuento-row" style="flex-wrap:nowrap; gap:8px; align-items:center;">
 
                 <!-- Cantidad -->
-                <div class="item-cant-ctrl">
+                <div class="item-cant-ctrl" style="flex-shrink:0;">
                     <button class="btn-cant-minus"
                         onclick="carrito[${idx}].cantidad=Math.max(1,(carrito[${idx}].cantidad||1)-1); _mrRenderPaso2();">−</button>
                     <input type="number" class="item-cantidad-input"
@@ -3525,20 +3533,24 @@ function _mrRenderPaso2() {
                 </div>
 
                 <!-- Descuento -->
-                <span style="font-size:11px; color:#64748b; white-space:nowrap;">Desc:</span>
-                <input type="number" class="item-descuento-input"
+                <span style="font-size:11px; color:#64748b; white-space:nowrap; flex-shrink:0;">Desc:</span>
+                <input type="number" class="item-descuento-input" style="flex:1; min-width:50px;"
                     min="0" step="any" value="${dVal || ''}" placeholder="0"
                     oninput="carrito[${idx}].descuentoValor=parseFloat(this.value)||0;"
                     onblur="_mrRenderPaso2();" onchange="_mrRenderPaso2();">
-                <div class="desc-tipo-toggle">
+                <div class="desc-tipo-toggle" style="flex-shrink:0;">
                     <button class="desc-tipo-btn ${dTipo==='%'?'active':''}"
                         onclick="carrito[${idx}].descuentoTipo='%'; _mrRenderPaso2();">%</button>
                     <button class="desc-tipo-btn ${dTipo==='USD'?'active':''}"
                         onclick="carrito[${idx}].descuentoTipo='USD'; _mrRenderPaso2();">USD</button>
                 </div>
+              </div>
 
+              <!-- Fila 2: IVA + botón eliminar -->
+              <div style="display:flex; align-items:center; gap:8px;">
                 <!-- IVA -->
                 <select class="item-iva-select ${sinIva ? 'sin-seleccionar' : ''}"
+                    style="flex:1; min-width:80px;"
                     onchange="carrito[${idx}].ivaPct=this.value===''?null:parseFloat(this.value); _mrRenderPaso2();">
                     <option value="" ${sinIva?'selected':''}>IVA</option>
                     <option value="10.5" ${ivaPct===10.5?'selected':''}>10,5%</option>
@@ -3546,9 +3558,16 @@ function _mrRenderPaso2() {
                     <option value="0"    ${ivaPct===0?'selected':''}>Exento</option>
                 </select>
 
-                <!-- Quitar -->
+                <!-- Eliminar ítem — FIX: botón visible con label -->
                 <button onclick="quitarDelCarrito(${idx}); _mrRenderPaso2();"
-                    style="margin-left:auto; background:none; border:none; color:#64748b; font-size:18px; cursor:pointer; padding:4px 6px; line-height:1;">✕</button>
+                    style="display:flex; align-items:center; gap:5px; padding:6px 12px;
+                           background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.25);
+                           border-radius:8px; color:#f87171; font-size:12px; font-weight:600;
+                           cursor:pointer; white-space:nowrap; flex-shrink:0;">
+                    ✕ Quitar
+                </button>
+              </div>
+
             </div>
         </div>`;
     }).join('');
