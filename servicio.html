@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.24.1 -->
+<!-- Portal TLC | servicio.html | v2026.06.24.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -157,6 +157,38 @@ body{background:var(--bg);color:var(--text-main);font-family:-apple-system,Blink
 .btn-orden:hover{border-color:var(--accent-blue);}
 body.tema-claro .form-select, body.tema-claro .form-input, body.tema-claro .form-textarea,
 body.tema-claro .det-field-select, body.tema-claro .det-field-input { background:#f8fafc; }
+
+/* ── CAMPOS TÉCNICOS (Diagnóstico, Partes, Tareas, Presupuesto) ── */
+.campo-tecnico-wrap{margin-bottom:10px;}
+.campo-tecnico-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  color:var(--text-muted);margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+.campo-tecnico-badge{font-size:9px;padding:1px 6px;border-radius:4px;font-weight:700;text-transform:uppercase;}
+.badge-etapa-activa{background:rgba(59,130,246,.2);color:#60a5fa;}
+.badge-completado{background:rgba(34,197,94,.15);color:#4ade80;}
+.campo-tecnico-textarea{width:100%;padding:8px 10px;border-radius:8px;
+  background:var(--bg);border:1px solid var(--border-glow);color:var(--text-main);
+  font-size:12px;font-family:inherit;resize:vertical;min-height:60px;outline:none;line-height:1.5;}
+.campo-tecnico-textarea:focus{border-color:var(--accent-blue);}
+.campo-tecnico-textarea::placeholder{color:var(--text-muted);}
+.campo-tecnico-textarea:disabled{opacity:.5;cursor:not-allowed;}
+.presupuesto-wrap{display:flex;flex-direction:column;gap:8px;}
+.presupuesto-link-row{display:flex;gap:8px;align-items:center;}
+.presupuesto-link-input{flex:1;padding:7px 10px;border-radius:8px;background:var(--bg);
+  border:1px solid var(--border-glow);color:var(--accent-blue);font-size:12px;outline:none;}
+.presupuesto-link-input:focus{border-color:var(--accent-blue);}
+.presupuesto-link-btn{padding:7px 10px;border-radius:8px;background:rgba(59,130,246,.15);
+  border:1px solid rgba(59,130,246,.3);color:#60a5fa;font-size:12px;cursor:pointer;white-space:nowrap;}
+.checkbox-row{display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;user-select:none;}
+.checkbox-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent-blue);cursor:pointer;flex-shrink:0;}
+.checkbox-row span{font-size:12px;font-weight:600;color:var(--text-main);}
+
+/* ── BOTÓN SIGUIENTE ETAPA ── */
+.btn-siguiente-etapa{width:100%;padding:13px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,#3a86ff,#7209b7);color:#fff;font-size:14px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;}
+.btn-siguiente-etapa:hover{opacity:.9;}
+.btn-siguiente-etapa:disabled{opacity:.4;cursor:not-allowed;}
+.btn-siguiente-etapa.ultimo{background:linear-gradient(135deg,#06d6a0,#0096c7);}
 
 /* ── GASTOS DEL SERVICIO ── */
 .gastos-tabla{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;}
@@ -472,7 +504,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 (function(){
 'use strict';
 
-console.log('%c Portal TLC | servicio.html | v2026.06.24.1 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+console.log('%c Portal TLC | servicio.html | v2026.06.24.2 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1026,6 +1058,15 @@ function _renderDetalle(t) {
       '</div>' +
     '</div>' +
 
+    // TRABAJO TÉCNICO
+    '<div class="det-section">Trabajo técnico</div>' +
+    '<div class="det-card">' +
+      _renderCamposTecnicos(t, puedeEditar) +
+    '</div>' +
+
+    // BOTÓN SIGUIENTE ETAPA
+    _renderBtnSiguiente(t, puedeEditar) +
+
     // NOTAS
     '<div class="det-section">Notas de seguimiento</div>' +
     '<div class="det-card">' +
@@ -1043,6 +1084,196 @@ function _renderDetalle(t) {
     // PELIGRO — botón eliminar removido (tickets son documentos permanentes)
     '';
 }
+
+// ── CAMPOS TÉCNICOS ──────────────────────────────────────────────
+var FLUJO_ETAPAS = ['recepcion','diagnostico','presupuesto','reparacion','para_facturar'];
+
+function _campoBadge(deposito, etapaActivacion) {
+  var idxActual = FLUJO_ETAPAS.indexOf(deposito);
+  var idxActiv  = FLUJO_ETAPAS.indexOf(etapaActivacion);
+  if (idxActual < idxActiv) return '<span class="campo-tecnico-badge" style="background:rgba(100,116,139,.15);color:#64748b;">Disponible en ' + etapaActivacion + '</span>';
+  if (idxActual === idxActiv) return '<span class="campo-tecnico-badge badge-etapa-activa">Etapa actual</span>';
+  return '<span class="campo-tecnico-badge badge-completado">✓</span>';
+}
+
+function _renderCamposTecnicos(t, puedeEditar) {
+  var dep = t.deposito || 'recepcion';
+  var idxDep = FLUJO_ETAPAS.indexOf(dep);
+  var finalizado = (dep === 'finalizado' || dep === 'cancelado');
+  var soloLectura = finalizado || !puedeEditar;
+
+  // ── Falla reportada (siempre visible, informativo) ──
+  var fallaHtml = '<div class="campo-tecnico-wrap">' +
+    '<div class="campo-tecnico-label">Falla reportada por el cliente ' + _campoBadge(dep,'recepcion') + '</div>' +
+    '<textarea class="campo-tecnico-textarea" placeholder="Falla reportada al ingresar el equipo..." ' +
+      (soloLectura ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'falla_reportada\',this.value)"') + '>' +
+      _esc(t.falla_reportada||'') + '</textarea>' +
+  '</div>';
+
+  // ── Accesorios (siempre visible) ──
+  var accesoriosHtml = '<div class="campo-tecnico-wrap">' +
+    '<div class="campo-tecnico-label">Accesorios recibidos ' + _campoBadge(dep,'recepcion') + '</div>' +
+    '<input class="campo-tecnico-textarea" style="min-height:auto;padding:8px 10px;" placeholder="Ej: Cable de poder, estuche. O Ninguno." ' +
+      'value="' + _esc(t.accesorios||'') + '" ' +
+      (soloLectura ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'accesorios\',this.value)"') + '>' +
+  '</div>';
+
+  // ── Diagnóstico (activo desde diagnóstico) ──
+  var diagDisabled = (idxDep < FLUJO_ETAPAS.indexOf('diagnostico')) || soloLectura;
+  var diagHtml = '<div class="campo-tecnico-wrap">' +
+    '<div class="campo-tecnico-label">Diagnóstico ' + _campoBadge(dep,'diagnostico') + '</div>' +
+    '<textarea class="campo-tecnico-textarea" placeholder="Completá el diagnóstico técnico del equipo..." ' +
+      (diagDisabled ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'diagnostico\',this.value)"') + '>' +
+      _esc(t.diagnostico||'') + '</textarea>' +
+  '</div>';
+
+  // ── Presupuesto vinculado (activo desde presupuesto) ──
+  var presupDisabled = (idxDep < FLUJO_ETAPAS.indexOf('presupuesto')) || soloLectura;
+  var presupHtml = '<div class="campo-tecnico-wrap">' +
+    '<div class="campo-tecnico-label">Presupuesto vinculado ' + _campoBadge(dep,'presupuesto') + '</div>' +
+    '<div class="presupuesto-wrap">' +
+      '<div class="presupuesto-link-row">' +
+        '<input class="presupuesto-link-input" id="det-presupuesto-link" ' +
+          'placeholder="Pegá el link del presupuesto generado..." ' +
+          'value="' + _esc(t.presupuesto_link||'') + '" ' +
+          (presupDisabled ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'presupuesto_link\',this.value)"') + '>' +
+        (t.presupuesto_link ? '<a href="' + _esc(t.presupuesto_link) + '" target="_blank" class="presupuesto-link-btn">🔗 Ver</a>' : '') +
+      '</div>' +
+      '<label class="checkbox-row">' +
+        '<input type="checkbox" id="det-presupuesto-aprobado" ' +
+          (t.presupuesto_aprobado ? 'checked' : '') + ' ' +
+          (presupDisabled ? 'disabled' : 'onchange="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'presupuesto_aprobado\',this.checked)"') + '>' +
+        '<span>Presupuesto aprobado por el cliente</span>' +
+      '</label>' +
+    '</div>' +
+  '</div>';
+
+  // ── Partes utilizadas (activo desde reparación) ──
+  var repDisabled = (idxDep < FLUJO_ETAPAS.indexOf('reparacion')) || soloLectura;
+  var partesHtml = '<div class="campo-tecnico-wrap">' +
+    '<div class="campo-tecnico-label">Partes utilizadas ' + _campoBadge(dep,'reparacion') + '</div>' +
+    '<textarea class="campo-tecnico-textarea" placeholder="Listá los repuestos y partes usadas en la reparación..." ' +
+      (repDisabled ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'partes_utilizadas\',this.value)"') + '>' +
+      _esc(t.partes_utilizadas||'') + '</textarea>' +
+  '</div>';
+
+  // ── Tareas realizadas (activo desde reparación) ──
+  var tareasHtml = '<div class="campo-tecnico-wrap">' +
+    '<div class="campo-tecnico-label">Tareas realizadas ' + _campoBadge(dep,'reparacion') + '</div>' +
+    '<textarea class="campo-tecnico-textarea" placeholder="Describí las tareas realizadas durante la reparación..." ' +
+      (repDisabled ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'tareas_realizadas\',this.value)"') + '>' +
+      _esc(t.tareas_realizadas||'') + '</textarea>' +
+  '</div>';
+
+  // ── Checkbox Reparado (activo desde reparación) ──
+  var reparadoHtml = '<label class="checkbox-row" style="margin-top:4px;">' +
+    '<input type="checkbox" id="det-reparado" ' +
+      (t.reparado ? 'checked' : '') + ' ' +
+      (repDisabled ? 'disabled' : 'onchange="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'reparado\',this.checked)"') + '>' +
+    '<span>Reparado ✓</span>' +
+  '</label>';
+
+  return fallaHtml + accesoriosHtml + diagHtml + presupHtml + partesHtml + tareasHtml + reparadoHtml;
+}
+
+// ── Guardar campo técnico en RTDB ─────────────────────────────────
+window._guardarCampoTecnico = function(id, campo, valor) {
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (t) t[campo] = valor;
+  if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual[campo] = valor;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_actualizarCampo', id_ticket:id, campo:campo, valor:valor }) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){ if(!r.ok) console.warn('Error guardando campo:', r.error); })
+  .catch(function(e){ console.warn(e); });
+};
+
+// ── Botón Siguiente Etapa ─────────────────────────────────────────
+var SIGUIENTE_ETAPA = {
+  'recepcion':   'diagnostico',
+  'diagnostico': 'presupuesto',
+  'presupuesto': 'reparacion',
+  'reparacion':  'para_facturar',
+};
+var ETAPA_LABEL = {
+  'diagnostico':  'Diagnóstico',
+  'presupuesto':  'Presupuesto',
+  'reparacion':   'Reparación',
+  'para_facturar':'Para Facturar',
+};
+
+function _renderBtnSiguiente(t, puedeEditar) {
+  if (!puedeEditar) return '';
+  var dep = t.deposito || 'recepcion';
+  var sig = SIGUIENTE_ETAPA[dep];
+  if (!sig) return '';
+  var label = ETAPA_LABEL[sig] || sig;
+  var esUltimo = sig === 'para_facturar';
+  return '<div style="padding:12px 0 4px;">' +
+    '<button class="btn-siguiente-etapa' + (esUltimo ? ' ultimo' : '') + '" ' +
+      'onclick="_siguienteEtapa(\'' + t.id_ticket + '\')">' +
+      '→ Pasar a ' + label +
+    '</button>' +
+  '</div>';
+}
+
+window._siguienteEtapa = function(id) {
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (!t) return;
+  var dep = t.deposito || 'recepcion';
+  var sig = SIGUIENTE_ETAPA[dep];
+  if (!sig) return;
+
+  var errores = [];
+
+  // Gate 1: Recepción → Diagnóstico
+  if (dep === 'recepcion') {
+    if (!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') errores.push('Asigná un técnico responsable');
+    if (!t.falla_reportada || !t.falla_reportada.trim()) errores.push('Completá la falla reportada por el cliente');
+    if (!t.accesorios || !t.accesorios.trim()) errores.push('Completá los accesorios recibidos (o escribí "Ninguno")');
+  }
+
+  // Gate 2: Diagnóstico → Presupuesto
+  if (dep === 'diagnostico') {
+    if (!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') errores.push('Asigná un técnico responsable');
+    if (!t.diagnostico || !t.diagnostico.trim()) errores.push('Completá el diagnóstico técnico');
+  }
+
+  // Gate 3: Presupuesto → Reparación
+  if (dep === 'presupuesto') {
+    if (!t.presupuesto_link || !t.presupuesto_link.trim()) errores.push('Agregá el link del presupuesto generado');
+    if (!t.presupuesto_aprobado) errores.push('Tildá "Presupuesto aprobado" antes de pasar a Reparación');
+  }
+
+  // Gate 4: Reparación → Para Facturar
+  if (dep === 'reparacion') {
+    if (!t.partes_utilizadas || !t.partes_utilizadas.trim()) errores.push('Completá las partes utilizadas');
+    if (!t.tareas_realizadas || !t.tareas_realizadas.trim()) errores.push('Completá las tareas realizadas');
+    if (!t.reparado) errores.push('Tildá "Reparado" para confirmar que el equipo está listo');
+  }
+
+  if (errores.length) {
+    _stMostrarError('⚠ ' + errores[0] + (errores.length > 1 ? ' (y ' + (errores.length-1) + ' más)' : ''));
+    return;
+  }
+
+  // Mover a siguiente columna
+  t.deposito = sig;
+  if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual.deposito = sig;
+
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_actualizarDeposito', id_ticket:id, deposito:sig }) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){
+    if (r.ok) {
+      _renderDetalle(t);
+      _aplicarFiltros();
+    } else {
+      _stMostrarError('Error al mover: ' + (r.error||'desconocido'));
+    }
+  })
+  .catch(function(e){ _stMostrarError('Error de conexión'); });
+};
 
 // ── J: GASTOS DEL SERVICIO ───────────────────────────────────────
 function _renderGastos(t) {
