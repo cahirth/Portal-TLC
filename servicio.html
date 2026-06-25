@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.25.1 -->
+<!-- Portal TLC | servicio.html | v2026.06.25.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -296,7 +296,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
           <div id="avatar-rol-st" style="display:inline-block;margin-top:4px;font-size:9px;font-weight:700;
                text-transform:uppercase;letter-spacing:0.6px;padding:1px 7px;border-radius:20px;
                background:rgba(58,134,255,.15);color:#3a86ff;border:1px solid rgba(58,134,255,.25);">—</div>
-          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.25.1</div>
+          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.25.2</div>
         </div>
       </div>
       <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
@@ -417,13 +417,20 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
     <input type="text" class="form-input" id="nuevo-cliente" placeholder="Ej: Clínica de Ojos Norte">
     <div class="form-row">
       <div>
-        <label class="form-label">Modelo de equipo</label>
-        <input type="text" class="form-input" id="nuevo-modelo" placeholder="Ej: HOCT-1 HUVITZ">
+        <label class="form-label">Marca del equipo</label>
+        <input type="text" class="form-input" id="nuevo-marca" placeholder="Ej: HUVITZ, Topcon, Moria">
       </div>
+      <div>
+        <label class="form-label">Modelo de equipo</label>
+        <input type="text" class="form-input" id="nuevo-modelo" placeholder="Ej: HOCT-1F">
+      </div>
+    </div>
+    <div class="form-row">
       <div>
         <label class="form-label">Nº de serie</label>
         <input type="text" class="form-input" id="nuevo-serie" placeholder="Ej: H100-2510074">
       </div>
+      <div></div>
     </div>
     <div class="form-row">
       <div>
@@ -508,7 +515,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 (function(){
 'use strict';
 
-console.log('%c Portal TLC | servicio.html | v2026.06.25.1 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+console.log('%c Portal TLC | servicio.html | v2026.06.25.2 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -771,6 +778,12 @@ async function _cargarTickets() {
     var res  = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now(), { cache:'no-store' });
     var data = await res.json();
     _tickets = data ? Object.values(data) : [];
+    // Ordenar: más reciente arriba
+    _tickets.sort(function(a,b){
+      var da = a.creado_en || a.actualizado_en || '';
+      var db = b.creado_en || b.actualizado_en || '';
+      return db > da ? 1 : db < da ? -1 : 0;
+    });
     loading.style.display = 'none';
     _setVista(_vistaActual, true);
     _aplicarFiltros();
@@ -1054,8 +1067,24 @@ function _renderDetalle(t) {
   }
 
   document.getElementById('det-body').innerHTML =
+    // BANNER ETAPA ACTUAL
+    (function(){
+      var colObj = COLUMNAS.find(function(c){ return c.key === (t.deposito||'recepcion'); });
+      var colLabel = colObj ? colObj.label : (t.deposito||'—');
+      var colColor = colObj ? colObj.color : '#64748b';
+      var colBg    = colObj ? colObj.bg    : 'rgba(100,116,139,.1)';
+      return '<div style="padding:12px 16px 0;">' +
+        '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;' +
+          'background:' + colBg + ';border:1px solid ' + colColor + '33;margin-bottom:10px;">' +
+          '<span style="width:8px;height:8px;border-radius:50%;background:' + colColor + ';flex-shrink:0;"></span>' +
+          '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:' + colColor + ';">Etapa actual</span>' +
+          '<span style="font-size:13px;font-weight:700;color:var(--text-main);margin-left:2px;">' + _esc(colLabel) + '</span>' +
+        '</div>' +
+      '</div>';
+    })() +
+
     // ACCESO RÁPIDO
-    '<div style="padding-top:14px;">' +
+    '<div style="padding:0 16px 10px;">' +
     '<div class="btn-orden-row">' +
       '<a class="btn-orden" href="' + ORDEN_URL + encodeURIComponent(t.id_ticket) + '" target="_blank">' +
         '<i class="fa-solid fa-file-lines"></i> Ver Orden</a>' +
@@ -1075,18 +1104,34 @@ function _renderDetalle(t) {
       '</div>' +
       '<div class="form-row">' +
         '<div class="det-field">' +
+          '<div class="det-field-label">Marca</div>' +
+          (puedeEditar
+            ? '<input class="det-field-input" value="' + _esc(t.equipo_marca||'') + '" placeholder="Marca..." onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'equipo_marca\',this.value,\'' + _esc(t.equipo_marca||'') + '\')">'
+            : '<div class="det-field-val">' + _esc(t.equipo_marca||'—') + '</div>') +
+        '</div>' +
+        '<div class="det-field">' +
           '<div class="det-field-label">Modelo</div>' +
           (puedeEditar
             ? '<input class="det-field-input" value="' + _esc(t.equipo_modelo||'') + '" onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'equipo_modelo\',this.value,\'' + _esc(t.equipo_modelo||'') + '\')">'
             : '<div class="det-field-val">' + _esc(t.equipo_modelo||'—') + '</div>') +
         '</div>' +
+      '</div>' +
+      '<div class="form-row">' +
         '<div class="det-field">' +
           '<div class="det-field-label">Nº de Serie</div>' +
           (puedeEditar
             ? '<input class="det-field-input" value="' + _esc(t.equipo_serie||'') + '" onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'equipo_serie\',this.value,\'' + _esc(t.equipo_serie||'') + '\')">'
             : '<div class="det-field-val">' + _esc(t.equipo_serie||'—') + '</div>') +
         '</div>' +
+        '<div class="det-field"></div>' +
       '</div>' +
+    '</div>' +
+
+    // FALLA REPORTADA POR EL EQUIPO
+    '<div class="det-section">Falla reportada por el equipo</div>' +
+    '<div class="det-card">' +
+      '<textarea class="campo-tecnico-textarea" style="min-height:50px;" readonly>' + _esc(t.falla_reportada||'') + '</textarea>' +
+      (t.accesorios ? '<div style="margin-top:6px;font-size:11px;color:var(--text-muted);"><strong>Accesorios:</strong> ' + _esc(t.accesorios) + '</div>' : '') +
     '</div>' +
 
     // ASIGNACIÓN Y ESTADO
@@ -1592,6 +1637,7 @@ window._crearTicket = function() {
   var payload = {
     accion:           'st_crearTicket',
     cliente:          cliente,
+    equipo_marca:     document.getElementById('nuevo-marca') ? document.getElementById('nuevo-marca').value.trim() : '',
     equipo_modelo:    modelo,
     equipo_serie:     serie,
     tecnico_asignado: tecnico,
@@ -1613,7 +1659,7 @@ window._crearTicket = function() {
   .then(function(r){
     if (r.ok) {
       _cerrarModalNuevo();
-      ['nuevo-cliente','nuevo-modelo','nuevo-serie','nuevo-falla','nuevo-accesorios','nuevo-nota']
+      ['nuevo-cliente','nuevo-marca','nuevo-modelo','nuevo-serie','nuevo-falla','nuevo-accesorios','nuevo-nota']
         .forEach(function(id){ var el=document.getElementById(id); if(el){ el.value=''; el.style.borderColor=''; } });
       document.getElementById('nuevo-tipo-ingreso').value = 'recepcion';
       _stActualizarDeposito();
