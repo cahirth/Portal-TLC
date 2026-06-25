@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.25.3 -->
+<!-- Portal TLC | servicio.html | v2026.06.25.4 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -296,7 +296,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
           <div id="avatar-rol-st" style="display:inline-block;margin-top:4px;font-size:9px;font-weight:700;
                text-transform:uppercase;letter-spacing:0.6px;padding:1px 7px;border-radius:20px;
                background:rgba(58,134,255,.15);color:#3a86ff;border:1px solid rgba(58,134,255,.25);">—</div>
-          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.25.3</div>
+          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.25.4</div>
         </div>
       </div>
       <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
@@ -415,6 +415,16 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
     </div>
     <label class="form-label">Cliente / Clínica</label>
     <input type="text" class="form-input" id="nuevo-cliente" placeholder="Ej: Clínica de Ojos Norte">
+    <div class="form-row" style="margin-top:8px;">
+      <div>
+        <label class="form-label">Domicilio</label>
+        <input type="text" class="form-input" id="nuevo-domicilio" placeholder="Dirección del cliente">
+      </div>
+      <div>
+        <label class="form-label">Teléfono</label>
+        <input type="text" class="form-input" id="nuevo-telefono" placeholder="Ej: +541112345678">
+      </div>
+    </div>
     <div class="form-row">
       <div>
         <label class="form-label">Marca del equipo</label>
@@ -515,7 +525,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 (function(){
 'use strict';
 
-console.log('%c Portal TLC | servicio.html | v2026.06.25.3 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+console.log('%c Portal TLC | servicio.html | v2026.06.25.4 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1104,6 +1114,20 @@ function _renderDetalle(t) {
       '</div>' +
       '<div class="form-row">' +
         '<div class="det-field">' +
+          '<div class="det-field-label">Domicilio</div>' +
+          (puedeEditar
+            ? '<input class="det-field-input" value="' + _esc(t.domicilio||'') + '" placeholder="Domicilio..." onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'domicilio\',this.value,\'' + _esc(t.domicilio||'') + '\')">'
+            : '<div class="det-field-val">' + _esc(t.domicilio||'—') + '</div>') +
+        '</div>' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Teléfono</div>' +
+          (puedeEditar
+            ? '<input class="det-field-input" value="' + _esc(t.telefono||'') + '" placeholder="Teléfono..." onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'telefono\',this.value,\'' + _esc(t.telefono||'') + '\')">'
+            : '<div class="det-field-val">' + _esc(t.telefono||'—') + '</div>') +
+        '</div>' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<div class="det-field">' +
           '<div class="det-field-label">Marca</div>' +
           (puedeEditar
             ? '<input class="det-field-input" value="' + _esc(t.equipo_marca||'') + '" placeholder="Marca..." onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'equipo_marca\',this.value,\'' + _esc(t.equipo_marca||'') + '\')">'
@@ -1639,6 +1663,8 @@ window._crearTicket = function() {
   var payload = {
     accion:           'st_crearTicket',
     cliente:          cliente,
+    domicilio:        document.getElementById('nuevo-domicilio') ? document.getElementById('nuevo-domicilio').value.trim() : '',
+    telefono:         document.getElementById('nuevo-telefono')  ? document.getElementById('nuevo-telefono').value.trim()  : '',
     equipo_marca:     document.getElementById('nuevo-marca') ? document.getElementById('nuevo-marca').value.trim() : '',
     equipo_modelo:    modelo,
     equipo_serie:     serie,
@@ -1661,7 +1687,7 @@ window._crearTicket = function() {
   .then(function(r){
     if (r.ok) {
       _cerrarModalNuevo();
-      ['nuevo-cliente','nuevo-marca','nuevo-modelo','nuevo-serie','nuevo-falla','nuevo-accesorios','nuevo-nota']
+      ['nuevo-cliente','nuevo-domicilio','nuevo-telefono','nuevo-marca','nuevo-modelo','nuevo-serie','nuevo-falla','nuevo-accesorios','nuevo-nota']
         .forEach(function(id){ var el=document.getElementById(id); if(el){ el.value=''; el.style.borderColor=''; } });
       document.getElementById('nuevo-tipo-ingreso').value = 'recepcion';
       _stActualizarDeposito();
