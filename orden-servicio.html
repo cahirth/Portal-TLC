@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | orden-servicio.html | v2026.06.25.2 -->
+<!-- Portal TLC | orden-servicio.html | v2026.06.25.3 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -95,37 +95,35 @@
         <div class="page-indicator">Hoja 1 de 1</div>
 
         <div class="client-card">
-            <div class="row-item"><strong>Señores:</strong> FUNDACIÓN ZAMBRANO</div>
-            <div class="row-item"><strong>Contacto Clínico:</strong> Dr. Jerónimo Zambrano</div>
-            <div class="row-item"><strong>CUIT:</strong> 30-64006989-5</div>
-            <div class="row-item"><strong>Domicilio de Asistencia:</strong> CABA, Argentina</div>
-            <div class="row-item"><strong>Teléfono:</strong> +541135710410</div>
+            <div class="row-item"><strong>Señores:</strong> <span id="os-cliente">—</span></div>
+            <div class="row-item"><strong>Domicilio de Asistencia:</strong> <span id="os-domicilio">—</span></div>
+            <div class="row-item"><strong>Teléfono:</strong> <span id="os-telefono">—</span></div>
         </div>
 
         <div class="section-title"><i class="fa-solid fa-microscope"></i> Identificación del Equipamiento Técnico</div>
         <div class="equipment-grid">
             <div class="grid-item">
                 <label>Marca</label>
-                <span>Moria</span>
+                <span id="os-marca">—</span>
             </div>
             <div class="grid-item">
                 <label>Modelo / Sistema</label>
-                <span>Microqueratome SBK</span>
+                <span id="os-modelo">—</span>
             </div>
             <div class="grid-item">
                 <label>Serie Nº (DNI Único)</label>
-                <span style="color:var(--navy-tlc);">S/N: 1105</span>
+                <span id="os-serie" style="color:var(--navy-tlc);">—</span>
             </div>
         </div>
 
         <div class="section-title"><i class="fa-solid fa-comment-medical"></i> Falla Reportada por el Cliente</div>
-        <textarea class="form-textarea" readonly>El cliente reporta funcionamiento defectuoso en el ciclo de avance del microqueratome. Se procede a resolver la contingencia conforme al protocolo de asistencia de banco de trabajo.</textarea>
+        <textarea id="os-falla" class="form-textarea" readonly placeholder="Falla reportada al ingresar el equipo..."></textarea>
 
         <div class="section-title"><i class="fa-solid fa-screwdriver-wrench"></i> Diagnóstico Técnico</div>
-        <textarea class="form-textarea" placeholder="Describir detalladamente el análisis técnico, las mediciones eléctricas/ópticas realizadas y la causa raíz identificada..."></textarea>
+        <textarea id="os-diagnostico" class="form-textarea" readonly placeholder="Diagnóstico técnico del equipo..."></textarea>
 
         <div class="section-title"><i class="fa-solid fa-list-check"></i> Tareas Realizadas</div>
-        <textarea class="form-textarea" placeholder="Describir las tareas de reparación, ajuste o mantenimiento realizadas sobre el equipo..."></textarea>
+        <textarea id="os-tareas" class="form-textarea" readonly placeholder="Tareas realizadas durante el servicio..."></textarea>
 
 
 
@@ -133,7 +131,7 @@
             <div class="signature-box">
                 <div style="font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase;">Responsable de Asistencia Técnica</div>
                 <div class="signature-pad-placeholder">Firma Digital del Técnico Autorizado</div>
-                <div style="font-size: 12px; color: var(--text-dark); margin-top: auto;"><strong>Especialista:</strong> Juan / Damián</div>
+                <div style="font-size: 12px; color: var(--text-dark); margin-top: auto;"><strong>Especialista:</strong> <span id="os-tecnico">—</span></div>
             </div>
             
             <div class="signature-box" style="background-color: rgba(16, 185, 129, 0.01);">
@@ -156,31 +154,91 @@
     </div>
 
     <script>
-    // Número de WhatsApp TLC (sin + ni espacios)
-    var TLC_WSP = '5491141479942';
+    var TLC_WSP   = '5491141479942';
+    var RTDB_URL  = 'https://portal-tlc-default-rtdb.firebaseio.com';
 
-    function _urlActual() {
-        return window.location.href;
+    var TECNICO_NOMBRE = {
+      'juan_garro':         'Juan Garro',
+      'damian_sosa':        'Damián Sosa',
+      'fernando_del_campo': 'Fernando Del Campo',
+      'cristian_hirth':     'Cristian Hirth',
+      'sin_asignar':        '—',
+    };
+
+    function _esc(s) {
+        return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function _fechaLinda(iso) {
+        if (!iso) return '—';
+        try {
+            var d = new Date(iso);
+            return d.toLocaleDateString('es-AR', { day:'numeric', month:'long', year:'numeric' });
+        } catch(e) { return iso; }
+    }
+
+    async function _cargarTicket() {
+        var params = new URLSearchParams(window.location.search);
+        var id     = params.get('id');
+        if (!id) { _mostrarError('No se especificó un ID de ticket en la URL.'); return; }
+
+        try {
+            var res  = await fetch(RTDB_URL + '/servicio_tecnico/' + encodeURIComponent(id) + '.json', { cache:'no-store' });
+            var t    = await res.json();
+            if (!t) { _mostrarError('Ticket no encontrado: ' + id); return; }
+
+            // Número de orden
+            document.querySelector('.doc-title').textContent = 'Orden de Asistencia Técnica N°: ' + t.id_ticket;
+
+            // Fecha de apertura
+            document.querySelector('.doc-subdata').innerHTML =
+                '<strong>Fecha de Apertura:</strong> ' + _fechaLinda(t.creado_en);
+
+            // Técnico
+            var tecNombre = TECNICO_NOMBRE[t.tecnico_asignado] || t.tecnico_asignado || '—';
+            document.getElementById('os-tecnico').textContent = tecNombre;
+
+            // Datos del cliente
+            document.getElementById('os-cliente').textContent    = t.cliente || '—';
+            document.getElementById('os-domicilio').textContent  = '—';
+            document.getElementById('os-telefono').textContent   = '—';
+
+            // Equipo
+            document.getElementById('os-marca').textContent  = '—';
+            document.getElementById('os-modelo').textContent = t.equipo_modelo || '—';
+            document.getElementById('os-serie').textContent  = t.equipo_serie  || '—';
+
+            // Campos técnicos
+            document.getElementById('os-falla').value      = t.falla_reportada  || '';
+            document.getElementById('os-diagnostico').value= t.diagnostico       || '';
+            document.getElementById('os-tareas').value     = t.tareas_realizadas || '';
+
+        } catch(e) {
+            _mostrarError('Error cargando datos: ' + e.message);
+        }
+    }
+
+    function _mostrarError(msg) {
+        var el = document.createElement('div');
+        el.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:12px 20px;border-radius:10px;z-index:999;font-weight:700;';
+        el.textContent = msg;
+        document.body.appendChild(el);
     }
 
     function enviarWspOrden(e) {
         e.preventDefault();
-        var nroOrden = document.querySelector('.doc-title') ? document.querySelector('.doc-title').textContent.trim() : 'Orden de Servicio';
-        var cliente  = document.querySelector('.client-card .row-item strong') ? document.querySelector('.client-card').textContent.trim().split('\n')[0] : '';
-        var msg = encodeURIComponent('Estimado/a, le compartimos la Orden de Asistencia Técnica de TLC SRL:\n' + nroOrden + '\nCliente: ' + cliente + '\n' + _urlActual());
+        var nroOrden = document.querySelector('.doc-title').textContent.trim();
+        var cliente  = document.getElementById('os-cliente').textContent.trim();
+        var msg = encodeURIComponent(
+            'Estimado/a, le compartimos la Orden de Asistencia Técnica de TLC SRL.' +
+            ' | ' + nroOrden +
+            ' | Cliente: ' + cliente +
+            ' | ' + window.location.href
+        );
         window.open('https://wa.me/' + TLC_WSP + '?text=' + msg, '_blank');
     }
 
-    function enviarWspPresupuesto(e) {
-        e.preventDefault();
-        var linkPresup = window._linkPresupuestoTecnico || '';
-        if (!linkPresup) {
-            alert('No hay un presupuesto técnico vinculado a esta orden todavía.');
-            return;
-        }
-        var msg = encodeURIComponent('Estimado/a, le compartimos el Presupuesto Técnico de TLC SRL:\n' + linkPresup);
-        window.open('https://wa.me/' + TLC_WSP + '?text=' + msg, '_blank');
-    }
+    document.addEventListener('DOMContentLoaded', _cargarTicket);
     </script>
 </body>
 </html>
