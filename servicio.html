@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.25.2 -->
+<!-- Portal TLC | servicio.html | v2026.06.25.3 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -296,7 +296,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
           <div id="avatar-rol-st" style="display:inline-block;margin-top:4px;font-size:9px;font-weight:700;
                text-transform:uppercase;letter-spacing:0.6px;padding:1px 7px;border-radius:20px;
                background:rgba(58,134,255,.15);color:#3a86ff;border:1px solid rgba(58,134,255,.25);">—</div>
-          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.25.2</div>
+          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.25.3</div>
         </div>
       </div>
       <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
@@ -515,7 +515,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 (function(){
 'use strict';
 
-console.log('%c Portal TLC | servicio.html | v2026.06.25.2 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+console.log('%c Portal TLC | servicio.html | v2026.06.25.3 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1127,13 +1127,6 @@ function _renderDetalle(t) {
       '</div>' +
     '</div>' +
 
-    // FALLA REPORTADA POR EL EQUIPO
-    '<div class="det-section">Falla reportada por el equipo</div>' +
-    '<div class="det-card">' +
-      '<textarea class="campo-tecnico-textarea" style="min-height:50px;" readonly>' + _esc(t.falla_reportada||'') + '</textarea>' +
-      (t.accesorios ? '<div style="margin-top:6px;font-size:11px;color:var(--text-muted);"><strong>Accesorios:</strong> ' + _esc(t.accesorios) + '</div>' : '') +
-    '</div>' +
-
     // ASIGNACIÓN Y ESTADO
     '<div class="det-section">Asignación y estado</div>' +
     '<div class="det-card">' +
@@ -1217,6 +1210,15 @@ function _renderCamposTecnicos(t, puedeEditar) {
   var finalizado = (dep === 'finalizado' || dep === 'cancelado');
   var soloLectura = finalizado || !puedeEditar;
 
+  // ── Falla reportada (siempre editable, primer campo) ──
+  var fallaHtml = '<div class="campo-tecnico-wrap">' +
+    '<div class="campo-tecnico-label">Falla reportada por el equipo</div>' +
+    '<textarea class="campo-tecnico-textarea" placeholder="Describí la falla que reportó el cliente al ingresar el equipo..." ' +
+      (soloLectura ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'falla_reportada\',this.value)"') + '>' +
+      _esc(t.falla_reportada||'') + '</textarea>' +
+    (t.accesorios ? '<div style="margin-top:5px;font-size:11px;color:var(--text-muted);"><strong>Accesorios recibidos:</strong> ' + _esc(t.accesorios) + '</div>' : '') +
+  '</div>';
+
   // ── Diagnóstico (activo desde diagnóstico) ──
   var diagDisabled = (idxDep < FLUJO_ETAPAS.indexOf('diagnostico')) || soloLectura;
   var diagHtml = '<div class="campo-tecnico-wrap">' +
@@ -1272,7 +1274,7 @@ function _renderCamposTecnicos(t, puedeEditar) {
     '<span>Reparado ✓</span>' +
   '</label>';
 
-  return diagHtml + presupHtml + partesHtml + tareasHtml + reparadoHtml;
+  return fallaHtml + diagHtml + presupHtml + partesHtml + tareasHtml + reparadoHtml;
 }
 
 // ── Guardar campo técnico en RTDB ─────────────────────────────────
