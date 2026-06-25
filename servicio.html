@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.24.7 -->
+<!-- Portal TLC | servicio.html | v2026.06.25.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -151,10 +151,13 @@ body{background:var(--bg);color:var(--text-main);font-family:-apple-system,Blink
 .nota-texto{font-size:12px;color:var(--text-main);line-height:1.5;}
 .btn-guardar-nota{width:100%;padding:10px;border-radius:10px;background:var(--accent-blue);
   color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;}
-.btn-orden{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:10px;
+.btn-orden-row{display:flex;gap:8px;margin-bottom:8px;}
+.btn-orden{display:flex;align-items:center;justify-content:center;gap:7px;flex:1;padding:10px;
   border-radius:10px;background:var(--panel-dark);border:1px solid var(--border-glow);
-  color:var(--text-main);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;text-decoration:none;}
+  color:var(--text-main);font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;}
 .btn-orden:hover{border-color:var(--accent-blue);}
+.btn-orden.presupuesto{border-color:rgba(245,158,11,.3);color:#fbbf24;}
+.btn-orden.presupuesto:hover{border-color:#fbbf24;}
 body.tema-claro .form-select, body.tema-claro .form-input, body.tema-claro .form-textarea,
 body.tema-claro .det-field-select, body.tema-claro .det-field-input { background:#f8fafc; }
 
@@ -293,6 +296,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
           <div id="avatar-rol-st" style="display:inline-block;margin-top:4px;font-size:9px;font-weight:700;
                text-transform:uppercase;letter-spacing:0.6px;padding:1px 7px;border-radius:20px;
                background:rgba(58,134,255,.15);color:#3a86ff;border:1px solid rgba(58,134,255,.25);">—</div>
+          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.25.1</div>
         </div>
       </div>
       <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
@@ -504,7 +508,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 (function(){
 'use strict';
 
-console.log('%c Portal TLC | servicio.html | v2026.06.24.7 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+console.log('%c Portal TLC | servicio.html | v2026.06.25.1 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1052,8 +1056,12 @@ function _renderDetalle(t) {
   document.getElementById('det-body').innerHTML =
     // ACCESO RÁPIDO
     '<div style="padding-top:14px;">' +
-    '<a class="btn-orden" href="' + ORDEN_URL + encodeURIComponent(t.id_ticket) + '" target="_blank">' +
-      '<i class="fa-solid fa-file-lines"></i> Ver Orden de Servicio</a>' +
+    '<div class="btn-orden-row">' +
+      '<a class="btn-orden" href="' + ORDEN_URL + encodeURIComponent(t.id_ticket) + '" target="_blank">' +
+        '<i class="fa-solid fa-file-lines"></i> Ver Orden</a>' +
+      '<button class="btn-orden presupuesto" onclick="void(0)" title="Próximamente">' +
+        '<i class="fa-solid fa-file-invoice-dollar"></i> Generar Presupuesto</button>' +
+    '</div>' +
     '</div>' +
 
     // INFO PRINCIPAL

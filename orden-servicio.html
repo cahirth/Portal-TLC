@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | orden-servicio.html | v2026.06.25.3 -->
+<!-- Portal TLC | orden-servicio.html | v2026.06.25.5 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -47,6 +47,14 @@
         .grid-item { display: flex; flex-direction: column; gap: 2px; }
         .grid-item label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; }
         .grid-item span { font-size: 13px; color: var(--text-dark); font-weight: 600; }
+
+        /* Inputs editables de equipo */
+        .equip-input { width:100%; border:1px solid transparent; border-radius:6px; padding:4px 6px;
+            font-size:13px; font-weight:600; color:var(--text-dark); background:transparent;
+            transition:border-color .15s; outline:none; }
+        .equip-input:hover { border-color:var(--border-color); background:#fff; }
+        .equip-input:focus { border-color:#3a86ff; background:#fff; }
+        @media print { .equip-input { border:none !important; background:transparent !important; padding:0; } }
 
         /* Tabla de Repuestos y Costos de Movilidad Inline (Pedido Vero) */
         .parts-table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; }
@@ -104,19 +112,19 @@
         <div class="equipment-grid">
             <div class="grid-item">
                 <label>Marca</label>
-                <span id="os-marca">—</span>
+                <input id="os-marca" class="equip-input" value="—" placeholder="Marca del equipo">
             </div>
             <div class="grid-item">
                 <label>Modelo / Sistema</label>
-                <span id="os-modelo">—</span>
+                <input id="os-modelo" class="equip-input" value="—" placeholder="Modelo">
             </div>
             <div class="grid-item">
                 <label>Serie Nº (DNI Único)</label>
-                <span id="os-serie" style="color:var(--navy-tlc);">—</span>
+                <input id="os-serie" class="equip-input" value="—" placeholder="Número de serie" style="color:var(--navy-tlc);">
             </div>
         </div>
 
-        <div class="section-title"><i class="fa-solid fa-comment-medical"></i> Falla Reportada por el Cliente</div>
+        <div class="section-title"><i class="fa-solid fa-comment-medical"></i> Falla Reportada por el Equipo — <span id="os-equipo-label" style="font-weight:400;text-transform:none;font-size:11px;color:var(--text-muted);">—</span></div>
         <textarea id="os-falla" class="form-textarea" readonly placeholder="Falla reportada al ingresar el equipo..."></textarea>
 
         <div class="section-title"><i class="fa-solid fa-screwdriver-wrench"></i> Diagnóstico Técnico</div>
@@ -137,15 +145,24 @@
             <div class="signature-box" style="background-color: rgba(16, 185, 129, 0.01);">
                 <div style="font-size: 11px; font-weight: bold; color: var(--navy-tlc); text-transform: uppercase;">Conformidad del Servicio Técnico</div>
                 <div class="signature-pad-placeholder">Firma y Aclaración del Propietario / Responsable</div>
-                <div style="font-size: 12px; color: var(--text-dark); margin-top: auto;"><strong>Aceptado por:</strong> Dr. Jerónimo Zambrano</div>
+                <div style="font-size: 12px; color: var(--text-dark); margin-top: auto;"><strong>Aceptado por:</strong> ___________________________</div>
             </div>
         </div>
 
         <div class="wsp-bar">
             <a class="btn-wsp btn-wsp-orden" href="#" onclick="enviarWspOrden(event)">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                Enviar Orden por WhatsApp
+                Enviar por WhatsApp
             </a>
+            <button class="btn-wsp" onclick="window.print()"
+                style="background:#1e3a5f;color:#fff;cursor:pointer;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
+                    <path d="M12 17v-6M9 14l3 3 3-3"/>
+                    <rect x="3" y="3" width="18" height="4" rx="1"/>
+                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V7"/>
+                </svg>
+                Guardar PDF
+            </button>
         </div>
 
         <div class="legal-footer">
@@ -209,6 +226,10 @@
             document.getElementById('os-serie').textContent  = t.equipo_serie  || '—';
 
             // Campos técnicos
+            // Label del equipo en el título de Falla
+            var labelEl = document.getElementById('os-equipo-label');
+            if (labelEl) labelEl.textContent = (t.equipo_modelo || '') + (t.equipo_serie ? ' · S/N ' + t.equipo_serie : '');
+
             document.getElementById('os-falla').value      = t.falla_reportada  || '';
             document.getElementById('os-diagnostico').value= t.diagnostico       || '';
             document.getElementById('os-tareas').value     = t.tareas_realizadas || '';
