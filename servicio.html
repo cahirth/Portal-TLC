@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.24.5 -->
+<!-- Portal TLC | servicio.html | v2026.06.24.6 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -504,7 +504,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 (function(){
 'use strict';
 
-console.log('%c Portal TLC | servicio.html | v2026.06.24.5 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+console.log('%c Portal TLC | servicio.html | v2026.06.24.6 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -941,18 +941,80 @@ window._onDrop = function(e, nuevaCol) {
   var id = _dragId; _dragId = null;
   var el = document.getElementById('ticket-' + id); if (el) el.classList.remove('dragging');
 
-  // Optimistic update
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
-  if (t) t.deposito = nuevaCol;
+  if (!t) return;
+
+  // Validar gates si es un movimiento hacia adelante en el flujo principal
+  var errores = _validarGate(t, nuevaCol);
+  if (errores.length) {
+    _stMostrarError('⚠ ' + errores[0] + (errores.length > 1 ? ' (y ' + (errores.length-1) + ' más)' : ''));
+    return;
+  }
+
+  // Optimistic update
+  var depositoAnterior = t.deposito;
+  t.deposito = nuevaCol;
   _aplicarFiltros();
 
   // Persistir vía GAS
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_actualizarDeposito', id_ticket:id, deposito:nuevaCol }) })
   .then(function(r){ return r.json(); })
-  .then(function(r){ if(!r.ok) { console.warn('Error actualizando depósito:', r.error); _cargarTickets(); } })
-  .catch(function(){ _cargarTickets(); });
+  .then(function(r){
+    if(!r.ok) {
+      // Revertir si falla
+      t.deposito = depositoAnterior;
+      _aplicarFiltros();
+      console.warn('Error actualizando depósito:', r.error);
+    }
+  })
+  .catch(function(){
+    t.deposito = depositoAnterior;
+    _aplicarFiltros();
+  });
 };
+
+// ── Validación de gates reutilizable (drag & drop + botón siguiente) ──
+function _validarGate(t, destino) {
+  var origen = t.deposito || 'recepcion';
+  var errores = [];
+
+  // Solo validar si el movimiento es hacia adelante en el flujo principal
+  var idxOrigen  = FLUJO_ETAPAS.indexOf(origen);
+  var idxDestino = FLUJO_ETAPAS.indexOf(destino);
+  if (idxOrigen < 0 || idxDestino < 0 || idxDestino <= idxOrigen) return errores; // libre hacia atrás o fuera del flujo
+
+  // Gate 1: Recepción → Diagnóstico (o más adelante)
+  if (idxOrigen <= FLUJO_ETAPAS.indexOf('recepcion') && idxDestino >= FLUJO_ETAPAS.indexOf('diagnostico')) {
+    if (!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') errores.push('Asigná un técnico responsable');
+    if (errores.length) return errores;
+  }
+
+  // Gate 2: Diagnóstico → Presupuesto (o más adelante)
+  if (idxOrigen <= FLUJO_ETAPAS.indexOf('diagnostico') && idxDestino >= FLUJO_ETAPAS.indexOf('presupuesto')) {
+    if (!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') errores.push('Asigná un técnico responsable');
+    if (t.estado_progreso !== 'en_curso') errores.push('El estado de progreso debe estar "En curso"');
+    if (!t.diagnostico || !t.diagnostico.trim()) errores.push('Completá el diagnóstico técnico');
+    if (errores.length) return errores;
+  }
+
+  // Gate 3: Presupuesto → Reparación (o más adelante)
+  if (idxOrigen <= FLUJO_ETAPAS.indexOf('presupuesto') && idxDestino >= FLUJO_ETAPAS.indexOf('reparacion')) {
+    if (!t.presupuesto_link || !t.presupuesto_link.trim()) errores.push('Agregá el link del presupuesto generado');
+    if (!t.presupuesto_aprobado) errores.push('Tildá "Presupuesto aprobado" antes de pasar a Reparación');
+    if (errores.length) return errores;
+  }
+
+  // Gate 4: Reparación → Para Facturar (o más adelante)
+  if (idxOrigen <= FLUJO_ETAPAS.indexOf('reparacion') && idxDestino >= FLUJO_ETAPAS.indexOf('para_facturar')) {
+    if (!t.partes_utilizadas || !t.partes_utilizadas.trim()) errores.push('Completá las partes utilizadas');
+    if (!t.tareas_realizadas || !t.tareas_realizadas.trim()) errores.push('Completá las tareas realizadas');
+    if (!t.reparado) errores.push('Tildá "Reparado" para confirmar que el equipo está listo');
+    if (errores.length) return errores;
+  }
+
+  return errores;
+}
 
 // ── Detalle de ticket ─────────────────────────────────────────────
 window._abrirDetalle = function(id) {
@@ -1208,32 +1270,8 @@ window._siguienteEtapa = function(id) {
   var sig = SIGUIENTE_ETAPA[dep];
   if (!sig) return;
 
-  var errores = [];
-
-  // Gate 1: Recepción → Diagnóstico: solo técnico asignado
-  if (dep === 'recepcion') {
-    if (!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') errores.push('Asigná un técnico responsable antes de avanzar');
-  }
-
-  // Gate 2: Diagnóstico → Presupuesto
-  if (dep === 'diagnostico') {
-    if (!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') errores.push('Asigná un técnico responsable');
-    if (t.estado_progreso !== 'en_curso') errores.push('El estado de progreso debe estar en "En curso"');
-    if (!t.diagnostico || !t.diagnostico.trim()) errores.push('Completá el diagnóstico técnico');
-  }
-
-  // Gate 3: Presupuesto → Reparación
-  if (dep === 'presupuesto') {
-    if (!t.presupuesto_link || !t.presupuesto_link.trim()) errores.push('Agregá el link del presupuesto generado');
-    if (!t.presupuesto_aprobado) errores.push('Tildá "Presupuesto aprobado" antes de pasar a Reparación');
-  }
-
-  // Gate 4: Reparación → Para Facturar
-  if (dep === 'reparacion') {
-    if (!t.partes_utilizadas || !t.partes_utilizadas.trim()) errores.push('Completá las partes utilizadas');
-    if (!t.tareas_realizadas || !t.tareas_realizadas.trim()) errores.push('Completá las tareas realizadas');
-    if (!t.reparado) errores.push('Tildá "Reparado" para confirmar que el equipo está listo');
-  }
+  // Mismos gates que drag & drop — función unificada
+  var errores = _validarGate(t, sig);
 
   if (errores.length) {
     _stMostrarError('⚠ ' + errores[0] + (errores.length > 1 ? ' (y ' + (errores.length-1) + ' más)' : ''));
