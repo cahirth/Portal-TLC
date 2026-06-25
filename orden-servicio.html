@@ -1,205 +1,186 @@
 <!DOCTYPE html>
+<!-- Portal TLC | orden-servicio.html | v2026.06.25.2 -->
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Orden de Servicio — TLC</title>
-<style>
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:"Times New Roman",Times,serif; background:#f1f5f9; color:#0f172a; font-size:13px; }
-  .page { max-width:780px; margin:20px auto; background:white; box-shadow:0 4px 32px rgba(0,0,0,0.12); padding:32px 36px; min-height:200px; }
-  @media print { body{background:white;} .page{margin:0;box-shadow:none;padding:24px 28px;} .no-print{display:none!important;} }
-  @media (max-width:600px) { .page{padding:12px;} }
-  table { border-collapse:collapse; width:100%; }
-  .badge { display:inline-block; padding:2px 10px; border-radius:8px; font-size:11px; font-weight:700; font-family:Arial,sans-serif; }
-  .badge.urgente    { background:#fef2f2; color:#dc2626; }
-  .badge.importante { background:#fff7ed; color:#ea580c; }
-  .badge.media      { background:#fefce8; color:#ca8a04; }
-  .badge.baja       { background:#f8fafc; color:#64748b; }
-  .btn-accion { padding:8px 18px; border:none; border-radius:6px; color:white; font-size:12px; font-family:Arial,sans-serif;
-    display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
-  .btn-pdf  { background:#0f172a; }
-  .btn-pdf:hover { background:#1e293b; }
-  .estado-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:80px 20px; text-align:center; font-family:Arial,sans-serif; }
-  .spinner { width:40px; height:40px; border:3px solid #e2e8f0; border-top-color:#0f172a;
-    border-radius:50%; animation:girar .8s linear infinite; margin-bottom:20px; }
-  @keyframes girar { to { transform:rotate(360deg); } }
-  .estado-titulo { font-size:15px; font-weight:700; color:#0f172a; margin-bottom:6px; }
-  .estado-msg { font-size:13px; color:#64748b; max-width:340px; line-height:1.5; }
-  .btn-reintentar { margin-top:18px; padding:9px 20px; background:#0f172a; color:white;
-    border:none; border-radius:6px; font-size:13px; cursor:pointer; font-family:Arial,sans-serif; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0; }
-  .field-cell { padding:10px 12px; border:1px solid #e2e8f0; }
-  .field-cell:nth-child(even) { border-left:none; }
-  .field-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
-    color:#64748b; font-family:Arial,sans-serif; margin-bottom:3px; }
-  .field-val { font-size:13px; color:#0f172a; font-weight:600; }
-  .nota-row { padding:10px 12px; border:1px solid #e2e8f0; border-top:none; }
-  .nota-meta { font-size:10px; color:#94a3b8; font-family:Arial,sans-serif; margin-bottom:3px; }
-  .nota-texto { font-size:12px; color:#374151; line-height:1.5; }
-  @media(max-width:500px) { .grid2{grid-template-columns:1fr;} .field-cell:nth-child(even){border-left:1px solid #e2e8f0;border-top:none;} }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TLC SRL - ANEXO I POE 8 - ORDEN DE SERVICIO</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-body: #f8f9fa;
+            --bg-card: #ffffff;
+            --bg-muted: #f1f3f5;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --navy-tlc: #0b132b;
+            --green-tlc: #10b981;
+            --orange-tlc: #f97316;
+        }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-dark); margin: 0; padding: 40px 20px; display: flex; justify-content: center; }
+        
+        /* Contenedor principal clavado en 860px idéntico al presupuesto de ventas */
+        .document-wrapper { width: 860px; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 4px; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); position: relative; }
+        
+        /* HEADER IDENTIDAD TLC - COPIA DE TU MODELO DE VENTAS */
+        .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; }
+        .logo-box { width: 45%; display: flex; align-items: center; gap: 12px; }
+        .logo-box svg { width: 100%; max-width: 260px; height: auto; }
+        .doc-meta-box { width: 50%; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+        .non-fiscal-badge { border: 1px solid var(--border-color); padding: 2px 10px; font-size: 11px; color: var(--text-muted); background-color: #fff; margin-bottom: 4px; }
+        .doc-title { font-size: 16px; font-weight: 700; color: var(--text-dark); margin: 0; }
+        .doc-subdata { font-size: 13px; color: #334155; margin: 0; }
+        .page-indicator { font-size: 11px; color: var(--text-muted); width: 100%; text-align: right; margin-bottom: 20px; }
+
+        /* SECCIÓN CLIENTE - CAJA REDONDEADA GRIS CLARO */
+        .client-card { background-color: #f8fafc; border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 30px; line-height: 1.5; font-size: 14px; }
+        .client-card strong { color: var(--text-dark); font-weight: 700; }
+        .client-card .row-item { margin-bottom: 4px; }
+        .client-card .row-item:last-child { margin-bottom: 0; }
+
+        /* SECCIONES DEL POE */
+        .section-title { font-size: 12px; color: var(--navy-tlc); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin: 25px 0 12px 0; border-bottom: 2px solid var(--navy-tlc); padding-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+        
+        .equipment-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; background-color: #fff; border: 1px solid var(--border-color); padding: 15px; border-radius: 6px; font-size: 13px; }
+        .grid-item { display: flex; flex-direction: column; gap: 2px; }
+        .grid-item label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; }
+        .grid-item span { font-size: 13px; color: var(--text-dark); font-weight: 600; }
+
+        /* Tabla de Repuestos y Costos de Movilidad Inline (Pedido Vero) */
+        .parts-table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; }
+        .parts-table th { background-color: var(--navy-tlc); color: #fff; text-align: left; padding: 10px 14px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+        .parts-table td { padding: 12px 14px; font-size: 13px; border-bottom: 1px solid var(--border-color); color: var(--text-dark); }
+        .parts-table tr:last-child td { border-bottom: none; }
+        .price-col { text-align: right; font-weight: 600; }
+
+        .form-textarea { width: 100%; border: 1px solid var(--border-color); color: var(--text-dark); padding: 12px; border-radius: 6px; font-size: 13px; resize: none; min-height: 75px; background-color: #fff; line-height: 1.4; }
+        
+        /* Firmas de conformidad */
+        .signature-container { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 30px; }
+        .signature-box { border: 1px dashed var(--border-color); background-color: #f8fafc; border-radius: 6px; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .signature-pad-placeholder { width: 100%; height: 80px; border-bottom: 1px solid var(--text-muted); display: flex; justify-content: center; align-items: center; color: var(--text-muted); font-size: 11px; font-style: italic; }
+
+        .legal-footer { margin-top: 35px; border-top: 1px solid var(--border-color); padding-top: 15px; font-size: 11px; color: var(--text-muted); line-height: 1.5; text-align: justify; }
+        
+        /* BOTONES WHATSAPP */
+        .wsp-bar { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+        .btn-wsp { display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; text-decoration: none; }
+        .btn-wsp-orden { background: #25d366; color: #fff; }
+        .btn-wsp-presupuesto { background: #128c7e; color: #fff; }
+        .btn-wsp:hover { opacity: .88; }
+        .btn-wsp svg { width: 18px; height: 18px; flex-shrink: 0; }
+        @media print { .wsp-bar { display: none; } }
+    </style>
 </head>
 <body>
-<div class="page" id="page-root">
-  <div class="estado-wrap">
-    <div class="spinner"></div>
-    <div class="estado-titulo">Cargando orden de servicio…</div>
-    <div class="estado-msg">Un momento, estamos trayendo los datos.</div>
-  </div>
-</div>
 
-<script>
-(function(){
-  var RTDB_URL    = 'https://portal-tlc-default-rtdb.firebaseio.com';
-  var LOGO_URL    = 'https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25';
-  var MAX_INTENTOS = 5;
-  var INTERVALO_MS = 1500;
+    <div class="document-wrapper">
+        <div class="header-container">
+            <div class="logo-box">
+                <img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25"
+                     onerror="this.src='https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq';this.onerror=null;"
+                     style="max-width:260px;width:100%;height:auto;" alt="TLC Logo">
+            </div>
+            
+            <div class="doc-meta-box">
+                <div class="non-fiscal-badge">Documento No Válido como Factura</div>
+                <div class="doc-title">Orden de Asistencia Técnica N°: POE8-OS-20260612</div>
+                <div class="doc-subdata" style="margin-top: 4px;"><strong>Fecha de Apertura:</strong> 12 de junio de 2026</div>
+                <div class="doc-subdata"><strong>Procedimiento de Referencia:</strong> POE 8 (Anexo I)</div>
+            </div>
+        </div>
 
-  var DEPOSITO_LABEL = {
-    en_laboratorio:'En Laboratorio', diagnostico:'Diagnóstico', presupuesto:'Presupuesto',
-    reparacion:'Reparación', preparacion_control_calidad:'Preparación / Control de Calidad',
-    para_facturar:'Para Facturar', para_instalar:'Para Instalar', seguimiento:'Seguimiento',
-    servicio_remoto:'Servicio Remoto', consignacion:'Consignación',
-    finalizado:'Finalizado', cancelado:'Cancelado',
-  };
-  var TECNICO_NOMBRE = {
-    sin_asignar:'Sin asignar', fernando_del_campo:'Fernando Del Campo',
-    cristian_hirth:'Cristian Hirth', veronica_ribaita:'Verónica Ribaita',
-    lourdes_davalos:'Lourdes Dávalos', juan_garro:'Juan Garro',
-    damian_sosa:'Damián Sosa', lucio_raineri:'Lucio Raineri',
-  };
+        <div class="page-indicator">Hoja 1 de 1</div>
 
-  function esc(s) {
-    return String(s==null?'':s).replace(/[&<>"']/g, function(c){
-      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-    });
-  }
-  function getIdFromUrl() {
-    return (new URLSearchParams(window.location.search).get('id')||'').trim();
-  }
-  function mostrarError(titulo, msg, conReintento) {
-    document.getElementById('page-root').innerHTML =
-      '<div class="estado-wrap"><div style="font-size:36px;margin-bottom:14px;">⚠️</div>' +
-      '<div class="estado-titulo">' + esc(titulo) + '</div>' +
-      '<div class="estado-msg">' + esc(msg) + '</div>' +
-      (conReintento ? '<button class="btn-reintentar" onclick="location.reload()">Reintentar</button>' : '') +
-      '</div>';
-  }
-  function formatFechaISO(iso) {
-    try { return new Date(iso).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'}); }
-    catch(e){ return iso||''; }
-  }
+        <div class="client-card">
+            <div class="row-item"><strong>Señores:</strong> FUNDACIÓN ZAMBRANO</div>
+            <div class="row-item"><strong>Contacto Clínico:</strong> Dr. Jerónimo Zambrano</div>
+            <div class="row-item"><strong>CUIT:</strong> 30-64006989-5</div>
+            <div class="row-item"><strong>Domicilio de Asistencia:</strong> CABA, Argentina</div>
+            <div class="row-item"><strong>Teléfono:</strong> +541135710410</div>
+        </div>
 
-  function renderOrden(id, t) {
-    document.title = 'OS-' + id + ' — ' + (t.cliente||'');
-    var etapa    = DEPOSITO_LABEL[t.deposito] || t.deposito || '—';
-    var tecnico  = TECNICO_NOMBRE[t.tecnico_asignado] || t.tecnico_asignado || '—';
-    var fechaCreado = t.creado_en ? formatFechaISO(t.creado_en) : '—';
-    var prio     = t.prioridad || 'media';
+        <div class="section-title"><i class="fa-solid fa-microscope"></i> Identificación del Equipamiento Técnico</div>
+        <div class="equipment-grid">
+            <div class="grid-item">
+                <label>Marca</label>
+                <span>Moria</span>
+            </div>
+            <div class="grid-item">
+                <label>Modelo / Sistema</label>
+                <span>Microqueratome SBK</span>
+            </div>
+            <div class="grid-item">
+                <label>Serie Nº (DNI Único)</label>
+                <span style="color:var(--navy-tlc);">S/N: 1105</span>
+            </div>
+        </div>
 
-    var notasHtml = '';
-    if (t.notas_comentarios && t.notas_comentarios.length) {
-      notasHtml = t.notas_comentarios.map(function(n){
-        return '<div class="nota-row">' +
-          '<div class="nota-meta">' + esc(n.autor||'—') + ' · ' +
-          (n.fecha ? formatFechaISO(n.fecha) : '') + '</div>' +
-          '<div class="nota-texto">' + esc(n.texto||'') + '</div>' +
-        '</div>';
-      }).join('');
-    } else {
-      notasHtml = '<div class="nota-row" style="color:#94a3b8;font-family:Arial,sans-serif;font-size:12px;">Sin notas registradas.</div>';
+        <div class="section-title"><i class="fa-solid fa-comment-medical"></i> Falla Reportada por el Cliente</div>
+        <textarea class="form-textarea" readonly>El cliente reporta funcionamiento defectuoso en el ciclo de avance del microqueratome. Se procede a resolver la contingencia conforme al protocolo de asistencia de banco de trabajo.</textarea>
+
+        <div class="section-title"><i class="fa-solid fa-screwdriver-wrench"></i> Diagnóstico Técnico</div>
+        <textarea class="form-textarea" placeholder="Describir detalladamente el análisis técnico, las mediciones eléctricas/ópticas realizadas y la causa raíz identificada..."></textarea>
+
+        <div class="section-title"><i class="fa-solid fa-list-check"></i> Tareas Realizadas</div>
+        <textarea class="form-textarea" placeholder="Describir las tareas de reparación, ajuste o mantenimiento realizadas sobre el equipo..."></textarea>
+
+
+
+        <div class="signature-container">
+            <div class="signature-box">
+                <div style="font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase;">Responsable de Asistencia Técnica</div>
+                <div class="signature-pad-placeholder">Firma Digital del Técnico Autorizado</div>
+                <div style="font-size: 12px; color: var(--text-dark); margin-top: auto;"><strong>Especialista:</strong> Juan / Damián</div>
+            </div>
+            
+            <div class="signature-box" style="background-color: rgba(16, 185, 129, 0.01);">
+                <div style="font-size: 11px; font-weight: bold; color: var(--navy-tlc); text-transform: uppercase;">Conformidad del Servicio Técnico</div>
+                <div class="signature-pad-placeholder">Firma y Aclaración del Propietario / Responsable</div>
+                <div style="font-size: 12px; color: var(--text-dark); margin-top: auto;"><strong>Aceptado por:</strong> Dr. Jerónimo Zambrano</div>
+            </div>
+        </div>
+
+        <div class="wsp-bar">
+            <a class="btn-wsp btn-wsp-orden" href="#" onclick="enviarWspOrden(event)">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                Enviar Orden por WhatsApp
+            </a>
+        </div>
+
+        <div class="legal-footer">
+            <strong>REGISTRO DE ASISTENCIA TÉCNICA:</strong> El presente documento constituye el registro oficial del Servicio de Asistencia Técnica (Mantenimiento y/o reparación a fin de mantener el equipamiento en sus especificaciones de fábrica) conforme lo establece el POE 8 del Sistema de Gestión de Calidad de Tecnología Láser Corneal S.R.L., bajo el marco regulatorio exigido por la Disposición A.N.M.A.T. 3266/13. Los registros correspondientes serán archivados de forma inmutable bajo la custodia de la Dirección Técnica de la empresa.
+        </div>
+    </div>
+
+    <script>
+    // Número de WhatsApp TLC (sin + ni espacios)
+    var TLC_WSP = '5491141479942';
+
+    function _urlActual() {
+        return window.location.href;
     }
 
-    document.getElementById('page-root').innerHTML =
-      // BOTONES
-      '<div class="no-print" style="text-align:right;margin-bottom:16px;">' +
-        '<button class="btn-accion btn-pdf" onclick="window.print()">↓ Guardar PDF</button>' +
-      '</div>' +
+    function enviarWspOrden(e) {
+        e.preventDefault();
+        var nroOrden = document.querySelector('.doc-title') ? document.querySelector('.doc-title').textContent.trim() : 'Orden de Servicio';
+        var cliente  = document.querySelector('.client-card .row-item strong') ? document.querySelector('.client-card').textContent.trim().split('\n')[0] : '';
+        var msg = encodeURIComponent('Estimado/a, le compartimos la Orden de Asistencia Técnica de TLC SRL:\n' + nroOrden + '\nCliente: ' + cliente + '\n' + _urlActual());
+        window.open('https://wa.me/' + TLC_WSP + '?text=' + msg, '_blank');
+    }
 
-      // HEADER
-      '<div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px;">' +
-        '<img src="' + LOGO_URL + '" alt="TLC" style="max-width:180px;width:45%;height:auto;" onerror="this.style.display=\'none\'">' +
-        '<div style="text-align:right;flex:1;min-width:160px;font-family:Arial,sans-serif;">' +
-          '<div style="font-size:11px;color:#64748b;margin-bottom:4px;border:1px solid #cbd5e1;padding:2px 10px;display:inline-block;">Documento interno · No válido como factura</div>' +
-          '<div style="font-size:14px;font-weight:700;color:#0f172a;margin-top:6px;">Orden de Servicio</div>' +
-          '<div style="font-size:12px;color:#374151;margin-top:3px;font-weight:600;">' + esc(id) + '</div>' +
-          '<div style="font-size:11px;color:#64748b;margin-top:3px;">Fecha: ' + fechaCreado + '</div>' +
-        '</div>' +
-      '</div>' +
-
-      // DATOS DEL EQUIPO
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;font-family:Arial,sans-serif;margin-bottom:8px;">Datos del equipo</div>' +
-      '<div style="border:1px solid #e2e8f0;border-radius:4px;overflow:hidden;margin-bottom:16px;">' +
-        '<div class="grid2">' +
-          '<div class="field-cell">' +
-            '<div class="field-label">Cliente / Clínica</div>' +
-            '<div class="field-val">' + esc(t.cliente||'—') + '</div>' +
-          '</div>' +
-          '<div class="field-cell">' +
-            '<div class="field-label">Técnico asignado</div>' +
-            '<div class="field-val">' + esc(tecnico) + '</div>' +
-          '</div>' +
-          '<div class="field-cell" style="border-top:none;">' +
-            '<div class="field-label">Modelo de equipo</div>' +
-            '<div class="field-val">' + esc(t.equipo_modelo||'—') + '</div>' +
-          '</div>' +
-          '<div class="field-cell" style="border-top:none;border-left:none;">' +
-            '<div class="field-label">Nº de serie</div>' +
-            '<div class="field-val" style="font-family:monospace;font-size:12px;">' + esc(t.equipo_serie||'—') + '</div>' +
-          '</div>' +
-          '<div class="field-cell" style="border-top:none;">' +
-            '<div class="field-label">Etapa actual (depósito)</div>' +
-            '<div class="field-val">' + esc(etapa) + '</div>' +
-          '</div>' +
-          '<div class="field-cell" style="border-top:none;border-left:none;">' +
-            '<div class="field-label">Prioridad</div>' +
-            '<div class="field-val"><span class="badge ' + esc(prio) + '">' + esc(prio) + '</span></div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-
-      // NOTAS Y SEGUIMIENTO
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;font-family:Arial,sans-serif;margin-bottom:8px;">Notas y seguimiento</div>' +
-      '<div style="border:1px solid #e2e8f0;border-radius:4px;overflow:hidden;margin-bottom:24px;">' +
-        notasHtml +
-      '</div>' +
-
-      // FIRMA
-      '<div style="text-align:right;font-family:Arial,sans-serif;font-size:12px;color:#374151;margin-bottom:24px;">' +
-        'Generado por:<br><strong>' + esc(t.creado_por||'TLC') + '</strong><br>info@tlcsrl.com.ar' +
-      '</div>' +
-
-      // FOOTER
-      '<div style="border-top:2px solid #0f172a;padding-top:12px;display:flex;align-items:center;gap:16px;">' +
-        '<img src="' + LOGO_URL + '" alt="TLC" style="width:70px;height:auto;" onerror="this.style.display=\'none\'">' +
-        '<div style="font-size:11px;color:#0f172a;font-family:Arial,sans-serif;line-height:1.6;">' +
-          '<strong>TECNOLOGÍA LÁSER CORNEAL S.R.L.</strong><br>' +
-          'Pasaje del Carmen 716 LOCAL PB C1019AAB · Buenos Aires, Argentina' +
-        '</div>' +
-      '</div>';
-  }
-
-  function buscarConReintento(id, intento) {
-    intento = intento || 0;
-    fetch(RTDB_URL + '/servicio_tecnico/' + encodeURIComponent(id) + '.json?_=' + Date.now(), { cache:'no-store' })
-    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function(data){
-      if (data && data.id_ticket) { renderOrden(id, data); return; }
-      if (intento < MAX_INTENTOS) setTimeout(function(){ buscarConReintento(id, intento+1); }, INTERVALO_MS);
-      else mostrarError('Orden no encontrada', 'No pudimos encontrar esta orden de servicio. Verificá el link.', true);
-    })
-    .catch(function(){
-      if (intento < MAX_INTENTOS) setTimeout(function(){ buscarConReintento(id, intento+1); }, INTERVALO_MS);
-      else mostrarError('Error de conexión', 'Revisá tu internet y volvé a intentar.', true);
-    });
-  }
-
-  var id = getIdFromUrl();
-  if (!id) mostrarError('Link incompleto', 'Este link no incluye un ID de orden válido.', false);
-  else buscarConReintento(id, 0);
-})();
-</script>
+    function enviarWspPresupuesto(e) {
+        e.preventDefault();
+        var linkPresup = window._linkPresupuestoTecnico || '';
+        if (!linkPresup) {
+            alert('No hay un presupuesto técnico vinculado a esta orden todavía.');
+            return;
+        }
+        var msg = encodeURIComponent('Estimado/a, le compartimos el Presupuesto Técnico de TLC SRL:\n' + linkPresup);
+        window.open('https://wa.me/' + TLC_WSP + '?text=' + msg, '_blank');
+    }
+    </script>
 </body>
 </html>
