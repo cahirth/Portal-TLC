@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.24.2 -->
+<!-- Portal TLC | servicio.html | v2026.06.24.3 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -504,7 +504,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 (function(){
 'use strict';
 
-console.log('%c Portal TLC | servicio.html | v2026.06.24.2 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+console.log('%c Portal TLC | servicio.html | v2026.06.24.3 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1104,7 +1104,7 @@ function _renderCamposTecnicos(t, puedeEditar) {
 
   // ── Falla reportada (siempre visible, informativo) ──
   var fallaHtml = '<div class="campo-tecnico-wrap">' +
-    '<div class="campo-tecnico-label">Falla reportada por el cliente ' + _campoBadge(dep,'recepcion') + '</div>' +
+    '<div class="campo-tecnico-label">Falla reportada por el cliente</div>' +
     '<textarea class="campo-tecnico-textarea" placeholder="Falla reportada al ingresar el equipo..." ' +
       (soloLectura ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'falla_reportada\',this.value)"') + '>' +
       _esc(t.falla_reportada||'') + '</textarea>' +
@@ -1112,7 +1112,7 @@ function _renderCamposTecnicos(t, puedeEditar) {
 
   // ── Accesorios (siempre visible) ──
   var accesoriosHtml = '<div class="campo-tecnico-wrap">' +
-    '<div class="campo-tecnico-label">Accesorios recibidos ' + _campoBadge(dep,'recepcion') + '</div>' +
+    '<div class="campo-tecnico-label">Accesorios recibidos</div>' +
     '<input class="campo-tecnico-textarea" style="min-height:auto;padding:8px 10px;" placeholder="Ej: Cable de poder, estuche. O Ninguno." ' +
       'value="' + _esc(t.accesorios||'') + '" ' +
       (soloLectura ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'accesorios\',this.value)"') + '>' +
@@ -1226,11 +1226,9 @@ window._siguienteEtapa = function(id) {
 
   var errores = [];
 
-  // Gate 1: Recepción → Diagnóstico
+  // Gate 1: Recepción → Diagnóstico: solo técnico asignado
   if (dep === 'recepcion') {
-    if (!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') errores.push('Asigná un técnico responsable');
-    if (!t.falla_reportada || !t.falla_reportada.trim()) errores.push('Completá la falla reportada por el cliente');
-    if (!t.accesorios || !t.accesorios.trim()) errores.push('Completá los accesorios recibidos (o escribí "Ninguno")');
+    if (!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') errores.push('Asigná un técnico responsable antes de avanzar');
   }
 
   // Gate 2: Diagnóstico → Presupuesto
