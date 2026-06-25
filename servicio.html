@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.23.6 -->
+<!-- Portal TLC | servicio.html | v2026.06.24.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -415,18 +415,12 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
     </div>
     <div class="form-row">
       <div>
-        <label class="form-label">Depósito inicial</label>
-        <select class="form-select" id="nuevo-deposito">
-          <option value="recepcion">Recepción</option>
-          <option value="diagnostico">Diagnóstico</option>
-          <option value="presupuesto">Presupuesto</option>
-          <option value="reparacion">Reparación</option>
-          <option value="preparacion_control_calidad">Preparación / CC</option>
-          <option value="para_facturar">Para facturar</option>
-          <option value="para_instalar">Para instalar</option>
-          <option value="seguimiento">Seguimiento</option>
+        <label class="form-label">Tipo de ingreso</label>
+        <select class="form-select" id="nuevo-tipo-ingreso" onchange="_stActualizarDeposito()">
+          <option value="recepcion">Recepcionado en TLC</option>
+          <option value="recepcion_presencial">Servicio presencial</option>
           <option value="servicio_remoto">Servicio remoto</option>
-          <option value="consignacion">Consignación</option>
+          <option value="otro">Otro (manual)</option>
         </select>
       </div>
       <div>
@@ -434,8 +428,29 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
         <input type="date" class="form-input" id="nuevo-fecha">
       </div>
     </div>
-    <label class="form-label">Nota inicial (opcional)</label>
-    <textarea class="form-textarea" id="nuevo-nota" placeholder="Descripción del problema o contexto..."></textarea>
+    <div id="deposito-manual-wrap" style="display:none;">
+      <label class="form-label">Depósito inicial (manual)</label>
+      <select class="form-select" id="nuevo-deposito">
+        <option value="recepcion">Recepción</option>
+        <option value="diagnostico">Diagnóstico</option>
+        <option value="presupuesto">Presupuesto</option>
+        <option value="reparacion">Reparación</option>
+        <option value="preparacion_control_calidad">Preparación / CC</option>
+        <option value="para_facturar">Para facturar</option>
+        <option value="para_instalar">Para instalar</option>
+        <option value="seguimiento">Seguimiento</option>
+        <option value="servicio_remoto">Servicio remoto</option>
+        <option value="consignacion">Consignación</option>
+      </select>
+    </div>
+    <label class="form-label">Falla reportada por el cliente <span style="color:#ef4444;">*</span></label>
+    <textarea class="form-textarea" id="nuevo-falla" placeholder="Describí la falla que reporta el cliente..." style="margin-bottom:4px;"></textarea>
+    <div id="error-falla" style="display:none;font-size:11px;color:#ef4444;margin-bottom:8px;">⚠ Campo obligatorio</div>
+    <label class="form-label">Accesorios recibidos <span style="color:#ef4444;">*</span></label>
+    <input type="text" class="form-input" id="nuevo-accesorios" placeholder="Ej: Cable de poder, manual. O escribí 'Ninguno'" style="margin-bottom:4px;">
+    <div id="error-accesorios" style="display:none;font-size:11px;color:#ef4444;margin-bottom:8px;">⚠ Campo obligatorio (escribí 'Ninguno' si no hay)</div>
+    <label class="form-label">Notas adicionales <span style="color:#64748b;font-size:10px;">(opcional)</span></label>
+    <textarea class="form-textarea" id="nuevo-nota" placeholder="Contexto adicional..."></textarea>
     <button class="btn-primary" onclick="_crearTicket()">Crear Ticket</button>
   </div>
 </div>
@@ -456,6 +471,8 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 <script>
 (function(){
 'use strict';
+
+console.log('%c Portal TLC | servicio.html | v2026.06.24.1 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -538,6 +555,20 @@ function _cargarSesion() {
     if (!vistaGuardada) {
       vistaGuardada = window.innerWidth >= 768 ? 'kanban' : 'lista';
     }
+    // Derivar clave interna del técnico desde el email
+    var EMAIL_A_TECNICO = {
+      'cristian.hirth':'cristian_hirth', 'cristian.hirth@tlcsrl.com.ar':'cristian_hirth',
+      'fernando.del.campo':'fernando_del_campo',
+      'juan.garro':'juan_garro',
+      'damian.sosa':'damian_sosa',
+      'veronica.ribaita':'veronica_ribaita',
+      'lourdes.davalos':'lourdes_davalos',
+      'lucio.raineri':'lucio_raineri',
+    };
+    var emailCompleto = (_session.username || '').toLowerCase();
+    var prefixEmail   = emailCompleto.split('@')[0];
+    _session.tecnico_key = EMAIL_A_TECNICO[emailCompleto] || EMAIL_A_TECNICO[prefixEmail] || prefixEmail.replace(/\./g, '_');
+
     _setVista(vistaGuardada, true);
     _actualizarBtnMostrarFin();
 
@@ -728,20 +759,8 @@ window._selFiltroDD = function(tipo, sel) {
 
 window._aplicarFiltros = function() {
   var query   = (document.getElementById('st-buscador').value || '').toLowerCase().trim();
-  var miClave = '';
-  if (_session) {
-    var EMAIL_A_TECNICO = {
-      'cristian.hirth':'cristian_hirth', 'cristian':'cristian_hirth',
-      'fernando.del.campo':'fernando_del_campo', 'fernando':'fernando_del_campo',
-      'juan.garro':'juan_garro', 'juan':'juan_garro',
-      'damian.sosa':'damian_sosa', 'damian':'damian_sosa',
-      'veronica.ribaita':'veronica_ribaita', 'veronica':'veronica_ribaita',
-      'lourdes.davalos':'lourdes_davalos', 'lourdes':'lourdes_davalos',
-      'lucio.raineri':'lucio_raineri', 'lucio':'lucio_raineri',
-    };
-    var prefix = (_session.username || '').split('@')[0].toLowerCase();
-    miClave = EMAIL_A_TECNICO[prefix] || prefix.replace(/\./g,'_');
-  }
+  // tecnico_key calculado en _cargarSesion una sola vez
+  var miClave = _session ? (_session.tecnico_key || '') : '';
   var base = _aplicarFiltroFin(_tickets);
   var filtrados = base.filter(function(t) {
     var fTec = _filtros.tecnico || 'todos';
@@ -1231,17 +1250,86 @@ window._abrirModalNuevo = function() {
 window._cerrarModalNuevo = function() {
   document.getElementById('modal-nuevo').classList.remove('open');
 };
-window._crearTicket = function() {
-  var cliente  = document.getElementById('nuevo-cliente').value.trim();
-  var modelo   = document.getElementById('nuevo-modelo').value.trim();
-  var serie    = document.getElementById('nuevo-serie').value.trim();
-  var tecnico  = document.getElementById('nuevo-tecnico').value;
-  var prio     = document.getElementById('nuevo-prioridad').value;
-  var deposito = document.getElementById('nuevo-deposito').value;
-  var fecha    = document.getElementById('nuevo-fecha').value;
-  var nota     = document.getElementById('nuevo-nota').value.trim();
+// ── Automatismo depósito por tipo de ingreso ──────────────────────
+window._stActualizarDeposito = function() {
+  var tipo = document.getElementById('nuevo-tipo-ingreso').value;
+  var wrap = document.getElementById('deposito-manual-wrap');
+  if (wrap) wrap.style.display = tipo === 'otro' ? 'block' : 'none';
+};
 
-  if (!cliente || !modelo) { alert('Cliente y modelo son obligatorios.'); return; }
+// ── Banner flotante de validación ─────────────────────────────────
+function _stMostrarError(msg) {
+  var banner = document.getElementById('st-banner-error');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'st-banner-error';
+    banner.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);' +
+      'background:#ef4444;color:#fff;font-size:13px;font-weight:700;padding:10px 20px;' +
+      'border-radius:10px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4);max-width:90vw;text-align:center;';
+    document.body.appendChild(banner);
+  }
+  banner.textContent = msg;
+  banner.style.display = 'block';
+  setTimeout(function(){ banner.style.display = 'none'; }, 3000);
+}
+
+window._crearTicket = function() {
+  var cliente    = document.getElementById('nuevo-cliente').value.trim();
+  var modelo     = document.getElementById('nuevo-modelo').value.trim();
+  var serie      = document.getElementById('nuevo-serie').value.trim();
+  var tecnico    = document.getElementById('nuevo-tecnico').value;
+  var prio       = document.getElementById('nuevo-prioridad').value;
+  var fecha      = document.getElementById('nuevo-fecha').value;
+  var falla      = document.getElementById('nuevo-falla').value.trim();
+  var accesorios = document.getElementById('nuevo-accesorios').value.trim();
+  var nota       = document.getElementById('nuevo-nota').value.trim();
+  var tipoIngreso = document.getElementById('nuevo-tipo-ingreso').value;
+
+  // Determinar depósito según tipo de ingreso
+  var depositoMap = {
+    'recepcion':          'recepcion',
+    'recepcion_presencial':'recepcion',
+    'servicio_remoto':    'servicio_remoto',
+    'otro':               (document.getElementById('nuevo-deposito') ? document.getElementById('nuevo-deposito').value : 'recepcion'),
+  };
+  var deposito = depositoMap[tipoIngreso] || 'recepcion';
+
+  // Validaciones con feedback visual
+  var ok = true;
+  if (!cliente || !modelo) { _stMostrarError('Cliente y modelo son obligatorios'); return; }
+
+  var elFalla = document.getElementById('nuevo-falla');
+  var errFalla = document.getElementById('error-falla');
+  if (!falla) {
+    elFalla.style.borderColor = '#ef4444';
+    if (errFalla) errFalla.style.display = 'block';
+    _stMostrarError('⚠ Completá la falla reportada por el cliente');
+    ok = false;
+  } else {
+    elFalla.style.borderColor = '';
+    if (errFalla) errFalla.style.display = 'none';
+  }
+
+  var elAcc = document.getElementById('nuevo-accesorios');
+  var errAcc = document.getElementById('error-accesorios');
+  if (!accesorios) {
+    elAcc.style.borderColor = '#ef4444';
+    if (errAcc) errAcc.style.display = 'block';
+    _stMostrarError('⚠ Indicá los accesorios recibidos (o escribí "Ninguno")');
+    ok = false;
+  } else {
+    elAcc.style.borderColor = '';
+    if (errAcc) errAcc.style.display = 'none';
+  }
+
+  if (!ok) return;
+
+  // Armar nota inicial con falla y accesorios indexados
+  var notaInicial = 'Falla reportada por el cliente: ' + falla;
+  notaInicial += '
+Accesorios recibidos: ' + accesorios;
+  if (nota) notaInicial += '
+' + nota;
 
   var payload = {
     accion:           'st_crearTicket',
@@ -1251,8 +1339,11 @@ window._crearTicket = function() {
     tecnico_asignado: tecnico,
     prioridad:        prio,
     deposito:         deposito,
+    tipo_ingreso:     tipoIngreso,
+    falla_reportada:  falla,
+    accesorios:       accesorios,
     fecha_vencimiento:fecha ? _fechaISOToDDMMYYYY(fecha) : '',
-    nota_inicial:     nota,
+    nota_inicial:     notaInicial,
     creado_por:       (_session && (_session.name || _session.username)) || '',
   };
 
@@ -1264,7 +1355,10 @@ window._crearTicket = function() {
   .then(function(r){
     if (r.ok) {
       _cerrarModalNuevo();
-      ['nuevo-cliente','nuevo-modelo','nuevo-serie','nuevo-nota'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+      ['nuevo-cliente','nuevo-modelo','nuevo-serie','nuevo-falla','nuevo-accesorios','nuevo-nota']
+        .forEach(function(id){ var el=document.getElementById(id); if(el){ el.value=''; el.style.borderColor=''; } });
+      document.getElementById('nuevo-tipo-ingreso').value = 'recepcion';
+      _stActualizarDeposito();
       _cargarTickets();
     } else { alert('Error creando ticket: ' + (r.error||'desconocido')); }
   })
