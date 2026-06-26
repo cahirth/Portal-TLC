@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.06.26.1 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -280,6 +281,14 @@
         body.tema-claro #login-step-code-idx button[onclick="volverPasoEmailIdx()"] {
             border-color:#cbd5e1; color:#475569;
         }
+    
+/* ── Avatar menu tema claro ── */
+body.tema-claro #avatar-menu-idx { background:#ffffff !important; border-color:#e2e8f0 !important; box-shadow:0 16px 48px rgba(0,0,0,.12) !important; }
+body.tema-claro #avatar-menu-idx > div:first-child { background:#f8fafc !important; border-bottom-color:#e2e8f0 !important; }
+body.tema-claro #avatar-nombre-idx { color:#0f172a !important; }
+body.tema-claro #avatar-email-idx  { color:#64748b !important; }
+body.tema-claro #avatar-rol-idx    { background:rgba(26,75,140,.08) !important; color:#1a4b8c !important; border-color:rgba(26,75,140,.2) !important; }
+body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8c !important; }
     </style>
 </head>
 <body>
@@ -324,6 +333,7 @@
                              text-transform:uppercase; letter-spacing:0.6px; padding:1px 7px; border-radius:20px;
                              background:rgba(58,134,255,.15); color:#3a86ff; border:1px solid rgba(58,134,255,.25);">—</div>
                     </div>
+                <button onclick="toggleAvatarMenuIdx(event)" title="Cerrar" style="background:rgba(100,116,139,.15); border:1px solid #1e3050; border-radius:8px; color:#94a3b8; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:16px; line-height:1;">✕</button>
                 </div>
 
                 <div style="padding:12px; display:flex; flex-direction:column; gap:10px;">
@@ -1545,6 +1555,7 @@
     function _setTemaIdx(tema) {
         try { localStorage.setItem('tlc_tema', tema); } catch(e) {}
         _aplicarTemaIdx();
+        setTimeout(function() { const m = document.getElementById('avatar-menu-idx'); if(m) m.style.display='none'; }, 150);
     }
 
     function _aplicarTemaIdx() {

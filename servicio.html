@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.25.5 -->
+<!-- Portal TLC | servicio.html | v2026.06.26.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -260,6 +260,14 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 .lista-ticket-cliente{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .lista-ticket-badges{display:flex;gap:5px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
 .lista-col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+/* ── Avatar menu tema claro ── */
+body.tema-claro #avatar-menu-st { background:#ffffff !important; border-color:#e2e8f0 !important; box-shadow:0 16px 48px rgba(0,0,0,.12) !important; }
+body.tema-claro #avatar-menu-st > div:first-child { background:#f8fafc !important; border-bottom-color:#e2e8f0 !important; }
+body.tema-claro #avatar-nombre-st { color:#0f172a !important; }
+body.tema-claro #avatar-email-st  { color:#64748b !important; }
+body.tema-claro #avatar-rol-st    { background:rgba(26,75,140,.08) !important; color:#1a4b8c !important; border-color:rgba(26,75,140,.2) !important; }
+body.tema-claro #avatar-icon-st   { background:#e8f0fc !important; color:#1a4b8c !important; }
 </style>
 </head>
 <body>
@@ -298,7 +306,8 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
           <div id="avatar-rol-st" style="display:inline-block;margin-top:4px;font-size:9px;font-weight:700;
                text-transform:uppercase;letter-spacing:0.6px;padding:1px 7px;border-radius:20px;
                background:rgba(58,134,255,.15);color:#3a86ff;border:1px solid rgba(58,134,255,.25);">—</div>
-          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.25.5</div>
+          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.26.1</div>
+          <button onclick="_toggleAvatarMenuSt(event)" title="Cerrar" style="background:rgba(100,116,139,.15); border:1px solid #1e3050; border-radius:8px; color:#94a3b8; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:16px; line-height:1;">✕</button>
         </div>
       </div>
       <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
@@ -527,7 +536,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 (function(){
 'use strict';
 
-console.log('%c Portal TLC | servicio.html | v2026.06.25.5 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+console.log('%c Portal TLC | servicio.html | v2026.06.26.1 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -661,6 +670,7 @@ function _aplicarTemaSt() {
 window._setTemaSt = function(tema) {
   try { localStorage.setItem(TEMA_KEY, tema); } catch(e) {}
   _aplicarTemaSt();
+    setTimeout(function() { const m = document.getElementById('avatar-menu-st'); if(m) m.style.display='none'; }, 150);
 };
 // Compat
 window._toggleTema = function() {

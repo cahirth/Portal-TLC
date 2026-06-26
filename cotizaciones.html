@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.06.26.1 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -280,6 +281,17 @@
         body.tema-claro .k-id       { color:#1a4b8c !important; }
         body.tema-claro .k-btn      { background:#f1f5f9 !important; border-color:#e2e8f0 !important; color:#475569 !important; }
         body.tema-claro .cambio-etapa-select { background:#ffffff !important; border-color:#e2e8f0 !important; color:#374151 !important; }
+
+/* ── Avatar menu tema claro ── */
+body.tema-claro #cot-avatar-menu { background:#ffffff !important; border-color:#e2e8f0 !important; box-shadow:0 16px 48px rgba(0,0,0,.12) !important; }
+body.tema-claro #cot-avatar-menu > div:first-child { background:#f8fafc !important; border-bottom-color:#e2e8f0 !important; }
+body.tema-claro #cot-avatar-nombre { color:#0f172a !important; }
+body.tema-claro #cot-avatar-email  { color:#64748b !important; }
+body.tema-claro #cot-avatar-rol    { background:rgba(26,75,140,.08) !important; color:#1a4b8c !important; border-color:rgba(26,75,140,.2) !important; }
+body.tema-claro #cot-avatar-menu-icon { background:#e8f0fc !important; color:#1a4b8c !important; border-color:rgba(26,75,140,.2) !important; }
+body.tema-claro #cot-avatar-menu > div:last-child > div:first-child { background:#f1f5f9 !important; border-color:#e2e8f0 !important; }
+body.tema-claro #cot-avatar-menu > div:last-child > div:nth-child(2) { background:#f1f5f9 !important; border-color:#e2e8f0 !important; }
+body.tema-claro #cot-wsp-saludo { background:#ffffff !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
         /* Detalle overlay */
         body.tema-claro .detalle-overlay { background:#f8fafc !important; }
         body.tema-claro .detalle-header  { background:#ffffff !important; border-bottom-color:#e2e8f0 !important; }
@@ -382,13 +394,15 @@
                 <div style="width:40px; height:40px; border-radius:50%; background:#1c2541; border:2px solid #3a86ff33;
                             display:flex; align-items:center; justify-content:center;
                             font-size:14px; font-weight:800; color:#3a86ff; flex-shrink:0;" id="cot-avatar-menu-icon">?</div>
-                <div style="min-width:0;">
+                <div style="min-width:0; flex:1;">
                     <div style="font-size:13px; font-weight:700; color:#f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="cot-avatar-nombre">—</div>
                     <div style="font-size:10px; color:#64748b; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="cot-avatar-email">—</div>
                     <div id="cot-avatar-rol" style="display:inline-block; margin-top:4px; font-size:9px; font-weight:700;
                          text-transform:uppercase; letter-spacing:0.6px; padding:1px 7px; border-radius:20px;
                          background:rgba(58,134,255,.15); color:#3a86ff; border:1px solid rgba(58,134,255,.25);">—</div>
                 </div>
+                <button onclick="toggleAvatarMenuCot()" title="Cerrar"
+                    style="background:rgba(100,116,139,.15); border:1px solid #1e3050; border-radius:8px; color:#94a3b8; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:16px; line-height:1;">✕</button>
             </div>
 
             <div style="padding:12px; display:flex; flex-direction:column; gap:10px;">
@@ -1486,9 +1500,12 @@ function cerrarDetalle() {
 let _mutacionQueue  = Promise.resolve();
 
 function _mutarEstadoCotizacion(id, nuevoEstado) {
-    // Paso A: actualizar en memoria a 0ms
+    // Paso A: actualizar en memoria a 0ms — buscar por idCot O por id (dealId HubSpot)
     [historicoCompleto, todasLasCot].forEach(arr => {
-        const c = arr.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id));
+        const c = arr.find(x =>
+            String(x.idCot || x.id_cotizacion || '') === String(id) ||
+            String(x.id || '') === String(id)
+        );
         if (c) c.estado = nuevoEstado;
     });
     aplicarFiltros();
@@ -2442,6 +2459,11 @@ function _inicializarAvatarCot() {
 function _setTemaCot(tema) {
     try { localStorage.setItem('tlc_tema', tema); } catch(e) {}
     _aplicarTemaCot();
+    // Cierre automático al elegir tema
+    setTimeout(function() {
+        const m = document.getElementById('cot-avatar-menu');
+        if (m) m.style.display = 'none';
+    }, 150);
 }
 
 function _aplicarTemaCot() {

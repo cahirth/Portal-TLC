@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.06.24.2 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.06.26.1 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -612,10 +612,7 @@
     }
 
     /* ── Dropdown perfil ─────────────────────────────────────────── */
-    body.tema-claro #avatar-menu {
-        background: #ffffff !important; border-color: #e2e8f0 !important;
-        box-shadow: 0 16px 48px rgba(0,0,0,.15) !important;
-    }
+    body.tema-claro #avatar-menu { background:#ffffff !important; border-color:#e2e8f0 !important; box-shadow:0 16px 48px rgba(0,0,0,.12) !important; }
     body.tema-claro #avatar-menu > div:first-child { background: #f8fafc !important; border-bottom-color: #e2e8f0 !important; }
     body.tema-claro #avatar-nombre-menu { color: #0f172a !important; }
     body.tema-claro #avatar-email-menu  { color: #64748b !important; }
@@ -937,6 +934,7 @@
                              text-transform:uppercase; letter-spacing:0.6px; padding:1px 7px; border-radius:20px;
                              background:rgba(58,134,255,.15); color:#3a86ff; border:1px solid rgba(58,134,255,.25);">—</div>
                     </div>
+                <button onclick="toggleAvatarMenu()" title="Cerrar" style="background:rgba(100,116,139,.15); border:1px solid #1e3050; border-radius:8px; color:#94a3b8; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:16px; line-height:1;">✕</button>
                 </div>
 
                 <div style="padding:12px; display:flex; flex-direction:column; gap:10px;">
@@ -1651,6 +1649,7 @@ function _aplicarTema(tema) {
     // 1. Mutar clase en body — todo lo demás lo hace el CSS .tema-claro
     if (tema === 'light') {
         document.body.classList.add('tema-claro');
+        setTimeout(function() { const m = document.getElementById('avatar-menu'); if(m) m.style.display='none'; }, 150);
     } else {
         document.body.classList.remove('tema-claro');
     }
