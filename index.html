@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.06.26.1 -->
+<!-- Portal TLC | index.html | v2026.06.26.2 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -314,7 +314,12 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
             <p id="txt-sub-title" style="font-size:11px; color:var(--text-muted);">Menú Principal</p>
         </div>
         <div style="position:relative;" id="avatar-wrap-idx">
-            <div class="header-profile" id="header-avatar" style="cursor:pointer;" onclick="toggleAvatarMenuIdx(event)">CH</div>
+            <button id="header-avatar" onclick="toggleAvatarMenuIdx(event)"
+                style="background:#1c2541; border:1px solid #222e50; border-radius:50%;
+                       width:38px; height:38px; display:flex; align-items:center; justify-content:center;
+                       cursor:pointer; font-size:12px; font-weight:800; color:#3a86ff; flex-shrink:0;">
+                <span id="idx-avatar-initials">CH</span>
+            </button>
 
             <div id="avatar-menu-idx" style="display:none; position:absolute; top:48px; right:0;
                  background:#0d1520; border:1px solid #1e3050; border-radius:16px;
@@ -1540,7 +1545,7 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
         const iniciales = partes.length >= 2
             ? (partes[0][0] + partes[partes.length-1][0]).toUpperCase()
             : nombre.substring(0,2).toUpperCase();
-        document.getElementById('header-avatar').textContent   = iniciales;
+        var _haSp = document.getElementById('idx-avatar-initials'); if(_haSp) _haSp.textContent = iniciales;
         document.getElementById('avatar-icon-idx').textContent = iniciales;
         document.getElementById('avatar-nombre-idx').textContent = nombre;
         document.getElementById('avatar-email-idx').textContent  = email;

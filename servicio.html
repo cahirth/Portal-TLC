@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.26.1 -->
+<!-- Portal TLC | servicio.html | v2026.06.26.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -275,6 +275,9 @@ body.tema-claro #avatar-icon-st   { background:#e8f0fc !important; color:#1a4b8c
 <!-- HEADER -->
 <header class="st-header">
   <button class="btn-icon" id="btn-back" onclick="history.back()">←</button>
+  <img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25"
+       onerror="this.style.display='none'" alt="TLC"
+       style="height:28px;width:auto;object-fit:contain;flex-shrink:0;">
   <div style="flex:1;">
     <div class="st-header-title">Servicio Técnico</div>
     <div class="st-header-sub" id="st-user-label">Cargando...</div>
@@ -282,15 +285,20 @@ body.tema-claro #avatar-icon-st   { background:#e8f0fc !important; color:#1a4b8c
 
   <!-- Toggle Lista / Kanban -->
   <div class="vista-toggle" id="vista-toggle">
-    <button class="vista-btn" id="btn-vista-lista" onclick="_setVista('lista')">☰</button>
-    <button class="vista-btn" id="btn-vista-kanban" onclick="_setVista('kanban')">⊞</button>
+    <button class="vista-btn" id="btn-vista-lista" onclick="_setVista('lista')">☰ Lista</button>
+    <button class="vista-btn" id="btn-vista-kanban" onclick="_setVista('kanban')">⊞ Kanban</button>
   </div>
 
   <button class="btn-icon" onclick="_recargarTickets()" title="Actualizar">↺</button>
 
   <!-- Avatar con menú — igual a index.html -->
   <div style="position:relative;" id="avatar-wrap-st">
-    <div class="st-header-profile" id="st-header-avatar" onclick="_toggleAvatarMenuSt(event)">CH</div>
+    <button id="st-header-avatar" onclick="_toggleAvatarMenuSt(event)"
+        style="background:#1c2541; border:1px solid #222e50; border-radius:50%;
+               width:38px; height:38px; display:flex; align-items:center; justify-content:center;
+               cursor:pointer; font-size:12px; font-weight:800; color:#3a86ff; flex-shrink:0;">
+        <span id="st-avatar-initials">CH</span>
+    </button>
     <div id="avatar-menu-st" style="display:none;position:absolute;top:48px;right:0;
          background:#0d1520;border:1px solid #1e3050;border-radius:16px;
          width:300px;z-index:600;box-shadow:0 16px 48px rgba(0,0,0,0.6);
@@ -306,7 +314,7 @@ body.tema-claro #avatar-icon-st   { background:#e8f0fc !important; color:#1a4b8c
           <div id="avatar-rol-st" style="display:inline-block;margin-top:4px;font-size:9px;font-weight:700;
                text-transform:uppercase;letter-spacing:0.6px;padding:1px 7px;border-radius:20px;
                background:rgba(58,134,255,.15);color:#3a86ff;border:1px solid rgba(58,134,255,.25);">—</div>
-          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.26.1</div>
+          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.26.2</div>
           <button onclick="_toggleAvatarMenuSt(event)" title="Cerrar" style="background:rgba(100,116,139,.15); border:1px solid #1e3050; border-radius:8px; color:#94a3b8; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:16px; line-height:1;">✕</button>
         </div>
       </div>
@@ -536,7 +544,7 @@ body.tema-claro #avatar-icon-st   { background:#e8f0fc !important; color:#1a4b8c
 (function(){
 'use strict';
 
-console.log('%c Portal TLC | servicio.html | v2026.06.26.1 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+console.log('%c Portal TLC | servicio.html | v2026.06.26.2 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -686,7 +694,7 @@ function _inicializarAvatarSt(session) {
   var iniciales = partes.length >= 2
     ? (partes[0][0] + partes[partes.length-1][0]).toUpperCase()
     : nombre.substring(0,2).toUpperCase();
-  var el = document.getElementById('st-header-avatar');
+  var el = document.getElementById('st-avatar-initials');
   var ic = document.getElementById('avatar-icon-st');
   var nm = document.getElementById('avatar-nombre-st');
   var em = document.getElementById('avatar-email-st');
