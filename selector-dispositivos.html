@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.06.26.4 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.06.28.1 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -135,6 +135,8 @@
         #btn-video { background: linear-gradient(135deg, #1c1520, #2d1a2e); border: 1.5px solid #f87171; color: #fca5a5; box-shadow: 0 0 12px rgba(248,113,113,0.15); }
         #btn-video:hover { background: #3d1f1f; box-shadow: 0 0 20px rgba(248,113,113,0.3); }
         .btn-cotizar { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; border-radius: 10px; background: #3a86ff; border: none; color: white; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 10px; }
+        .btn-cotizar.solo-vista { background: #1e293b !important; color: #475569 !important; cursor: not-allowed !important; border: 1px solid #334155 !important; }
+        .btn-carrito-solo-vista { opacity: .4 !important; pointer-events: none !important; }
 
         /* FORMULARIO COTIZACIÓN */
         .detalle-overlay { position: fixed; inset: 0; background: #0b1329; z-index: 200; display: none; overflow-y: auto; }
@@ -1605,6 +1607,11 @@ async function mostrarApp(account) {
     document.getElementById('user-greeting').textContent = `Hola, ${nombre}`;
     document.getElementById('btn-carrito').style.display = 'flex';
 
+    // Rol Solo Vista / Visor: puede ver precios pero no cotizar
+    if (currentUserRol === 'Visor' || currentUserRol === 'Solo_Precios' || currentUserRol === 'Solo Vista') {
+        document.getElementById('btn-carrito').classList.add('btn-carrito-solo-vista');
+    }
+
     // Avatar — iniciales
     const partes = nombre.trim().split(' ');
     const iniciales = partes.length >= 2
@@ -2876,6 +2883,16 @@ document.getElementById('btn-back').addEventListener('click', () => {
 // ─── FORMULARIO ───────────────────────────────────────────────────────────────
 document.getElementById('btn-cotizar').addEventListener('click', agregarAlCarrito);
 
+// Aplicar estilo según rol al abrir cualquier detalle
+(function _aplicarRolBtnCotizar() {
+    const btn = document.getElementById('btn-cotizar');
+    if (!btn) return;
+    if (_esSoloVista && _esSoloVista()) {
+        btn.classList.add('solo-vista');
+        btn.title = 'Solo Vista: no podés agregar al carrito';
+    }
+})();
+
 // ══════════════════════════════════════════════════════════════════
 // MÓDULO CARRITO — Estado unificado
 // ══════════════════════════════════════════════════════════════════
@@ -3022,7 +3039,15 @@ function actualizarBadge() {
 }
 
 // ─── Agregar al carrito con chequeo de compatibilidad ────────────
+function _esSoloVista() {
+    return currentUserRol === 'Visor' || currentUserRol === 'Solo_Precios' || currentUserRol === 'Solo Vista';
+}
+
 function agregarAlCarrito() {
+    if (_esSoloVista()) {
+        alert('Tu rol de Solo Vista no permite agregar al carrito ni generar cotizaciones.');
+        return;
+    }
     const d = dispositivoActual;
     if (!d) return;
 

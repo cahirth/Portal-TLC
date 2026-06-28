@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.06.26.4 -->
+<!-- Portal TLC | cotizaciones.html | v2026.06.28.1 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1544,8 +1544,12 @@ function _mutarEstadoCotizacion(id, nuevoEstado) {
 function _cambiarEstadoDesdeDetalle(id, nuevoEstado) {
     _mutarEstadoCotizacion(id, nuevoEstado);
     setTimeout(() => {
-        const c = (typeof historicoCompleto !== 'undefined' ? historicoCompleto : todasLasCot)
-            .find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id)) || cotActual;
+        // Buscar en todas las fuentes disponibles — idCot, id_cotizacion o id numérico HubSpot
+        const buscar = arr => arr && arr.find(x =>
+            String(x.idCot || x.id_cotizacion || '') === String(id) ||
+            String(x.id || '') === String(id)
+        );
+        const c = buscar(historicoCompleto) || buscar(todasLasCot) || cotActual;
         if (c) _renderDetalle(c);
     }, 0);
 }
