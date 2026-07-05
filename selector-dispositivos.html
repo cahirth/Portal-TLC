@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.05.1 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.05.2 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1833,6 +1833,46 @@ function invalidarCachePrecios() {
 
 // ─── Carga desde Firebase RTDB — ~100-200ms, siempre fresco ──
 
+// Firebase RTDB no permite espacios ni ciertos símbolos como keys, así que
+// FotoMap.gs sanitiza los headers (ej: "Sub Categoria" → "Sub_Categoria")
+// antes de subir. Acá los traducimos de vuelta a los nombres originales
+// que usa todo el resto del código del selector.
+const _MAPA_HEADERS_FIREBASE = {
+    'Sub_Categoria':            'Sub Categoria',
+    'Nombre_de_Dispositivo':    'Nombre de Dispositivo',
+    'Precio_LISTA':             'Precio LISTA',
+    'Precio_CONTADO_CNO':       'Precio CONTADO CNO',
+    'Tasa_TNA__':               'Tasa_TNA_$',
+    'Adelanto_TLC___6':         'Adelanto_TLC_$_6',
+    'CUOTA_TLC___6':            'CUOTA_TLC_$_6',
+    'Descripcion_TLC___6':      'Descripcion_TLC_$_6',
+    'Adelanto_TLC___12':        'Adelanto_TLC_$_12',
+    'CUOTA_TLC___12':           'CUOTA_TLC_$_12',
+    'Descripcion_TLC___12':     'Descripcion_TLC_$_12',
+    'Adelanto_L__12':           'Adelanto_L$_12',
+    'Cuota_L__12':              'Cuota_L$_12',
+    'Descripcion_L__12':        'Descripcion_L$_12',
+    'Adelanto_L__24':           'Adelanto_L$_24',
+    'Cuota_L__24':              'Cuota_L$_24',
+    'Descripcion_L__24':        'Descripcion_L$_24',
+    'Adelanto_L__36':           'Adelanto_L$_36',
+    'Cuota_L__36':              'Cuota_L$_36',
+    'Descripcion_L__36':        'Descripcion_L$_36',
+    'Adelanto___CREDICOOP':     'Adelanto_$_CREDICOOP',
+    'Descripcion___adelanto_CREDICOOP_36': 'Descripcion_$_adelanto_CREDICOOP_36',
+    'Cuotas___CREDICOOP_36':    'Cuotas_$_CREDICOOP_36',
+    'Descripcion___CREDICOOP_36': 'Descripcion_$_CREDICOOP_36',
+};
+
+function _normalizarProductoFirebase(obj) {
+    const out = {};
+    Object.keys(obj).forEach(k => {
+        const keyOriginal = _MAPA_HEADERS_FIREBASE[k] || k;
+        out[keyOriginal] = obj[k];
+    });
+    return out;
+}
+
 async function _fetchPreciosFirebase() {
     const t0   = performance.now();
     const resp = await fetch(FIREBASE_RTDB_URL + '/precios.json', { cache: 'no-store' });
@@ -1840,7 +1880,8 @@ async function _fetchPreciosFirebase() {
     const obj = await resp.json();
     if (!obj) throw new Error('Firebase RTDB → nodo /precios vacío');
     // El nodo /precios es un objeto {clave: {...datos...}} — lo convertimos a array
-    const data = Object.values(obj);
+    // y normalizamos las keys sanitizadas de vuelta a los nombres originales.
+    const data = Object.values(obj).map(_normalizarProductoFirebase);
     const ms   = Math.round(performance.now() - t0);
     console.log(`[Precios] ✅ Firebase RTDB (${ms}ms) — ${data.length} items`);
     return data;
