@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.06.28.1 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.05.1 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1744,8 +1744,9 @@ async function cargarFotoMap() {
 // ════════════════════════════════════════════════════════════
 
 const PRECIOS_CACHE_KEY     = 'tlc_precios_v1';
-const PRECIOS_CACHE_VERSION = '1';
+const PRECIOS_CACHE_VERSION = '2'; // bump: ahora prioriza Firebase RTDB
 const PRECIOS_STATIC_URL    = './precios.json';
+const FIREBASE_RTDB_URL     = 'https://portal-tlc-default-rtdb.firebaseio.com';
 
 // ─── IntersectionObserver para lazy loading en browsers sin soporte nativo ────
 const _lazyObserver = ('IntersectionObserver' in window)
@@ -1830,6 +1831,21 @@ function invalidarCachePrecios() {
     console.log('[Precios] Cache invalidado');
 }
 
+// ─── Carga desde Firebase RTDB — ~100-200ms, siempre fresco ──
+
+async function _fetchPreciosFirebase() {
+    const t0   = performance.now();
+    const resp = await fetch(FIREBASE_RTDB_URL + '/precios.json', { cache: 'no-store' });
+    if (!resp.ok) throw new Error('Firebase RTDB → HTTP ' + resp.status);
+    const obj = await resp.json();
+    if (!obj) throw new Error('Firebase RTDB → nodo /precios vacío');
+    // El nodo /precios es un objeto {clave: {...datos...}} — lo convertimos a array
+    const data = Object.values(obj);
+    const ms   = Math.round(performance.now() - t0);
+    console.log(`[Precios] ✅ Firebase RTDB (${ms}ms) — ${data.length} items`);
+    return data;
+}
+
 // ─── Carga desde Sheets (fallback) ───────────────────────
 
 async function _fetchSheetDirecto(sheetName) {
@@ -1853,46 +1869,28 @@ async function _fetchSheetDirecto(sheetName) {
 // ─── Carga principal con prioridad ────────────────────────
 
 async function cargarPreciosInstantaneo() {
-    // 1. sessionStorage — 0ms
+    // 1. Firebase RTDB — ~100-200ms, siempre la versión más fresca.
+    //    Es la fuente de verdad principal desde que se sincroniza manualmente
+    //    con el botón del Sheet. Se intenta primero porque no depende del
+    //    CDN de GitHub Pages, que puede tardar minutos en propagar cambios.
+    try {
+        const data = await _fetchPreciosFirebase();
+        if (data && data.length) {
+            _guardarCachePrecios(data, 'firebase');
+            return data;
+        }
+    } catch(err) {
+        console.warn('[Precios] ⚠️ Firebase RTDB no disponible:', err.message);
+    }
+
+    // 2. sessionStorage — 0ms (si Firebase falló, usar lo último cacheado)
     const cached = _leerCachePrecios();
     if (cached) {
         console.log(`[Precios] ✅ sessionStorage (0ms) — ${cached.length} items`);
-
-        // Chequeo silencioso en background: ¿hay versión nueva en GitHub?
-        // Si la hay, invalida el caché y recarga los precios sin interrumpir al usuario
-        _chequearActualizacionPrecios().then(hayNueva => {
-            if (!hayNueva) return;
-            // Recargar precios frescos en background y actualizar dispositivos
-            // Obtener SHA nuevo y guardar junto con los datos frescos
-            fetch('https://api.github.com/repos/cahirth/Portal-TLC/contents/precios.json', { cache: 'no-store' })
-                .then(r => r.ok ? r.json() : null)
-                .then(meta => {
-                    const sha = meta?.sha || '';
-                    return fetch(PRECIOS_STATIC_URL, { cache: 'no-store' })
-                        .then(r => r.ok ? r.json() : null)
-                        .then(data => ({ data, sha }));
-                })
-                .then(({ data, sha }) => {
-                    if (!data || !data.length) return;
-                    _guardarCachePrecios(data, sha);
-                    dispositivos = data;
-                    console.log(`[Precios] 🔄 Actualizado en background — ${data.length} items`);
-                    // Re-renderizar la vista actual si está en lista de equipos
-                    if (typeof renderLista === 'function' && subcatActual) {
-                        const filtered = dispositivos.filter(d =>
-                            d['Categoria'] === catActual &&
-                            (subcatActual === 'TODAS' || d['Sub Categoria'] === subcatActual)
-                        );
-                        renderLista(filtered);
-                    }
-                })
-                .catch(() => {});
-        });
-
         return cached;
     }
 
-    // 2. precios.json estático — ~50ms
+    // 3. precios.json estático — ~50ms (fallback si Firebase y caché fallan)
     try {
         const t0   = performance.now();
         const resp = await fetch(PRECIOS_STATIC_URL, { cache: 'no-store' });
@@ -1900,11 +1898,6 @@ async function cargarPreciosInstantaneo() {
             const data = await resp.json();
             const ms   = Math.round(performance.now() - t0);
             console.log(`[Precios] ✅ precios.json (${ms}ms) — ${data.length} items`);
-            // Obtener SHA via GitHub API para comparaciones futuras
-            fetch('https://api.github.com/repos/cahirth/Portal-TLC/contents/precios.json', { cache: 'no-store' })
-                .then(r => r.ok ? r.json() : null)
-                .then(meta => { if (meta?.sha) _guardarCachePrecios(data, meta.sha); })
-                .catch(() => {});
             _guardarCachePrecios(data, '');
             return data;
         }
@@ -1913,7 +1906,7 @@ async function cargarPreciosInstantaneo() {
         console.warn('[Precios] ⚠️ precios.json no disponible:', err.message);
     }
 
-    // 3. Fallback: Google Sheets directo — ~1500ms
+    // 4. Último recurso: Google Sheets directo — ~1500ms
     console.warn('[Precios] ⚠️ Fallback a Google Sheets directo');
     const t0   = performance.now();
     const data = await _fetchSheetDirecto('Lista_Precios');
@@ -4752,33 +4745,24 @@ function mostrarFormStatus(msg, tipo) {
 }
 
 // ─── POLLING PRECIOS CADA 10 MIN ──────────────────────────────────────────────
-// Chequea en background si precios.json cambió — actualiza sin F5
+// Firebase RTDB es la fuente en vivo — releer directo es rápido (~150ms) y
+// siempre trae la versión sincronizada más reciente, sin comparar SHA.
 setInterval(() => {
-    _chequearActualizacionPrecios().then(hayNueva => {
-        if (!hayNueva) return;
-        fetch('https://api.github.com/repos/cahirth/Portal-TLC/contents/precios.json', { cache: 'no-store' })
-            .then(r => r.ok ? r.json() : null)
-            .then(meta => {
-                const sha = meta?.sha || '';
-                return fetch('./precios.json', { cache: 'no-store' })
-                    .then(r => r.ok ? r.json() : null)
-                    .then(data => ({ data, sha }));
-            })
-            .then(({ data, sha }) => {
-                if (!data || !data.length) return;
-                _guardarCachePrecios(data, sha);
-                dispositivos = data;
-                console.log('[Precios] 🔄 Polling: actualizado en background — ' + data.length + ' items');
-                if (typeof renderLista === 'function' && subcatActual) {
-                    const filtered = dispositivos.filter(d =>
-                        d['Categoria'] === catActual &&
-                        (subcatActual === 'TODAS' || d['Sub Categoria'] === subcatActual)
-                    );
-                    renderLista(filtered);
-                }
-            })
-            .catch(() => {});
-    });
+    _fetchPreciosFirebase()
+        .then(data => {
+            if (!data || !data.length) return;
+            _guardarCachePrecios(data, 'firebase');
+            dispositivos = data;
+            console.log('[Precios] 🔄 Polling Firebase: actualizado en background — ' + data.length + ' items');
+            if (typeof renderLista === 'function' && subcatActual) {
+                const filtered = dispositivos.filter(d =>
+                    d['Categoria'] === catActual &&
+                    (subcatActual === 'TODAS' || d['Sub Categoria'] === subcatActual)
+                );
+                renderLista(filtered);
+            }
+        })
+        .catch(() => {});
 }, 10 * 60 * 1000); // cada 10 minutos
 
 // ─── ARRANCAR ─────────────────────────────────────────────────────────────────
