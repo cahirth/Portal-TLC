@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.07.05.3 -->
+<!-- Portal TLC | index.html | v2026.07.05.4 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -348,7 +348,7 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
         <div class="header-title-block">
             <h1 id="txt-main-title">Portal TLC</h1>
             <p id="txt-sub-title" style="font-size:11px; color:var(--text-muted);">Menú Principal</p>
-            <p style="font-size:9px; color:var(--text-muted); opacity:.6; margin-top:1px;">v2026.07.05.3</p>
+            <p style="font-size:9px; color:var(--text-muted); opacity:.6; margin-top:1px;">v2026.07.05.4</p>
         </div>
         <div style="position:relative;" id="avatar-wrap-idx">
             <button id="header-avatar" onclick="toggleAvatarMenuIdx(event)"
@@ -1298,12 +1298,43 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
     // ════════════════════════════════════════════════════════════════
     const FIREBASE_DB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
 
-    function _fotoUrlSimple(foto) {
+    const FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+    let _ofertasFotoMap = null; // se carga una sola vez, lazy
+
+    async function _cargarOfertasFotoMap() {
+        if (_ofertasFotoMap) return _ofertasFotoMap;
+        try {
+            const res  = await fetch(FOTO_MAP_URL, { redirect: 'follow' });
+            const data = await res.json();
+            _ofertasFotoMap = (data && !data.error) ? data : {};
+        } catch (e) {
+            console.warn('[Ofertas] No se pudo cargar FotoMap:', e.message);
+            _ofertasFotoMap = {};
+        }
+        return _ofertasFotoMap;
+    }
+
+    // Resuelve la URL de la foto de un producto. Cubre 3 formatos:
+    // 1) lh3.googleusercontent.com directo
+    // 2) drive.google.com/file/d/ID/view  → se convierte a lh3
+    // 3) Ruta relativa "Fotos/nombre.png" → se busca en el FotoMap (misma
+    //    fuente que usa selector-dispositivos.html), probando primero la
+    //    versión .webp y luego el nombre original como fallback.
+    function _fotoUrlSimple(foto, fotoMap) {
         if (!foto) return '';
         const s = String(foto).trim();
         if (s.includes('lh3.googleusercontent.com')) return s;
+
         const mDrive = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
         if (mDrive) return `https://lh3.googleusercontent.com/d/${mDrive[1]}`;
+
+        const mFotos = s.match(/^Fotos\/(.+)$/i);
+        if (mFotos && fotoMap) {
+            const nombre    = mFotos[1].toLowerCase();
+            const nombreWebP = nombre.replace(/\.(png|jpg|jpeg)$/i, '.webp');
+            return fotoMap[nombreWebP] || fotoMap[nombre] || '';
+        }
+
         return '';
     }
 
@@ -1319,7 +1350,10 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
         if (!wrap || !scroll) return;
 
         try {
-            const resp = await fetch(FIREBASE_DB_URL + '/precios.json', { cache: 'no-store' });
+            const [resp, fotoMap] = await Promise.all([
+                fetch(FIREBASE_DB_URL + '/precios.json', { cache: 'no-store' }),
+                _cargarOfertasFotoMap(),
+            ]);
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
             const data = await resp.json();
             if (!data) return;
@@ -1331,8 +1365,7 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
 
             scroll.innerHTML = ofertas.map(p => {
                 const nombre = p['Nombre_de_Dispositivo'] || p['Nombre de Dispositivo'] || '';
-                const foto   = _fotoUrlSimple(p['Foto']);
-                console.log('[Ofertas]', nombre, '→ Foto raw:', p['Foto'], '→ URL:', foto);
+                const foto   = _fotoUrlSimple(p['Foto'], fotoMap);
                 return `
                     <div class="oferta-card" onclick="window.location.href='selector-dispositivos.html?oferta=${encodeURIComponent(nombre)}'">
                         <div class="oferta-card-foto">
