@@ -348,6 +348,7 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
         <div class="header-title-block">
             <h1 id="txt-main-title">Portal TLC</h1>
             <p id="txt-sub-title" style="font-size:11px; color:var(--text-muted);">Menú Principal</p>
+            <p style="font-size:9px; color:var(--text-muted); opacity:.6; margin-top:1px;">v2026.07.05.3</p>
         </div>
         <div style="position:relative;" id="avatar-wrap-idx">
             <button id="header-avatar" onclick="toggleAvatarMenuIdx(event)"
@@ -1345,10 +1346,44 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
             }).join('');
 
             wrap.style.display = 'block';
+            _iniciarAutoScrollOfertas(scroll);
 
         } catch (e) {
             console.warn('[Ofertas] No se pudo cargar el banner:', e.message);
         }
+    }
+
+    // Auto-scroll suave cada 1 segundo. Se pausa si el usuario interactúa
+    // (touch/mouse) y retoma después de unos segundos de inactividad.
+    let _ofertasAutoScrollTimer = null;
+    let _ofertasAutoScrollPausado = false;
+
+    function _iniciarAutoScrollOfertas(scroll) {
+        if (_ofertasAutoScrollTimer) clearInterval(_ofertasAutoScrollTimer);
+
+        const cardWidth = 132 + 10; // ancho de tarjeta + gap
+
+        _ofertasAutoScrollTimer = setInterval(() => {
+            if (_ofertasAutoScrollPausado) return;
+            const maxScroll = scroll.scrollWidth - scroll.clientWidth;
+            if (maxScroll <= 0) return; // no hay overflow, nada que scrollear
+
+            const proximo = scroll.scrollLeft + cardWidth;
+            if (proximo >= maxScroll - 5) {
+                scroll.scrollTo({ left: 0, behavior: 'smooth' }); // vuelve al inicio
+            } else {
+                scroll.scrollTo({ left: proximo, behavior: 'smooth' });
+            }
+        }, 1000);
+
+        const pausar = () => {
+            _ofertasAutoScrollPausado = true;
+            clearTimeout(scroll._resumeTimeout);
+            scroll._resumeTimeout = setTimeout(() => { _ofertasAutoScrollPausado = false; }, 4000);
+        };
+        scroll.addEventListener('touchstart', pausar, { passive: true });
+        scroll.addEventListener('mousedown', pausar);
+        scroll.addEventListener('wheel', pausar, { passive: true });
     }
 
     async function cargarRadar() {
