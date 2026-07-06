@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.05.3 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.05.4 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -2021,11 +2021,14 @@ async function cargarTodo() {
             });
             // Actualizar solo el grid de categorías sin cambiar la vista actual
             if (!catActual) renderCategorias();
-        });
 
-        // Deep-link ?oferta=NombreDelProducto — abre el detalle directo
-        // (usado por el banner de ofertas en index.html)
-        _abrirOfertaDesdeURL();
+            // Deep-link ?oferta=NombreDelProducto — abre el detalle directo
+            // (usado por el banner de ofertas en index.html). Se ejecuta
+            // DESPUÉS de que fotoMap esté listo, para que la foto del
+            // producto cargue bien la primera vez (antes se abría en paralelo
+            // y la foto quedaba vacía si el producto usaba ruta relativa).
+            _abrirOfertaDesdeURL();
+        });
 
     } catch(e) {
         document.getElementById('lista').innerHTML =
