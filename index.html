@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.07.05.2 -->
+<!-- Portal TLC | index.html | v2026.07.05.3 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -122,14 +122,14 @@
             color: var(--text-muted); display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
         }
         .ofertas-scroll {
-            display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden;
-            padding-bottom: 4px; margin-bottom: 18px; scroll-snap-type: x proximity;
-            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            display: flex; gap: 10px; overflow-x: scroll; overflow-y: hidden;
+            padding: 2px 2px 8px; margin: 0 -2px 4px;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none; touch-action: pan-x;
         }
         .ofertas-scroll::-webkit-scrollbar { display: none; }
         .oferta-card {
-            flex: 0 0 auto; width: 132px; background: var(--panel-dark); border: 1px solid var(--border-glow);
-            border-radius: 14px; overflow: hidden; cursor: pointer; scroll-snap-align: start;
+            flex: 0 0 132px; width: 132px; background: var(--panel-dark); border: 1px solid var(--border-glow);
+            border-radius: 14px; overflow: hidden; cursor: pointer;
             transition: transform 0.15s;
         }
         .oferta-card:active { transform: scale(0.96); }
@@ -437,14 +437,6 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
         <div class="app-view active" id="view-home">
 
             <!-- Banner de ofertas — scroll horizontal, solo productos con Oferta=TRUE -->
-            <div id="ofertas-wrap" style="display:none;">
-                <div class="ofertas-titulo">
-                    <i class="fa-solid fa-fire" style="color:#ff5fa8;"></i>
-                    Ofertas
-                </div>
-                <div class="ofertas-scroll" id="ofertas-scroll"></div>
-            </div>
-
             <div class="menu-list-stack">
                 <div class="menu-item-row" id="menu-ventas" onclick="abrirModuloConPermiso('view-ventas-menu', 'Ventas', 'Embudo Comercial', 'ventas')">
                     <div class="item-logo-container" style="overflow:hidden; padding:0;">
@@ -474,6 +466,14 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
                     <div class="item-text-box"><h3>Administración</h3><p>Gestión interna y reportes</p></div>
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
+            </div>
+
+            <div id="ofertas-wrap" style="display:none; margin-top:18px;">
+                <div class="ofertas-titulo">
+                    <i class="fa-solid fa-fire" style="color:#ff5fa8;"></i>
+                    Ofertas
+                </div>
+                <div class="ofertas-scroll" id="ofertas-scroll"></div>
             </div>
         </div>
         <div class="app-view" id="view-servicio-menu">
@@ -1331,11 +1331,11 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
             scroll.innerHTML = ofertas.map(p => {
                 const nombre = p['Nombre_de_Dispositivo'] || p['Nombre de Dispositivo'] || '';
                 const foto   = _fotoUrlSimple(p['Foto']);
-                const nombreEscapado = nombre.replace(/'/g, "\\'");
+                console.log('[Ofertas]', nombre, '→ Foto raw:', p['Foto'], '→ URL:', foto);
                 return `
                     <div class="oferta-card" onclick="window.location.href='selector-dispositivos.html?oferta=${encodeURIComponent(nombre)}'">
                         <div class="oferta-card-foto">
-                            ${foto ? `<img src="${foto}" loading="lazy" onerror="this.style.display='none'">` : ''}
+                            ${foto ? `<img src="${foto}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\\'fa-solid fa-image\\' style=\\'color:var(--text-muted);font-size:20px;\\'></i>';">` : `<i class="fa-solid fa-image" style="color:var(--text-muted);font-size:20px;"></i>`}
                         </div>
                         <div class="oferta-card-body">
                             <div class="oferta-badge">Oferta</div>
