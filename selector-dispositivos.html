@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.05.2 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.05.3 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -2023,6 +2023,10 @@ async function cargarTodo() {
             if (!catActual) renderCategorias();
         });
 
+        // Deep-link ?oferta=NombreDelProducto — abre el detalle directo
+        // (usado por el banner de ofertas en index.html)
+        _abrirOfertaDesdeURL();
+
     } catch(e) {
         document.getElementById('lista').innerHTML =
             `<div class="empty">❌ Error cargando datos: ${e.message}
@@ -2670,6 +2674,51 @@ function filtrar() {
 }
 
 // ─── DETALLE ─────────────────────────────────────────────────────────────────
+// Deep-link desde el banner de ofertas en index.html: ?oferta=NombreExacto
+// Busca el producto por nombre en el array completo (sin depender de
+// filtros de categoría/búsqueda activos) y abre su detalle directamente.
+function _abrirOfertaDesdeURL() {
+    const params = new URLSearchParams(window.location.search);
+    const nombreOferta = params.get('oferta');
+    if (!nombreOferta) return;
+
+    const producto = dispositivos.find(d =>
+        (d['Nombre de Dispositivo'] || '').trim() === nombreOferta.trim()
+    );
+    if (!producto) {
+        console.warn('[Ofertas] No se encontró el producto:', nombreOferta);
+        return;
+    }
+
+    // Activar la categoría y subcategoría del producto para que abrirDetalle
+    // pueda encontrarlo dentro de la lista filtrada
+    catActual    = producto['Categoria'] || '';
+    subcatActual = (producto['Sub Categoria'] || '').trim() || 'TODAS';
+
+    // Cambiar a la vista de lista de equipos
+    const catSelect = document.getElementById('categoria-select');
+    if (catSelect) catSelect.value = catActual;
+
+    const filtrados = dispositivos.filter(d => {
+        if (d['Categoria'] !== catActual) return false;
+        if (subcatActual !== 'TODAS' && (d['Sub Categoria'] || '').trim() !== subcatActual) return false;
+        return true;
+    });
+
+    renderLista(filtrados);
+
+    const idxEnLista = filtrados.indexOf(producto);
+    if (idxEnLista >= 0) {
+        // Pequeño delay para asegurar que el DOM de la lista ya se renderizó
+        setTimeout(() => abrirDetalle(idxEnLista), 50);
+    }
+
+    // Limpiar el parámetro de la URL para que un refresh no vuelva a abrir el modal
+    const url = new URL(window.location);
+    url.searchParams.delete('oferta');
+    window.history.replaceState({}, '', url);
+}
+
 function abrirDetalle(idx) {
     const q = sinAcentos((document.getElementById('buscador')?.value || '').trim());
     const filtrados = dispositivos.filter(d => {

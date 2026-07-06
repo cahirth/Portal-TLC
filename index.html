@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.07.05.1 -->
+<!-- Portal TLC | index.html | v2026.07.05.2 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -116,6 +116,42 @@
         .item-text-box h3 { font-size: 15px; color: var(--text-main); font-weight: 600; }
 
         /* ═══ TLC RADAR — Métricas + Pendientes (home) ═══ */
+        /* ── Banner de ofertas — scroll horizontal ── */
+        .ofertas-titulo {
+            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+            color: var(--text-muted); display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+        }
+        .ofertas-scroll {
+            display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden;
+            padding-bottom: 4px; margin-bottom: 18px; scroll-snap-type: x proximity;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+        }
+        .ofertas-scroll::-webkit-scrollbar { display: none; }
+        .oferta-card {
+            flex: 0 0 auto; width: 132px; background: var(--panel-dark); border: 1px solid var(--border-glow);
+            border-radius: 14px; overflow: hidden; cursor: pointer; scroll-snap-align: start;
+            transition: transform 0.15s;
+        }
+        .oferta-card:active { transform: scale(0.96); }
+        .oferta-card-foto {
+            width: 100%; height: 88px; background: #0a1628; display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .oferta-card-foto img { width: 100%; height: 100%; object-fit: cover; }
+        .oferta-card-body { padding: 8px 9px; }
+        .oferta-card-nombre {
+            font-size: 11px; font-weight: 700; color: var(--text-main); line-height: 1.25;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .oferta-badge {
+            display: inline-block; font-size: 8.5px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 0.4px; padding: 2px 6px; border-radius: 5px; margin-bottom: 5px;
+            background: rgba(255, 0, 127, 0.18); color: #ff5fa8; border: 1px solid rgba(255, 0, 127, 0.35);
+        }
+        body.tema-claro .oferta-card { background: #ffffff; border-color: #e2e8f0; }
+        body.tema-claro .oferta-card-foto { background: #f1f5f9; }
+        body.tema-claro .oferta-card-nombre { color: #0f172a; }
+
         .radar-metricas {
             display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
             margin-bottom: 16px;
@@ -399,6 +435,15 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
 
         <!-- ================= PANTALLA 1: MENÚ RAÍZ (HOME) ================= -->
         <div class="app-view active" id="view-home">
+
+            <!-- Banner de ofertas — scroll horizontal, solo productos con Oferta=TRUE -->
+            <div id="ofertas-wrap" style="display:none;">
+                <div class="ofertas-titulo">
+                    <i class="fa-solid fa-fire" style="color:#ff5fa8;"></i>
+                    Ofertas
+                </div>
+                <div class="ofertas-scroll" id="ofertas-scroll"></div>
+            </div>
 
             <div class="menu-list-stack">
                 <div class="menu-item-row" id="menu-ventas" onclick="abrirModuloConPermiso('view-ventas-menu', 'Ventas', 'Embudo Comercial', 'ventas')">
@@ -1216,6 +1261,7 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
             }
         });
         cargarRadar();
+        cargarBannerOfertas();
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -1241,6 +1287,68 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
         if (['Ganada', 'closedwon'].includes(e))                            return 'Ganada';
         if (['Perdida', 'closedlost'].includes(e))                          return 'Perdida';
         return e;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // BANNER DE OFERTAS — scroll horizontal en Home
+    // Fuente: Firebase RTDB /precios (misma que usa el selector), filtrado
+    // por Oferta=TRUE. Al tocar una tarjeta, va directo al detalle del
+    // producto en selector-dispositivos.html vía ?oferta=NombreExacto.
+    // ════════════════════════════════════════════════════════════════
+    const FIREBASE_DB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+
+    function _fotoUrlSimple(foto) {
+        if (!foto) return '';
+        const s = String(foto).trim();
+        if (s.includes('lh3.googleusercontent.com')) return s;
+        const mDrive = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (mDrive) return `https://lh3.googleusercontent.com/d/${mDrive[1]}`;
+        return '';
+    }
+
+    function _boolOferta(v) {
+        if (typeof v === 'boolean') return v;
+        const s = String(v || '').trim().toLowerCase();
+        return s === 'true' || s === 'verdadero' || s === '1' || s === 'si' || s === 'sí';
+    }
+
+    async function cargarBannerOfertas() {
+        const wrap   = document.getElementById('ofertas-wrap');
+        const scroll = document.getElementById('ofertas-scroll');
+        if (!wrap || !scroll) return;
+
+        try {
+            const resp = await fetch(FIREBASE_DB_URL + '/precios.json', { cache: 'no-store' });
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+            if (!data) return;
+
+            const productos = Object.values(data);
+            const ofertas = productos.filter(p => _boolOferta(p['Oferta']));
+
+            if (!ofertas.length) return; // sin ofertas activas → banner no se muestra
+
+            scroll.innerHTML = ofertas.map(p => {
+                const nombre = p['Nombre_de_Dispositivo'] || p['Nombre de Dispositivo'] || '';
+                const foto   = _fotoUrlSimple(p['Foto']);
+                const nombreEscapado = nombre.replace(/'/g, "\\'");
+                return `
+                    <div class="oferta-card" onclick="window.location.href='selector-dispositivos.html?oferta=${encodeURIComponent(nombre)}'">
+                        <div class="oferta-card-foto">
+                            ${foto ? `<img src="${foto}" loading="lazy" onerror="this.style.display='none'">` : ''}
+                        </div>
+                        <div class="oferta-card-body">
+                            <div class="oferta-badge">Oferta</div>
+                            <div class="oferta-card-nombre">${nombre}</div>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            wrap.style.display = 'block';
+
+        } catch (e) {
+            console.warn('[Ofertas] No se pudo cargar el banner:', e.message);
+        }
     }
 
     async function cargarRadar() {
