@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.06.28.1 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.06.1 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -738,9 +738,15 @@ async function _cargarVendedores(emailLogueado) {
     // Si el Sheet devolvió vacío, también usar fallback
     if (!listaVendedores.length) listaVendedores = VENDEDORES_FALLBACK;
     else {
-        // Combinar: agregar del fallback los que no estén en el Sheet
+        // Combinar: agregar del fallback los que no estén en el Sheet.
+        // Comparación normalizada (trim + lowercase) para email y nombre,
+        // evita duplicados por diferencias de capitalización.
+        const _normNombre = s => String(s || '').trim().toLowerCase();
         VENDEDORES_FALLBACK.forEach(fb => {
-            const yaExiste = listaVendedores.find(v => v.email === fb.email || v.nombre === fb.nombre);
+            const yaExiste = listaVendedores.find(v =>
+                _normNombre(v.email) === _normNombre(fb.email) ||
+                _normNombre(v.nombre) === _normNombre(fb.nombre)
+            );
             if (!yaExiste) listaVendedores.push(fb);
         });
     }
@@ -828,10 +834,14 @@ async function cargar(forzar = false) {
 
         historicoCompleto = data;
 
-        // Extraer vendedores únicos del JSON y mergear con listaVendedores del Sheet
+        // Extraer vendedores únicos del JSON y mergear con listaVendedores del Sheet.
+        // Comparación normalizada (trim + lowercase) para evitar duplicados como
+        // "Cristian Hirth" / "cristian hirth" que son la misma persona con
+        // distinta capitalización en el histórico vs el Sheet.
+        const _normalizarNombre = s => String(s || '').trim().toLowerCase();
         const vendedoresEnJSON = [...new Set(data.map(c => c.vendedor).filter(Boolean))];
         vendedoresEnJSON.forEach(nombre => {
-            const yaExiste = listaVendedores.find(v => v.nombre === nombre);
+            const yaExiste = listaVendedores.find(v => _normalizarNombre(v.nombre) === _normalizarNombre(nombre));
             if (!yaExiste) listaVendedores.push({ email: '', nombre, rol: 'Vendedor' });
         });
         // Reconstruir dropdown con la lista completa
