@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.06.4 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.06.5 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1399,7 +1399,7 @@
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.07.05.2"; console.log("%c TLC Portal v2026.07.05.2 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.07.06.5"; console.log("%c TLC Portal v2026.07.06.5 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 
 // Mapa nombre_archivo → URL lh3 (cargado desde Apps Script)
@@ -2006,6 +2006,19 @@ async function cargarTodo() {
         // Renderizar lista (vacía hasta que se elija categoría)
         renderLista([]);
 
+        // Deep-links — se ejecutan YA, apenas tenemos los precios (Firebase,
+        // ~100-200ms), sin esperar al FotoMap (Google Apps Script, ~1-3s).
+        // Si el producto usa una foto de ruta relativa (necesita FotoMap),
+        // abrirDetalle() la deja marcada con data-foto-key y el bloque de
+        // FotoMap de abajo la actualiza sola cuando esté lista — sin
+        // bloquear la apertura del detalle.
+        _abrirOfertaDesdeURL();
+
+        // Deep-link ?ticket=X — viene del botón "Generar Presupuesto"
+        // en servicio.html. Abre directo el modal de resumen con los
+        // datos del cliente/equipo ya precargados.
+        _leerParametrosTicketDesdeURL();
+
         // FotoMap en background — actualiza imágenes sin re-renderizar
         // Prueba la key WebP primero, luego la original como fallback
         cargarFotoMap().then(() => {
@@ -2021,18 +2034,6 @@ async function cargarTodo() {
             });
             // Actualizar solo el grid de categorías sin cambiar la vista actual
             if (!catActual) renderCategorias();
-
-            // Deep-link ?oferta=NombreDelProducto — abre el detalle directo
-            // (usado por el banner de ofertas en index.html). Se ejecuta
-            // DESPUÉS de que fotoMap esté listo, para que la foto del
-            // producto cargue bien la primera vez (antes se abría en paralelo
-            // y la foto quedaba vacía si el producto usaba ruta relativa).
-            _abrirOfertaDesdeURL();
-
-            // Deep-link ?ticket=X — viene del botón "Generar Presupuesto"
-            // en servicio.html. Abre directo el modal de resumen con los
-            // datos del cliente/equipo ya precargados.
-            _leerParametrosTicketDesdeURL();
         });
 
     } catch(e) {
@@ -2758,11 +2759,19 @@ function abrirDetalle(idx) {
     document.getElementById('detalle-nombre').textContent = nombre;
     document.getElementById('detalle-desc').textContent = desc;
 
-    // Foto
+    // Foto — si aún no resolvió (fotoMap sin cargar todavía), se marca con
+    // data-foto-key para que se actualice sola cuando FotoMap esté listo.
     const wrap = document.getElementById('detalle-foto-wrap');
+    const fotoRawDetalle = (d['Foto'] || '').toString().trim();
+    const fotoKeysDetalle = fotoKeyFromRaw(fotoRawDetalle);
+    const fotoKeyAttrDetalle = (!foto && fotoKeysDetalle.webp)
+        ? ` data-foto-key="${fotoKeysDetalle.webp}" data-foto-key-fallback="${fotoKeysDetalle.original}"`
+        : '';
     wrap.innerHTML = foto
         ? `<img class="detalle-foto" src="${foto}" onclick="abrirLightbox('${foto}')" style="cursor:zoom-in;" title="Tocar para ampliar" onerror="this.outerHTML='<div class=\\'detalle-foto-placeholder\\'>🔬</div>'">`
-        : `<div class="detalle-foto-placeholder">🔬</div>`;
+        : (fotoKeysDetalle.webp
+            ? `<img class="detalle-foto foto-pending"${fotoKeyAttrDetalle} src="" style="background:#0f1a30;min-height:180px;" onclick="this.src && abrirLightbox(this.src)">`
+            : `<div class="detalle-foto-placeholder">🔬</div>`);
 
     // Precio Lista (siempre mostrar si tiene valor)
     const precioLista = d['Precio LISTA'];
