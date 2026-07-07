@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.06.1 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.06.2 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -3575,34 +3575,44 @@ function _leerParametrosTicketDesdeURL() {
 
     _ticketVinculado = ticket;
 
-    const razonSocial = params.get('cliente') || '';
-    const marca       = params.get('marca')   || '';
-    const modelo      = params.get('modelo')  || '';
-    const serie       = params.get('serie')   || '';
-    const telefono    = params.get('telefono')|| '';
+    const razonSocial = params.get('cliente')  || '';
+    const marca       = params.get('marca')    || '';
+    const modelo      = params.get('modelo')   || '';
+    const serie       = params.get('serie')    || '';
+    const telefono    = params.get('telefono') || '';
     const domicilio   = params.get('domicilio')|| '';
 
-    // Guardamos para usar cuando se abra el modal de resumen
+    // Guardamos los datos del cliente para precargar el modal cuando el
+    // Admin arme el carrito y llegue a "Confirmar y enviar cotización".
+    // El carrito arranca vacío: el Admin elige manualmente los ítems de
+    // servicio (repuestos, mano de obra, etc.) desde la categoría Servicio.
     window._datosTicketPrecarga = {
-        razonSocial, marca, modelo, serie, telefono, domicilio,
-        equipoTexto: [marca, modelo].filter(Boolean).join(' '),
+        razonSocial, telefono, domicilio,
+        equipoTexto: [marca, modelo].filter(Boolean).join(' ') + (serie ? ' · S/N ' + serie : ''),
     };
 
-    console.log('[Ticket] Datos precargados desde servicio.html:', window._datosTicketPrecarga);
+    console.log('[Ticket] Vinculado a ticket ' + ticket + ' — datos de cliente listos para precargar');
 
-    // Abrir directo el modal de resumen con los datos ya cargados
+    // Pre-seleccionar la categoría "Servicio" para que el Admin arme
+    // el carrito directamente ahí, sin tener que buscarla.
     setTimeout(() => {
-        abrirModalResumen();
-        const d = window._datosTicketPrecarga;
-        const razEl = document.getElementById('mr-razon');
-        const telEl = document.getElementById('mr-telefono');
-        const domEl = document.getElementById('mr-domicilio');
-        const notasEl = document.getElementById('mr-notas');
-        if (razEl && d.razonSocial) razEl.value = d.razonSocial;
-        if (telEl && d.telefono)    telEl.value = d.telefono;
-        if (domEl && d.domicilio)   domEl.value = d.domicilio;
-        if (notasEl && d.equipoTexto) notasEl.value = 'Presupuesto técnico — Equipo: ' + d.equipoTexto + (serie ? ' · S/N ' + serie : '');
+        if (typeof abrirCategoria === 'function') abrirCategoria('Servicio');
     }, 300);
+}
+
+// Se llama al abrir el modal de resumen (abrirModalResumen) — si hay datos
+// de un ticket pendientes de precarga, completa razón social/teléfono/notas.
+function _aplicarPrecargaTicketSiCorresponde() {
+    const d = window._datosTicketPrecarga;
+    if (!d) return;
+    const razEl   = document.getElementById('mr-razon');
+    const telEl   = document.getElementById('mr-telefono');
+    const domEl   = document.getElementById('mr-domicilio');
+    const notasEl = document.getElementById('mr-notas');
+    if (razEl && d.razonSocial && !razEl.value) razEl.value = d.razonSocial;
+    if (telEl && d.telefono    && !telEl.value) telEl.value = d.telefono;
+    if (domEl && d.domicilio   && !domEl.value) domEl.value = d.domicilio;
+    if (notasEl && d.equipoTexto && !notasEl.value) notasEl.value = 'Presupuesto técnico — Equipo: ' + d.equipoTexto;
 }
 let _mrCompanyId    = null;   // ID empresa HubSpot resuelto por CUIT
 let _mrContactId    = null;   // ID contacto HubSpot resuelto por email
@@ -3996,6 +4006,11 @@ function abrirModalResumen() {
     // Generar ID al abrir el modal
     _idCotActual = generarIdCotizacion();
     document.getElementById('mr-id-display').textContent = _idCotActual;
+
+    // Si venimos de "Generar Presupuesto" en un ticket de Servicio Técnico,
+    // precargar cliente/teléfono/notas (una sola vez, no pisa si el usuario
+    // ya escribió algo manualmente).
+    _aplicarPrecargaTicketSiCorresponde();
 
     // Resetear estado
     document.getElementById('mr-resultado').style.display = 'none';
