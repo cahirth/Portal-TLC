@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.07.05.7 -->
+<!-- Portal TLC | index.html | v2026.07.07.1 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -446,7 +446,7 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
                     <div class="item-text-box"><h3>Ventas</h3><p>Cotizaciones y Pipeline Leads</p></div>
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
-                <div class="menu-item-row" id="menu-servicio" onclick="window.location.href='servicio.html'">
+                <div class="menu-item-row" id="menu-servicio" onclick="abrirUrlConPermiso('servicio.html', 'Servicio Técnico', 'servicio')">
                     <div class="item-logo-container" style="overflow:hidden; padding:0;">
                         <img src="https://lh3.googleusercontent.com/d/1HdFljwTWje8_7Yv3Muc2soSbZjKXy8_N" style="width:48px; height:48px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-microscope\'></i>'; this.parentElement.classList.add('logo-servicio');">
                     </div>
@@ -1539,6 +1539,19 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
         openModule(viewId, title, subtitle);
     }
 
+    // Igual que abrirModuloConPermiso, pero para módulos que navegan a un
+    // archivo HTML externo (ej: servicio.html) en vez de abrir una vista
+    // interna. Sin esto, el candado visual quedaba desconectado del click
+    // real y el módulo se abría igual aunque estuviera bloqueado.
+    function abrirUrlConPermiso(url, title, seccion) {
+        const el = document.getElementById('menu-' + seccion);
+        if (el && el.dataset.bloqueado === 'true') {
+            mostrarToast('🔒 Sin acceso a ' + title);
+            return;
+        }
+        window.location.href = url;
+    }
+
     function mostrarToast(msg) {
         const t = document.getElementById('toast-bar');
         const txt = document.getElementById('toast-text');
@@ -1678,6 +1691,18 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
             navigator.serviceWorker.register('sw.js')
                 .then(reg => console.log('SW registrado:', reg.scope))
                 .catch(err => console.log('SW error:', err));
+        });
+
+        // Cuando el SW nuevo toma control (después de subir una versión
+        // nueva del archivo), recarga automáticamente la página para que
+        // el usuario vea la actualización sin tener que hacerlo a mano.
+        let _swYaRecargo = false;
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'SW_UPDATED' && !_swYaRecargo) {
+                _swYaRecargo = true;
+                console.log('[SW] Nueva versión detectada, recargando...', event.data.version);
+                window.location.reload();
+            }
         });
     }
 
