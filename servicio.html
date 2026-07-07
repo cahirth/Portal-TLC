@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.06.26.3 -->
+<!-- Portal TLC | servicio.html | v2026.07.06.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -321,7 +321,7 @@ body.tema-claro #avatar-menu-st [style*="background:#0a1628"] { background:#ffff
           <div id="avatar-rol-st" style="display:inline-block;margin-top:4px;font-size:9px;font-weight:700;
                text-transform:uppercase;letter-spacing:0.6px;padding:1px 7px;border-radius:20px;
                background:rgba(58,134,255,.15);color:#3a86ff;border:1px solid rgba(58,134,255,.25);">—</div>
-          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.06.26.3</div>
+          <div style="margin-top:4px;font-size:9px;color:#334155;letter-spacing:0.3px;">v2026.07.06.1</div>
           <button onclick="_toggleAvatarMenuSt(event)" title="Cerrar" style="background:rgba(100,116,139,.15); border:1px solid #1e3050; border-radius:8px; color:#94a3b8; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:16px; line-height:1;">✕</button>
         </div>
       </div>
@@ -551,7 +551,7 @@ body.tema-claro #avatar-menu-st [style*="background:#0a1628"] { background:#ffff
 (function(){
 'use strict';
 
-console.log('%c Portal TLC | servicio.html | v2026.06.26.3 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+console.log('%c Portal TLC | servicio.html | v2026.07.06.1 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -559,6 +559,7 @@ var RTDB_URL    = 'https://portal-tlc-default-rtdb.firebaseio.com';
 var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY    = 'tlc_tema';
 var ORDEN_URL   = 'https://cahirth.github.io/Portal-TLC/orden-servicio.html?id=';
+var SELECTOR_URL = 'https://cahirth.github.io/Portal-TLC/selector-dispositivos.html';
 
 // ── Columnas del Kanban ───────────────────────────────────────────
 // ── D: ID internos fijos — labels editables desde RTDB /servicio_config/columnas ──
@@ -1125,8 +1126,11 @@ function _renderDetalle(t) {
     '<div class="btn-orden-row">' +
       '<a class="btn-orden" href="' + ORDEN_URL + encodeURIComponent(t.id_ticket) + '" target="_blank">' +
         '<i class="fa-solid fa-file-lines"></i> Ver Orden</a>' +
-      '<button class="btn-orden presupuesto" onclick="void(0)" title="Próximamente">' +
-        '<i class="fa-solid fa-file-invoice-dollar"></i> Generar Presupuesto</button>' +
+      (_permisos.admin
+        ? '<button class="btn-orden presupuesto" onclick="_generarPresupuestoTecnico(\'' + t.id_ticket + '\')">' +
+            '<i class="fa-solid fa-file-invoice-dollar"></i> ' + (t.presupuesto_link ? 'Modificar Presupuesto' : 'Generar Presupuesto') + '</button>'
+        : '<button class="btn-orden presupuesto" disabled title="Solo Administrador" style="opacity:.4;cursor:not-allowed;">' +
+            '<i class="fa-solid fa-file-invoice-dollar"></i> Presupuesto</button>') +
     '</div>' +
     '</div>' +
 
@@ -1281,6 +1285,28 @@ function _renderCamposTecnicos(t, puedeEditar) {
 
   // ── Presupuesto vinculado (activo desde presupuesto) ──
   var presupDisabled = (idxDep < FLUJO_ETAPAS.indexOf('presupuesto')) || soloLectura;
+  var historial = Array.isArray(t.presupuestos) ? t.presupuestos : [];
+  var historialHtml = '';
+  if (_permisos.admin && historial.length > 0) {
+    historialHtml = '<div style="margin-top:10px;border-top:1px solid var(--border-glow);padding-top:8px;">' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);margin-bottom:6px;">' +
+        'Historial de versiones (' + historial.length + ')' +
+      '</div>' +
+      historial.slice().reverse().map(function(v, i) {
+        var fechaLinda = '';
+        try { fechaLinda = new Date(v.fecha).toLocaleDateString('es-AR', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+        catch(e) { fechaLinda = v.fecha || '—'; }
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:11px;">' +
+          '<span style="color:var(--text-muted);">v' + v.version + ' · ' + fechaLinda + '</span>' +
+          '<span style="display:flex;align-items:center;gap:8px;">' +
+            (v.monto ? '<span style="font-weight:700;color:var(--text-main);">USD ' + Number(v.monto).toLocaleString('en-US') + '</span>' : '') +
+            (v.link ? '<a href="' + _esc(v.link) + '" target="_blank" style="color:#60a5fa;text-decoration:none;">Ver 🔗</a>' : '') +
+          '</span>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
   var presupHtml = '<div class="campo-tecnico-wrap">' +
     '<div class="campo-tecnico-label">Presupuesto vinculado ' + _campoBadge(dep,'presupuesto') + '</div>' +
     '<div class="presupuesto-wrap">' +
@@ -1297,6 +1323,7 @@ function _renderCamposTecnicos(t, puedeEditar) {
           (presupDisabled ? 'disabled' : 'onchange="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'presupuesto_aprobado\',this.checked)"') + '>' +
         '<span>Presupuesto aprobado por el cliente</span>' +
       '</label>' +
+      historialHtml +
     '</div>' +
   '</div>';
 
@@ -1329,6 +1356,26 @@ function _renderCamposTecnicos(t, puedeEditar) {
 }
 
 // ── Guardar campo técnico en RTDB ─────────────────────────────────
+// ── Generar/Modificar Presupuesto Técnico (solo Admin) ────────────
+// Abre el selector de dispositivos con datos pre-cargados del ticket.
+// El selector, al guardar la cotización, vuelve a escribir el link y
+// el registro en el historial de este ticket vía st_agregarPresupuesto.
+window._generarPresupuestoTecnico = function(id) {
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (!t) return;
+
+  var params = new URLSearchParams();
+  params.set('ticket', t.id_ticket);
+  if (t.cliente)       params.set('cliente', t.cliente);
+  if (t.equipo_marca)  params.set('marca', t.equipo_marca);
+  if (t.equipo_modelo) params.set('modelo', t.equipo_modelo);
+  if (t.equipo_serie)  params.set('serie', t.equipo_serie);
+  if (t.telefono)      params.set('telefono', t.telefono);
+  if (t.domicilio)     params.set('domicilio', t.domicilio);
+
+  window.open(SELECTOR_URL + '?' + params.toString(), '_blank');
+};
+
 window._guardarCampoTecnico = function(id, campo, valor) {
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
   if (t) t[campo] = valor;

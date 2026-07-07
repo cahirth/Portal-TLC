@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.05.4 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.06.1 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -2028,6 +2028,11 @@ async function cargarTodo() {
             // producto cargue bien la primera vez (antes se abría en paralelo
             // y la foto quedaba vacía si el producto usaba ruta relativa).
             _abrirOfertaDesdeURL();
+
+            // Deep-link ?ticket=X — viene del botón "Generar Presupuesto"
+            // en servicio.html. Abre directo el modal de resumen con los
+            // datos del cliente/equipo ya precargados.
+            _leerParametrosTicketDesdeURL();
         });
 
     } catch(e) {
@@ -3558,6 +3563,47 @@ function generarIdCotizacion() {
 let _blobUrlActual  = null;
 let _linkWspActual  = null;
 let _idCotActual    = null;
+let _ticketVinculado = null; // ID del ticket de servicio, si venimos de "Generar Presupuesto" en servicio.html
+
+// Lee ?ticket=X&cliente=Y&marca=...&modelo=...&serie=...&telefono=...&domicilio=...
+// desde la URL (llegan al hacer click en "Generar Presupuesto" desde un ticket
+// de Servicio Técnico) y precarga los datos del cliente en el modal de resumen.
+function _leerParametrosTicketDesdeURL() {
+    const params = new URLSearchParams(window.location.search);
+    const ticket = params.get('ticket');
+    if (!ticket) return;
+
+    _ticketVinculado = ticket;
+
+    const razonSocial = params.get('cliente') || '';
+    const marca       = params.get('marca')   || '';
+    const modelo      = params.get('modelo')  || '';
+    const serie       = params.get('serie')   || '';
+    const telefono    = params.get('telefono')|| '';
+    const domicilio   = params.get('domicilio')|| '';
+
+    // Guardamos para usar cuando se abra el modal de resumen
+    window._datosTicketPrecarga = {
+        razonSocial, marca, modelo, serie, telefono, domicilio,
+        equipoTexto: [marca, modelo].filter(Boolean).join(' '),
+    };
+
+    console.log('[Ticket] Datos precargados desde servicio.html:', window._datosTicketPrecarga);
+
+    // Abrir directo el modal de resumen con los datos ya cargados
+    setTimeout(() => {
+        abrirModalResumen();
+        const d = window._datosTicketPrecarga;
+        const razEl = document.getElementById('mr-razon');
+        const telEl = document.getElementById('mr-telefono');
+        const domEl = document.getElementById('mr-domicilio');
+        const notasEl = document.getElementById('mr-notas');
+        if (razEl && d.razonSocial) razEl.value = d.razonSocial;
+        if (telEl && d.telefono)    telEl.value = d.telefono;
+        if (domEl && d.domicilio)   domEl.value = d.domicilio;
+        if (notasEl && d.equipoTexto) notasEl.value = 'Presupuesto técnico — Equipo: ' + d.equipoTexto + (serie ? ' · S/N ' + serie : '');
+    }, 300);
+}
 let _mrCompanyId    = null;   // ID empresa HubSpot resuelto por CUIT
 let _mrContactId    = null;   // ID contacto HubSpot resuelto por email
 let _mrClienteValidado = false; // true cuando hay cliente confirmado en el wizard
@@ -4179,6 +4225,7 @@ async function generarPropuesta() {
                 vendedor:               vendedor,
                 linkPdf:                linkFinal,
                 carrito:                carritoDetallado,
+                ticket:                 _ticketVinculado || '', // vincula el presupuesto al ticket de Servicio Técnico
             })
         }).then(r => r.json()).then(reg => {
             if (reg.status === 'SUCCESS') console.log('✅ Sheets:', reg.id, '— fila', reg.fila);
