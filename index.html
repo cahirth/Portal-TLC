@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.07.07.1 -->
+<!-- Portal TLC | index.html | v2026.07.07.3 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -27,7 +27,8 @@
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: #030712; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; margin: 0; padding: 0; }
+        body { background-color: #030712; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; margin: 0; padding: 0; overscroll-behavior-x: none; }
+        html { overscroll-behavior-x: none; }
 
         /* MOBILE: full screen sin borde */
         .phone-container {
@@ -1350,10 +1351,13 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
         if (!wrap || !scroll) return;
 
         try {
-            const [resp, fotoMap] = await Promise.all([
-                fetch(FIREBASE_DB_URL + '/precios.json', { cache: 'no-store' }),
-                _cargarOfertasFotoMap(),
-            ]);
+            // Solo esperamos Firebase (~100-200ms) — el FotoMap (Google Apps
+            // Script, puede tardar 1-3s) se pide en paralelo pero NO bloquea
+            // el render del banner. Las fotos que dependan de él se completan
+            // solas cuando esté listo, igual que en selector-dispositivos.html.
+            const fotoMapPromise = _cargarOfertasFotoMap();
+
+            const resp = await fetch(FIREBASE_DB_URL + '/precios.json', { cache: 'no-store' });
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
             const data = await resp.json();
             if (!data) return;
@@ -1363,13 +1367,22 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
 
             if (!ofertas.length) return; // sin ofertas activas → banner no se muestra
 
-            scroll.innerHTML = ofertas.map(p => {
+            scroll.innerHTML = ofertas.map((p, idx) => {
                 const nombre = p['Nombre_de_Dispositivo'] || p['Nombre de Dispositivo'] || '';
-                const foto   = _fotoUrlSimple(p['Foto'], fotoMap);
+                // Resolver con lo que ya tenemos (lh3/drive directo funciona ya).
+                // Si depende del FotoMap (ruta relativa "Fotos/..."), queda
+                // marcada con data-oferta-foto-raw para completarse después.
+                const fotoRaw = (p['Foto'] || '').toString().trim();
+                const foto = _fotoUrlSimple(fotoRaw, null);
+                const necesitaFotoMap = !foto && fotoRaw;
+
                 return `
                     <div class="oferta-card" onclick="window.location.href='selector-dispositivos.html?oferta=${encodeURIComponent(nombre)}'">
-                        <div class="oferta-card-foto">
-                            ${foto ? `<img src="${foto}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\\'fa-solid fa-image\\' style=\\'color:var(--text-muted);font-size:20px;\\'></i>';">` : `<i class="fa-solid fa-image" style="color:var(--text-muted);font-size:20px;"></i>`}
+                        <div class="oferta-card-foto" id="oferta-foto-${idx}" ${necesitaFotoMap ? `data-oferta-foto-raw="${_escAttr(fotoRaw)}"` : ''}>
+                            ${foto
+                                ? `<img src="${foto}" loading="lazy" onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\\'fa-solid fa-image\\' style=\\'color:var(--text-muted);font-size:20px;\\'></i>';">`
+                                : `<i class="fa-solid fa-image" style="color:var(--text-muted);font-size:20px;"></i>`
+                            }
                         </div>
                         <div class="oferta-card-body">
                             <div class="oferta-badge">Oferta</div>
@@ -1381,9 +1394,24 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
             wrap.style.display = 'block';
             _iniciarAutoScrollOfertas(scroll);
 
+            // Cuando el FotoMap termine, completar las fotos pendientes
+            fotoMapPromise.then(fotoMap => {
+                document.querySelectorAll('[data-oferta-foto-raw]').forEach(el => {
+                    const raw = el.dataset.ofertaFotoRaw;
+                    const url = _fotoUrlSimple(raw, fotoMap);
+                    if (url) {
+                        el.innerHTML = `<img src="${url}" loading="lazy" onerror="this.style.display='none'">`;
+                    }
+                });
+            });
+
         } catch (e) {
             console.warn('[Ofertas] No se pudo cargar el banner:', e.message);
         }
+    }
+
+    function _escAttr(s) {
+        return String(s || '').replace(/"/g, '&quot;');
     }
 
     // Auto-scroll suave cada 1 segundo. Se pausa si el usuario interactúa
@@ -1563,7 +1591,11 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
 
     let navigationHistory = [];
 
-    // Sistema de navegación nativo multidireccional con memoria de capas
+    // Sistema de navegación nativo multidireccional con memoria de capas.
+    // Cada vez que se abre un módulo, se agrega una entrada al historial
+    // real del navegador (history.pushState) para que el gesto de swipe
+    // back (mobile) o el botón físico "atrás" disparen nuestro propio
+    // handleBackNavigation() en vez de sacar al usuario de la PWA.
     function openModule(viewId, title, subtitle) {
         let currentActive = document.querySelector('.app-view.active');
         let currentActiveId = currentActive ? currentActive.id : 'view-home';
@@ -1574,11 +1606,22 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
                 title: document.getElementById('txt-main-title').innerText,
                 subtitle: document.getElementById('txt-sub-title').innerText
             });
+            try { history.pushState({ tlcView: viewId }, '', '#' + viewId); } catch(e) {}
         }
         executeSwitch(viewId, title, subtitle);
         if (viewId === 'view-cotizaciones') cargarCotizaciones();
         if (viewId === 'form-recepcion') initRecepcionForm();
     }
+
+    // Intercepta el gesto de swipe-back / botón atrás del navegador y lo
+    // redirige a la navegación interna de la PWA, en vez de dejar que el
+    // navegador salga de la página o vuelva a un estado anterior real.
+    window.addEventListener('popstate', function(event) {
+        if (navigationHistory.length > 0) {
+            handleBackNavigation();
+            try { history.pushState({ tlcView: 'guard' }, '', window.location.pathname); } catch(e) {}
+        }
+    });
 
     function executeSwitch(targetViewId, title, subtitle) {
         document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
@@ -1686,6 +1729,11 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
 
 
 <script>
+    // Estado inicial en el historial real del navegador, para que el
+    // primer gesto de swipe-back tenga algo que interceptar en vez de
+    // sacar directo al usuario de la PWA.
+    try { history.replaceState({ tlcView: 'view-home' }, '', window.location.pathname); } catch(e) {}
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js')

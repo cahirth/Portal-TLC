@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.06.5 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.07.1 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -3677,10 +3677,16 @@ function _mrRenderPaso2() {
         const hayDesc = dVal > 0;
         const sinIva  = ivaPct === null;
 
-        // Ítems "genéricos" (precio de lista = 0, típicamente productos tipo
-        // "SERVICIO" cargados en el Sheet sin precio fijo, para reparaciones
-        // o trabajos a medida) permiten editar nombre y precio de lista inline.
-        const esEditable = item.editable === true || !(item.precioLista > 0);
+        // Ítems editables inline (nombre + precio de lista):
+        // (1) categoría "Servicio Técnico" — siempre editable, porque cada
+        //     ticket es un trabajo distinto (mano de obra, repuestos, etc.)
+        //     aunque el producto tenga un precio base cargado en el Sheet.
+        // (2) cualquier ítem con precio de lista = 0 — típicamente productos
+        //     genéricos tipo "SERVICIO" sin precio fijo predefinido.
+        const categoriaItem = (item._data && item._data['Categoria']) || '';
+        const esEditable = item.editable === true
+            || categoriaItem === 'SERV_TECNICO'
+            || !(item.precioLista > 0);
 
         return `<div class="mr-item-card" id="mr-item-card-${idx}">
 
