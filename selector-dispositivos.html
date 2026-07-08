@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.07.6 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.07.7 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1409,7 +1409,7 @@
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.07.07.5"; console.log("%c TLC Portal v2026.07.07.5 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.07.07.7"; console.log("%c TLC Portal v2026.07.07.7 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 
 // Mapa nombre_archivo → URL lh3 (cargado desde Apps Script)
@@ -3933,15 +3933,12 @@ function _mrActualizarTotalesPaso2() {
 // Cambia la moneda de UN solo ítem del carrito, convirtiendo el precio
 // (y el descuento, si está en valor absoluto) con el TC BNA vendedor.
 function _mrCambiarMonedaItem(idx, monedaDestino) {
-    console.log('[Moneda] _mrCambiarMonedaItem llamada — idx:', idx, 'destino:', monedaDestino, '_tcBNA:', _tcBNA);
     const item = carrito[idx];
-    if (!item) { console.log('[Moneda] item no encontrado en idx', idx); return; }
+    if (!item) return;
     const monedaActual = item.moneda || 'USD';
-    console.log('[Moneda] item:', item.nombre, '| monedaActual:', monedaActual, '| precioLista antes:', item.precioLista);
-    if (monedaActual === monedaDestino) { console.log('[Moneda] ya está en esa moneda, no hace nada'); return; }
+    if (monedaActual === monedaDestino) return; // ya está en esa moneda
 
     if (!_tcBNA) {
-        console.log('[Moneda] _tcBNA no disponible todavía');
         alert('El tipo de cambio BNA todavía no cargó. Esperá unos segundos e intentá de nuevo.');
         return;
     }
@@ -3953,7 +3950,6 @@ function _mrCambiarMonedaItem(idx, monedaDestino) {
         item.precioLista = Math.round((precioActual / _tcBNA) * 100) / 100;
     }
     item.moneda = monedaDestino;
-    console.log('[Moneda] precioLista después:', item.precioLista, '| moneda:', item.moneda);
 
     if (item.descuentoTipo === 'USD' || item.descuentoTipo === 'ARS') {
         const descActual = parseFloat(item.descuentoValor) || 0;
@@ -4674,10 +4670,20 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
     const wspLinkPresup = '';
 
     // ── Totales reales con descuento e IVA por ítem ──────────────
+    // Cada ítem puede estar en su propia moneda (item.moneda); todos se
+    // convierten a la moneda de presentación elegida (_mrMonedaTotales)
+    // usando el TC BNA vendedor antes de sumar.
+    const _monedaPresupTotales = (typeof _mrMonedaTotales !== 'undefined' && _mrMonedaTotales) || 'USD';
     let netoTotal = 0, ivaTotal = 0;
     carrito.forEach(function(item) {
         const qty    = item.cantidad || 1;
-        const base   = (opt.key === 'CONTADO') ? (item.precioCNO || item.precioLista || 0) : (item.precioLista || 0);
+        const monedaItem = item.moneda || 'USD';
+        const precioRaw = (opt.key === 'CONTADO') ? (item.precioCNO || item.precioLista || 0) : (item.precioLista || 0);
+        let base = precioRaw;
+        if (monedaItem !== _monedaPresupTotales && typeof _tcBNA !== 'undefined' && _tcBNA) {
+            if (monedaItem === 'USD' && _monedaPresupTotales === 'ARS') base = precioRaw * _tcBNA;
+            else if (monedaItem === 'ARS' && _monedaPresupTotales === 'USD') base = precioRaw / _tcBNA;
+        }
         const bruto  = base * qty;
         const dVal   = parseFloat(item.descuentoValor) || 0;
         const dTipo  = item.descuentoTipo || '%';
@@ -4689,9 +4695,24 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
     const totalConIva = netoTotal + ivaTotal;
 
     // ── Filas de productos ────────────────────────────────────────
+    // Moneda elegida para mostrar el presupuesto final (default: la que
+    // el usuario configuró con "Convertir todo a" en el modal, USD si no
+    // se tocó nada). Cada ítem puede tener su propia moneda (item.moneda);
+    // se convierte a la moneda de presentación elegida usando el TC BNA.
+    const monedaPresupuesto = (typeof _mrMonedaTotales !== 'undefined' && _mrMonedaTotales) || 'USD';
+    const fmtSegunMoneda = (n) => monedaPresupuesto === 'ARS' ? fmtARS(n) : fmtUSD(n);
+    const etiquetaMonedaPresup = monedaPresupuesto === 'ARS' ? 'AR$' : 'USD';
+
     const filasProductos = carrito.map(function(i) {
         const qty    = i.cantidad || 1;
-        const base   = (opt.key === 'CONTADO') ? (i.precioCNO || i.precioLista || 0) : (i.precioLista || 0);
+        const monedaItem = i.moneda || 'USD';
+        const precioRaw = (opt.key === 'CONTADO') ? (i.precioCNO || i.precioLista || 0) : (i.precioLista || 0);
+        // Convertir el precio del ítem a la moneda de presentación elegida
+        let base = precioRaw;
+        if (monedaItem !== monedaPresupuesto && typeof _tcBNA !== 'undefined' && _tcBNA) {
+            if (monedaItem === 'USD' && monedaPresupuesto === 'ARS') base = precioRaw * _tcBNA;
+            else if (monedaItem === 'ARS' && monedaPresupuesto === 'USD') base = precioRaw / _tcBNA;
+        }
         const bruto  = base * qty;
         const dVal   = parseFloat(i.descuentoValor) || 0;
         const dTipo  = i.descuentoTipo || '%';
@@ -4725,12 +4746,12 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
             '<\/div><\/div>',
             '<\/td>',
             '<td style="padding:14px 10px;text-align:right;vertical-align:top;width:130px;">',
-            '<div style="font-size:13px;color:#374151;">USD &nbsp;' + fmtUSD(base).replace('USD ','') + '<\/div>',
-            hayDesc ? '<div style="font-size:11px;color:#64748b;">Descuento ' + (dTipo==='%' ? dVal.toFixed(0)+',00 %' : 'USD ' + dVal.toFixed(2)) + '<\/div>' : '',
+            '<div style="font-size:13px;color:#374151;">' + etiquetaMonedaPresup + ' &nbsp;' + fmtSegunMoneda(base).replace(etiquetaMonedaPresup + ' ','').replace('USD ','').replace('AR$ ','') + '<\/div>',
+            hayDesc ? '<div style="font-size:11px;color:#64748b;">Descuento ' + (dTipo==='%' ? dVal.toFixed(0)+',00 %' : etiquetaMonedaPresup + ' ' + dVal.toFixed(2)) + '<\/div>' : '',
             '<\/td>',
             '<td style="padding:14px 10px;text-align:right;vertical-align:top;width:130px;">',
-            '<div style="font-size:13px;font-weight:600;color:#0f172a;">USD &nbsp;' + fmtUSD(bruto).replace('USD ','') + '<\/div>',
-            hayDesc ? '<div style="font-size:12px;color:#dc2626;">USD &nbsp;\u2212' + fmtUSD(descMonto).replace('USD ','') + '<\/div>' : '',
+            '<div style="font-size:13px;font-weight:600;color:#0f172a;">' + etiquetaMonedaPresup + ' &nbsp;' + fmtSegunMoneda(bruto).replace(etiquetaMonedaPresup + ' ','').replace('USD ','').replace('AR$ ','') + '<\/div>',
+            hayDesc ? '<div style="font-size:12px;color:#dc2626;">' + etiquetaMonedaPresup + ' &nbsp;\u2212' + fmtSegunMoneda(descMonto).replace(etiquetaMonedaPresup + ' ','').replace('USD ','').replace('AR$ ','') + '<\/div>' : '',
             '<\/td>',
             '<\/tr>'
         ].join('');
@@ -4904,9 +4925,9 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         // Tabla totales — alineada a la derecha, ancho contenido
         '<div style="display:flex;justify-content:flex-end;margin-bottom:16px;">',
         '<table style="border-collapse:collapse;min-width:260px;">',
-        '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">Subtotal<\/td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>USD<\/strong> &nbsp;' + fmtUSD(netoTotal).replace('USD ','') + '<\/td><\/tr>',
-        '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">IVA<\/td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>USD<\/strong> &nbsp;' + fmtUSD(ivaTotal).replace('USD ','') + '<\/td><\/tr>',
-        '<tr style="border-top:2px solid #0f172a;"><td style="padding:8px 8px;font-size:14px;font-weight:700;">Total<\/td><td style="padding:8px 8px;text-align:right;font-size:14px;font-weight:700;"><strong>USD<\/strong> &nbsp;' + fmtUSD(totalConIva).replace('USD ','') + '<\/td><\/tr>',
+        '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">Subtotal<\/td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>' + etiquetaMonedaPresup + '<\/strong> &nbsp;' + fmtSegunMoneda(netoTotal).replace('USD ','').replace('AR$ ','') + '<\/td><\/tr>',
+        '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">IVA<\/td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>' + etiquetaMonedaPresup + '<\/strong> &nbsp;' + fmtSegunMoneda(ivaTotal).replace('USD ','').replace('AR$ ','') + '<\/td><\/tr>',
+        '<tr style="border-top:2px solid #0f172a;"><td style="padding:8px 8px;font-size:14px;font-weight:700;">Total<\/td><td style="padding:8px 8px;text-align:right;font-size:14px;font-weight:700;"><strong>' + etiquetaMonedaPresup + '<\/strong> &nbsp;' + fmtSegunMoneda(totalConIva).replace('USD ','').replace('AR$ ','') + '<\/td><\/tr>',
         '<\/table>',
         '<\/div>',
 
