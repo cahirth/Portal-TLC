@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.07.07.4 -->
+<!-- Portal TLC | index.html | v2026.07.07.5 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1211,7 +1211,7 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
     // Placeholder de arranque (mientras carga el Sheet) — el valor real y
     // definitivo de verComisiones viene SIEMPRE de la columna "Ver Comisiones"
     // en cargarPermisosUsuario(), independiente del rol.
-    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, verComisiones: false, rol: 'Administrador' };
+    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, tareas: true, verComisiones: false, rol: 'Administrador' };
 
     async function cargarPermisosUsuario(email) {
         try {
@@ -1228,6 +1228,7 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
             const servicioIdx= cols.indexOf('Servicio Tecnico');
             const comexIdx   = cols.indexOf('Comercio Exterior');
             const adminIdx   = cols.indexOf('Administracion');
+            const tareasIdx  = cols.indexOf('Tareas');
             const comisionesIdx = cols.indexOf('Ver Comisiones');
 
             const fila = rows.find(r => {
@@ -1247,11 +1248,12 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
                     servicio:      bool(servicioIdx),
                     comex:         bool(comexIdx),
                     admin:         bool(adminIdx),
+                    tareas:        bool(tareasIdx),
                     verComisiones: bool(comisionesIdx),
                 };
             } else {
                 // Email no encontrado → acceso mínimo
-                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, verComisiones: false };
+                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, verComisiones: false };
             }
         } catch(e) {
             console.warn('Error cargando permisos:', e);
@@ -1266,7 +1268,7 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
             { id: 'menu-servicio', permiso: userPermisos.servicio },
             { id: 'menu-comex',    permiso: userPermisos.comex },
             { id: 'menu-admin',    permiso: userPermisos.admin },
-            { id: 'menu-tareas',   permiso: true }, // módulo en construcción, abierto para todos por ahora
+            { id: 'menu-tareas',   permiso: userPermisos.tareas },
         ];
         secciones.forEach(({ id, permiso }) => {
             const el = document.getElementById(id);
