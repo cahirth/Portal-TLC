@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.07.5 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.07.6 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -3933,12 +3933,15 @@ function _mrActualizarTotalesPaso2() {
 // Cambia la moneda de UN solo ítem del carrito, convirtiendo el precio
 // (y el descuento, si está en valor absoluto) con el TC BNA vendedor.
 function _mrCambiarMonedaItem(idx, monedaDestino) {
+    console.log('[Moneda] _mrCambiarMonedaItem llamada — idx:', idx, 'destino:', monedaDestino, '_tcBNA:', _tcBNA);
     const item = carrito[idx];
-    if (!item) return;
+    if (!item) { console.log('[Moneda] item no encontrado en idx', idx); return; }
     const monedaActual = item.moneda || 'USD';
-    if (monedaActual === monedaDestino) return; // ya está en esa moneda
+    console.log('[Moneda] item:', item.nombre, '| monedaActual:', monedaActual, '| precioLista antes:', item.precioLista);
+    if (monedaActual === monedaDestino) { console.log('[Moneda] ya está en esa moneda, no hace nada'); return; }
 
     if (!_tcBNA) {
+        console.log('[Moneda] _tcBNA no disponible todavía');
         alert('El tipo de cambio BNA todavía no cargó. Esperá unos segundos e intentá de nuevo.');
         return;
     }
@@ -3950,6 +3953,7 @@ function _mrCambiarMonedaItem(idx, monedaDestino) {
         item.precioLista = Math.round((precioActual / _tcBNA) * 100) / 100;
     }
     item.moneda = monedaDestino;
+    console.log('[Moneda] precioLista después:', item.precioLista, '| moneda:', item.moneda);
 
     if (item.descuentoTipo === 'USD' || item.descuentoTipo === 'ARS') {
         const descActual = parseFloat(item.descuentoValor) || 0;
