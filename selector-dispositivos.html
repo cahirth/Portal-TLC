@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.07.1 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.07.2 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1304,6 +1304,16 @@
 
             <!-- Grilla ítems con descuento -->
             <div id="mr-paso2-items" style="margin-bottom:12px;"></div>
+
+            <!-- Selector global de moneda: convierte TODOS los ítems de una -->
+            <div id="mr-moneda-global-wrap" style="display:flex; align-items:center; gap:8px; margin-bottom:12px; padding:8px 10px; background:rgba(58,134,255,.06); border:1px solid rgba(58,134,255,.2); border-radius:10px;">
+                <span style="font-size:11px; color:#64748b; font-weight:600; white-space:nowrap;">Convertir todo a:</span>
+                <div class="desc-tipo-toggle" style="flex:1;">
+                    <button type="button" class="desc-tipo-btn" onclick="_mrConvertirMonedaGlobal('USD')" style="flex:1;">USD</button>
+                    <button type="button" class="desc-tipo-btn" onclick="_mrConvertirMonedaGlobal('ARS')" style="flex:1;">ARS</button>
+                </div>
+                <span id="mr-tc-bna-label" style="font-size:10px; color:#64748b; white-space:nowrap;"></span>
+            </div>
 
             <!-- Totales dinámicos -->
             <div id="mr-paso2-totales" style="margin-bottom:16px;"></div>
@@ -3666,7 +3676,11 @@ function _mrRenderPaso2() {
 
     const itemsHtml = carrito.map((item, idx) => {
         const qty    = item.cantidad || 1;
-        const base   = mod.usaCNO ? (item.precioCNO || item.precioLista || 0) : (item.precioLista || 0);
+        const monedaItem = item.moneda || 'USD'; // 'USD' o 'ARS'
+        // base siempre en USD para los cálculos de descuento/IVA/totales;
+        // si el ítem está en ARS, se convierte con el TC BNA vendedor.
+        const precioListaRaw = mod.usaCNO ? (item.precioCNO || item.precioLista || 0) : (item.precioLista || 0);
+        const base   = monedaItem === 'ARS' && _tcBNA ? (precioListaRaw / _tcBNA) : precioListaRaw;
         const bruto  = base * qty;
         const dVal   = parseFloat(item.descuentoValor) || 0;
         const dTipo  = item.descuentoTipo || '%';
@@ -3701,12 +3715,17 @@ function _mrRenderPaso2() {
                              placeholder="Descripción del servicio...">`
                         : `<div class="mr-item-nombre" style="font-size:13px; font-weight:700; line-height:1.3;">${item.nombre}</div>`
                     }
-                    <div style="font-size:11px; color:#64748b; margin-top:2px; display:flex; align-items:center; gap:5px;">
+                    <div style="font-size:11px; color:#64748b; margin-top:2px; display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
                         ${esEditable
-                            ? `<span>USD</span><input type="number" min="0" step="any" value="${item.precioLista || 0}"
+                            ? `<select onchange="carrito[${idx}].moneda=this.value; _mrRenderPaso2();"
+                                 style="background:transparent;border:none;border-bottom:1px dashed #475569;color:inherit;font-size:11px;padding:1px 0;outline:none;cursor:pointer;">
+                                 <option value="USD" ${monedaItem==='USD'?'selected':''}>USD</option>
+                                 <option value="ARS" ${monedaItem==='ARS'?'selected':''}>ARS</option>
+                               </select>
+                               <input type="number" min="0" step="any" value="${precioListaRaw || 0}"
                                  style="width:70px;background:transparent;border:none;border-bottom:1px dashed #475569;color:inherit;font-size:11px;padding:1px 2px;outline:none;"
                                  onblur="carrito[${idx}].precioLista=parseFloat(this.value)||0; _mrRenderPaso2();"> lista`
-                            : `${fmtUSD(base)} lista`
+                            : `${monedaItem === 'ARS' ? fmtARS(precioListaRaw) : fmtUSD(base)} lista`
                         }
                         ${hayDesc ? `<span style="color:#f8961e;"> · −${dTipo==='%' ? dVal+'%' : fmtUSD(dVal)}</span>` : ''}
                     </div>
@@ -3842,7 +3861,12 @@ function _mrActualizarTotalesPaso2() {
 
     carrito.forEach(item => {
         const qty   = item.cantidad || 1;
-        const base  = mod.usaCNO ? (item.precioCNO || item.precioLista || 0) : (item.precioLista || 0);
+        const monedaItem = item.moneda || 'USD';
+        const precioListaRaw = mod.usaCNO ? (item.precioCNO || item.precioLista || 0) : (item.precioLista || 0);
+        // Convertir siempre a USD para totalizar (si el ítem está en ARS
+        // y no hay TC disponible todavía, se toma como si ya fuera USD
+        // para no romper el cálculo — se corrige apenas el TC BNA cargue).
+        const base  = monedaItem === 'ARS' && _tcBNA ? (precioListaRaw / _tcBNA) : precioListaRaw;
         const bruto = base * qty;
         const dVal  = parseFloat(item.descuentoValor) || 0;
         const dTipo = item.descuentoTipo || '%';
@@ -3874,6 +3898,44 @@ function _mrActualizarTotalesPaso2() {
             <span style="color:${colorAccent};">${fmtUSD(totalConIva)}</span>
         </div>
     `;
+
+    // Actualizar label de TC BNA en el selector global de moneda
+    const tcLabel = document.getElementById('mr-tc-bna-label');
+    if (tcLabel) tcLabel.textContent = _tcBNA ? `TC: $${_tcBNA.toLocaleString('es-AR')}` : '';
+}
+
+// Convierte TODOS los ítems del carrito a la moneda elegida (USD o ARS),
+// recalculando precioLista con el TC BNA vendedor. Si algún ítem ya está
+// en esa moneda, se deja igual (no se vuelve a convertir).
+function _mrConvertirMonedaGlobal(monedaDestino) {
+    if (!_tcBNA) {
+        alert('El tipo de cambio BNA todavía no cargó. Esperá unos segundos e intentá de nuevo.');
+        return;
+    }
+    carrito.forEach(item => {
+        const monedaActual = item.moneda || 'USD';
+        if (monedaActual === monedaDestino) return; // ya está en esa moneda
+
+        const precioActual = item.precioLista || 0;
+        if (monedaActual === 'USD' && monedaDestino === 'ARS') {
+            item.precioLista = Math.round(precioActual * _tcBNA);
+        } else if (monedaActual === 'ARS' && monedaDestino === 'USD') {
+            item.precioLista = Math.round((precioActual / _tcBNA) * 100) / 100;
+        }
+        item.moneda = monedaDestino;
+
+        // Si el ítem tenía descuento en valor absoluto (no %), también
+        // hay que convertirlo para que siga representando el mismo monto.
+        if (item.descuentoTipo === 'USD' || item.descuentoTipo === 'ARS') {
+            const descActual = parseFloat(item.descuentoValor) || 0;
+            if (monedaActual === 'USD' && monedaDestino === 'ARS') {
+                item.descuentoValor = Math.round(descActual * _tcBNA);
+            } else if (monedaActual === 'ARS' && monedaDestino === 'USD') {
+                item.descuentoValor = Math.round((descActual / _tcBNA) * 100) / 100;
+            }
+        }
+    });
+    _mrRenderPaso2();
 }
 
 // ─── BUSCADOR UNIVERSAL ───────────────────────────────────────────
