@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.07.4 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.07.5 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1309,8 +1309,8 @@
             <div id="mr-moneda-global-wrap" style="display:flex; align-items:center; gap:8px; margin-bottom:12px; padding:8px 10px; background:rgba(58,134,255,.06); border:1px solid rgba(58,134,255,.2); border-radius:10px;">
                 <span style="font-size:11px; color:#64748b; font-weight:600; white-space:nowrap;">Convertir todo a:</span>
                 <div class="desc-tipo-toggle" style="flex:1;">
-                    <button type="button" class="desc-tipo-btn" onclick="_mrConvertirMonedaGlobal('USD')" style="flex:1;">USD</button>
-                    <button type="button" class="desc-tipo-btn" onclick="_mrConvertirMonedaGlobal('ARS')" style="flex:1;">ARS</button>
+                    <button type="button" class="desc-tipo-btn active" data-moneda="USD" onclick="_mrConvertirMonedaGlobal('USD')" style="flex:1;">USD</button>
+                    <button type="button" class="desc-tipo-btn" data-moneda="ARS" onclick="_mrConvertirMonedaGlobal('ARS')" style="flex:1;">ARS</button>
                 </div>
                 <span id="mr-tc-bna-label" style="font-size:10px; color:#64748b; white-space:nowrap;"></span>
             </div>
@@ -1409,7 +1409,7 @@
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.07.07.4"; console.log("%c TLC Portal v2026.07.07.4 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = "2026.07.07.5"; console.log("%c TLC Portal v2026.07.07.5 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 
 // Mapa nombre_archivo → URL lh3 (cargado desde Apps Script)
@@ -1455,6 +1455,7 @@ let dispositivoActual = null;
 let modalidadActual = null;
 let cantidadActual = 1;
 let _tcBNA = null; // TC BNA vendedor — se fetchea al iniciar y se actualiza periódicamente
+let _mrMonedaTotales = 'USD'; // moneda en la que se muestran Subtotal/IVA/Total del modal
 
 async function _fetchTcBNA() {
     try {
@@ -3727,9 +3728,9 @@ function _mrRenderPaso2() {
                         ${esEditable
                             ? `<div class="desc-tipo-toggle" style="flex-shrink:0;">
                                  <button type="button" class="desc-tipo-btn ${monedaItem==='USD'?'active':''}"
-                                   onclick="carrito[${idx}].moneda='USD'; _mrRenderPaso2();">USD</button>
+                                   onclick="_mrCambiarMonedaItem(${idx}, 'USD'); return false;">USD</button>
                                  <button type="button" class="desc-tipo-btn ${monedaItem==='ARS'?'active':''}"
-                                   onclick="carrito[${idx}].moneda='ARS'; _mrRenderPaso2();">$</button>
+                                   onclick="_mrCambiarMonedaItem(${idx}, 'ARS'); return false;">$</button>
                                </div>
                                <input type="number" min="0" step="any" value="${precioListaRaw || 0}"
                                  style="width:70px;background:transparent;border:none;border-bottom:1px dashed #475569;color:inherit;font-size:11px;padding:1px 2px;outline:none;"
@@ -3896,30 +3897,78 @@ function _mrActualizarTotalesPaso2() {
     const colorBorder = claro ? '#e2e8f0'  : '#1e3050';
     const colorTotal  = claro ? '#0f172a'  : '#f1f5f9';
     const colorAccent = claro ? '#1a4b8c'  : '#3a86ff';
+
+    // netoTotal/ivaTotal/totalConIva están siempre calculados en USD.
+    // Si el usuario eligió "Convertir todo a ARS", se muestran convertidos
+    // (solo para visualización de estos totales — el precio de cada ítem
+    // ya está en su moneda real, esto es independiente).
+    const mostrarEnARS = _mrMonedaTotales === 'ARS' && _tcBNA;
+    const fmtTotal = (n) => mostrarEnARS ? fmtARS(n * _tcBNA) : fmtUSD(n);
+    const etiquetaMoneda = mostrarEnARS ? 'ARS' : 'USD';
+
     el.innerHTML = `
         <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:13px; color:${colorLabel}; border-top:1px solid ${colorBorder};">
-            <span>Subtotal Neto USD</span><span>${fmtUSD(netoTotal)}</span>
+            <span>Subtotal Neto ${etiquetaMoneda}</span><span>${fmtTotal(netoTotal)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; color:#f8961e;">
-            <span>IVA discriminado</span><span>${fmtUSD(ivaTotal)}</span>
+            <span>IVA discriminado</span><span>${fmtTotal(ivaTotal)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:10px 0 4px; font-size:16px; font-weight:800; border-top:1px solid ${colorBorder}; margin-top:4px;">
-            <span style="color:${colorTotal};">TOTAL USD c/IVA</span>
-            <span style="color:${colorAccent};">${fmtUSD(totalConIva)}</span>
+            <span style="color:${colorTotal};">TOTAL ${etiquetaMoneda} c/IVA</span>
+            <span style="color:${colorAccent};">${fmtTotal(totalConIva)}</span>
         </div>
     `;
 
-    // Actualizar label de TC BNA en el selector global de moneda
+    // Actualizar label de TC BNA y resaltar botón de moneda activa
     const tcLabel = document.getElementById('mr-tc-bna-label');
     if (tcLabel) tcLabel.textContent = _tcBNA ? `TC: $${_tcBNA.toLocaleString('es-AR')}` : '';
+    document.querySelectorAll('#mr-moneda-global-wrap .desc-tipo-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.moneda === _mrMonedaTotales);
+    });
 }
 
 // Convierte TODOS los ítems del carrito a la moneda elegida (USD o ARS),
 // recalculando precioLista con el TC BNA vendedor. Si algún ítem ya está
 // en esa moneda, se deja igual (no se vuelve a convertir).
-function _mrConvertirMonedaGlobal(monedaDestino) {
+// Cambia la moneda de UN solo ítem del carrito, convirtiendo el precio
+// (y el descuento, si está en valor absoluto) con el TC BNA vendedor.
+function _mrCambiarMonedaItem(idx, monedaDestino) {
+    const item = carrito[idx];
+    if (!item) return;
+    const monedaActual = item.moneda || 'USD';
+    if (monedaActual === monedaDestino) return; // ya está en esa moneda
+
     if (!_tcBNA) {
         alert('El tipo de cambio BNA todavía no cargó. Esperá unos segundos e intentá de nuevo.');
+        return;
+    }
+
+    const precioActual = item.precioLista || 0;
+    if (monedaActual === 'USD' && monedaDestino === 'ARS') {
+        item.precioLista = Math.round(precioActual * _tcBNA);
+    } else if (monedaActual === 'ARS' && monedaDestino === 'USD') {
+        item.precioLista = Math.round((precioActual / _tcBNA) * 100) / 100;
+    }
+    item.moneda = monedaDestino;
+
+    if (item.descuentoTipo === 'USD' || item.descuentoTipo === 'ARS') {
+        const descActual = parseFloat(item.descuentoValor) || 0;
+        if (monedaActual === 'USD' && monedaDestino === 'ARS') {
+            item.descuentoValor = Math.round(descActual * _tcBNA);
+        } else if (monedaActual === 'ARS' && monedaDestino === 'USD') {
+            item.descuentoValor = Math.round((descActual / _tcBNA) * 100) / 100;
+        }
+    }
+
+    _mrRenderPaso2();
+}
+
+function _mrConvertirMonedaGlobal(monedaDestino) {
+    _mrMonedaTotales = monedaDestino; // guarda la elección para mostrar Subtotal/IVA/Total en esta moneda
+
+    if (!_tcBNA) {
+        alert('El tipo de cambio BNA todavía no cargó. Esperá unos segundos e intentá de nuevo.');
+        _mrActualizarTotalesPaso2(); // igual actualiza el resaltado del botón
         return;
     }
     carrito.forEach(item => {
