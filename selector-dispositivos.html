@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.09.1 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.09.6 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -4405,7 +4405,10 @@ async function generarPropuesta() {
                 ticket:                 _ticketVinculado || '', // vincula el presupuesto al ticket de Servicio Técnico
             })
         }).then(r => r.json()).then(reg => {
-            if (reg.status === 'SUCCESS') console.log('✅ Sheets:', reg.id, '— fila', reg.fila);
+            if (reg.status === 'SUCCESS') {
+                console.log('✅ Sheets:', reg.id, '— fila', reg.fila);
+                console.log('%c🔗 TinyURL debug: ' + (reg.tinyUrlDebug || '(sin dato — subir FotoMap.gs v82+)'), 'background:#1e293b;color:#facc15;font-weight:bold;padding:3px 8px;border-radius:4px;');
+            }
             else console.warn('⚠️ Error Sheets:', reg.message);
         }).catch(err => console.warn('⚠️ Error Sheets:', err));
 

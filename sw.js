@@ -1,4 +1,9 @@
-// Portal TLC | sw.js | v13
+// Portal TLC | sw.js | v14
+// v14: Fix "Failed to execute 'put' on 'Cache': Request method 'POST'
+//      is unsupported" — la Cache API solo permite cachear pedidos
+//      GET. Se agregó guard (event.request.method === 'GET') antes de
+//      cada cache.put() para evitar el error en consola (no rompía el
+//      flujo real, pero ensuciaba la consola en cada POST a GAS).
 // v13: Se agrega version.js (fuente única de versión) a la lista
 //      network-first, para que nunca quede cacheado de forma stale.
 //      CACHE_NAME bumpeado → fuerza limpieza de cachés viejas al activar.
@@ -6,7 +11,7 @@
 //      Cache-first solo para assets externos (Font Awesome, etc.).
 //      Limpia cachés viejas automáticamente al activar.
 
-const CACHE_NAME = 'portal-tlc-v13';
+const CACHE_NAME = 'portal-tlc-v14';
 
 const HTML_LOCAL = [
     './',
@@ -68,6 +73,15 @@ self.addEventListener('fetch', event => {
         url.includes('lh3.googleusercontent.com') ||
         url.includes('dolarapi.com')
     ) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
+    // Los pedidos que no son GET (POST, PUT, etc. — ej. llamadas a Apps
+    // Script) nunca se cachean: van directo a la red. Evita el error
+    // "Failed to execute 'put' on 'Cache': Request method 'POST' is
+    // unsupported" que tira la Cache API si se intenta cachear un POST.
+    if (event.request.method !== 'GET') {
         event.respondWith(fetch(event.request));
         return;
     }
