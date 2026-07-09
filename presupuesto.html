@@ -1,11 +1,16 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.09.2 -->
+<!-- Portal TLC | presupuesto.html | v2026.07.09.3 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Presupuesto — Tecnología Láser Corneal</title>
+<meta property="og:title" content="Presupuesto — Tecnología Láser Corneal">
+<meta property="og:description" content="Propuesta comercial de equipamiento oftalmológico. Tocá para ver el detalle completo.">
+<meta property="og:image" content="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
   body { font-family:"Times New Roman",Times,serif; background:#f1f5f9; color:#0f172a; font-size:13px; }
@@ -173,10 +178,11 @@
     } catch(e) { fecha = ''; }
 
     var urlActual = window.location.href;
+    var urlParaCompartir = p.linkCorto || urlActual; // link corto de TinyURL si está disponible (v79+); si no, la URL larga actual
     var telWsp = formatearTelefonoWsp(p.telefono);
     var saludo = 'Hola, le compartimos el presupuesto de Tecnología Láser Corneal SRL';
     var linkWsp = (function() {
-      var msg = encodeURIComponent(saludo + ':\n' + urlActual + '\n(Ref: ' + idCot + ')');
+      var msg = encodeURIComponent(saludo + ':\n' + urlParaCompartir + '\n(Ref: ' + idCot + ')');
       return telWsp ? ('https://wa.me/' + telWsp + '?text=' + msg) : ('https://wa.me/?text=' + msg);
     })();
 
