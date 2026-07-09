@@ -1,9 +1,12 @@
-// Portal TLC | sw.js | v12
+// Portal TLC | sw.js | v13
+// v13: Se agrega version.js (fuente única de versión) a la lista
+//      network-first, para que nunca quede cacheado de forma stale.
+//      CACHE_NAME bumpeado → fuerza limpieza de cachés viejas al activar.
 // v12: Network-first para archivos HTML propios → siempre trae la versión más nueva.
 //      Cache-first solo para assets externos (Font Awesome, etc.).
 //      Limpia cachés viejas automáticamente al activar.
 
-const CACHE_NAME = 'portal-tlc-v12';
+const CACHE_NAME = 'portal-tlc-v13';
 
 const HTML_LOCAL = [
     './',
@@ -14,6 +17,7 @@ const HTML_LOCAL = [
     './servicio.html',
     './orden-servicio.html',
     './manifest.json',
+    './version.js',
 ];
 
 const ASSETS_EXTERNOS = [

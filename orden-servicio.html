@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<!-- Portal TLC | orden-servicio.html | v2026.06.25.6 -->
+<!-- Portal TLC | orden-servicio.html | v2026.07.09.1 -->
 <html lang="es">
 <head>
+<script src="version.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TLC SRL - ANEXO I POE 8 - ORDEN DE SERVICIO</title>
@@ -260,6 +261,29 @@
     }
 
     document.addEventListener('DOMContentLoaded', _cargarTicket);
+
+    console.log('%c Portal TLC | orden-servicio.html | v' + PORTAL_TLC_VERSION + ' ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+
+    // ─── SERVICE WORKER: registro + auto-actualización ────────────────
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('SW registrado:', reg.scope))
+                .catch(err => console.log('SW error:', err));
+        });
+
+        // Cuando el SW nuevo toma control (después de subir una versión
+        // nueva del archivo), recarga automáticamente la página para que
+        // el usuario vea la actualización sin tener que hacerlo a mano.
+        let _swYaRecargoOrd = false;
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'SW_UPDATED' && !_swYaRecargoOrd) {
+                _swYaRecargoOrd = true;
+                console.log('[SW] Nueva versión detectada, recargando...', event.data.version);
+                window.location.reload();
+            }
+        });
+    }
     </script>
 </body>
 </html>

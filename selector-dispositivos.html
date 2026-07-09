@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.07.7 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.09.1 -->
 <html lang="es">
 <head>
+<script src="version.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>TLC — Dispositivos</title>
@@ -988,6 +989,9 @@
                         Cerrar sesión
                     </button>
 
+                    <!-- Versión de la app -->
+                    <div style="text-align:center; font-size:9px; color:#334155; padding-top:2px;">Portal TLC · v<span id="footer-version-sel"></span></div>
+
                 </div>
             </div><!-- /avatar-menu -->
         </div>
@@ -1409,7 +1413,7 @@
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const APP_VERSION = "2026.07.07.7"; console.log("%c TLC Portal v2026.07.07.7 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = PORTAL_TLC_VERSION; console.log("%c TLC Portal v" + APP_VERSION + " ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 
 // Mapa nombre_archivo → URL lh3 (cargado desde Apps Script)
@@ -5124,3 +5128,34 @@ initLogin().catch(console.error);
     <button onclick="cerrarLightbox()" style="position:absolute; top:16px; right:20px; background:rgba(255,255,255,0.15); border:none; color:white; font-size:24px; width:40px; height:40px; border-radius:50%; cursor:pointer; line-height:1;">×</button>
 </div>
 </div><!-- /app-wrapper -->
+
+<script>
+// ─── SERVICE WORKER: registro + auto-actualización ────────────────
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('SW registrado:', reg.scope))
+            .catch(err => console.log('SW error:', err));
+    });
+
+    // Cuando el SW nuevo toma control (después de subir una versión
+    // nueva del archivo), recarga automáticamente la página para que
+    // el usuario vea la actualización sin tener que hacerlo a mano.
+    let _swYaRecargoSel = false;
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SW_UPDATED' && !_swYaRecargoSel) {
+            _swYaRecargoSel = true;
+            console.log('[SW] Nueva versión detectada, recargando...', event.data.version);
+            window.location.reload();
+        }
+    });
+}
+
+// Mostrar versión en el pie del menú de avatar
+try {
+    const elFooterVerSel = document.getElementById('footer-version-sel');
+    if (elFooterVerSel) elFooterVerSel.textContent = (typeof PORTAL_TLC_VERSION !== 'undefined') ? PORTAL_TLC_VERSION : '?';
+} catch(e) {}
+</script>
+</body>
+</html>

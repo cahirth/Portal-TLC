@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.06.2 -->
+<!-- Portal TLC | servicio.html | v2026.07.09.1 -->
 <html lang="es">
 <head>
+<script src="version.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#080d14">
@@ -369,6 +370,9 @@ body.tema-claro #avatar-menu-st [style*="background:#0a1628"] { background:#ffff
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           Cerrar sesión
         </button>
+
+        <!-- Versión de la app -->
+        <div style="text-align:center; font-size:9px; color:#334155; padding-top:2px;">Portal TLC · v<span id="footer-version-st"></span></div>
       </div>
     </div>
   </div>
@@ -551,7 +555,7 @@ body.tema-claro #avatar-menu-st [style*="background:#0a1628"] { background:#ffff
 (function(){
 'use strict';
 
-console.log('%c Portal TLC | servicio.html | v2026.07.06.1 ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
+console.log('%c Portal TLC | servicio.html | v' + PORTAL_TLC_VERSION + ' ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1791,6 +1795,33 @@ function _formatFechaISO(iso) {
 }
 
 })();
+
+// ─── SERVICE WORKER: registro + auto-actualización ────────────────
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('SW registrado:', reg.scope))
+            .catch(err => console.log('SW error:', err));
+    });
+
+    // Cuando el SW nuevo toma control (después de subir una versión
+    // nueva del archivo), recarga automáticamente la página para que
+    // el usuario vea la actualización sin tener que hacerlo a mano.
+    let _swYaRecargoSt = false;
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SW_UPDATED' && !_swYaRecargoSt) {
+            _swYaRecargoSt = true;
+            console.log('[SW] Nueva versión detectada, recargando...', event.data.version);
+            window.location.reload();
+        }
+    });
+}
+
+// Mostrar versión en el pie del menú de avatar
+try {
+    const elFooterVerSt = document.getElementById('footer-version-st');
+    if (elFooterVerSt) elFooterVerSt.textContent = (typeof PORTAL_TLC_VERSION !== 'undefined') ? PORTAL_TLC_VERSION : '?';
+} catch(e) {}
 </script>
 </body>
 </html>

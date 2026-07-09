@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.06.1 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.09.1 -->
 <html lang="es">
 <head>
+<script src="version.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>TLC — Cotizaciones</title>
@@ -453,6 +454,9 @@ body.tema-claro #cot-wsp-saludo { background:#ffffff !important; border-color:#e
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                     Cerrar sesión
                 </button>
+
+                <!-- Versión de la app -->
+                <div style="text-align:center; font-size:9px; color:#334155; padding-top:2px;">Portal TLC · v<span id="footer-version-cot"></span></div>
             </div>
         </div>
     </div>
@@ -570,8 +574,8 @@ body.tema-claro #cot-wsp-saludo { background:#ffffff !important; border-color:#e
 // TLC — Cotizaciones v2026.06.06.2
 // Motor unificado: historico.json + Roles dinámicos desde Vendedores
 // ═══════════════════════════════════════════════════════════════════
-const APP_VERSION = "2026.06.22.46";
-console.log("%c TLC Cotizaciones v2026.06.20.38 ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+const APP_VERSION = PORTAL_TLC_VERSION;
+console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 const HISTORICO_URL = 'https://raw.githubusercontent.com/cahirth/Portal-TLC/main/historico.json';
@@ -2538,6 +2542,33 @@ window.addEventListener('storage', (e) => {
 
 // ─── ARRANCAR ────────────────────────────────────────────────────
 init().catch(console.error);
+
+// ─── SERVICE WORKER: registro + auto-actualización ────────────────
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('SW registrado:', reg.scope))
+            .catch(err => console.log('SW error:', err));
+    });
+
+    // Cuando el SW nuevo toma control (después de subir una versión
+    // nueva del archivo), recarga automáticamente la página para que
+    // el usuario vea la actualización sin tener que hacerlo a mano.
+    let _swYaRecargoCot = false;
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SW_UPDATED' && !_swYaRecargoCot) {
+            _swYaRecargoCot = true;
+            console.log('[SW] Nueva versión detectada, recargando...', event.data.version);
+            window.location.reload();
+        }
+    });
+}
+
+// Mostrar versión en el pie del menú de avatar
+try {
+    const elFooterVerCot = document.getElementById('footer-version-cot');
+    if (elFooterVerCot) elFooterVerCot.textContent = (typeof PORTAL_TLC_VERSION !== 'undefined') ? PORTAL_TLC_VERSION : '?';
+} catch(e) {}
 </script>
 </body>
 </html>
