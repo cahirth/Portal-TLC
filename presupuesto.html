@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.10.2 -->
+<!-- Portal TLC | presupuesto.html | v2026.07.10.3 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -70,27 +70,18 @@
   }
 
   // ── Botón "Volver" del header ──────────────────────────────────
-  // Prioridad de destino:
-  //  1) Si la URL trae ?ticket=ID (link generado desde un ticket de
-  //     Servicio Técnico) → vuelve a servicio.html con ese ticket.
-  //  2) Si no hay ?ticket= pero sí venimos navegando desde dentro del
-  //     propio Portal (mismo origen en document.referrer, ej. se abrió
-  //     con "Abrir →" desde cotizaciones.html) → usa el historial del
-  //     navegador (history.back()), que respeta la vista exacta de la
-  //     que salió el usuario.
-  //  3) Si no hay ninguna de las dos (llegó por un link compartido de
-  //     WhatsApp/email, no hay historial previo en la PWA) → Home.
+  // Siempre va a index.html. Se simplificó (antes intentaba usar
+  // history.back() cuando el referrer era interno) porque en el
+  // navegador embebido de WhatsApp (el más común para este flujo,
+  // ya que el link llega compartido por WhatsApp) history.back() se
+  // comporta de forma inconsistente. Si en el futuro se conecta el
+  // flujo de ?ticket= real, ahí sí vale la pena la lógica condicional.
   window._volverPresupuesto = function() {
     try {
       var params = new URLSearchParams(window.location.search);
       var ticketId = (params.get('ticket') || '').trim();
       if (ticketId) {
         window.location.href = 'servicio.html?ticket=' + encodeURIComponent(ticketId);
-        return;
-      }
-      var refIsInterno = document.referrer && document.referrer.indexOf(window.location.origin) === 0;
-      if (refIsInterno && window.history.length > 1) {
-        window.history.back();
         return;
       }
     } catch(e) {}
