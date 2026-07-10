@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.09.6 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.10.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -3614,13 +3614,14 @@ function _leerParametrosTicketDesdeURL() {
     const serie       = params.get('serie')    || '';
     const telefono    = params.get('telefono') || '';
     const domicilio   = params.get('domicilio')|| '';
+    const falla       = params.get('falla')    || '';
 
     // Guardamos los datos del cliente para precargar el modal cuando el
     // Admin arme el carrito y llegue a "Confirmar y enviar cotización".
     // El carrito arranca vacío: el Admin elige manualmente los ítems de
     // servicio (repuestos, mano de obra, etc.) desde la categoría Servicio.
     window._datosTicketPrecarga = {
-        razonSocial, telefono, domicilio,
+        razonSocial, telefono, domicilio, falla,
         equipoTexto: [marca, modelo].filter(Boolean).join(' ') + (serie ? ' · S/N ' + serie : ''),
     };
 
@@ -3634,18 +3635,39 @@ function _leerParametrosTicketDesdeURL() {
 }
 
 // Se llama al abrir el modal de resumen (abrirModalResumen) — si hay datos
-// de un ticket pendientes de precarga, completa razón social/teléfono/notas.
+// de un ticket pendientes de precarga, completa nombre/razón social/
+// teléfono/notas, y salta directo a "Pantalla Comercial" (Paso 2) sin
+// pedirle al vendedor que vuelva a tipear nada que ya está en el ticket.
 function _aplicarPrecargaTicketSiCorresponde() {
     const d = window._datosTicketPrecarga;
     if (!d) return;
-    const razEl   = document.getElementById('mr-razon');
-    const telEl   = document.getElementById('mr-telefono');
-    const domEl   = document.getElementById('mr-domicilio');
-    const notasEl = document.getElementById('mr-notas');
-    if (razEl && d.razonSocial && !razEl.value) razEl.value = d.razonSocial;
-    if (telEl && d.telefono    && !telEl.value) telEl.value = d.telefono;
-    if (domEl && d.domicilio   && !domEl.value) domEl.value = d.domicilio;
-    if (notasEl && d.equipoTexto && !notasEl.value) notasEl.value = 'Presupuesto técnico — Equipo: ' + d.equipoTexto;
+    const nombreEl = document.getElementById('mr-nombre');
+    const razEl    = document.getElementById('mr-razon');
+    const telEl    = document.getElementById('mr-telefono');
+    const notasEl  = document.getElementById('mr-notas');
+
+    // El ticket de Servicio Técnico solo trackea un campo "cliente" (sin
+    // distinguir persona física vs. razón social) — lo usamos para ambos
+    // campos del wizard, así "Nombre" (que es obligatorio para avanzar a
+    // Pantalla Comercial) queda completo automáticamente.
+    if (nombreEl && d.razonSocial && !nombreEl.value) nombreEl.value = d.razonSocial;
+    if (razEl    && d.razonSocial && !razEl.value)    razEl.value    = d.razonSocial;
+    if (telEl    && d.telefono    && !telEl.value)    telEl.value    = d.telefono;
+
+    if (notasEl && !notasEl.value) {
+        const partesNota = [];
+        if (d.equipoTexto) partesNota.push('Equipo: ' + d.equipoTexto);
+        if (d.falla)       partesNota.push('Falla reportada: ' + d.falla);
+        if (d.domicilio)   partesNota.push('Domicilio: ' + d.domicilio);
+        if (partesNota.length) notasEl.value = 'Presupuesto técnico — ' + partesNota.join(' · ');
+    }
+
+    // Si ya tenemos nombre + teléfono (los dos campos obligatorios del
+    // Paso 1), saltamos directo al Paso 2 — mismo mecanismo que usa el
+    // wizard cuando el vendedor ya validó un cliente manualmente.
+    if (nombreEl?.value.trim() && telEl?.value.trim()) {
+        _mrClienteValidado = true;
+    }
 }
 let _mrCompanyId    = null;   // ID empresa HubSpot resuelto por CUIT
 let _mrContactId    = null;   // ID contacto HubSpot resuelto por email
