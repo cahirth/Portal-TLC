@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.09.5 -->
+<!-- Portal TLC | presupuesto.html | v2026.07.10.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -36,6 +36,7 @@
   .estado-icono { font-size:36px; margin-bottom:14px; }
   .btn-reintentar { margin-top:18px; padding:9px 20px; background:#0f172a; color:white; border:none; border-radius:6px; font-size:13px; cursor:pointer; font-family:Arial,sans-serif; }
   .btn-reintentar:hover { background:#1e293b; }
+  html, body { overscroll-behavior-x: none; }
 </style>
 </head>
 <body>
@@ -207,7 +208,7 @@
       '</div>' +
 
       '<div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px;">' +
-        '<img src="' + LOGO_URL + '" alt="TLC" style="max-width:200px;width:50%;height:auto;" onerror="this.style.display=\'none\'">' +
+        '<img src="' + LOGO_URL + '" alt="TLC" onclick="window._volverPresupuesto && window._volverPresupuesto()" style="max-width:200px;width:50%;height:auto;cursor:pointer;" title="Volver" onerror="this.style.display=\'none\'">' +
         '<div style="text-align:right;flex:1;min-width:160px;">' +
           '<div style="margin-bottom:6px;"><span class="badge-novalido">Documento No Válido como Factura</span></div>' +
           '<div style="font-size:13px;font-weight:600;font-family:Arial,sans-serif;color:#0f172a;">Presupuesto Nº: ' + esc(idCot) + '</div>' +
@@ -330,6 +331,21 @@
 console.log('%c Portal TLC | presupuesto.html | v' + PORTAL_TLC_VERSION + ' ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
 // ─── SERVICE WORKER: registro + auto-actualización ────────────────
+// Bloqueo de gesto swipe-back / botón atrás del navegador — usa la
+// misma lógica inteligente del botón "Volver" (ticket vinculado /
+// referrer interno / Home) en vez de dejar que el navegador se vaya.
+try {
+    history.pushState({ tlcGuard: true }, '', window.location.href);
+    window.addEventListener('popstate', function() {
+        history.pushState({ tlcGuard: true }, '', window.location.href);
+        if (typeof window._volverPresupuesto === 'function') {
+            window._volverPresupuesto();
+        } else {
+            window.location.href = 'index.html';
+        }
+    });
+} catch(e) {}
+
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js')

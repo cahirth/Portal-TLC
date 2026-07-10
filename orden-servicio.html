@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | orden-servicio.html | v2026.07.09.1 -->
+<!-- Portal TLC | orden-servicio.html | v2026.07.10.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -81,7 +81,8 @@
         .btn-wsp:hover { opacity: .88; }
         .btn-wsp svg { width: 18px; height: 18px; flex-shrink: 0; }
         @media print { .wsp-bar { display: none; } }
-    </style>
+      html, body { overscroll-behavior-x: none; }
+</style>
 </head>
 <body>
 
@@ -89,6 +90,7 @@
         <div class="header-container">
             <div class="logo-box">
                 <img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25"
+                     onclick="window.location.href='index.html'" style="cursor:pointer;" title="Ir al inicio"
                      onerror="this.src='https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq';this.onerror=null;"
                      style="max-width:260px;width:100%;height:auto;" alt="TLC Logo">
             </div>
@@ -265,7 +267,18 @@
     console.log('%c Portal TLC | orden-servicio.html | v' + PORTAL_TLC_VERSION + ' ', 'background:#3a86ff;color:#fff;font-weight:800;border-radius:4px;padding:2px 8px;');
 
     // ─── SERVICE WORKER: registro + auto-actualización ────────────────
-    if ('serviceWorker' in navigator) {
+    // Bloqueo de gesto swipe-back / botón atrás del navegador — evita que
+// el usuario salga de golpe de la PWA. Redirige a index.html en vez de
+// dejar que el navegador navegue a lo que sea que había antes.
+try {
+    history.pushState({ tlcGuard: true }, '', window.location.href);
+    window.addEventListener('popstate', function() {
+        history.pushState({ tlcGuard: true }, '', window.location.href);
+        window.location.href = 'index.html';
+    });
+} catch(e) {}
+
+if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js')
                 .then(reg => console.log('SW registrado:', reg.scope))
