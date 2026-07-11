@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.5 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.6 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -3613,7 +3613,11 @@ let _ticketVinculado = null; // ID del ticket de servicio, si venimos de "Genera
 // Lee ?ticket=X&cliente=Y&marca=...&modelo=...&serie=...&telefono=...&domicilio=...
 // desde la URL (llegan al hacer click en "Generar Presupuesto" desde un ticket
 // de Servicio Técnico) y precarga los datos del cliente en el modal de resumen.
-function _leerParametrosTicketDesdeURL() {
+// Si viene ?modificar=IDCOT (el ticket ya tenía un presupuesto generado antes,
+// "Modificar Presupuesto"), en vez de arrancar con un ítem en blanco carga el
+// carrito completo de esa última versión desde RTDB, para editar sobre eso
+// (agregar ítem, cambiar descuento, etc.) en vez de reescribir todo de cero.
+async function _leerParametrosTicketDesdeURL() {
     const params = new URLSearchParams(window.location.search);
     const ticket = params.get('ticket');
     if (!ticket) return;
@@ -3628,6 +3632,7 @@ function _leerParametrosTicketDesdeURL() {
     const telefono    = params.get('telefono') || '';
     const domicilio   = params.get('domicilio')|| '';
     const falla       = params.get('falla')    || '';
+    const idCotAModificar = params.get('modificar') || '';
 
     // Guardamos los datos del cliente para precargar el modal cuando el
     // Admin arme el carrito y llegue a "Confirmar y enviar cotización".
@@ -3640,11 +3645,33 @@ function _leerParametrosTicketDesdeURL() {
 
     console.log('[Ticket] Vinculado a ticket ' + ticket + ' — datos de cliente listos para precargar');
 
+    // Si venimos de "Modificar Presupuesto", intentamos traer el carrito
+    // de la última versión generada para ese ticket, en vez de arrancar
+    // de cero.
+    let carritoRecuperado = false;
+    if (idCotAModificar && carrito.length === 0) {
+        try {
+            const resp = await fetch(FIREBASE_RTDB_URL + '/cotizaciones/' + idCotAModificar + '/presupuesto.json', { cache: 'no-store' });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && Array.isArray(data.carrito) && data.carrito.length > 0) {
+                    data.carrito.forEach(item => carrito.push(item));
+                    carritoRecuperado = true;
+                    console.log('[Ticket] Última versión (' + idCotAModificar + ') recuperada — ' + data.carrito.length + ' ítem(s)');
+                }
+            }
+        } catch(eRec) {
+            console.warn('[Ticket] No se pudo recuperar la versión anterior, arranca en blanco:', eRec);
+        }
+    }
+
     // Agregamos automáticamente un ítem "Servicio" editable al carrito
     // (mismo tipo de ítem que si el Admin lo hubiera elegido a mano
     // desde la categoría "Servicio Técnico") y abrimos directo el
     // modal en Pantalla Comercial — así no hay que navegar ni elegir
     // nada manualmente, el Admin solo completa precio + IVA.
+    // (Si ya se recuperó una versión anterior, no agregamos el ítem en
+    // blanco — el Admin edita sobre lo que ya había.)
     if (carrito.length === 0) {
         carrito.push({
             nombre:      'Servicio y mantenimiento de acuerdo a Servicio N° ' + ticket,
@@ -3655,13 +3682,17 @@ function _leerParametrosTicketDesdeURL() {
             linkFolleto: '',
             linkVideo:   '',
             cantidad:    1,
-            moneda:      'USD',
+            moneda:      'ARS',
             editable:    true,
             _data:       { 'Categoria': 'SERV_TECNICO' },
             _mods:       [],
         });
-        actualizarBadge();
+        // El ítem arranca en $0, así que no hace falta esperar el TC BNA
+        // para "convertir" nada — solo marcamos la vista de totales en
+        // ARS directamente, coherente con el ítem recién creado.
+        _mrMonedaTotales = 'ARS';
     }
+    actualizarBadge();
 
     setTimeout(() => {
         if (typeof abrirModalResumen === 'function') abrirModalResumen();
@@ -3801,9 +3832,10 @@ function _mrRenderPaso2() {
                                    onclick="_mrCambiarMonedaItem(${idx}, 'ARS'); return false;">$</button>
                                </div>
                                <input type="number" min="0" step="any" value="${precioListaRaw || 0}"
-                                 style="width:70px;background:transparent;border:none;border-bottom:1px dashed #475569;color:inherit;font-size:11px;padding:1px 2px;outline:none;"
+                                 style="width:110px;background:transparent;border:none;border-bottom:1px dashed #475569;color:inherit;font-size:13px;font-weight:600;padding:3px 4px;outline:none;"
                                  oninput="carrito[${idx}].precioLista=parseFloat(this.value)||0;"
-                                 onblur="carrito[${idx}].precioLista=parseFloat(this.value)||0; _mrRenderPaso2();"> lista`
+                                 onblur="carrito[${idx}].precioLista=parseFloat(this.value)||0; _mrRenderPaso2();"
+                                 onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"> lista`
                             : `${monedaItem === 'ARS' ? fmtARS(precioListaRaw) : fmtUSD(base)} lista`
                         }
                         ${hayDesc ? `<span style="color:#f8961e;"> · −${dTipo==='%' ? dVal+'%' : fmtUSD(dVal)}</span>` : ''}
@@ -4032,13 +4064,18 @@ function _mrCambiarMonedaItem(idx, monedaDestino) {
 }
 
 function _mrConvertirMonedaGlobal(monedaDestino) {
-    _mrMonedaTotales = monedaDestino; // guarda la elección para mostrar Subtotal/IVA/Total en esta moneda
-
     if (!_tcBNA) {
         alert('El tipo de cambio BNA todavía no cargó. Esperá unos segundos e intentá de nuevo.');
         _mrActualizarTotalesPaso2(); // igual actualiza el resaltado del botón
         return;
     }
+    _mrMonedaTotales = monedaDestino; // guarda la elección para mostrar Subtotal/IVA/Total en esta moneda
+    // (se setea DESPUÉS de confirmar que hay TC BNA — antes se seteaba
+    // primero y quedaba desincronizada de la moneda real de los ítems si
+    // el TC todavía no había cargado: el modal MOSTRABA "ARS" pero los
+    // ítems seguían guardados en USD por dentro, y el presupuesto final
+    // salía en USD aunque en pantalla decía pesos.)
+
     carrito.forEach(item => {
         const monedaActual = item.moneda || 'USD';
         if (monedaActual === monedaDestino) return; // ya está en esa moneda

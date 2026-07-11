@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.11.2 -->
+<!-- Portal TLC | servicio.html | v2026.07.11.3 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1408,6 +1408,14 @@ window._generarPresupuestoTecnico = function(id) {
   if (t.telefono)      params.set('telefono', t.telefono);
   if (t.domicilio)     params.set('domicilio', t.domicilio);
   if (t.falla_reportada) params.set('falla', t.falla_reportada);
+
+  // Si el ticket ya tiene presupuestos generados antes ("Modificar
+  // Presupuesto"), mandamos el idCot de la ÚLTIMA versión para que
+  // Pantalla Comercial cargue ese carrito en vez de arrancar en blanco.
+  if (Array.isArray(t.presupuestos) && t.presupuestos.length > 0) {
+    var ultimo = t.presupuestos[t.presupuestos.length - 1];
+    if (ultimo && ultimo.idCot) params.set('modificar', ultimo.idCot);
+  }
 
   window.location.href = SELECTOR_URL + '?' + params.toString();
 };
