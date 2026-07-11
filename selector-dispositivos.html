@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.6 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.7 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -3665,31 +3665,63 @@ async function _leerParametrosTicketDesdeURL() {
         }
     }
 
-    // Agregamos automáticamente un ítem "Servicio" editable al carrito
-    // (mismo tipo de ítem que si el Admin lo hubiera elegido a mano
-    // desde la categoría "Servicio Técnico") y abrimos directo el
-    // modal en Pantalla Comercial — así no hay que navegar ni elegir
+    // Agregamos automáticamente el ítem "Servicio" al carrito (el mismo
+    // producto que Cristian administra en el Sheet Lista_Precios, fila
+    // Categoria=SERV_TECNICO / Sub Categoria=SERVICIO) y abrimos directo
+    // el modal en Pantalla Comercial — así no hay que navegar ni elegir
     // nada manualmente, el Admin solo completa precio + IVA.
-    // (Si ya se recuperó una versión anterior, no agregamos el ítem en
-    // blanco — el Admin edita sobre lo que ya había.)
+    // (Si ya se recuperó una versión anterior, no agregamos nada acá —
+    // el Admin edita sobre lo que ya había.)
     if (carrito.length === 0) {
-        carrito.push({
-            nombre:      'Servicio y mantenimiento de acuerdo a Servicio N° ' + ticket,
-            precioLista: 0,
-            precioCNO:   0,
-            comision:    '',
-            foto:        '',
-            linkFolleto: '',
-            linkVideo:   '',
-            cantidad:    1,
-            moneda:      'ARS',
-            editable:    true,
-            _data:       { 'Categoria': 'SERV_TECNICO' },
-            _mods:       [],
-        });
-        // El ítem arranca en $0, así que no hace falta esperar el TC BNA
-        // para "convertir" nada — solo marcamos la vista de totales en
-        // ARS directamente, coherente con el ítem recién creado.
+        // Esperamos a que el catálogo (dispositivos) esté cargado — puede
+        // no estarlo todavía si esta función corre muy temprano.
+        for (let intento = 0; intento < 30 && dispositivos.length === 0; intento++) {
+            await new Promise(r => setTimeout(r, 100));
+        }
+        const productoServicio = dispositivos.find(d =>
+            (d['Categoria'] || '').trim() === 'SERV_TECNICO' &&
+            (d['Sub Categoria'] || '').trim().toUpperCase() === 'SERVICIO'
+        );
+
+        if (productoServicio) {
+            const precioLista = parseNum(productoServicio['Precio LISTA']);
+            const precioCNO   = parseNum(productoServicio['Precio CONTADO CNO']);
+            carrito.push({
+                nombre:      ((productoServicio['Nombre de Dispositivo'] || 'Servicio técnico') + ' N° ' + ticket).trim(),
+                precioLista: isNaN(precioLista) ? 0 : precioLista,
+                precioCNO:   isNaN(precioCNO)   ? 0 : precioCNO,
+                comision:    productoServicio['COMISIONES']   || '',
+                foto:        fotoUrl(productoServicio['Foto'] || ''),
+                linkFolleto: productoServicio['Link_Folleto'] || '',
+                linkVideo:   productoServicio['Link_Web']     || '',
+                cantidad:    1,
+                moneda:      'ARS',
+                editable:    true,
+                _data:       productoServicio,
+                _mods:       [],
+            });
+            console.log('[Ticket] Ítem "Servicio" cargado desde el catálogo (Sheet Lista_Precios)');
+        } else {
+            // Respaldo si el ítem no está en el Sheet o el catálogo no
+            // llegó a cargar a tiempo — nunca deja al Admin sin ítem.
+            console.warn('[Ticket] No se encontró el producto SERV_TECNICO/SERVICIO en el catálogo — usando texto de respaldo');
+            carrito.push({
+                nombre:      'Servicio y mantenimiento de acuerdo a Servicio N° ' + ticket,
+                precioLista: 0,
+                precioCNO:   0,
+                comision:    '',
+                foto:        '',
+                linkFolleto: '',
+                linkVideo:   '',
+                cantidad:    1,
+                moneda:      'ARS',
+                editable:    true,
+                _data:       { 'Categoria': 'SERV_TECNICO' },
+                _mods:       [],
+            });
+        }
+        // El ítem arranca en su precio de lista (o $0 si no hay) — no
+        // hace falta esperar el TC BNA para marcar la vista en ARS.
         _mrMonedaTotales = 'ARS';
     }
     actualizarBadge();
