@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.10.3 -->
+<!-- Portal TLC | servicio.html | v2026.07.11.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -128,6 +128,9 @@ body.tema-claro .btn-icon:hover{background:#cbd5e1;border-color:#3a86ff;}
 .btn-primary{width:100%;padding:12px;border-radius:10px;background:var(--accent-blue);
   color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;}
 .btn-primary:hover{background:#2a76ef;}
+.btn-secondary{padding:10px;border-radius:10px;background:transparent;border:1.5px dashed var(--border-glow);
+  color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;}
+.btn-secondary:hover{border-color:var(--accent-blue);color:var(--accent-blue);}
 .btn-peligro{background:transparent;border:1px solid #ef4444;color:#ef4444;
   width:100%;padding:10px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;}
 
@@ -446,6 +449,8 @@ body.tema-claro #avatar-menu-st [style*="background:#0a1628"] { background:#ffff
     </div>
     <label class="form-label">Cliente / Clínica</label>
     <input type="text" class="form-input" id="nuevo-cliente" placeholder="Ej: Clínica de Ojos Norte">
+    <label class="form-label">Nombre del médico <span style="color:#64748b;font-size:10px;">(opcional)</span></label>
+    <input type="text" class="form-input" id="nuevo-medico" placeholder="Ej: Dr. Juan Pérez" style="margin-bottom:8px;">
     <div class="form-row" style="margin-top:8px;">
       <div>
         <label class="form-label">Domicilio</label>
@@ -535,6 +540,10 @@ body.tema-claro #avatar-menu-st [style*="background:#0a1628"] { background:#ffff
     <div id="error-accesorios" style="display:none;font-size:11px;color:#ef4444;margin-bottom:8px;">⚠ Campo obligatorio (escribí 'Ninguno' si no hay)</div>
     <label class="form-label">Notas adicionales <span style="color:#64748b;font-size:10px;">(opcional)</span></label>
     <textarea class="form-textarea" id="nuevo-nota" placeholder="Contexto adicional..."></textarea>
+    <label class="form-label">Fotos del equipo <span style="color:#64748b;font-size:10px;">(opcional, hasta 3)</span></label>
+    <div id="nuevo-fotos-preview" style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;"></div>
+    <input type="file" id="nuevo-foto-input" accept="image/*" capture="environment" style="display:none;" onchange="_onNuevaFotoSeleccionada(event)">
+    <button type="button" class="btn-secondary" id="btn-agregar-foto-nuevo" onclick="document.getElementById('nuevo-foto-input').click()" style="width:100%;margin-bottom:10px;">📷 Agregar foto</button>
     <button class="btn-primary" onclick="_crearTicket()">Crear Ticket</button>
   </div>
 </div>
@@ -550,6 +559,14 @@ body.tema-claro #avatar-menu-st [style*="background:#0a1628"] { background:#ffff
     <a id="btn-orden-header" href="#" target="_blank" class="btn-icon" title="Ver orden de servicio">📄</a>
   </div>
   <div class="detalle-body-wrap" id="det-body"></div>
+</div>
+
+<!-- Input file oculto reutilizado para agregar fotos desde el detalle del ticket -->
+<input type="file" id="det-foto-input" accept="image/*" capture="environment" style="display:none;" onchange="_onDetFotoSeleccionada(event)">
+
+<!-- Lightbox para ver fotos en grande -->
+<div id="st-lightbox" onclick="_cerrarLightboxFoto()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;">
+  <img id="st-lightbox-img" src="" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,.8);">
 </div>
 
 <script>
@@ -1148,6 +1165,12 @@ function _renderDetalle(t) {
           ? '<input class="det-field-input" value="' + _esc(t.cliente||'') + '" onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'cliente\',this.value,\'' + _esc(t.cliente||'') + '\')">'
           : '<div class="det-field-val">' + _esc(t.cliente||'—') + '</div>') +
       '</div>' +
+      '<div class="det-field">' +
+        '<div class="det-field-label">Nombre del médico</div>' +
+        (puedeEditar
+          ? '<input class="det-field-input" value="' + _esc(t.nombre_medico||'') + '" placeholder="Ej: Dr. Juan Pérez" onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'nombre_medico\',this.value,\'' + _esc(t.nombre_medico||'') + '\')">'
+          : '<div class="det-field-val">' + _esc(t.nombre_medico||'—') + '</div>') +
+      '</div>' +
       '<div class="form-row">' +
         '<div class="det-field">' +
           '<div class="det-field-label">Domicilio</div>' +
@@ -1185,6 +1208,12 @@ function _renderDetalle(t) {
         '</div>' +
         '<div class="det-field"></div>' +
       '</div>' +
+    '</div>' +
+
+    // FOTOS
+    '<div class="det-section">Fotos del equipo</div>' +
+    '<div class="det-card">' +
+      _renderFotosTicket(t, puedeEditar) +
     '</div>' +
 
     // ASIGNACIÓN Y ESTADO
@@ -1372,6 +1401,7 @@ window._generarPresupuestoTecnico = function(id) {
   var params = new URLSearchParams();
   params.set('ticket', t.id_ticket);
   if (t.cliente)       params.set('cliente', t.cliente);
+  if (t.nombre_medico) params.set('medico', t.nombre_medico);
   if (t.equipo_marca)  params.set('marca', t.equipo_marca);
   if (t.equipo_modelo) params.set('modelo', t.equipo_modelo);
   if (t.equipo_serie)  params.set('serie', t.equipo_serie);
@@ -1660,7 +1690,159 @@ window._abrirModalNuevo = function() {
 };
 window._cerrarModalNuevo = function() {
   document.getElementById('modal-nuevo').classList.remove('open');
+  _nuevoTicketFotos = [];
+  _renderFotosPreviewNuevo();
 };
+
+// ══════════════════════════════════════════════════════════════════
+// FOTOS — compresión en el cliente + galería (formulario de ingreso
+// y detalle del ticket). Hasta 3 fotos por ticket, JPEG ~800px de
+// ancho / calidad 60-70%, base64 directo en RTDB (sin Firebase
+// Storage). Comprimir en el cliente evita subir fotos de 5-10MB tal
+// cual salen de la cámara del celular.
+// ══════════════════════════════════════════════════════════════════
+
+function _comprimirImagen(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var maxAncho = 800;
+      var escala = Math.min(1, maxAncho / img.width);
+      var w = Math.max(1, Math.round(img.width * escala));
+      var h = Math.max(1, Math.round(img.height * escala));
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/jpeg', 0.65));
+    };
+    img.onerror = function() { _stMostrarError('No se pudo leer la imagen'); };
+    img.src = e.target.result;
+  };
+  reader.onerror = function() { _stMostrarError('No se pudo leer el archivo'); };
+  reader.readAsDataURL(file);
+}
+
+// ── Fotos en el formulario de "Nuevo Ticket" (antes de crear) ──────
+var _nuevoTicketFotos = [];
+
+window._onNuevaFotoSeleccionada = function(event) {
+  var file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  if (_nuevoTicketFotos.length >= 3) { _stMostrarError('Máximo 3 fotos'); return; }
+  _comprimirImagen(file, function(dataUrl) {
+    _nuevoTicketFotos.push(dataUrl);
+    _renderFotosPreviewNuevo();
+  });
+};
+
+function _renderFotosPreviewNuevo() {
+  var wrap = document.getElementById('nuevo-fotos-preview');
+  if (!wrap) return;
+  wrap.innerHTML = _nuevoTicketFotos.map(function(src, i) {
+    return '<div style="position:relative;">' +
+      '<img src="' + src + '" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border-glow);">' +
+      '<button type="button" onclick="_quitarFotoNuevo(' + i + ')" ' +
+        'style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:12px;cursor:pointer;line-height:1;">✕</button>' +
+    '</div>';
+  }).join('');
+  var btn = document.getElementById('btn-agregar-foto-nuevo');
+  if (btn) btn.style.display = _nuevoTicketFotos.length >= 3 ? 'none' : 'block';
+}
+
+window._quitarFotoNuevo = function(i) {
+  _nuevoTicketFotos.splice(i, 1);
+  _renderFotosPreviewNuevo();
+};
+
+// ── Fotos en el detalle de un ticket ya creado ──────────────────────
+function _renderFotosTicket(t, puedeEditar) {
+  var fotos = Array.isArray(t.fotos) ? t.fotos : [];
+  var thumbs = fotos.map(function(src, i) {
+    return '<div style="position:relative;">' +
+      '<img src="' + src + '" onclick="_verFotoGrande(' + i + ')" ' +
+        'style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border-glow);cursor:pointer;">' +
+      (puedeEditar
+        ? '<button type="button" onclick="_eliminarFotoTicket(\'' + t.id_ticket + '\',' + i + ')" ' +
+            'style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:12px;cursor:pointer;line-height:1;">✕</button>'
+        : '') +
+    '</div>';
+  }).join('');
+  var addBtn = (puedeEditar && fotos.length < 3)
+    ? '<button type="button" onclick="_agregarFotoTicket(\'' + t.id_ticket + '\')" ' +
+        'style="width:72px;height:72px;border-radius:8px;border:1.5px dashed var(--border-glow);background:none;color:var(--text-muted);font-size:24px;cursor:pointer;">+</button>'
+    : '';
+  if (!thumbs && !addBtn) return '<div style="color:var(--text-muted);font-size:12px;">Sin fotos.</div>';
+  return '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + thumbs + addBtn + '</div>';
+}
+
+var _fotoTicketIdPendiente = null;
+
+window._agregarFotoTicket = function(idTicket) {
+  _fotoTicketIdPendiente = idTicket;
+  document.getElementById('det-foto-input').click();
+};
+
+window._onDetFotoSeleccionada = function(event) {
+  var file = event.target.files[0];
+  event.target.value = '';
+  if (!file || !_fotoTicketIdPendiente) return;
+  var idTicket = _fotoTicketIdPendiente;
+  _comprimirImagen(file, function(dataUrl) {
+    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'st_agregarFoto', id_ticket:idTicket, foto:dataUrl }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if (r.ok) {
+        var fotosNuevas = r.fotos || [];
+        var t2 = _tickets.find(function(x){ return x.id_ticket === idTicket; });
+        if (t2) t2.fotos = fotosNuevas;
+        if (_ticketActual && _ticketActual.id_ticket === idTicket) {
+          _ticketActual.fotos = fotosNuevas;
+          _renderDetalle(_ticketActual);
+        }
+      } else {
+        _stMostrarError('Error al subir foto: ' + (r.error||'desconocido'));
+      }
+    })
+    .catch(function(){ _stMostrarError('Error de conexión al subir foto'); });
+  });
+};
+
+window._eliminarFotoTicket = function(idTicket, idx) {
+  if (!confirm('¿Eliminar esta foto?')) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_eliminarFoto', id_ticket:idTicket, indice:idx }) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){
+    if (r.ok) {
+      var fotosNuevas = r.fotos || [];
+      var t2 = _tickets.find(function(x){ return x.id_ticket === idTicket; });
+      if (t2) t2.fotos = fotosNuevas;
+      if (_ticketActual && _ticketActual.id_ticket === idTicket) {
+        _ticketActual.fotos = fotosNuevas;
+        _renderDetalle(_ticketActual);
+      }
+    } else {
+      _stMostrarError('Error al eliminar foto: ' + (r.error||'desconocido'));
+    }
+  })
+  .catch(function(){ _stMostrarError('Error de conexión'); });
+};
+
+window._verFotoGrande = function(idx) {
+  if (!_ticketActual || !Array.isArray(_ticketActual.fotos)) return;
+  var src = _ticketActual.fotos[idx];
+  if (!src) return;
+  document.getElementById('st-lightbox-img').src = src;
+  document.getElementById('st-lightbox').style.display = 'flex';
+};
+window._cerrarLightboxFoto = function() {
+  document.getElementById('st-lightbox').style.display = 'none';
+};
+
 // ── Automatismo depósito por tipo de ingreso ──────────────────────
 window._stActualizarDeposito = function() {
   var tipo = document.getElementById('nuevo-tipo-ingreso').value;
@@ -1748,6 +1930,7 @@ window._crearTicket = function() {
     equipo_marca:     document.getElementById('nuevo-marca') ? document.getElementById('nuevo-marca').value.trim() : '',
     equipo_modelo:    modelo,
     equipo_serie:     serie,
+    nombre_medico:    document.getElementById('nuevo-medico') ? document.getElementById('nuevo-medico').value.trim() : '',
     tecnico_asignado: tecnico,
     prioridad:        prio,
     deposito:         deposito,
@@ -1757,6 +1940,7 @@ window._crearTicket = function() {
     fecha_vencimiento:fecha ? _fechaISOToDDMMYYYY(fecha) : '',
     nota_inicial:     notaInicial,
     creado_por:       (_session && (_session.name || _session.username)) || '',
+    fotos:            _nuevoTicketFotos,
   };
 
   var btn = document.querySelector('#modal-nuevo .btn-primary');
@@ -1767,10 +1951,12 @@ window._crearTicket = function() {
   .then(function(r){
     if (r.ok) {
       _cerrarModalNuevo();
-      ['nuevo-cliente','nuevo-domicilio','nuevo-telefono','nuevo-marca','nuevo-modelo','nuevo-serie','nuevo-falla','nuevo-accesorios','nuevo-nota']
+      ['nuevo-cliente','nuevo-medico','nuevo-domicilio','nuevo-telefono','nuevo-marca','nuevo-modelo','nuevo-serie','nuevo-falla','nuevo-accesorios','nuevo-nota']
         .forEach(function(id){ var el=document.getElementById(id); if(el){ el.value=''; el.style.borderColor=''; } });
       document.getElementById('nuevo-tipo-ingreso').value = 'recepcion';
       _stActualizarDeposito();
+      _nuevoTicketFotos = [];
+      _renderFotosPreviewNuevo();
       _cargarTickets();
     } else { alert('Error creando ticket: ' + (r.error||'desconocido')); }
   })

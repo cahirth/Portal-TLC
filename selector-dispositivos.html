@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.10.2 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -3611,6 +3611,7 @@ function _leerParametrosTicketDesdeURL() {
     _ticketVinculado = ticket;
 
     const razonSocial = params.get('cliente')  || '';
+    const nombreMedico= params.get('medico')   || '';
     const marca       = params.get('marca')    || '';
     const modelo      = params.get('modelo')   || '';
     const serie       = params.get('serie')    || '';
@@ -3623,7 +3624,7 @@ function _leerParametrosTicketDesdeURL() {
     // El carrito arranca vacío: el Admin elige manualmente los ítems de
     // servicio (repuestos, mano de obra, etc.) desde la categoría Servicio.
     window._datosTicketPrecarga = {
-        razonSocial, telefono, domicilio, falla,
+        razonSocial, nombreMedico, telefono, domicilio, falla,
         equipoTexto: [marca, modelo].filter(Boolean).join(' ') + (serie ? ' · S/N ' + serie : ''),
     };
 
@@ -3652,7 +3653,13 @@ function _aplicarPrecargaTicketSiCorresponde() {
     // distinguir persona física vs. razón social) — lo usamos para ambos
     // campos del wizard, así "Nombre" (que es obligatorio para avanzar a
     // Pantalla Comercial) queda completo automáticamente.
-    if (nombreEl && d.razonSocial && !nombreEl.value) nombreEl.value = d.razonSocial;
+    // El ticket de Servicio Técnico ahora trackea "cliente" (razón
+    // social / clínica) y, por separado, "nombre_medico" (persona).
+    // mr-nombre (obligatorio para avanzar a Pantalla Comercial) toma
+    // primero el médico si existe, y si no, cae a la razón social —
+    // así tickets viejos sin el campo médico siguen funcionando igual
+    // que antes.
+    if (nombreEl && !nombreEl.value) nombreEl.value = d.nombreMedico || d.razonSocial || '';
     if (razEl    && d.razonSocial && !razEl.value)    razEl.value    = d.razonSocial;
     if (telEl    && d.telefono    && !telEl.value)    telEl.value    = d.telefono;
 
