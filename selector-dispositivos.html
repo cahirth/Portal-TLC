@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.7 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.8 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -3655,9 +3655,28 @@ async function _leerParametrosTicketDesdeURL() {
             if (resp.ok) {
                 const data = await resp.json();
                 if (data && Array.isArray(data.carrito) && data.carrito.length > 0) {
-                    data.carrito.forEach(item => carrito.push(item));
+                    data.carrito.forEach(item => {
+                        // Normalizamos el ítem recuperado: forzamos que quede
+                        // editable (para poder cambiar precio/desc/agregar
+                        // descuento) y garantizamos que tenga moneda explícita
+                        // — un ítem recuperado sin moneda default a USD en
+                        // otras funciones y eso rompía la conversión si
+                        // después se tocaba el toggle ARS/USD.
+                        item.editable = true;
+                        item.moneda   = item.moneda || 'USD';
+                        if (!item._data) item._data = { 'Categoria': 'SERV_TECNICO' };
+                        item.precioCNO = item.precioCNO || item.precioLista || 0;
+                        carrito.push(item);
+                    });
+                    // La vista de totales arranca en la misma moneda que
+                    // tenía el primer ítem recuperado, para que coincida
+                    // con lo que ya estaba guardado sin que el Admin tenga
+                    // que re-tocar el toggle (evita el bug de doble
+                    // conversión si alguien lo toca "para corregir" algo
+                    // que en realidad ya estaba bien).
+                    _mrMonedaTotales = carrito[0].moneda || 'USD';
                     carritoRecuperado = true;
-                    console.log('[Ticket] Última versión (' + idCotAModificar + ') recuperada — ' + data.carrito.length + ' ítem(s)');
+                    console.log('[Ticket] Última versión (' + idCotAModificar + ') recuperada — ' + data.carrito.length + ' ítem(s), moneda ' + _mrMonedaTotales);
                 }
             }
         } catch(eRec) {
@@ -4512,6 +4531,11 @@ async function generarPropuesta() {
             return {
                 nombre:         i.nombre,
                 precioLista:    base,
+                moneda:         i.moneda || 'USD', // ← FIX: faltaba este campo. Sin él, "Modificar Presupuesto"
+                                                    //   recuperaba el ítem sin saber su moneda real, caía a USD
+                                                    //   por default, y si se re-tocaba el toggle ARS multiplicaba
+                                                    //   un valor que YA estaba en pesos otra vez por el TC (bug
+                                                    //   de números gigantes en el historial de versiones).
                 descuentoTipo:  esContado ? '%' : dTipo,
                 descuentoValor: esContado ? 0   : dVal,
                 precioNeto:     Math.round((neto / qty) * 100) / 100,
@@ -4545,6 +4569,7 @@ async function generarPropuesta() {
                 linkPdf:                linkFinal,
                 carrito:                carritoDetallado,
                 ticket:                 _ticketVinculado || '', // vincula el presupuesto al ticket de Servicio Técnico
+                monedaTotales:          (typeof _mrMonedaTotales !== 'undefined' && _mrMonedaTotales) || (carrito[0] && carrito[0].moneda) || 'USD',
             })
         }).then(r => r.json()).then(reg => {
             if (reg.status === 'SUCCESS') {
