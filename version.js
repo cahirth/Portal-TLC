@@ -6,4 +6,4 @@
 //
 // Al subir un cambio: actualizar SOLO esta línea. El console.log y el
 // texto visible en el menú de avatar de cada módulo lo leen de acá.
-const PORTAL_TLC_VERSION = "2026.07.11.2";
+const PORTAL_TLC_VERSION = "2026.07.11.4";

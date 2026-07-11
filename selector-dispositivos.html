@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.2 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.4 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -247,7 +247,12 @@
     .mr-item-info { flex:1 1 200px; min-width:0; }
     .mr-item-nombre { overflow-wrap:break-word; word-break:break-word; }
     .mr-item-precio-box { text-align:right; flex:0 0 auto; margin-left:auto; }
-    @media (max-width: 360px) {
+    /* Antes el corte era en max-width:360px, un ancho que ningún celular
+       moderno tiene (iPhone/Android arrancan en 375-414px) — por eso el
+       precio nunca bajaba de línea y el nombre quedaba comprimido y
+       cortado. Con 480px, el precio baja debajo del nombre en la
+       inmensa mayoría de los celulares, dándole todo el ancho al texto. */
+    @media (max-width: 480px) {
         .mr-item-precio-box { flex-basis:100%; margin-left:0; text-align:left; margin-top:4px; }
     }
 
@@ -270,7 +275,7 @@
     .item-precio-neto { font-size:14px; font-weight:800; color:#06d6a0; margin-left:auto; }
     .mr-item-card {
         background:#080d14; border:1px solid #1e3050; border-radius:12px;
-        padding:14px; margin-bottom:10px;
+        padding:16px; margin-bottom:12px;
     }
     /* ── NOMBRE DEL ÍTEM — clase fija, no depende de JS calculando tema ──
        Default = modo oscuro (color claro). Se sobreescribe en .tema-claro.
@@ -843,9 +848,14 @@
         max-width: 100% !important;
         box-sizing: border-box !important;
     }
-    /* Contenedor global del modal: nunca más ancho que la pantalla */
+    /* Contenedor global del modal: nunca más ancho que la pantalla.
+       Antes esto pisaba silenciosamente el max-width:860px del
+       desktop (ambas reglas usan !important sobre el mismo selector;
+       ganaba la última en orden de aparición, que era esta con 680px).
+       Ahora usa el mismo tope de 860px, así el modal aprovecha el
+       ancho disponible en PC y nunca desborda en mobile. */
     #modal-resumen-box {
-        max-width: min(680px, calc(100vw - 24px)) !important;
+        max-width: min(860px, calc(100vw - 24px)) !important;
         overflow-x: hidden !important;
         box-sizing: border-box !important;
     }
@@ -3684,6 +3694,8 @@ function _aplicarPrecargaTicketSiCorresponde() {
     if (razEl    && d.razonSocial && !razEl.value)    razEl.value    = d.razonSocial;
     if (telEl    && d.telefono    && !telEl.value)    telEl.value    = d.telefono;
 
+    console.log('[Ticket] Precarga aplicada — nombreEl encontrado:', !!nombreEl, '| valor final mr-nombre:', nombreEl?.value || '(vacío)');
+
     if (notasEl && !notasEl.value) {
         const partesNota = [];
         if (d.equipoTexto) partesNota.push('Equipo: ' + d.equipoTexto);
@@ -3774,10 +3786,10 @@ function _mrRenderPaso2() {
                 ${item.foto ? `<img src="${item.foto}" style="width:44px;height:44px;border-radius:8px;object-fit:contain;background:#0f1a30;flex-shrink:0;" onerror="this.style.display='none'">` : ''}
                 <div class="mr-item-info">
                     ${esEditable
-                        ? `<input type="text" class="mr-item-nombre-input" value="${_esc(item.nombre)}"
-                             style="font-size:13px;font-weight:700;line-height:1.3;width:100%;background:transparent;border:none;border-bottom:1px dashed #475569;color:inherit;padding:2px 0;outline:none;"
+                        ? `<textarea class="mr-item-nombre-input" rows="2"
+                             style="font-size:13px;font-weight:700;line-height:1.3;width:100%;background:transparent;border:none;border-bottom:1px dashed #475569;color:inherit;padding:2px 0;outline:none;resize:none;font-family:inherit;overflow-y:auto;"
                              onblur="carrito[${idx}].nombre=this.value||'Ítem sin nombre'; _mrRenderPaso2();"
-                             placeholder="Descripción del servicio...">`
+                             placeholder="Descripción del servicio...">${_esc(item.nombre)}</textarea>`
                         : `<div class="mr-item-nombre" style="font-size:13px; font-weight:700; line-height:1.3;">${item.nombre}</div>`
                     }
                     <div style="font-size:11px; color:#64748b; margin-top:2px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -4358,15 +4370,24 @@ const PA_COTIZACIONES_URL = 'https://defaultbbd111b805224e3d9f4378d1ca0e71.cf.en
 
 // ─── PASO 1: Generar propuesta ────────────────────────────────────
 async function generarPropuesta() {
-    const nombre   = document.getElementById('mr-nombre').value.trim();
+    let nombre    = document.getElementById('mr-nombre').value.trim();
     const razon    = document.getElementById('mr-razon').value.trim();
     const cuit     = document.getElementById('mr-cuit').value.trim();
-    const telefono = document.getElementById('mr-telefono').value.trim();
+    let telefono  = document.getElementById('mr-telefono').value.trim();
     const email    = document.getElementById('mr-email').value.trim();
     const notas    = document.getElementById('mr-notas').value.trim();
     const vendedor = document.getElementById('mr-vendedor').value.trim();
     const plazoEntrega  = document.getElementById('mr-plazo-entrega')?.value  || 'inmediato';
     const lugarEntrega  = document.getElementById('mr-lugar-entrega')?.selectedOptions[0]?.text || 'Clínica del Cliente';
+
+    // Respaldo: si venimos de un ticket de Servicio Técnico y el campo
+    // quedó vacío por cualquier motivo (recarga en background, etc.),
+    // usamos el dato original del ticket en vez de bloquear el envío.
+    if ((!nombre || !telefono) && window._datosTicketPrecarga) {
+        const d = window._datosTicketPrecarga;
+        if (!nombre)   { nombre   = (d.nombreMedico || d.razonSocial || '').trim(); if (nombre) document.getElementById('mr-nombre').value = nombre; }
+        if (!telefono) { telefono = (d.telefono || '').trim();                       if (telefono) document.getElementById('mr-telefono').value = telefono; }
+    }
 
     if (!nombre)   { mostrarMrStatus('Completá el nombre del médico.', 'error'); return; }
     if (!telefono) { mostrarMrStatus('Completá el teléfono de contacto.', 'error'); return; }
