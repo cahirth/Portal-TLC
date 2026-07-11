@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.1 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -3630,10 +3630,31 @@ function _leerParametrosTicketDesdeURL() {
 
     console.log('[Ticket] Vinculado a ticket ' + ticket + ' — datos de cliente listos para precargar');
 
-    // Pre-seleccionar la categoría "Servicio" para que el Admin arme
-    // el carrito directamente ahí, sin tener que buscarla.
+    // Agregamos automáticamente un ítem "Servicio" editable al carrito
+    // (mismo tipo de ítem que si el Admin lo hubiera elegido a mano
+    // desde la categoría "Servicio Técnico") y abrimos directo el
+    // modal en Pantalla Comercial — así no hay que navegar ni elegir
+    // nada manualmente, el Admin solo completa precio + IVA.
+    if (carrito.length === 0) {
+        carrito.push({
+            nombre:      'Servicio de reparación de acuerdo a propuesta técnica',
+            precioLista: 0,
+            precioCNO:   0,
+            comision:    '',
+            foto:        '',
+            linkFolleto: '',
+            linkVideo:   '',
+            cantidad:    1,
+            moneda:      'USD',
+            editable:    true,
+            _data:       { 'Categoria': 'SERV_TECNICO' },
+            _mods:       [],
+        });
+        actualizarBadge();
+    }
+
     setTimeout(() => {
-        if (typeof abrirCategoria === 'function') abrirCategoria('SERV_TECNICO');
+        if (typeof abrirModalResumen === 'function') abrirModalResumen();
     }, 300);
 }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.11.1 -->
+<!-- Portal TLC | servicio.html | v2026.07.11.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1760,14 +1760,18 @@ window._quitarFotoNuevo = function(i) {
 // ── Fotos en el detalle de un ticket ya creado ──────────────────────
 function _renderFotosTicket(t, puedeEditar) {
   var fotos = Array.isArray(t.fotos) ? t.fotos : [];
+  var bloqueadas = t.fotos_bloqueadas || 0;
   var thumbs = fotos.map(function(src, i) {
+    var protegida = i < bloqueadas;
     return '<div style="position:relative;">' +
       '<img src="' + src + '" onclick="_verFotoGrande(' + i + ')" ' +
         'style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border-glow);cursor:pointer;">' +
-      (puedeEditar
-        ? '<button type="button" onclick="_eliminarFotoTicket(\'' + t.id_ticket + '\',' + i + ')" ' +
-            'style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:12px;cursor:pointer;line-height:1;">✕</button>'
-        : '') +
+      (protegida
+        ? '<span title="Foto del ingreso — no se puede borrar" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#64748b;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;">🔒</span>'
+        : (puedeEditar
+            ? '<button type="button" onclick="_eliminarFotoTicket(\'' + t.id_ticket + '\',' + i + ')" ' +
+                'style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:12px;cursor:pointer;line-height:1;">✕</button>'
+            : '')) +
     '</div>';
   }).join('');
   var addBtn = (puedeEditar && fotos.length < 3)
@@ -1812,6 +1816,11 @@ window._onDetFotoSeleccionada = function(event) {
 };
 
 window._eliminarFotoTicket = function(idTicket, idx) {
+  var bloqueadas = (_ticketActual && _ticketActual.id_ticket === idTicket) ? (_ticketActual.fotos_bloqueadas || 0) : 0;
+  if (idx < bloqueadas) {
+    _stMostrarError('Esta foto se cargó en el ingreso del equipo y no se puede eliminar.');
+    return;
+  }
   if (!confirm('¿Eliminar esta foto?')) return;
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_eliminarFoto', id_ticket:idTicket, indice:idx }) })
