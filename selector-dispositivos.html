@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.12.2 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.12.3 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -4889,6 +4889,7 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
     const monedaPresupuesto = (typeof _mrMonedaTotales !== 'undefined' && _mrMonedaTotales) || 'USD';
     const fmtSegunMoneda = (n) => monedaPresupuesto === 'ARS' ? fmtARS(n) : fmtUSD(n);
     const etiquetaMonedaPresup = monedaPresupuesto === 'ARS' ? 'AR$' : 'USD';
+    console.log('%c[Presupuesto] Moneda del documento: ' + monedaPresupuesto + ' (_mrMonedaTotales=' + (typeof _mrMonedaTotales !== 'undefined' ? _mrMonedaTotales : 'undefined') + ', item[0].moneda=' + (carrito[0] ? carrito[0].moneda : 'sin ítems') + ')', 'background:#1e293b;color:#facc15;font-weight:bold;padding:3px 8px;border-radius:4px;');
 
     const filasProductos = carrito.map(function(i) {
         const qty    = i.cantidad || 1;
