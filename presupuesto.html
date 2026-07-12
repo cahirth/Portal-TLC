@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.11.1 -->
+<!-- Portal TLC | presupuesto.html | v2026.07.11.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -170,7 +170,7 @@
     } catch(e) { fecha = ''; }
 
     var urlActual = window.location.href;
-    var urlParaCompartir = p.linkCorto || urlActual; // link corto de TinyURL si está disponible (v79+); si no, la URL larga actual
+    var urlParaCompartir = urlActual; // siempre el link real de GitHub Pages — se sacó TinyURL de acá por decisión de Cristian (página intermedia molesta + generaba links viejos confusos)
     var telWsp = formatearTelefonoWsp(p.telefono);
     var saludo = 'Hola, le compartimos el presupuesto de Tecnología Láser Corneal SRL';
     var linkWsp = (function() {
@@ -210,6 +210,7 @@
       '</div>' +
 
       '<div style="text-align:right;font-size:11px;color:#64748b;font-family:Arial,sans-serif;margin-bottom:16px;">Hoja 1 de 1</div>' +
+      (p.ticketId ? '<div style="margin-bottom:16px;font-size:11px;font-family:Arial,sans-serif;"><a href="https://cahirth.github.io/Portal-TLC/orden-servicio.html?id=' + esc(p.ticketId) + '" style="color:#2563eb;text-decoration:none;font-weight:600;">🔧 Ver Orden de Servicio N° ' + esc(p.ticketId) + ' →</a></div>' : '') +
 
       '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:20px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);">' +
         '<div style="font-size:13px;font-family:Arial,sans-serif;"><strong>Señores:</strong> ' + esc(p.nombreMedico) + '</div>' +

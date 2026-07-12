@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.8 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.9 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -3706,7 +3706,7 @@ async function _leerParametrosTicketDesdeURL() {
             const precioLista = parseNum(productoServicio['Precio LISTA']);
             const precioCNO   = parseNum(productoServicio['Precio CONTADO CNO']);
             carrito.push({
-                nombre:      ((productoServicio['Nombre de Dispositivo'] || 'Servicio técnico') + ' N° ' + ticket).trim(),
+                nombre:      'Servicio y mantenimiento de acuerdo a Orden N°: ' + ticket,
                 precioLista: isNaN(precioLista) ? 0 : precioLista,
                 precioCNO:   isNaN(precioCNO)   ? 0 : precioCNO,
                 comision:    productoServicio['COMISIONES']   || '',
@@ -3717,6 +3717,7 @@ async function _leerParametrosTicketDesdeURL() {
                 moneda:      'ARS',
                 editable:    true,
                 _data:       productoServicio,
+                _equipoDesc: (window._datosTicketPrecarga && window._datosTicketPrecarga.equipoTexto) || '',
                 _mods:       [],
             });
             console.log('[Ticket] Ítem "Servicio" cargado desde el catálogo (Sheet Lista_Precios)');
@@ -3725,7 +3726,7 @@ async function _leerParametrosTicketDesdeURL() {
             // llegó a cargar a tiempo — nunca deja al Admin sin ítem.
             console.warn('[Ticket] No se encontró el producto SERV_TECNICO/SERVICIO en el catálogo — usando texto de respaldo');
             carrito.push({
-                nombre:      'Servicio y mantenimiento de acuerdo a Servicio N° ' + ticket,
+                nombre:      'Servicio y mantenimiento de acuerdo a Orden N°: ' + ticket,
                 precioLista: 0,
                 precioCNO:   0,
                 comision:    '',
@@ -3736,6 +3737,7 @@ async function _leerParametrosTicketDesdeURL() {
                 moneda:      'ARS',
                 editable:    true,
                 _data:       { 'Categoria': 'SERV_TECNICO' },
+                _equipoDesc: (window._datosTicketPrecarga && window._datosTicketPrecarga.equipoTexto) || '',
                 _mods:       [],
             });
         }
@@ -3874,6 +3876,7 @@ function _mrRenderPaso2() {
                              placeholder="Descripción del servicio...">${_esc(item.nombre)}</textarea>`
                         : `<div class="mr-item-nombre" style="font-size:13px; font-weight:700; line-height:1.3;">${item.nombre}</div>`
                     }
+                    ${item._equipoDesc ? `<div style="font-size:11px; color:#94a3b8; margin-top:2px;">🔧 Equipo: ${_esc(item._equipoDesc)}</div>` : ''}
                     <div style="font-size:11px; color:#64748b; margin-top:2px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                         ${esEditable
                             ? `<div class="desc-tipo-toggle" style="flex-shrink:0;">
@@ -4915,6 +4918,7 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
             fotoHtml ? '<div style="flex-shrink:0;">' + fotoHtml + '<\/div>' : '',
             '<div>',
             '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:3px;">' + i.nombre + '<\/div>',
+            i._equipoDesc ? '<div style="font-size:11px;color:#64748b;margin-bottom:2px;">\ud83d\udd27 Equipo: ' + i._equipoDesc + '<\/div>' : '',
             '<div style="font-size:11px;color:#94a3b8;">' + opt.label + (i._data && i._data['Origen'] ? ' \u00B7 Origen: ' + i._data['Origen'] : '') + '<\/div>',
             mediaHtml,
             '<\/div><\/div>',
@@ -5050,6 +5054,7 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         // BOTONES: PDF + WhatsApp (activo de entrada, sin semáforo)
         '<div class="no-print" style="text-align:right;margin-bottom:16px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">',
         '<button class="btn-accion btn-pdf" onclick="guardarPDF()">&#8595; Guardar PDF<\/button>',
+        _ticketVinculado ? '<a href="https://cahirth.github.io/Portal-TLC/orden-servicio.html?id=' + encodeURIComponent(_ticketVinculado) + '" target="_blank" rel="noopener noreferrer" style="padding:8px 18px;border:1px solid #cbd5e1;border-radius:6px;color:#475569;font-size:12px;font-family:Arial,sans-serif;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">\ud83d\udd27 Ver Orden de Servicio<\/a>' : '',
         linkPublico ? '<button id="btn-whatsapp" class="btn-accion btn-ws-active">\uD83D\uDCAC Enviar por WhatsApp<\/button>' : '',
         '<\/div>',
 
@@ -5092,6 +5097,11 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         estructuraHtml,
         '<\/tbody>',
         '<\/table>',
+
+        // Link a la Orden de Servicio DENTRO del documento (a diferencia
+        // del botón de arriba, este SÍ queda visible al guardar como PDF,
+        // porque no tiene la clase no-print).
+        _ticketVinculado ? '<div style="margin:-8px 0 16px;font-size:11px;font-family:Arial,sans-serif;"><a href="https://cahirth.github.io/Portal-TLC/orden-servicio.html?id=' + encodeURIComponent(_ticketVinculado) + '" style="color:#2563eb;text-decoration:none;font-weight:600;">\ud83d\udd27 Ver Orden de Servicio N\u00B0 ' + _ticketVinculado + ' \u2192<\/a><\/div>' : '',
 
         // TOTALES — ancho completo, condiciones abajo (responsive mobile)
         notas ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:10px 14px;margin-bottom:12px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#92400e;margin-bottom:4px;font-family:Arial,sans-serif;">Notas<\/div><div style="font-size:12px;color:#78350f;line-height:1.5;">' + notas + '<\/div><\/div>' : '',
