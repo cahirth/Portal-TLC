@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.11.4 -->
+<!-- Portal TLC | servicio.html | v2026.07.12.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -480,7 +480,7 @@ body.tema-claro #avatar-menu-st [style*="background:#0a1628"] { background:#ffff
     </div>
     <div class="form-row">
       <div>
-        <label class="form-label">Técnico asignado</label>
+        <label class="form-label">Responsable asignado</label>
         <select class="form-select" id="nuevo-tecnico">
           <option value="sin_asignar">Sin asignar</option>
           <option value="juan_garro">Juan Garro</option>
@@ -1227,7 +1227,7 @@ function _renderDetalle(t) {
             : '<div class="det-field-val">' + (t.deposito||'—') + '</div>') +
         '</div>' +
         '<div class="det-field">' +
-          '<div class="det-field-label">Técnico</div>' +
+          '<div class="det-field-label">Responsable</div>' +
           (puedeEditar
             ? '<select class="det-field-select" onchange="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'tecnico_asignado\',this.value,\'\')">' + _optsTecnico(t.tecnico_asignado) + '</select>'
             : '<div class="det-field-val">' + (TECNICO_LABEL[t.tecnico_asignado]||'—') + '</div>') +
@@ -1293,6 +1293,25 @@ function _campoBadge(deposito, etapaActivacion) {
   return '<span class="campo-tecnico-badge badge-completado">✓</span>';
 }
 
+// Muestra las fotos cargadas en el ingreso del equipo (las protegidas,
+// fotos_bloqueadas) como "Evidencia Fotográfica" junto a la falla
+// reportada — de solo lectura acá (el borrado/agregado real vive en la
+// sección "Fotos del equipo" más abajo, esto es solo referencia visual
+// rápida al lado del texto de la falla).
+function _renderEvidenciaFotografica(t) {
+  var fotos = Array.isArray(t.fotos) ? t.fotos : [];
+  var bloqueadas = t.fotos_bloqueadas || 0;
+  if (bloqueadas === 0) return '';
+  var thumbs = fotos.slice(0, bloqueadas).map(function(src, i) {
+    return '<img src="' + src + '" onclick="_verFotoGrande(' + i + ')" ' +
+      'style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--border-glow);cursor:pointer;">';
+  }).join('');
+  return '<div style="margin-top:8px;">' +
+    '<div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:4px;">📷 Evidencia fotográfica (ingreso)</div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + thumbs + '</div>' +
+  '</div>';
+}
+
 function _renderCamposTecnicos(t, puedeEditar) {
   var dep = t.deposito || 'recepcion';
   var idxDep = FLUJO_ETAPAS.indexOf(dep);
@@ -1306,6 +1325,7 @@ function _renderCamposTecnicos(t, puedeEditar) {
       (soloLectura ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'falla_reportada\',this.value)"') + '>' +
       _esc(t.falla_reportada||'') + '</textarea>' +
     (t.accesorios ? '<div style="margin-top:5px;font-size:11px;color:var(--text-muted);"><strong>Accesorios recibidos:</strong> ' + _esc(t.accesorios) + '</div>' : '') +
+    _renderEvidenciaFotografica(t) +
   '</div>';
 
   // ── Diagnóstico (activo desde diagnóstico) ──

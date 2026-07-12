@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.11.9 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.12.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -4497,7 +4497,7 @@ async function generarPropuesta() {
         // Pages. El JSON real del presupuesto se manda a RTDB en 'registrarCotizacion'.
         const linkFinal = 'https://cahirth.github.io/Portal-TLC/presupuesto.html?id=' + _idCotActual;
 
-        const htmlPresup = await generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot: _idCotActual, plazoEntrega, lugarEntrega, linkPublico: linkFinal });
+        const htmlPresup = await generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot: _idCotActual, plazoEntrega, lugarEntrega, linkPublico: linkFinal, domicilio: (window._datosTicketPrecarga && window._datosTicketPrecarga.domicilio) || '' });
 
         // ── Vista instantánea para el VENDEDOR via Blob URL — 0ms ───────────
         // (el cliente recibe linkFinal → presupuesto.html, que lee de RTDB)
@@ -4567,6 +4567,7 @@ async function generarPropuesta() {
                 razonSocial:            razon,
                 cuit:                   cuit,
                 telefono:               telefono,
+                domicilio:              (window._datosTicketPrecarga && window._datosTicketPrecarga.domicilio) || '',
                 notas:                  notas,
                 vendedor:               vendedor,
                 linkPdf:                linkFinal,
@@ -4816,7 +4817,7 @@ function abrirCheckout() { abrirModalResumen(); }
 function nuevoPresupuesto() { nuevaCotizacion(); }
 function mostrarCoStatus(msg, tipo) { mostrarMrStatus(msg, tipo); }
 
-async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot, plazoEntrega, lugarEntrega, linkPublico }) {
+async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, notas, vendedor, idCot, plazoEntrega, lugarEntrega, linkPublico, domicilio }) {
     const fecha    = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'long', year:'numeric' });
     const nroRef   = idCot || generarIdCotizacion();
     const c        = calcularCarrito();
@@ -5077,6 +5078,7 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         razon    ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Instituci\u00F3n:<\/strong> ' + razon + '<\/div>' : '',
         cuit     ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>CUIT:<\/strong> ' + cuit + '<\/div>' : '',
         telefono ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Tel\u00E9fono:<\/strong> ' + telefono + '<\/div>' : '',
+        domicilio ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Domicilio:<\/strong> ' + domicilio + '<\/div>' : '',
         email    ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Email:<\/strong> ' + email + '<\/div>' : '',
         '<\/div>',
 
