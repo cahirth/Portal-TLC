@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.12.1 -->
+<!-- Portal TLC | presupuesto.html | v2026.07.12.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -99,8 +99,9 @@
       '</div>';
   }
 
-  function buildFilasProductos(carrito) {
+  function buildFilasProductos(carrito, etiquetaMoneda) {
     if (!Array.isArray(carrito) || !carrito.length) return '';
+    etiquetaMoneda = etiquetaMoneda || 'USD';
     return carrito.map(function(i) {
       var qty = i.cantidad || 1;
       var base = i.precioLista || i.precioNeto || 0;
@@ -131,12 +132,12 @@
           '</div>' +
         '</td>' +
         '<td style="padding:14px 10px;text-align:right;vertical-align:top;width:130px;">' +
-          '<div style="font-size:13px;color:#374151;">USD &nbsp;' + Math.round(base).toLocaleString('es-AR') + '</div>' +
-          (hayDesc ? '<div style="font-size:11px;color:#64748b;">Descuento ' + (dTipo==='%' ? dVal.toFixed(0)+',00 %' : 'USD ' + dVal.toFixed(2)) + '</div>' : '') +
+          '<div style="font-size:13px;color:#374151;">' + etiquetaMoneda + ' &nbsp;' + Math.round(base).toLocaleString('es-AR') + '</div>' +
+          (hayDesc ? '<div style="font-size:11px;color:#64748b;">Descuento ' + (dTipo==='%' ? dVal.toFixed(0)+',00 %' : etiquetaMoneda + ' ' + dVal.toFixed(2)) + '</div>' : '') +
         '</td>' +
         '<td style="padding:14px 10px;text-align:right;vertical-align:top;width:130px;">' +
-          '<div style="font-size:13px;font-weight:600;color:#0f172a;">USD &nbsp;' + Math.round(bruto).toLocaleString('es-AR') + '</div>' +
-          (hayDesc ? '<div style="font-size:12px;color:#dc2626;">USD &nbsp;−' + Math.round(descMonto).toLocaleString('es-AR') + '</div>' : '') +
+          '<div style="font-size:13px;font-weight:600;color:#0f172a;">' + etiquetaMoneda + ' &nbsp;' + Math.round(bruto).toLocaleString('es-AR') + '</div>' +
+          (hayDesc ? '<div style="font-size:12px;color:#dc2626;">' + etiquetaMoneda + ' &nbsp;−' + Math.round(descMonto).toLocaleString('es-AR') + '</div>' : '') +
         '</td>' +
         '</tr>'
       );
@@ -162,6 +163,7 @@
     var netoTotal = totales.subtotal_neto != null ? totales.subtotal_neto : 0;
     var ivaTotal  = totales.iva_total     != null ? totales.iva_total     : 0;
     var totalCIva = totales.total_con_iva != null ? totales.total_con_iva : (netoTotal + ivaTotal);
+    var etiquetaMoneda = (p.monedaTotales === 'ARS') ? 'AR$' : 'USD'; // ← FIX: antes "USD" estaba escrito fijo en 6 lugares de este archivo, sin leer la moneda real guardada
 
     var fecha = '';
     try {
@@ -231,16 +233,16 @@
             '<th style="padding:8px 10px;text-align:right;font-size:12px;font-family:Arial,sans-serif;width:130px;">Precio Total</th>' +
           '</tr>' +
         '</thead>' +
-        '<tbody>' + buildFilasProductos(c) + '</tbody>' +
+        '<tbody>' + buildFilasProductos(c, etiquetaMoneda) + '</tbody>' +
       '</table>' +
 
       (p.notas ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:10px 14px;margin-bottom:12px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#92400e;margin-bottom:4px;font-family:Arial,sans-serif;">Notas</div><div style="font-size:12px;color:#78350f;line-height:1.5;">' + esc(p.notas) + '</div></div>' : '') +
 
       '<div style="display:flex;justify-content:flex-end;margin-bottom:16px;">' +
         '<table style="border-collapse:collapse;min-width:260px;">' +
-          '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">Subtotal</td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>USD</strong> &nbsp;' + Math.round(netoTotal).toLocaleString('es-AR') + '</td></tr>' +
-          '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">IVA</td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>USD</strong> &nbsp;' + Math.round(ivaTotal).toLocaleString('es-AR') + '</td></tr>' +
-          '<tr style="border-top:2px solid #0f172a;"><td style="padding:8px 8px;font-size:14px;font-weight:700;">Total</td><td style="padding:8px 8px;text-align:right;font-size:14px;font-weight:700;"><strong>USD</strong> &nbsp;' + Math.round(totalCIva).toLocaleString('es-AR') + '</td></tr>' +
+          '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">Subtotal</td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>' + etiquetaMoneda + '</strong> &nbsp;' + Math.round(netoTotal).toLocaleString('es-AR') + '</td></tr>' +
+          '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">IVA</td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>' + etiquetaMoneda + '</strong> &nbsp;' + Math.round(ivaTotal).toLocaleString('es-AR') + '</td></tr>' +
+          '<tr style="border-top:2px solid #0f172a;"><td style="padding:8px 8px;font-size:14px;font-weight:700;">Total</td><td style="padding:8px 8px;text-align:right;font-size:14px;font-weight:700;"><strong>' + etiquetaMoneda + '</strong> &nbsp;' + Math.round(totalCIva).toLocaleString('es-AR') + '</td></tr>' +
         '</table>' +
       '</div>' +
 
@@ -249,7 +251,7 @@
         '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;line-height:1.9;">' +
           (p.condicionesComerciales ? '<strong>Condición de Pago:</strong> ' + esc(p.condicionesComerciales) + '<br>' : '') +
           (p.detalleFinanciacion ? '<strong>Detalle de Financiación:</strong> ' + esc(p.detalleFinanciacion) + '<br>' : '') +
-          '<strong>Forma de Pago:</strong> Transferencia o depósito bancario. Valores expresados en dólares oficiales Banco Nación con el tipo de cambio del día de acreditación de cada pago.<br>' +
+          '<strong>Forma de Pago:</strong> Transferencia o depósito bancario. ' + (etiquetaMoneda === 'ARS' ? 'Valores expresados en pesos argentinos.' : 'Valores expresados en dólares oficiales Banco Nación con el tipo de cambio del día de acreditación de cada pago.') + '<br>' +
           '<strong>Lugar de Entrega:</strong> Se entrega en nuestra oficina en Del Carmen 716 PB CABA.' +
         '</div>' +
       '</div>' +
