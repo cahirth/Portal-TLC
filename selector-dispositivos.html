@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.12.1 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.12.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -4583,7 +4583,13 @@ async function generarPropuesta() {
             else console.warn('⚠️ Error Sheets:', reg.message);
         }).catch(err => console.warn('⚠️ Error Sheets:', err));
 
-        // Registrar en SharePoint via Power Automate (fire-and-forget)
+        // Registrar en SharePoint + HubSpot (fire-and-forget) — SOLO para
+        // cotizaciones de Ventas. Los presupuestos generados desde un
+        // ticket de Servicio Técnico NO deben crear Deal en HubSpot ni
+        // entrada en historico.json (eso es lo que lee el Kanban de
+        // Ventas en cotizaciones.html) — su seguimiento vive en el
+        // propio ticket (presupuestos[] en servicio_tecnico/{id}).
+        if (!_ticketVinculado) {
         fetch(PA_COTIZACIONES_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -4649,6 +4655,9 @@ async function generarPropuesta() {
               }
           })
           .catch(err => console.warn('⚠️ Error HubSpot fetch:', err));
+        } else {
+            console.log('[Ticket] Presupuesto vinculado a ' + _ticketVinculado + ' — se omite SharePoint/HubSpot/historico.json (no debe aparecer en el Kanban de Ventas)');
+        }
 
         // ── WhatsApp: teléfono + mensaje personalizado ────────────────
         _linkWspActual = _buildWspLink(telefono, linkFinal, nombre, _idCotActual);
