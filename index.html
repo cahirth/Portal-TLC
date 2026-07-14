@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.07.10.2 -->
+<!-- Portal TLC | index.html | v2026.07.14.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -327,6 +327,8 @@ body.tema-claro #avatar-nombre-idx { color:#0f172a !important; }
 body.tema-claro #avatar-email-idx  { color:#64748b !important; }
 body.tema-claro #avatar-rol-idx    { background:rgba(26,75,140,.08) !important; color:#1a4b8c !important; border-color:rgba(26,75,140,.2) !important; }
 body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8c !important; }
+body.tema-claro #idx-btn-tema-oscuro,
+body.tema-claro #idx-btn-tema-claro { border: 1px solid #e2e8f0 !important; }
     </style>
 </head>
 <body>
@@ -1834,9 +1836,11 @@ body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8
         document.getElementById('avatar-icon-idx').textContent = iniciales;
         document.getElementById('avatar-nombre-idx').textContent = nombre;
         document.getElementById('avatar-email-idx').textContent  = email;
-        // Rol (si está disponible en el contexto global)
+        // Rol (viene de la sesión — antes buscaba una variable global
+        // "currentRolIdx" que nunca se definía en ningún lado, así que
+        // el badge se quedaba vacío siempre)
         const rolEl = document.getElementById('avatar-rol-idx');
-        if (rolEl && typeof currentRolIdx !== 'undefined') rolEl.textContent = currentRolIdx || 'Usuario';
+        if (rolEl) rolEl.textContent = account.rol || 'Usuario';
         _aplicarTemaIdx();
         _initSaludoWspIdx();
     }
