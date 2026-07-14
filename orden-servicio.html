@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | orden-servicio.html | v2026.07.12.2 -->
+<!-- Portal TLC | orden-servicio.html | v2026.07.12.3 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -179,8 +179,8 @@
     </div>
 
     <script>
-    var TLC_WSP   = '5491141479942';
     var RTDB_URL  = 'https://portal-tlc-default-rtdb.firebaseio.com';
+    var _clienteTelefono = ''; // ← teléfono real del cliente del ticket, se completa en _cargarTicket()
 
     var TECNICO_NOMBRE = {
       'juan_garro':         'Juan Garro',
@@ -192,6 +192,21 @@
 
     function _esc(s) {
         return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // Misma lógica que usa presupuesto.html para armar el número en
+    // formato WhatsApp (549 + área + número, sin el "15" del medio).
+    function formatearTelefonoWsp(raw) {
+        var d = String(raw || '').replace(/\D/g, '');
+        if (!d) return '';
+        if (d.charAt(0) === '0' && d.length > 10) d = d.slice(1);
+        if (d.indexOf('5499') === 0) d = '549' + d.slice(4);
+        if (d.indexOf('549') === 0) {
+            d = '549' + d.slice(3).replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2');
+        } else if (d.length <= 10) {
+            d = '549' + d.replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2');
+        }
+        return d;
     }
 
     function _fechaLinda(iso) {
@@ -227,6 +242,7 @@
             document.getElementById('os-cliente').textContent    = t.cliente || '—';
             document.getElementById('os-domicilio').textContent = t.domicilio || '—';
             document.getElementById('os-telefono').textContent  = t.telefono  || '—';
+            _clienteTelefono = t.telefono || '';
 
             // Equipo
             document.getElementById('os-marca').value  = t.equipo_marca  || '';
@@ -278,7 +294,14 @@
             ' | Cliente: ' + cliente +
             ' | ' + window.location.href
         );
-        window.open('https://wa.me/' + TLC_WSP + '?text=' + msg, '_blank');
+        // Manda al teléfono real del cliente (t.telefono del ticket). Si
+        // el ticket no tiene teléfono cargado, abre WhatsApp sin
+        // destinatario fijo para que se elija el contacto a mano — antes
+        // esto SIEMPRE mandaba a un número fijo de TLC (bug), sin importar
+        // quién fuera el cliente.
+        var telWsp = formatearTelefonoWsp(_clienteTelefono);
+        var url = telWsp ? ('https://wa.me/' + telWsp + '?text=' + msg) : ('https://wa.me/?text=' + msg);
+        window.open(url, '_blank');
     }
 
     document.addEventListener('DOMContentLoaded', _cargarTicket);
