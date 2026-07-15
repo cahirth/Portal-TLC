@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | orden-servicio.html | v2026.07.15.1 -->
+<!-- Portal TLC | orden-servicio.html | v2026.07.15.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -295,10 +295,12 @@
         e.preventDefault();
         var nroOrden = document.querySelector('.doc-title').textContent.trim();
         var cliente  = document.getElementById('os-cliente').textContent.trim();
-        // Link corto propio (ir.tlcsrl.com.ar/[idTicket]) — mismo sistema
-        // que presupuesto.html, sin TinyURL ni terceros. Si por algún
-        // motivo no hay ID cargado, cae al link largo actual como respaldo.
-        var linkCorto = _idTicketActual ? ('https://ir.tlcsrl.com.ar/' + encodeURIComponent(_idTicketActual)) : window.location.href;
+        // Link con dominio propio (ir.tlcsrl.com.ar en vez de cahirth.github.io).
+        // Antes probamos la versión ultra-corta (vía 404.html) pero WhatsApp
+        // no arma el preview con logo ahí porque el servidor responde 404
+        // (GitHub Pages es estático) y WhatsApp corta apenas ve el 404. Esta
+        // ruta es un archivo real, responde 200, preview funciona siempre.
+        var linkCorto = _idTicketActual ? ('https://ir.tlcsrl.com.ar/orden-servicio.html?id=' + encodeURIComponent(_idTicketActual)) : window.location.href;
         var msg = encodeURIComponent(
             'Estimado/a, le compartimos la Orden de Asistencia Técnica de TLC SRL.' +
             ' | ' + nroOrden +

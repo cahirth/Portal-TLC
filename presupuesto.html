@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.15.2 -->
+<!-- Portal TLC | presupuesto.html | v2026.07.15.3 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -173,11 +173,14 @@
     } catch(e) { fecha = ''; }
 
     var urlActual = window.location.href;
-    // Link corto propio (sistema armado con Cristian: ir.tlcsrl.com.ar/[idCot]
-    // redirige instantáneo a esta misma página vía el 404.html receptor en
-    // la raíz del repo — nada de TinyURL ni terceros). Si por algún motivo
-    // idCot no está disponible, cae al link largo real como respaldo.
-    var urlParaCompartir = idCot ? ('https://ir.tlcsrl.com.ar/' + encodeURIComponent(idCot)) : urlActual;
+    // Link con dominio propio (ir.tlcsrl.com.ar en vez de cahirth.github.io).
+    // Antes probamos la versión ultra-corta (ir.tlcsrl.com.ar/[idCot], vía
+    // 404.html) pero WhatsApp no arma el preview con logo ahí porque el
+    // servidor responde 404 (GitHub Pages es estático, no puede fingir
+    // que esa ruta "existe" con código 200) — WhatsApp corta apenas ve el
+    // 404, sin importar que el contenido esté bien armado adentro. Esta
+    // ruta SÍ es un archivo real, responde 200, preview funciona siempre.
+    var urlParaCompartir = idCot ? ('https://ir.tlcsrl.com.ar/presupuesto.html?id=' + encodeURIComponent(idCot)) : urlActual;
     var telWsp = formatearTelefonoWsp(p.telefono);
     var saludo = 'Hola, le compartimos el presupuesto de Tecnología Láser Corneal SRL';
     var linkWsp = (function() {
