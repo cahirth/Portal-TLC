@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.12.3 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.14.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -5037,7 +5037,11 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
 
         '<' + 'script>',
         '(function(){',
-        '  var URL_PUBLICA  = ' + JSON.stringify(linkPublico || '') + ';',
+        // Link corto propio (ir.tlcsrl.com.ar/[idCot]) — sistema armado con
+        // Cristian para reemplazar TinyURL definitivamente, sin terceros.
+        // Redirige instantáneo vía el 404.html receptor en la raíz del repo.
+        // Si por algún motivo no hay idCot, cae al link largo real (linkPublico).
+        '  var URL_PUBLICA  = ' + JSON.stringify(idCot ? ('https://ir.tlcsrl.com.ar/' + idCot) : (linkPublico || '')) + ';',
         '  var TEL          = ' + JSON.stringify(wspTelSanitizado) + ';',
         '  var SALUDO       = ' + JSON.stringify(wspSaludoFinal) + ';',
         '  function buildLinkWsp(){',

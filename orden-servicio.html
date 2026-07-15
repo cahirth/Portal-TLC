@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | orden-servicio.html | v2026.07.12.3 -->
+<!-- Portal TLC | orden-servicio.html | v2026.07.14.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -181,6 +181,7 @@
     <script>
     var RTDB_URL  = 'https://portal-tlc-default-rtdb.firebaseio.com';
     var _clienteTelefono = ''; // ← teléfono real del cliente del ticket, se completa en _cargarTicket()
+    var _idTicketActual = ''; // ← ID real del ticket (TLC-ST-...), para armar el link corto
 
     var TECNICO_NOMBRE = {
       'juan_garro':         'Juan Garro',
@@ -229,6 +230,7 @@
 
             // Número de orden
             document.querySelector('.doc-title').textContent = 'Orden de Asistencia Técnica N°: ' + t.id_ticket;
+            _idTicketActual = t.id_ticket || '';
 
             // Fecha de apertura
             document.querySelector('.doc-subdata').innerHTML =
@@ -288,11 +290,15 @@
         e.preventDefault();
         var nroOrden = document.querySelector('.doc-title').textContent.trim();
         var cliente  = document.getElementById('os-cliente').textContent.trim();
+        // Link corto propio (ir.tlcsrl.com.ar/[idTicket]) — mismo sistema
+        // que presupuesto.html, sin TinyURL ni terceros. Si por algún
+        // motivo no hay ID cargado, cae al link largo actual como respaldo.
+        var linkCorto = _idTicketActual ? ('https://ir.tlcsrl.com.ar/' + encodeURIComponent(_idTicketActual)) : window.location.href;
         var msg = encodeURIComponent(
             'Estimado/a, le compartimos la Orden de Asistencia Técnica de TLC SRL.' +
             ' | ' + nroOrden +
             ' | Cliente: ' + cliente +
-            ' | ' + window.location.href
+            ' | ' + linkCorto
         );
         // Manda al teléfono real del cliente (t.telefono del ticket). Si
         // el ticket no tiene teléfono cargado, abre WhatsApp sin

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<!-- Portal TLC | 404.html (receptor de links cortos ir.tlcsrl.com.ar) | v2026.07.14.1 -->
+<!--
+  Este archivo vive en la RAÍZ del repo Portal-TLC (junto a index.html),
+  no adentro de ninguna carpeta. GitHub Pages sirve automáticamente
+  este archivo para cualquier URL que no exista como archivo real —
+  eso es justo lo que aprovechamos acá: ir.tlcsrl.com.ar/TLC-XXXXX
+  "no existe" como archivo, así que cae siempre acá.
+
+  No necesita consultar Firebase: el propio formato del ID ya nos dice
+  a qué documento corresponde.
+    - TLC-ST-YYYYMMDD-XXXX  → Orden de Servicio (tiene "-ST-")
+    - TLC-YYYYMMDD-XXXX     → Presupuesto (todo lo demás)
+
+  Si el link no tiene forma de ID válido (alguien entró directo a
+  ir.tlcsrl.com.ar sin nada más, o escribió cualquier cosa), redirige
+  a la web oficial de TLC en vez de mostrar una pantalla en blanco o
+  un error.
+-->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Redirigiendo…</title>
+<style>
+  body {
+    margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: #0f172a; color: #94a3b8; font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<div>Redirigiendo…</div>
+<script>
+(function () {
+  var BASE = 'https://cahirth.github.io/Portal-TLC/';
+  var FALLBACK = 'https://www.tlcsrl.com.ar/';
+
+  // El ID viaja en el path: ir.tlcsrl.com.ar/TLC-20260714-K9WV
+  // (sacamos las barras sobrantes al principio/final y decodificamos
+  // por si el navegador URL-encodeó algo)
+  var id = decodeURIComponent(
+    window.location.pathname.replace(/^\/+/, '').replace(/\/+$/, '')
+  );
+
+  var ES_ID_VALIDO = /^TLC-(ST-)?\d{8}-[A-Z0-9]{4,}$/i.test(id);
+
+  if (!ES_ID_VALIDO) {
+    window.location.replace(FALLBACK);
+  } else if (/^TLC-ST-/i.test(id)) {
+    window.location.replace(BASE + 'orden-servicio.html?id=' + encodeURIComponent(id));
+  } else {
+    window.location.replace(BASE + 'presupuesto.html?id=' + encodeURIComponent(id));
+  }
+})();
+</script>
+</body>
+</html>
