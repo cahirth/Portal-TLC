@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<!-- Portal TLC | checklist-HRK-1.html | v2026.07.16.1 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check List HRK-1 — Tecnología Láser Corneal</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: #f1f5f9;
+    color: #0f172a;
+    margin: 0;
+    padding: 20px 12px 60px;
+  }
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 28px 26px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+  .header-brand {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: 0.3px;
+  }
+  .header-brand span { color: #3a86ff; }
+  .doc-title {
+    text-align: right;
+  }
+  .doc-title h1 {
+    font-size: 20px;
+    margin: 0 0 2px;
+    color: #0f172a;
+  }
+  .doc-title .sub {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .datos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 20px;
+    margin-bottom: 24px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  @media (max-width: 560px) { .datos-grid { grid-template-columns: 1fr; } }
+  .campo label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    margin-bottom: 4px;
+  }
+  .campo input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+  }
+  .campo input:focus { outline: 2px solid #3a86ff; outline-offset: 1px; }
+
+  .item {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .item-cat {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .item-cat .n {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: #0f172a;
+    color: #fff;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .item-detail {
+    font-size: 13px;
+    color: #374151;
+    line-height: 1.55;
+    margin-bottom: 10px;
+    white-space: pre-line;
+  }
+  .item-imgs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+  .item-result {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .item-result .lbl { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+  .radio-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .radio-opt input[type=radio] { width: 16px; height: 16px; cursor: pointer; accent-color: #3a86ff; }
+  .radio-opt.ok input:checked ~ span, .radio-opt input:checked { accent-color: #16a34a; }
+  .radio-opt.bad input[type=radio] { accent-color: #dc2626; }
+
+  .valores-extra {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 10px 0;
+  }
+  .valores-extra .campo { flex: 1; min-width: 140px; }
+  .valores-extra input { text-align: center; font-weight: 700; }
+
+  .comment-box {
+    margin-top: 20px;
+  }
+  .comment-box label {
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 6px;
+  }
+  .comment-box textarea {
+    width: 100%;
+    min-height: 90px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+  }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-primary { background: #0f172a; color: #fff; }
+  .btn-primary:hover { background: #1e293b; }
+  .btn-secondary { background: transparent; border: 1px solid #cbd5e1; color: #475569; }
+  .btn-secondary:hover { background: #f1f5f9; }
+
+  .signature-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-top: 28px;
+  }
+  @media (max-width: 560px) { .signature-row { grid-template-columns: 1fr; } }
+  .signature-box {
+    border-top: 1px solid #0f172a;
+    padding-top: 6px;
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
+  }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page { box-shadow: none; padding: 10px 14px; }
+    .no-print { display: none !important; }
+    .item { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-brand">Tecnología <span>Láser</span> Corneal</div>
+    <div class="doc-title">
+      <h1>Protocolo de Control y Entrega Técnica</h1>
+      <div class="sub">HUVITZ HRK-1 · Autorefractómetro / Queratómetro</div>
+    </div>
+  </div>
+
+  <p style="font-size:12px;color:#475569;line-height:1.5;margin:-6px 0 20px;">
+    Este documento certifica que el autorefractómetro/queratómetro Huvitz HRK-1 ha sido sometido a un
+    riguroso proceso de mantenimiento preventivo, calibración óptica y control de sistemas
+    mecánicos/electrónicos conforme a las especificaciones del fabricante.
+  </p>
+
+  <div class="datos-grid">
+    <div class="campo"><label>Cliente / Clínica</label><input type="text" placeholder="Nombre del cliente / clínica"></div>
+    <div class="campo"><label>Fecha de Control</label><input type="date"></div>
+    <div class="campo"><label>N° de Serie</label><input type="text" placeholder="Serial number"></div>
+    <div class="campo"><label>Técnico Responsable</label><input type="text" placeholder="Técnico / Responsable"></div>
+  </div>
+
+  <div class="item-cat" style="font-size:15px;margin:6px 0 12px;">1. Calibración y Ajustes Ópticos (REF / KER)</div>
+  <div class="item">
+    <div class="item-cat"><span class="n">1</span>Alineación del Sistema Óptico (WD)</div>
+    <div class="item-detail">Ajuste de distancia de trabajo (KER working distance delta entre -0.05 y 0.05mm).</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r1" value="ok">OK</label>
+      <label class="radio-opt bad"><input type="radio" name="r1" value="falla">Falla</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">2</span>Calibración de Autorefracción (REF)</div>
+    <div class="item-detail">Verificación de dioptrías mediante ojo de prueba y registro de curvas estables de refracción.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r2" value="ok">OK</label>
+      <label class="radio-opt bad"><input type="radio" name="r2" value="falla">Falla</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">3</span>Calibración de Queratometría (KER)</div>
+    <div class="item-detail">Calibración del Mire-ring mediante esferas de testeo (curvaturas R: 6.71 a 9.51mm). Tolerancia ±0.1px.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r3" value="ok">OK</label>
+      <label class="radio-opt bad"><input type="radio" name="r3" value="falla">Falla</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">4</span>Calibración de Enfoque Óptico (Moving Assy)</div>
+    <div class="item-detail">Desplazamiento del módulo óptico uniforme según la dioptría para señal estable en retina.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r4" value="ok">OK</label>
+      <label class="radio-opt bad"><input type="radio" name="r4" value="falla">Falla</label>
+    </div>
+  </div>
+
+  <div class="item-cat" style="font-size:15px;margin:24px 0 12px;">2. Diagnóstico Mecánico y Motores</div>
+  <div class="item">
+    <div class="item-cat"><span class="n">5</span>Calibración del Motor BLDC (Prisma)</div>
+    <div class="item-detail">Calibración del motor rotatorio del prisma con confirmación de datos válidos (Data Valid).</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r5" value="ok">OK</label>
+      <label class="radio-opt bad"><input type="radio" name="r5" value="falla">Falla</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">6</span>Ajuste y Respuesta del Auto-Tracking (DCM)</div>
+    <div class="item-detail">Calibración de variables 'DIST CONST-UP/DOWN' para centrado automático sin oscilaciones.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r6" value="ok">OK</label>
+      <label class="radio-opt bad"><input type="radio" name="r6" value="falla">Falla</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">7</span>Movimiento Mecánico General (Joystick)</div>
+    <div class="item-detail">Movimiento fluido en los ejes X, Y y Z. Sistema de elevación y fijación mecánica óptimos.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r7" value="ok">OK</label>
+      <label class="radio-opt bad"><input type="radio" name="r7" value="falla">Falla</label>
+    </div>
+  </div>
+
+  <div class="item-cat" style="font-size:15px;margin:24px 0 12px;">3. Interfaz de Usuario y Sistema</div>
+  <div class="item">
+    <div class="item-cat"><span class="n">8</span>Actualización de Firmware (S/W)</div>
+    <div class="item-detail">Carga y validación de última versión de software estable de la placa principal.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r8" value="ok">OK</label>
+      <label class="radio-opt bad"><input type="radio" name="r8" value="falla">Falla</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">9</span>Pantalla Táctil y Botones Físicos</div>
+    <div class="item-detail">Operación correcta de pantalla LCD táctil, botón de disparo y accesos del menú.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r9" value="ok">OK</label>
+      <label class="radio-opt bad"><input type="radio" name="r9" value="falla">Falla</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">10</span>Impresora Térmica</div>
+    <div class="item-detail">Alimentación de papel adecuada y calidad de impresión de tickets clara y sin cortes.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r10" value="ok">OK</label>
+      <label class="radio-opt bad"><input type="radio" name="r10" value="falla">Falla</label>
+    </div>
+  </div>
+
+  <div class="comment-box">
+    <label>Observaciones del Servicio Técnico / Recomendaciones de Uso</label>
+    <textarea placeholder="Observaciones adicionales, repuestos utilizados, recomendaciones..."></textarea>
+  </div>
+
+  <div class="signature-row">
+    <div class="signature-box">Firma del Técnico Especialista</div>
+    <div class="signature-box">Recibido Conforme (Cliente)</div>
+  </div>
+
+  <div class="actions no-print">
+    <button class="btn btn-primary" onclick="window.print()">↓ Guardar / Imprimir PDF</button>
+    <button class="btn btn-secondary" onclick="if(confirm('¿Limpiar todos los campos del formulario?')) location.reload();">Limpiar formulario</button>
+  </div>
+
+</div>
+</body>
+</html>

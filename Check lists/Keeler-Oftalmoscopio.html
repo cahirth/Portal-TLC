@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<!-- Portal TLC | checklist-Keeler-Oftalmoscopio.html | v2026.07.16.1 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lista de Verificación Técnica — Keeler — Tecnología Láser Corneal</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: #f1f5f9;
+    color: #0f172a;
+    margin: 0;
+    padding: 20px 12px 60px;
+  }
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 28px 26px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+  .header-brand {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: 0.3px;
+  }
+  .header-brand span { color: #3a86ff; }
+  .doc-title {
+    text-align: right;
+  }
+  .doc-title h1 {
+    font-size: 20px;
+    margin: 0 0 2px;
+    color: #0f172a;
+  }
+  .doc-title .sub {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .datos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 20px;
+    margin-bottom: 24px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  @media (max-width: 560px) { .datos-grid { grid-template-columns: 1fr; } }
+  .campo label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    margin-bottom: 4px;
+  }
+  .campo input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+  }
+  .campo input:focus { outline: 2px solid #3a86ff; outline-offset: 1px; }
+
+  .item {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .item-cat {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .item-cat .n {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: #0f172a;
+    color: #fff;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .item-detail {
+    font-size: 13px;
+    color: #374151;
+    line-height: 1.55;
+    margin-bottom: 10px;
+    white-space: pre-line;
+  }
+  .item-imgs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+  .item-result {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .item-result .lbl { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+  .radio-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .radio-opt input[type=radio] { width: 16px; height: 16px; cursor: pointer; accent-color: #3a86ff; }
+  .radio-opt.ok input:checked ~ span, .radio-opt input:checked { accent-color: #16a34a; }
+  .radio-opt.bad input[type=radio] { accent-color: #dc2626; }
+
+  .valores-extra {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 10px 0;
+  }
+  .valores-extra .campo { flex: 1; min-width: 140px; }
+  .valores-extra input { text-align: center; font-weight: 700; }
+
+  .comment-box {
+    margin-top: 20px;
+  }
+  .comment-box label {
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 6px;
+  }
+  .comment-box textarea {
+    width: 100%;
+    min-height: 90px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+  }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-primary { background: #0f172a; color: #fff; }
+  .btn-primary:hover { background: #1e293b; }
+  .btn-secondary { background: transparent; border: 1px solid #cbd5e1; color: #475569; }
+  .btn-secondary:hover { background: #f1f5f9; }
+
+  .signature-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-top: 28px;
+  }
+  @media (max-width: 560px) { .signature-row { grid-template-columns: 1fr; } }
+  .signature-box {
+    border-top: 1px solid #0f172a;
+    padding-top: 6px;
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
+  }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page { box-shadow: none; padding: 10px 14px; }
+    .no-print { display: none !important; }
+    .item { break-inside: avoid; }
+  }
+</style>
+
+<style>
+  .datos-item {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px 8px 0 0;
+    overflow: hidden;
+    margin-top: 14px;
+  }
+  .datos-item > div { padding: 8px 12px; font-size: 12px; border-bottom: 1px solid #e2e8f0; }
+  .datos-item .campo-label { background: #f8fafc; font-weight: 700; color: #475569; }
+  .datos-item .campo-val input { width: 100%; border: none; background: transparent; font-size: 12px; font-family: inherit; padding: 0; }
+  .datos-item .campo-val input:focus { outline: 1px solid #3a86ff; border-radius: 3px; }
+  .check-tabla {
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    overflow: hidden;
+    margin-bottom: 22px;
+  }
+  .check-tabla-head {
+    display: grid; grid-template-columns: 50px 1fr;
+    background: #0f172a; color: #fff; font-size: 11px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .check-tabla-head > div { padding: 8px 12px; }
+  .check-row { display: grid; grid-template-columns: 50px 1fr; border-top: 1px solid #e2e8f0; }
+  .check-row:hover { background: #f8fafc; }
+  .check-row .check-box-cell { display: flex; align-items: center; justify-content: center; }
+  .check-row .check-box-cell input[type=checkbox] { width: 20px; height: 20px; cursor: pointer; accent-color: #16a34a; }
+  .check-row .check-text { padding: 10px 12px; font-size: 12.5px; color: #374151; line-height: 1.5; }
+  .check-row .check-text strong { color: #0f172a; }
+  .nota-soporte {
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+    padding: 12px 16px; font-size: 12px; color: #78350f; line-height: 1.6; margin-bottom: 20px;
+  }
+</style>
+
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-brand">Tecnología <span>Láser</span> Corneal</div>
+    <div class="doc-title">
+      <h1>Lista de Verificación Técnica</h1>
+      <div class="sub">Recepción, Control de Stock y Service de Componentes Médicos</div>
+    </div>
+  </div>
+
+  <div class="datos-grid">
+    <div class="campo"><label>Distribuidor Oficial</label><input type="text" value="Tecnología LASER-CORNEAL (Argentina) — www.tlcsrl.com.ar" readonly style="color:#64748b;"></div>
+    <div class="campo"><label>Fecha</label><input type="date"></div>
+    <div class="campo"><label>Marca de Equipos</label><input type="text" value="Keeler Ophthalmic Instruments" readonly style="color:#64748b;"></div>
+    <div class="campo"><label>Técnico</label><input type="text" placeholder="Técnico / Responsable"></div>
+  </div>
+
+  <div class="item-cat" style="font-size:15px;margin:20px 0 4px;"><span class="n">1</span>Cabezal de Oftalmoscopio y Lámpara</div>
+  <div class="datos-item">
+    <div class="campo-label">Descripción</div><div class="campo-val"><input type="text" placeholder="Ej: 3.6V PRACT OPHTH HEAD & BULB"></div>
+    <div class="campo-label">N° Catálogo / Reorden</div><div class="campo-val"><input type="text" placeholder="Ej: 1127-P-1004"></div>
+    <div class="campo-label">Número de Lote (LOT)</div><div class="campo-val"><input type="text" placeholder="Ej: 210810"></div>
+  </div>
+  <div class="check-tabla">
+    <div class="check-tabla-head"><div>OK</div><div>Punto de Control Técnico</div></div>
+    <div class="check-row">
+      <div class="check-box-cell"><input type="checkbox"></div>
+      <div class="check-text"><strong>Caja y Embalaje:</strong> Verificar que el empaque no presente impactos directos que comprometan la alineación óptica interna del cabezal.</div>
+    </div>
+    <div class="check-row">
+      <div class="check-box-cell"><input type="checkbox"></div>
+      <div class="check-text"><strong>Inspección Mecánica y Óptica:</strong> Comprobar la rotación suave del disco de lentes de Recoss y la correcta indexación de los filtros/aperturas en cada posición.</div>
+    </div>
+    <div class="check-row">
+      <div class="check-box-cell"><input type="checkbox"></div>
+      <div class="check-text"><strong>Estado de la Lámpara (Bulbo):</strong> Validar visualmente que el filamento del bulbo de 3.6V esté intacto y firmemente asentado en su alojamiento.</div>
+    </div>
+    <div class="check-row">
+      <div class="check-box-cell"><input type="checkbox"></div>
+      <div class="check-text"><strong>Contactos Eléctricos:</strong> Revisar que la base roscada o de encastre hacia el mango esté completamente limpia, libre de óxido o restos de sulfatación.</div>
+    </div>
+  </div>
+
+  <div class="item-cat" style="font-size:15px;margin:20px 0 4px;"><span class="n">2</span>Mini Cargador de Litio</div>
+  <div class="datos-item">
+    <div class="campo-label">Descripción</div><div class="campo-val"><input type="text" placeholder="Ej: LITHIUM MINI CHARGER"></div>
+    <div class="campo-label">Referencia (REF)</div><div class="campo-val"><input type="text" placeholder="Ej: 1941-P-1341"></div>
+    <div class="campo-label">Número de Lote (LOT)</div><div class="campo-val"><input type="text" placeholder="Ej: 230214"></div>
+    <div class="campo-label">Fecha de Fabricación</div><div class="campo-val"><input type="text" placeholder="Ej: 2023-02-14"></div>
+  </div>
+  <div class="check-tabla">
+    <div class="check-tabla-head"><div>OK</div><div>Punto de Control Técnico</div></div>
+    <div class="check-row">
+      <div class="check-box-cell"><input type="checkbox"></div>
+      <div class="check-text"><strong>Pines de Contacto:</strong> Constatar que los pines internos de carga en la base no se encuentren vencidos, hundidos o con deformaciones mecánicas.</div>
+    </div>
+    <div class="check-row">
+      <div class="check-box-cell"><input type="checkbox"></div>
+      <div class="check-text"><strong>Fuente de Alimentación:</strong> Comprobar la presencia del cable/transformador correspondiente y su compatibilidad eléctrica con el suministro local.</div>
+    </div>
+    <div class="check-row">
+      <div class="check-box-cell"><input type="checkbox"></div>
+      <div class="check-text"><strong>Condiciones de Almacenamiento:</strong> Verificar que la unidad no evidencie exposición a temperaturas extremas por debajo del límite de -10°C indicado en el rótulo.</div>
+    </div>
+    <div class="check-row">
+      <div class="check-box-cell"><input type="checkbox"></div>
+      <div class="check-text"><strong>Prueba Dinámica de Carga:</strong> Acoplar un mango de litio compatible para certificar la activación del indicador LED y la continuidad del flujo de corriente.</div>
+    </div>
+  </div>
+
+  <div class="nota-soporte">
+    <strong>Nota de Soporte:</strong> Ambos insumos corresponden a la distribución oficial autorizada en Argentina.
+    Ante cualquier anomalía técnica detectada durante este checklist, canalizar el reclamo adjuntando el número
+    de lote respectivo a través de la garantía oficial de soporte postventa.
+  </div>
+
+  <div class="comment-box">
+    <label>Observaciones adicionales</label>
+    <textarea placeholder="Anomalías detectadas, reclamos, notas adicionales..."></textarea>
+  </div>
+
+  <div class="signature-row">
+    <div class="signature-box">Firma del Técnico</div>
+    <div class="signature-box">Control de Recepción</div>
+  </div>
+
+  <div class="actions no-print">
+    <button class="btn btn-primary" onclick="window.print()">↓ Guardar / Imprimir PDF</button>
+    <button class="btn btn-secondary" onclick="if(confirm('¿Limpiar todos los campos del formulario?')) location.reload();">Limpiar formulario</button>
+  </div>
+
+</div>
+</body>
+</html>
