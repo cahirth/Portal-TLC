@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.15.2 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.15.3 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2458,6 +2458,9 @@ function toggleGrupo(key) {
 }
 
 function abrirCategoria(cat) {
+    document.getElementById('vista-resultados-busqueda')?.remove();
+    const bCats = document.getElementById('buscador-cats');
+    if (bCats) bCats.value = '';
     catActual = cat;
     subcatActual = 'TODAS';
     _grupoExpandido = null;
@@ -2531,6 +2534,9 @@ function navegarAtras() {
 }
 
 function volverCategorias() {
+    document.getElementById('vista-resultados-busqueda')?.remove();
+    const bCats = document.getElementById('buscador-cats');
+    if (bCats) bCats.value = '';
     catActual = null;
     subcatActual = 'TODAS';
     _mostrarVista('categorias');
@@ -2564,16 +2570,27 @@ function busquedaUniversal(q) {
 function _ejecutarBusqueda(q) {
     const qClean = sinAcentos(q.trim().toLowerCase());
 
+    // Detectar en qué pantalla estamos — antes esto siempre asumía que
+    // estábamos en "subcategorías" (usaba subcats-grid como ancla fijo),
+    // así que buscar desde la pantalla principal de categorías (que usa
+    // cats-grid) rompía en silencio: subcats-grid no existe ahí, y el
+    // código fallaba con un error de JS sin avisar nada al usuario.
+    const enCategorias = document.getElementById('vista-categorias').style.display !== 'none';
+    const gridId = enCategorias ? 'cats-grid' : 'subcats-grid';
+    const grid = document.getElementById(gridId);
+
     if (!qClean) {
-        // Reset: volver a la vista de subcategorías normal
+        // Reset: volver a la vista normal (categorías o subcategorías, según dónde estemos)
         document.getElementById('vista-resultados-busqueda')?.remove();
-        const grid = document.getElementById('subcats-grid');
         if (grid) grid.style.display = 'flex';
-        _renderSubcatsGrid(catActual);
+        if (enCategorias) renderCategorias(); else _renderSubcatsGrid(catActual);
         return;
     }
 
-    // Buscar en todos los dispositivos de la categoría actual
+    // Buscar en TODOS los dispositivos — catActual ya es null en la
+    // pantalla principal (se resetea en volverCategorias()), así que
+    // esta misma condición ya cubre "buscar en todo" sin hacer nada
+    // especial: si no hay categoría activa, no filtra por categoría.
     const base = dispositivos.filter(d =>
         !catActual || d['Categoria'] === catActual
     );
@@ -2585,8 +2602,7 @@ function _ejecutarBusqueda(q) {
         return nombre.includes(qClean) || desc.includes(qClean) || marca.includes(qClean);
     });
 
-    // Ocultar grid de subcategorías y mostrar resultados inline
-    const grid = document.getElementById('subcats-grid');
+    // Ocultar el grid de la pantalla actual y mostrar resultados inline
     if (grid) grid.style.display = 'none';
 
     let resDiv = document.getElementById('vista-resultados-busqueda');
