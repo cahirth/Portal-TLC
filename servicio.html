@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.14.2 -->
+<!-- Portal TLC | servicio.html | v2026.07.15.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -471,10 +471,18 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
     <div class="form-row">
       <div>
         <label class="form-label">Marca del equipo</label>
-        <input type="text" class="form-input" id="nuevo-marca" placeholder="Ej: HUVITZ, Topcon, Moria">
+        <select class="form-select" id="nuevo-marca" onchange="_actualizarModelosNuevo()">
+          <option value="">Seleccioná...</option>
+          <option value="HUVITZ">HUVITZ</option>
+          <option value="MICROCLEAR">MICROCLEAR</option>
+          <option value="KEELER">KEELER</option>
+          <option value="MEDLOGICS">MEDLOGICS</option>
+          <option value="OTROS">Otros</option>
+        </select>
       </div>
       <div>
         <label class="form-label">Modelo de equipo</label>
+        <select class="form-select" id="nuevo-modelo-select" onchange="document.getElementById('nuevo-modelo').value=this.value;" style="display:none;"></select>
         <input type="text" class="form-input" id="nuevo-modelo" placeholder="Ej: HOCT-1F">
       </div>
     </div>
@@ -1699,6 +1707,37 @@ window._confirmarEliminar = function(id) {
 };
 
 // ── Nuevo ticket ──────────────────────────────────────────────────
+// Modelos disponibles por marca — HOCT/HBM/APOLLO son las que tienen
+// checklist técnico asociado (ver pendiente de tarjetas especiales);
+// Keeler y Medlogics no tienen checklist, quedan como dato nomás.
+var MODELOS_POR_MARCA = {
+  'HUVITZ':     ['HRK-1', 'HBM-1', 'HOCT-1', 'HOCT-1F'],
+  'MICROCLEAR': ['APOLLO'],
+  'KEELER':     ['ALL PUPIL II', 'OFTALMOSCOPIO DIRECTO', 'RETINOSCOPIO DIRECTO'],
+  'MEDLOGICS':  ['CONSOLA ML7', 'PIEZA DE MANO ML7'],
+};
+
+window._actualizarModelosNuevo = function() {
+  var marca = document.getElementById('nuevo-marca').value;
+  var sel   = document.getElementById('nuevo-modelo-select');
+  var txt   = document.getElementById('nuevo-modelo');
+  var modelos = MODELOS_POR_MARCA[marca];
+  if (modelos) {
+    sel.innerHTML = '<option value="">Seleccioná...</option>' +
+      modelos.map(function(m) { return '<option value="' + m + '">' + m + '</option>'; }).join('');
+    sel.style.display = 'block';
+    sel.selectedIndex = 0;
+    txt.style.display = 'none';
+    txt.value = '';
+  } else {
+    // Marca "Otros" (o ninguna elegida todavía) → modelo vuelve a texto libre
+    sel.style.display = 'none';
+    sel.innerHTML = '';
+    txt.style.display = 'block';
+    txt.value = '';
+  }
+};
+
 window._abrirModalNuevo = function() {
   if (!_permisos.servicio) return;
   document.getElementById('modal-nuevo').classList.add('open');
@@ -1977,6 +2016,7 @@ window._crearTicket = function() {
       _cerrarModalNuevo();
       ['nuevo-cliente','nuevo-medico','nuevo-domicilio','nuevo-telefono','nuevo-marca','nuevo-modelo','nuevo-serie','nuevo-falla','nuevo-accesorios','nuevo-nota']
         .forEach(function(id){ var el=document.getElementById(id); if(el){ el.value=''; el.style.borderColor=''; } });
+      _actualizarModelosNuevo(); // vuelve el campo modelo a texto libre, oculta el select
       document.getElementById('nuevo-tipo-ingreso').value = 'recepcion';
       _stActualizarDeposito();
       _nuevoTicketFotos = [];
