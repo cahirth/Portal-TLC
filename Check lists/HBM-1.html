@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | checklist-HBM-1.html | v2026.07.17.3 -->
+<!-- Portal TLC | checklist-HBM-1.html | v2026.07.17.4 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -223,7 +223,13 @@
 <div class="page">
 
   <div class="header">
-    <div class="header-brand">Tecnología <span>Láser</span> Corneal</div>
+    <div class="header-brand" style="display:flex; align-items:center; gap:10px;">
+      <img src="https://lh3.googleusercontent.com/d/1HdFljwTWje8_7Yv3Muc2soSbZjKXy8_N"
+           style="width:32px; height:32px; object-fit:cover; border-radius:8px; flex-shrink:0;"
+           onerror="this.style.display='none'"
+           alt="Servicio Técnico">
+      Tecnología <span>Láser</span> Corneal
+    </div>
     <div class="doc-title">
       <h1>Check List — HBM-1</h1>
       <div class="sub">Biómetro óptico · Control de calibración</div>
@@ -236,7 +242,7 @@
     <div class="campo"><label>Dealer</label><input type="text" id="c-dealer" placeholder="Nombre del cliente / clínica"></div>
     <div class="campo"><label>Fecha</label><input type="date" id="c-fecha"></div>
     <div class="campo"><label>Modelo / N° de Serie</label><input type="text" id="c-serie" placeholder="HBM-1 / S/N"></div>
-    <div class="campo"><label>Responsable</label><input type="text" id="c-engineer" placeholder="Técnico / Responsable"></div>
+    <div class="campo"><label>Responsable</label><select id="c-engineer"><option value="">Cargando técnicos…</option></select></div>
   </div>
 
   <div class="item">
@@ -392,6 +398,53 @@ const TECNICO_NOMBRE_CL = {
     lucio_raineri: 'Lucio Raineri',
 };
 
+function _escHtmlCl(s) {
+    const d = document.createElement('div');
+    d.textContent = String(s || '');
+    return d.innerHTML;
+}
+
+// Agrega el valor como opción del <select> si todavía no existe (ej. un
+// nombre guardado antes que no vino en la lista de Vendedores) y lo
+// selecciona — así nunca se pierde un dato ya guardado por no matchear.
+function _asegurarOpcionCl(sel, valor) {
+    if (!sel || !valor) return;
+    const existe = Array.from(sel.options).some(function(o) { return o.value === valor; });
+    if (!existe) {
+        const opt = document.createElement('option');
+        opt.value = valor;
+        opt.textContent = valor;
+        sel.appendChild(opt);
+    }
+    sel.value = valor;
+}
+
+// Carga el dropdown de Responsable desde la hoja "Vendedores" (vía GAS,
+// acción 'listarTecnicos'). Si falla la carga (sin red, GAS caído, etc.),
+// convierte el campo a texto libre para no bloquear el checklist.
+async function _cargarTecnicosDropdown() {
+    const sel = document.getElementById('c-engineer');
+    if (!sel) return;
+    try {
+        const resp = await fetch(GAS_URL_CL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ accion: 'listarTecnicos' }),
+        });
+        const r = await resp.json();
+        if (!r.ok || !Array.isArray(r.tecnicos) || !r.tecnicos.length) throw new Error(r.error || 'Sin técnicos disponibles');
+        sel.innerHTML = '<option value="">-- Seleccionar --</option>' +
+            r.tecnicos.map(function(t) { return '<option value="' + _escHtmlCl(t.nombre) + '">' + _escHtmlCl(t.nombre) + '</option>'; }).join('');
+    } catch (err) {
+        console.warn('[Checklist] No se pudo cargar la lista de técnicos, se deja como texto libre:', err.message);
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = 'c-engineer';
+        input.placeholder = 'Técnico / Responsable';
+        sel.replaceWith(input);
+    }
+}
+
 function _getTicketId() {
     const params = new URLSearchParams(window.location.search);
     return params.get('ticket') || '';
@@ -429,7 +482,7 @@ function _aplicarDatosCl(d) {
     if (d.dealer !== undefined) document.getElementById('c-dealer').value = d.dealer;
     if (d.fecha !== undefined) document.getElementById('c-fecha').value = d.fecha;
     if (d.serie !== undefined) document.getElementById('c-serie').value = d.serie;
-    if (d.responsable !== undefined) document.getElementById('c-engineer').value = d.responsable;
+    if (d.responsable !== undefined) _asegurarOpcionCl(document.getElementById('c-engineer'), d.responsable);
     if (d.comentarios !== undefined) document.getElementById('c-comentarios').value = d.comentarios;
     if (d.respuestas) {
         Object.keys(d.respuestas).forEach(key => {
@@ -477,7 +530,7 @@ async function _cargarChecklistDesdeFirebase() {
         }
         if (responsableElPrefill && !responsableElPrefill.value) {
             const nombreTecnico = TECNICO_NOMBRE_CL[ticket.tecnico_asignado] || '';
-            if (nombreTecnico) responsableElPrefill.value = nombreTecnico;
+            if (nombreTecnico) _asegurarOpcionCl(responsableElPrefill, nombreTecnico);
         }
 
         const data = ticket.checklist_tecnico;
@@ -572,7 +625,10 @@ async function _completarChecklist() {
     }
 }
 
-_cargarChecklistDesdeFirebase();
+(async function _iniciarChecklistCl() {
+    await _cargarTecnicosDropdown();
+    await _cargarChecklistDesdeFirebase();
+})();
 </script>
 </body>
 </html>
