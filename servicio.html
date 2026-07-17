@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.16.2 -->
+<!-- Portal TLC | servicio.html | v2026.07.16.4 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -615,11 +615,24 @@ var CHECKLIST_POR_MODELO = {
     'KEELER PSL CLASSIC LED': 'Keeler-Oftalmoscopio.html',
 };
 
+function _escapeRegExpCl(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function _archivoChecklistParaModelo(modelo) {
     if (!modelo) return null;
-    var key = modelo.toString().trim().toUpperCase();
-    for (var k in CHECKLIST_POR_MODELO) {
-        if (k.toUpperCase() === key) return CHECKLIST_POR_MODELO[k];
+    var texto = modelo.toString().trim().toUpperCase();
+    if (!texto) return null;
+    // Busca la clave del mapeo dentro del texto del modelo, pero respetando
+    // límite de palabra: "HUVITZ HBM-1" matchea con la clave "HBM-1", pero
+    // "HUVITZ HBM-1M" (otro modelo distinto) NO matchea, porque después de
+    // "HBM-1" sigue una letra ("M") — no es un límite de palabra real.
+    // Se ordenan las claves de más larga a más corta para priorizar
+    // coincidencias más específicas (ej. "HOCT-1F" antes que "HOCT-1").
+    var claves = Object.keys(CHECKLIST_POR_MODELO).sort(function(a, b){ return b.length - a.length; });
+    for (var i = 0; i < claves.length; i++) {
+        var patron = new RegExp('(^|[^A-Z0-9])' + _escapeRegExpCl(claves[i].toUpperCase()) + '($|[^A-Z0-9])');
+        if (patron.test(texto)) return CHECKLIST_POR_MODELO[claves[i]];
     }
     return null;
 }
