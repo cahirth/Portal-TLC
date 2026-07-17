@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | checklist-HBM-1.html | v2026.07.16.1 -->
+<!-- Portal TLC | checklist-HBM-1.html | v2026.07.16.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -378,6 +378,7 @@ Usar el AL JIG (14mm, 40mm) — desviación de valor permitida ± 0.05. Tomar la
 //   servicio_tecnico/{ticketId}/checklist_tecnico
 // Si no hay ?ticket= en la URL, el checklist funciona standalone (sin guardar).
 const FIREBASE_RTDB_URL_CL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+const GAS_URL_CL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 const CL_MODELO = 'HBM-1';
 const CL_TOTAL_ITEMS = 10;
 
@@ -444,9 +445,28 @@ async function _cargarChecklistDesdeFirebase() {
     const ticketId = _getTicketId();
     if (!ticketId) return; // standalone, sin ticket vinculado
     try {
-        const resp = await fetch(`${FIREBASE_RTDB_URL_CL}/servicio_tecnico/${ticketId}/checklist_tecnico.json`, { cache: 'no-store' });
-        const data = await resp.json();
-        if (!data) return;
+        // Un solo fetch trae el ticket completo (incluye checklist_tecnico si ya existe)
+        const resp = await fetch(`${FIREBASE_RTDB_URL_CL}/servicio_tecnico/${ticketId}.json`, { cache: 'no-store' });
+        const ticket = await resp.json();
+        if (!ticket) {
+            _mostrarBannerCl('⚠️ No se encontró el ticket ' + ticketId + ' en el sistema.', 'error');
+            return;
+        }
+
+        // Prefill desde los datos del ticket (Soporte Técnico) — solo si el
+        // campo está vacío, para no pisar algo que el técnico ya haya tipeado.
+        const dealerEl = document.getElementById('c-dealer');
+        const fechaEl  = document.getElementById('c-fecha');
+        const serieEl  = document.getElementById('c-serie');
+        if (dealerEl && !dealerEl.value) dealerEl.value = ticket.cliente || '';
+        if (fechaEl && !fechaEl.value) fechaEl.value = new Date().toISOString().slice(0, 10);
+        if (serieEl && !serieEl.value) {
+            const partes = [ticket.equipo_modelo || '', ticket.equipo_serie || ''].filter(Boolean);
+            serieEl.value = partes.join(' / ');
+        }
+
+        const data = ticket.checklist_tecnico;
+        if (!data) return; // todavía no hay respuestas guardadas para este ticket
         _aplicarDatosCl(data);
         if (data.completado) {
             _bloquearFormularioCl();
@@ -470,11 +490,13 @@ async function _guardarChecklist(silencioso) {
     datos.completado = false;
     datos.fecha_guardado = new Date().toISOString();
     try {
-        const resp = await fetch(`${FIREBASE_RTDB_URL_CL}/servicio_tecnico/${ticketId}/checklist_tecnico.json`, {
-            method: 'PATCH',
-            body: JSON.stringify(datos),
+        const resp = await fetch(GAS_URL_CL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ accion: 'st_guardarChecklist', id_ticket: ticketId, checklist_tecnico: datos }),
         });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const r = await resp.json();
+        if (!r.ok) throw new Error(r.error || 'Error desconocido');
         if (!silencioso) _mostrarBannerCl('💾 Respuestas guardadas correctamente.', 'ok');
         return true;
     } catch (err) {
@@ -500,11 +522,13 @@ async function _completarChecklist() {
     datos.completado_por = responsable;
     datos.fecha_completado = new Date().toISOString();
     try {
-        const resp = await fetch(`${FIREBASE_RTDB_URL_CL}/servicio_tecnico/${ticketId}/checklist_tecnico.json`, {
-            method: 'PATCH',
-            body: JSON.stringify(datos),
+        const resp = await fetch(GAS_URL_CL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ accion: 'st_guardarChecklist', id_ticket: ticketId, checklist_tecnico: datos }),
         });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const r = await resp.json();
+        if (!r.ok) throw new Error(r.error || 'Error desconocido');
         _bloquearFormularioCl();
         _mostrarBannerCl(`✅ Checklist marcado como completado por ${responsable}. Solo lectura.`, 'ok');
     } catch (err) {
