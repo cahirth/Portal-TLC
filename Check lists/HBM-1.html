@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | checklist-HBM-1.html | v2026.07.16.2 -->
+<!-- Portal TLC | checklist-HBM-1.html | v2026.07.17.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -497,7 +497,7 @@ async function _guardarChecklist(silencioso) {
         });
         const r = await resp.json();
         if (!r.ok) throw new Error(r.error || 'Error desconocido');
-        if (!silencioso) _mostrarBannerCl('💾 Respuestas guardadas correctamente.', 'ok');
+        if (!silencioso) { _mostrarBannerCl('💾 Respuestas guardadas correctamente.', 'ok'); alert('💾 Checklist guardado correctamente.'); }
         return true;
     } catch (err) {
         if (!silencioso) alert('No se pudo guardar el checklist: ' + err.message);
@@ -531,6 +531,7 @@ async function _completarChecklist() {
         if (!r.ok) throw new Error(r.error || 'Error desconocido');
         _bloquearFormularioCl();
         _mostrarBannerCl(`✅ Checklist marcado como completado por ${responsable}. Solo lectura.`, 'ok');
+        alert(`✅ Checklist marcado como COMPLETADO por ${responsable}.`);
     } catch (err) {
         alert('No se pudo marcar el checklist como completado: ' + err.message);
     }
