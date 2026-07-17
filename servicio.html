@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.17.3 -->
+<!-- Portal TLC | servicio.html | v2026.07.17.4 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -287,6 +287,8 @@ body.tema-claro #avatar-menu-st [style*="background:#0a1628"] { background:#f8fa
 body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cbd5e1 !important; color:#0f172a !important; }
   html, body { overscroll-behavior-x: none; }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 </head>
 <body>
 
@@ -368,6 +370,17 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
             oninput="_guardarSaludoWspSt(this.value)"></textarea>
           <div style="font-size:10px;color:#334155;margin-top:3px;">Se guarda automáticamente · URL se agrega al final</div>
         </div>
+        <!-- Notificaciones push -->
+        <button id="btn-activar-push" onclick="_activarNotificacionesPush()"
+          style="width:100%;padding:11px;border-radius:10px;background:transparent;
+                 border:1px solid #1e3050;color:var(--text-main);font-size:13px;font-weight:600;
+                 cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+                 transition:background .15s;margin-bottom:8px;"
+          onmouseover="this.style.background='rgba(58,134,255,.08)'"
+          onmouseout="this.style.background='transparent'">
+          🔔 <span id="btn-activar-push-txt">Activar notificaciones</span>
+        </button>
+
         <!-- Cerrar sesión -->
         <button onclick="_cerrarSesionSt()"
           style="width:100%;padding:11px;border-radius:10px;background:transparent;
@@ -608,6 +621,21 @@ var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaK
 var RTDB_URL    = 'https://portal-tlc-default-rtdb.firebaseio.com';
 var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY    = 'tlc_tema';
+
+// ── Firebase Web SDK — solo para Cloud Messaging (push). El resto del
+//    Portal sigue usando la API REST de RTDB directo (fetch), esto es
+//    exclusivamente para poder pedir el token de push del navegador.
+var FIREBASE_WEB_CONFIG = {
+  apiKey: "AIzaSyBWErT79w26PGaWDCxzmcbvMzWaRJ-GzDU",
+  authDomain: "portal-tlc.firebaseapp.com",
+  databaseURL: "https://portal-tlc-default-rtdb.firebaseio.com",
+  projectId: "portal-tlc",
+  storageBucket: "portal-tlc.firebasestorage.app",
+  messagingSenderId: "379089734539",
+  appId: "1:379089734539:web:60fc2a3425d572e11cfd8e",
+};
+var FCM_VAPID_KEY = 'BB6mDz49NUdVV_C3tzMskY3_r9JU6A2UXtqFKxYaQsogj9sCQmTQsEF7AllTNT7fOqcjg1FT6tXoOacux05GpQM';
+
 var ORDEN_URL   = 'https://cahirth.github.io/Portal-TLC/orden-servicio.html?id=';
 var SELECTOR_URL = 'https://cahirth.github.io/Portal-TLC/selector-dispositivos.html';
 var CHECKLIST_URL_BASE = 'https://cahirth.github.io/Portal-TLC/Check%20lists/';
@@ -783,6 +811,7 @@ window._toggleTema = function() {
 
 // ── Avatar menu (igual a index.html) ──────────────────────────────
 function _inicializarAvatarSt(session) {
+  _actualizarBotonPush();
   var nombre   = session.name || session.username || '—';
   var email    = session.username || '—';
   var partes   = nombre.trim().split(' ');
@@ -1548,6 +1577,48 @@ window._enviarMensajeTicket = function(idTicket) {
   .catch(function(){ _stMostrarError('Error de conexión al enviar mensaje'); });
 };
 
+// ══════════════════════════════════════════════════════════════════
+// NOTIFICACIONES PUSH (FCM) — pedido de permiso + guardado de token
+// ══════════════════════════════════════════════════════════════════
+function _actualizarBotonPush() {
+  var txt = document.getElementById('btn-activar-push-txt');
+  if (!txt) return;
+  if (!('Notification' in window)) { txt.textContent = 'No disponible en este navegador'; return; }
+  if (Notification.permission === 'granted') txt.textContent = 'Notificaciones activadas ✓';
+  else if (Notification.permission === 'denied') txt.textContent = 'Notificaciones bloqueadas (revisar navegador)';
+  else txt.textContent = 'Activar notificaciones';
+}
+
+window._activarNotificacionesPush = async function() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    _stMostrarError('Este navegador no soporta notificaciones push.');
+    return;
+  }
+  try {
+    var permiso = await Notification.requestPermission();
+    _actualizarBotonPush();
+    if (permiso !== 'granted') {
+      if (permiso === 'denied') _stMostrarError('Bloqueaste las notificaciones. Para activarlas, habilitalas en la configuración del sitio del navegador.');
+      return;
+    }
+
+    if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(FIREBASE_WEB_CONFIG);
+    var messaging = firebase.messaging();
+    var registration = await navigator.serviceWorker.ready;
+    var token = await messaging.getToken({ vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: registration });
+    if (!token) { _stMostrarError('No se pudo generar el token de notificaciones.'); return; }
+
+    var email = (_session && _session.username) || '';
+    if (!email) return;
+    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'guardarTokenPush', email:email, token:token }) });
+    var r = await resp.json();
+    if (!r.ok) _stMostrarError('No se pudo guardar el token: ' + (r.error||'desconocido'));
+  } catch(err) {
+    console.error('[Push] Error activando notificaciones:', err);
+    _stMostrarError('Error activando notificaciones: ' + err.message);
+  }
+};
 
 function _campoBadge(deposito, etapaActivacion) {
   var idxActual = FLUJO_ETAPAS.indexOf(deposito);

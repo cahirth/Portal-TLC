@@ -1,3 +1,50 @@
+// Portal TLC | sw.js | v15
+// v15: Firebase Cloud Messaging — recepción de push en segundo plano.
+//      importScripts de firebase-app + firebase-messaging (compat, es
+//      lo único que funciona dentro de un Service Worker clásico sin
+//      bundler). onBackgroundMessage muestra la notificación nativa
+//      del sistema operativo; notificationclick abre/enfoca el ticket.
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+    apiKey: "AIzaSyBWErT79w26PGaWDCxzmcbvMzWaRJ-GzDU",
+    authDomain: "portal-tlc.firebaseapp.com",
+    databaseURL: "https://portal-tlc-default-rtdb.firebaseio.com",
+    projectId: "portal-tlc",
+    storageBucket: "portal-tlc.firebasestorage.app",
+    messagingSenderId: "379089734539",
+    appId: "1:379089734539:web:60fc2a3425d572e11cfd8e",
+});
+
+const _messaging = firebase.messaging();
+
+_messaging.onBackgroundMessage(function(payload) {
+    const titulo = (payload.notification && payload.notification.title) || 'Portal TLC';
+    const cuerpo = (payload.notification && payload.notification.body) || '';
+    const link = (payload.fcmOptions && payload.fcmOptions.link) ||
+                 (payload.data && payload.data.link) || './servicio.html';
+    self.registration.showNotification(titulo, {
+        body: cuerpo,
+        icon: './icons/icon-512.png',
+        badge: './icons/icon-512.png',
+        data: { link: link },
+    });
+});
+
+self.addEventListener('notificationclick', function(event) {
+    event.notification.close();
+    const link = (event.notification.data && event.notification.data.link) || './servicio.html';
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+            for (const c of clientList) {
+                if (c.url.includes('servicio.html') && 'focus' in c) { c.navigate(link); return c.focus(); }
+            }
+            if (clients.openWindow) return clients.openWindow(link);
+        })
+    );
+});
+
 // Portal TLC | sw.js | v14
 // v14: Fix "Failed to execute 'put' on 'Cache': Request method 'POST'
 //      is unsupported" — la Cache API solo permite cachear pedidos
@@ -11,7 +58,7 @@
 //      Cache-first solo para assets externos (Font Awesome, etc.).
 //      Limpia cachés viejas automáticamente al activar.
 
-const CACHE_NAME = 'portal-tlc-v14';
+const CACHE_NAME = 'portal-tlc-v15';
 
 const HTML_LOCAL = [
     './',
