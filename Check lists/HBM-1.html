@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | checklist-HBM-1.html | v2026.07.12.1 -->
+<!-- Portal TLC | checklist-HBM-1.html | v2026.07.16.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -230,6 +230,8 @@
     </div>
   </div>
 
+  <div id="cl-status-banner" class="no-print" style="display:none; margin-bottom:16px; padding:10px 14px; border-radius:8px; font-size:13px; font-weight:700; text-align:center;"></div>
+
   <div class="datos-grid">
     <div class="campo"><label>Dealer</label><input type="text" id="c-dealer" placeholder="Nombre del cliente / clínica"></div>
     <div class="campo"><label>Fecha</label><input type="date" id="c-fecha"></div>
@@ -361,10 +363,156 @@ Usar el AL JIG (14mm, 40mm) — desviación de valor permitida ± 0.05. Tomar la
   </div>
 
   <div class="actions no-print">
-    <button class="btn btn-primary" onclick="window.print()">↓ Guardar / Imprimir PDF</button>
-    <button class="btn btn-secondary" onclick="if(confirm('¿Limpiar todos los campos del formulario?')) document.getElementById(\'form-checklist\').reset ? document.getElementById(\'form-checklist\').reset() : location.reload();">Limpiar formulario</button>
+    <button class="btn btn-primary" id="cl-btn-guardar" onclick="_guardarChecklist()">💾 Guardar respuestas</button>
+    <button class="btn btn-primary" id="cl-btn-completar" style="background:#16a34a;" onclick="_completarChecklist()">✅ Marcar como completado</button>
+    <button class="btn btn-secondary" onclick="window.print()">🖨️ Imprimir / PDF</button>
+    <button class="btn btn-secondary" onclick="if(confirm('¿Limpiar todos los campos del formulario?')) location.reload();">Limpiar formulario</button>
   </div>
 
 </div>
+
+<script>
+// ── Integración con Firebase RTDB — Checklist técnico vinculado a un ticket ──
+// El checklist se identifica por el parámetro ?ticket=ID en la URL (igual que
+// orden-servicio.html). Las respuestas se guardan en:
+//   servicio_tecnico/{ticketId}/checklist_tecnico
+// Si no hay ?ticket= en la URL, el checklist funciona standalone (sin guardar).
+const FIREBASE_RTDB_URL_CL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+const CL_MODELO = 'HBM-1';
+const CL_TOTAL_ITEMS = 10;
+
+function _getTicketId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('ticket') || '';
+}
+
+function _mostrarBannerCl(texto, tipo) {
+    const b = document.getElementById('cl-status-banner');
+    if (!b) return;
+    b.style.display = 'block';
+    b.textContent = texto;
+    if (tipo === 'ok') { b.style.background = '#f0fdf4'; b.style.border = '1px solid #16a34a'; b.style.color = '#16a34a'; }
+    else if (tipo === 'warn') { b.style.background = '#fffbeb'; b.style.border = '1px solid #d97706'; b.style.color = '#d97706'; }
+    else { b.style.background = '#fef2f2'; b.style.border = '1px solid #dc2626'; b.style.color = '#dc2626'; }
+}
+
+function _recolectarDatosCl() {
+    const respuestas = {};
+    for (let i = 1; i <= CL_TOTAL_ITEMS; i++) {
+        const sel = document.querySelector(`input[name="r${i}"]:checked`);
+        respuestas['r' + i] = sel ? sel.value : '';
+    }
+    return {
+        modelo: CL_MODELO,
+        dealer: document.getElementById('c-dealer')?.value || '',
+        fecha: document.getElementById('c-fecha')?.value || '',
+        serie: document.getElementById('c-serie')?.value || '',
+        responsable: document.getElementById('c-engineer')?.value || '',
+        comentarios: document.getElementById('c-comentarios')?.value || '',
+        respuestas,
+    };
+}
+
+function _aplicarDatosCl(d) {
+    if (!d) return;
+    if (d.dealer !== undefined) document.getElementById('c-dealer').value = d.dealer;
+    if (d.fecha !== undefined) document.getElementById('c-fecha').value = d.fecha;
+    if (d.serie !== undefined) document.getElementById('c-serie').value = d.serie;
+    if (d.responsable !== undefined) document.getElementById('c-engineer').value = d.responsable;
+    if (d.comentarios !== undefined) document.getElementById('c-comentarios').value = d.comentarios;
+    if (d.respuestas) {
+        Object.keys(d.respuestas).forEach(key => {
+            const val = d.respuestas[key];
+            if (!val) return;
+            const el = document.querySelector(`input[name="${key}"][value="${val}"]`);
+            if (el) el.checked = true;
+        });
+    }
+}
+
+function _bloquearFormularioCl() {
+    document.querySelectorAll('.campo input, .comment-box textarea, .item-result input[type="radio"]').forEach(el => {
+        el.disabled = true;
+    });
+    const btnG = document.getElementById('cl-btn-guardar');
+    const btnC = document.getElementById('cl-btn-completar');
+    if (btnG) btnG.style.display = 'none';
+    if (btnC) btnC.style.display = 'none';
+}
+
+async function _cargarChecklistDesdeFirebase() {
+    const ticketId = _getTicketId();
+    if (!ticketId) return; // standalone, sin ticket vinculado
+    try {
+        const resp = await fetch(`${FIREBASE_RTDB_URL_CL}/servicio_tecnico/${ticketId}/checklist_tecnico.json`, { cache: 'no-store' });
+        const data = await resp.json();
+        if (!data) return;
+        _aplicarDatosCl(data);
+        if (data.completado) {
+            _bloquearFormularioCl();
+            const fechaComp = data.fecha_completado ? new Date(data.fecha_completado).toLocaleString('es-AR') : '';
+            _mostrarBannerCl(`✅ Checklist completado${data.completado_por ? ' por ' + data.completado_por : ''}${fechaComp ? ' — ' + fechaComp : ''}. Solo lectura.`, 'ok');
+        } else {
+            _mostrarBannerCl('📋 Checklist en progreso — se guardó una versión previa, revisá los datos antes de continuar.', 'warn');
+        }
+    } catch (err) {
+        console.warn('[Checklist] No se pudo cargar desde Firebase:', err.message);
+    }
+}
+
+async function _guardarChecklist(silencioso) {
+    const ticketId = _getTicketId();
+    if (!ticketId) {
+        if (!silencioso) alert('Este checklist no está vinculado a ningún ticket (falta el parámetro ?ticket= en la URL), así que no se puede guardar en el sistema. Podés igual imprimirlo/exportarlo a PDF.');
+        return false;
+    }
+    const datos = _recolectarDatosCl();
+    datos.completado = false;
+    datos.fecha_guardado = new Date().toISOString();
+    try {
+        const resp = await fetch(`${FIREBASE_RTDB_URL_CL}/servicio_tecnico/${ticketId}/checklist_tecnico.json`, {
+            method: 'PATCH',
+            body: JSON.stringify(datos),
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (!silencioso) _mostrarBannerCl('💾 Respuestas guardadas correctamente.', 'ok');
+        return true;
+    } catch (err) {
+        if (!silencioso) alert('No se pudo guardar el checklist: ' + err.message);
+        return false;
+    }
+}
+
+async function _completarChecklist() {
+    const ticketId = _getTicketId();
+    if (!ticketId) {
+        alert('Este checklist no está vinculado a ningún ticket, no se puede marcar como completado.');
+        return;
+    }
+    if (!confirm('¿Marcar este checklist como COMPLETADO? Una vez completado no se va a poder seguir editando.')) return;
+    const responsable = document.getElementById('c-engineer')?.value?.trim();
+    if (!responsable) {
+        alert('Completá el campo "Responsable" antes de marcar el checklist como completado.');
+        return;
+    }
+    const datos = _recolectarDatosCl();
+    datos.completado = true;
+    datos.completado_por = responsable;
+    datos.fecha_completado = new Date().toISOString();
+    try {
+        const resp = await fetch(`${FIREBASE_RTDB_URL_CL}/servicio_tecnico/${ticketId}/checklist_tecnico.json`, {
+            method: 'PATCH',
+            body: JSON.stringify(datos),
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        _bloquearFormularioCl();
+        _mostrarBannerCl(`✅ Checklist marcado como completado por ${responsable}. Solo lectura.`, 'ok');
+    } catch (err) {
+        alert('No se pudo marcar el checklist como completado: ' + err.message);
+    }
+}
+
+_cargarChecklistDesdeFirebase();
+</script>
 </body>
 </html>
