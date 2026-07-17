@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.16.4 -->
+<!-- Portal TLC | servicio.html | v2026.07.17.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1142,6 +1142,11 @@ function _validarGate(t, destino) {
     if (!t.partes_utilizadas || !t.partes_utilizadas.trim()) errores.push('Completá las partes utilizadas');
     if (!t.tareas_realizadas || !t.tareas_realizadas.trim()) errores.push('Completá las tareas realizadas');
     if (!t.reparado) errores.push('Tildá "Reparado" para confirmar que el equipo está listo');
+    // Si el modelo tiene un checklist técnico asociado, tiene que estar
+    // marcado como completado antes de pasar a Para Facturar.
+    if (_archivoChecklistParaModelo(t.equipo_modelo) && !(t.checklist_tecnico && t.checklist_tecnico.completado)) {
+      errores.push('Completá el checklist técnico antes de pasar a Para Facturar');
+    }
     if (errores.length) return errores;
   }
 
