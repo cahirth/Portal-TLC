@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | checklist-HOCT-1F.html | v2026.07.12.1 -->
+<!-- Portal TLC | checklist-HOCT-1F.html | v2026.07.17.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -223,18 +223,25 @@
 <div class="page">
 
   <div class="header">
-    <div class="header-brand">Tecnología <span>Láser</span> Corneal</div>
+    <div class="header-brand" style="display:flex; align-items:center;">
+      <img src="https://cahirth.github.io/Portal-TLC/icons/logo-tlc.png"
+           style="height:34px; width:auto; object-fit:contain;"
+           onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', 'Tecnología <span>Láser</span> Corneal')"
+           alt="Tecnología Láser Corneal">
+    </div>
     <div class="doc-title">
       <h1>Regular Check Sheet</h1>
       <div class="sub">HOCT-1 / HOCT-1F · OCT &amp; Fundus Camera</div>
     </div>
   </div>
 
+  <div id="cl-status-banner" class="no-print" style="display:none; margin-bottom:16px; padding:10px 14px; border-radius:8px; font-size:13px; font-weight:700; text-align:center;"></div>
+
   <div class="datos-grid">
-    <div class="campo"><label>Dealer</label><input type="text" placeholder="Nombre del cliente / clínica"></div>
-    <div class="campo"><label>Fecha</label><input type="date"></div>
-    <div class="campo"><label>N° de Serie</label><input type="text" placeholder="Serial number"></div>
-    <div class="campo"><label>Responsable</label><input type="text" placeholder="Técnico / Responsable"></div>
+    <div class="campo"><label>Dealer</label><input type="text" id="c-dealer" placeholder="Nombre del cliente / clínica"></div>
+    <div class="campo"><label>Fecha</label><input type="date" id="c-fecha"></div>
+    <div class="campo"><label>N° de Serie</label><input type="text" id="c-serie" placeholder="Serial number"></div>
+    <div class="campo"><label>Responsable</label><select id="c-engineer"><option value="">Cargando técnicos…</option></select></div>
     <div class="campo" style="grid-column: 1 / -1;">
       <label>Modelo</label>
       <div style="display:flex;gap:18px;margin-top:2px;">
@@ -431,7 +438,7 @@
 
   <div class="comment-box">
     <label>Comentarios</label>
-    <textarea placeholder="Observaciones adicionales, repuestos utilizados, recomendaciones..."></textarea>
+    <textarea id="c-comentarios" placeholder="Observaciones adicionales, repuestos utilizados, recomendaciones..."></textarea>
   </div>
 
   <div class="signature-row">
@@ -440,10 +447,260 @@
   </div>
 
   <div class="actions no-print">
-    <button class="btn btn-primary" onclick="window.print()">↓ Guardar / Imprimir PDF</button>
+    <button class="btn btn-primary" id="cl-btn-guardar" onclick="_guardarChecklist()">💾 Guardar respuestas</button>
+    <button class="btn btn-primary" id="cl-btn-completar" style="background:#16a34a;" onclick="_completarChecklist()">✅ Marcar como completado</button>
+    <button class="btn btn-secondary" onclick="window.print()">🖨️ Imprimir / PDF</button>
     <button class="btn btn-secondary" onclick="if(confirm('¿Limpiar todos los campos del formulario?')) location.reload();">Limpiar formulario</button>
   </div>
 
 </div>
+
+<script>
+// ── Integración con Firebase RTDB — Checklist técnico vinculado a un ticket ──
+const FIREBASE_RTDB_URL_CL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+const GAS_URL_CL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+const CL_MODELO = 'HOCT-1F';
+// Numeración de ítems no correlativa en este formulario (salta del 9 al 12)
+const CL_ITEM_IDS = [1,2,3,4,5,6,7,8,9,12,13,14,15,16,17,18];
+
+const TECNICO_NOMBRE_CL = {
+    sin_asignar: '', juan_garro: 'Juan Garro', damian_sosa: 'Damián Sosa',
+    fernando_del_campo: 'Fernando Del Campo', cristian_hirth: 'Cristian Hirth',
+    veronica_ribaita: 'Verónica Ribaita', lourdes_davalos: 'Lourdes Dávalos',
+    lucio_raineri: 'Lucio Raineri',
+};
+
+function _escHtmlCl(s) {
+    const d = document.createElement('div');
+    d.textContent = String(s || '');
+    return d.innerHTML;
+}
+
+function _asegurarOpcionCl(sel, valor) {
+    if (!sel || !valor) return;
+    const existe = Array.from(sel.options).some(function(o) { return o.value === valor; });
+    if (!existe) {
+        const opt = document.createElement('option');
+        opt.value = valor;
+        opt.textContent = valor;
+        sel.appendChild(opt);
+    }
+    sel.value = valor;
+}
+
+async function _cargarTecnicosDropdown() {
+    const sel = document.getElementById('c-engineer');
+    if (!sel) return;
+    try {
+        const resp = await fetch(GAS_URL_CL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ accion: 'listarTecnicos' }),
+        });
+        const r = await resp.json();
+        if (!r.ok || !Array.isArray(r.tecnicos) || !r.tecnicos.length) throw new Error(r.error || 'Sin técnicos disponibles');
+        sel.innerHTML = '<option value="">-- Seleccionar --</option>' +
+            r.tecnicos.map(function(t) { return '<option value="' + _escHtmlCl(t.nombre) + '">' + _escHtmlCl(t.nombre) + '</option>'; }).join('');
+    } catch (err) {
+        console.warn('[Checklist] No se pudo cargar la lista de técnicos, se deja como texto libre:', err.message);
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = 'c-engineer';
+        input.placeholder = 'Técnico / Responsable';
+        sel.replaceWith(input);
+    }
+}
+
+function _getTicketId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('ticket') || '';
+}
+
+function _mostrarBannerCl(texto, tipo) {
+    const b = document.getElementById('cl-status-banner');
+    if (!b) return;
+    b.style.display = 'block';
+    b.textContent = texto;
+    if (tipo === 'ok') { b.style.background = '#f0fdf4'; b.style.border = '1px solid #16a34a'; b.style.color = '#16a34a'; }
+    else if (tipo === 'warn') { b.style.background = '#fffbeb'; b.style.border = '1px solid #d97706'; b.style.color = '#d97706'; }
+    else { b.style.background = '#fef2f2'; b.style.border = '1px solid #dc2626'; b.style.color = '#dc2626'; }
+}
+
+function _recolectarDatosCl() {
+    const respuestas = {};
+    CL_ITEM_IDS.forEach(function(i) {
+        const sel = document.querySelector(`input[name="r${i}"]:checked`);
+        respuestas['r' + i] = sel ? sel.value : '';
+    });
+    const modeloSel = document.querySelector('input[name="modelo"]:checked');
+    return {
+        modelo: CL_MODELO,
+        submodelo: modeloSel ? modeloSel.value : '',
+        dealer: document.getElementById('c-dealer')?.value || '',
+        fecha: document.getElementById('c-fecha')?.value || '',
+        serie: document.getElementById('c-serie')?.value || '',
+        responsable: document.getElementById('c-engineer')?.value || '',
+        comentarios: document.getElementById('c-comentarios')?.value || '',
+        respuestas,
+    };
+}
+
+function _aplicarDatosCl(d) {
+    if (!d) return;
+    if (d.dealer !== undefined) document.getElementById('c-dealer').value = d.dealer;
+    if (d.fecha !== undefined) document.getElementById('c-fecha').value = d.fecha;
+    if (d.serie !== undefined) document.getElementById('c-serie').value = d.serie;
+    if (d.comentarios !== undefined) document.getElementById('c-comentarios').value = d.comentarios;
+    if (d.responsable !== undefined) _asegurarOpcionCl(document.getElementById('c-engineer'), d.responsable);
+    if (d.submodelo) {
+        const el = document.querySelector(`input[name="modelo"][value="${d.submodelo}"]`);
+        if (el) el.checked = true;
+    }
+    if (d.respuestas) {
+        Object.keys(d.respuestas).forEach(key => {
+            const val = d.respuestas[key];
+            if (!val) return;
+            const el = document.querySelector(`input[name="${key}"][value="${val}"]`);
+            if (el) el.checked = true;
+        });
+    }
+}
+
+function _bloquearFormularioCl() {
+    document.querySelectorAll('.campo input, .campo select, .comment-box textarea, .item-result input[type="radio"]').forEach(el => {
+        el.disabled = true;
+    });
+    const btnG = document.getElementById('cl-btn-guardar');
+    const btnC = document.getElementById('cl-btn-completar');
+    if (btnG) btnG.style.display = 'none';
+    if (btnC) btnC.style.display = 'none';
+}
+
+async function _cargarChecklistDesdeFirebase() {
+    const ticketId = _getTicketId();
+    if (!ticketId) return;
+    try {
+        const resp = await fetch(`${FIREBASE_RTDB_URL_CL}/servicio_tecnico/${ticketId}.json`, { cache: 'no-store' });
+        const ticket = await resp.json();
+        if (!ticket) {
+            _mostrarBannerCl('⚠️ No se encontró el ticket ' + ticketId + ' en el sistema.', 'error');
+            return;
+        }
+
+        const dealerEl = document.getElementById('c-dealer');
+        const fechaEl  = document.getElementById('c-fecha');
+        const serieEl  = document.getElementById('c-serie');
+        const responsableElPrefill = document.getElementById('c-engineer');
+        if (dealerEl && !dealerEl.value) dealerEl.value = ticket.cliente || '';
+        if (fechaEl && !fechaEl.value) fechaEl.value = new Date().toISOString().slice(0, 10);
+        if (serieEl && !serieEl.value) {
+            const partes = [ticket.equipo_modelo || '', ticket.equipo_serie || ''].filter(Boolean);
+            serieEl.value = partes.join(' / ');
+        }
+        if (responsableElPrefill && !responsableElPrefill.value) {
+            const nombreTecnico = TECNICO_NOMBRE_CL[ticket.tecnico_asignado] || '';
+            if (nombreTecnico) _asegurarOpcionCl(responsableElPrefill, nombreTecnico);
+        }
+        // Preseleccionar el submodelo (HOCT-1 / HOCT-1F) según el modelo del ticket
+        if (!document.querySelector('input[name="modelo"]:checked') && ticket.equipo_modelo) {
+            const modeloTxt = ticket.equipo_modelo.toUpperCase();
+            const sub = modeloTxt.indexOf('HOCT-1F') !== -1 ? 'HOCT-1F' : (modeloTxt.indexOf('HOCT-1') !== -1 ? 'HOCT-1' : '');
+            if (sub) { const el = document.querySelector(`input[name="modelo"][value="${sub}"]`); if (el) el.checked = true; }
+        }
+
+        const data = ticket.checklist_tecnico;
+        if (data) {
+            _aplicarDatosCl(data);
+            if (data.completado) {
+                _bloquearFormularioCl();
+                const fechaComp = data.fecha_completado ? new Date(data.fecha_completado).toLocaleString('es-AR') : '';
+                _mostrarBannerCl(`✅ Checklist completado${data.completado_por ? ' por ' + data.completado_por : ''}${fechaComp ? ' — ' + fechaComp : ''}. Solo lectura.`, 'ok');
+            } else {
+                _mostrarBannerCl('📋 Checklist en progreso — se guardó una versión previa, revisá los datos antes de continuar.', 'warn');
+            }
+        }
+
+        const responsableEl = document.getElementById('c-engineer');
+        const estaCompletado = !!(data && data.completado);
+        if (!estaCompletado && !responsableEl?.value?.trim()) {
+            _mostrarBannerCl('⚠️ Ingresá el nombre del técnico responsable antes de continuar — es obligatorio.', 'warn');
+            responsableEl?.focus();
+        }
+    } catch (err) {
+        console.warn('[Checklist] No se pudo cargar desde Firebase:', err.message);
+    }
+}
+
+async function _guardarChecklist(silencioso) {
+    const ticketId = _getTicketId();
+    if (!ticketId) {
+        if (!silencioso) alert('Este checklist no está vinculado a ningún ticket (falta el parámetro ?ticket= en la URL), así que no se puede guardar en el sistema. Podés igual imprimirlo/exportarlo a PDF.');
+        return false;
+    }
+    const responsableEl = document.getElementById('c-engineer');
+    if (!responsableEl?.value?.trim()) {
+        if (!silencioso) {
+            alert('Completá el campo "Responsable" antes de guardar el checklist. Es obligatorio.');
+            responsableEl?.focus();
+            responsableEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        return false;
+    }
+    const datos = _recolectarDatosCl();
+    datos.completado = false;
+    datos.fecha_guardado = new Date().toISOString();
+    try {
+        const resp = await fetch(GAS_URL_CL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ accion: 'st_guardarChecklist', id_ticket: ticketId, checklist_tecnico: datos }),
+        });
+        const r = await resp.json();
+        if (!r.ok) throw new Error(r.error || 'Error desconocido');
+        if (!silencioso) { _mostrarBannerCl('💾 Respuestas guardadas correctamente.', 'ok'); alert('💾 Checklist guardado correctamente.'); }
+        return true;
+    } catch (err) {
+        if (!silencioso) alert('No se pudo guardar el checklist: ' + err.message);
+        return false;
+    }
+}
+
+async function _completarChecklist() {
+    const ticketId = _getTicketId();
+    if (!ticketId) {
+        alert('Este checklist no está vinculado a ningún ticket, no se puede marcar como completado.');
+        return;
+    }
+    if (!confirm('¿Marcar este checklist como COMPLETADO? Una vez completado no se va a poder seguir editando.')) return;
+    const responsable = document.getElementById('c-engineer')?.value?.trim();
+    if (!responsable) {
+        alert('Completá el campo "Responsable" antes de marcar el checklist como completado.');
+        return;
+    }
+    const datos = _recolectarDatosCl();
+    datos.completado = true;
+    datos.completado_por = responsable;
+    datos.fecha_completado = new Date().toISOString();
+    try {
+        const resp = await fetch(GAS_URL_CL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ accion: 'st_guardarChecklist', id_ticket: ticketId, checklist_tecnico: datos }),
+        });
+        const r = await resp.json();
+        if (!r.ok) throw new Error(r.error || 'Error desconocido');
+        _bloquearFormularioCl();
+        _mostrarBannerCl(`✅ Checklist marcado como completado por ${responsable}. Solo lectura.`, 'ok');
+        alert(`✅ Checklist marcado como COMPLETADO por ${responsable}.`);
+    } catch (err) {
+        alert('No se pudo marcar el checklist como completado: ' + err.message);
+    }
+}
+
+(async function _iniciarChecklistCl() {
+    await _cargarTecnicosDropdown();
+    await _cargarChecklistDesdeFirebase();
+})();
+</script>
 </body>
 </html>
