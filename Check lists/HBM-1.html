@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | checklist-HBM-1.html | v2026.07.17.2 -->
+<!-- Portal TLC | checklist-HBM-1.html | v2026.07.17.3 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -382,6 +382,16 @@ const GAS_URL_CL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59Sza
 const CL_MODELO = 'HBM-1';
 const CL_TOTAL_ITEMS = 10;
 
+// Mapeo código interno del técnico (tecnico_asignado en el ticket) →
+// nombre completo para mostrar. Calcado del mismo mapeo que usa
+// servicio.html (_optsTecnico) para que el nombre coincida siempre.
+const TECNICO_NOMBRE_CL = {
+    sin_asignar: '', juan_garro: 'Juan Garro', damian_sosa: 'Damián Sosa',
+    fernando_del_campo: 'Fernando Del Campo', cristian_hirth: 'Cristian Hirth',
+    veronica_ribaita: 'Verónica Ribaita', lourdes_davalos: 'Lourdes Dávalos',
+    lucio_raineri: 'Lucio Raineri',
+};
+
 function _getTicketId() {
     const params = new URLSearchParams(window.location.search);
     return params.get('ticket') || '';
@@ -458,11 +468,16 @@ async function _cargarChecklistDesdeFirebase() {
         const dealerEl = document.getElementById('c-dealer');
         const fechaEl  = document.getElementById('c-fecha');
         const serieEl  = document.getElementById('c-serie');
+        const responsableElPrefill = document.getElementById('c-engineer');
         if (dealerEl && !dealerEl.value) dealerEl.value = ticket.cliente || '';
         if (fechaEl && !fechaEl.value) fechaEl.value = new Date().toISOString().slice(0, 10);
         if (serieEl && !serieEl.value) {
             const partes = [ticket.equipo_modelo || '', ticket.equipo_serie || ''].filter(Boolean);
             serieEl.value = partes.join(' / ');
+        }
+        if (responsableElPrefill && !responsableElPrefill.value) {
+            const nombreTecnico = TECNICO_NOMBRE_CL[ticket.tecnico_asignado] || '';
+            if (nombreTecnico) responsableElPrefill.value = nombreTecnico;
         }
 
         const data = ticket.checklist_tecnico;
