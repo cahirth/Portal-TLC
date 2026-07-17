@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | checklist-HBM-1.html | v2026.07.17.1 -->
+<!-- Portal TLC | checklist-HBM-1.html | v2026.07.17.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -466,14 +466,25 @@ async function _cargarChecklistDesdeFirebase() {
         }
 
         const data = ticket.checklist_tecnico;
-        if (!data) return; // todavía no hay respuestas guardadas para este ticket
-        _aplicarDatosCl(data);
-        if (data.completado) {
-            _bloquearFormularioCl();
-            const fechaComp = data.fecha_completado ? new Date(data.fecha_completado).toLocaleString('es-AR') : '';
-            _mostrarBannerCl(`✅ Checklist completado${data.completado_por ? ' por ' + data.completado_por : ''}${fechaComp ? ' — ' + fechaComp : ''}. Solo lectura.`, 'ok');
-        } else {
-            _mostrarBannerCl('📋 Checklist en progreso — se guardó una versión previa, revisá los datos antes de continuar.', 'warn');
+        if (data) {
+            _aplicarDatosCl(data);
+            if (data.completado) {
+                _bloquearFormularioCl();
+                const fechaComp = data.fecha_completado ? new Date(data.fecha_completado).toLocaleString('es-AR') : '';
+                _mostrarBannerCl(`✅ Checklist completado${data.completado_por ? ' por ' + data.completado_por : ''}${fechaComp ? ' — ' + fechaComp : ''}. Solo lectura.`, 'ok');
+            } else {
+                _mostrarBannerCl('📋 Checklist en progreso — se guardó una versión previa, revisá los datos antes de continuar.', 'warn');
+            }
+        }
+
+        // Responsable es obligatorio — se chequea cada vez que se abre el
+        // checklist (no solo al guardar/completar). Si está vacío y el
+        // checklist todavía no está completado, se lo exige de entrada.
+        const responsableEl = document.getElementById('c-engineer');
+        const estaCompletado = !!(data && data.completado);
+        if (!estaCompletado && !responsableEl?.value?.trim()) {
+            _mostrarBannerCl('⚠️ Ingresá el nombre del técnico responsable antes de continuar — es obligatorio.', 'warn');
+            responsableEl?.focus();
         }
     } catch (err) {
         console.warn('[Checklist] No se pudo cargar desde Firebase:', err.message);
@@ -484,6 +495,15 @@ async function _guardarChecklist(silencioso) {
     const ticketId = _getTicketId();
     if (!ticketId) {
         if (!silencioso) alert('Este checklist no está vinculado a ningún ticket (falta el parámetro ?ticket= en la URL), así que no se puede guardar en el sistema. Podés igual imprimirlo/exportarlo a PDF.');
+        return false;
+    }
+    const responsableEl = document.getElementById('c-engineer');
+    if (!responsableEl?.value?.trim()) {
+        if (!silencioso) {
+            alert('Completá el campo "Responsable" antes de guardar el checklist. Es obligatorio.');
+            responsableEl?.focus();
+            responsableEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
         return false;
     }
     const datos = _recolectarDatosCl();
