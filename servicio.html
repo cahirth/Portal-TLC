@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.15.4 -->
+<!-- Portal TLC | servicio.html | v2026.07.16.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -600,6 +600,29 @@ var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY    = 'tlc_tema';
 var ORDEN_URL   = 'https://cahirth.github.io/Portal-TLC/orden-servicio.html?id=';
 var SELECTOR_URL = 'https://cahirth.github.io/Portal-TLC/selector-dispositivos.html';
+var CHECKLIST_URL_BASE = 'https://cahirth.github.io/Portal-TLC/Check%20lists/';
+// Mapeo modelo de equipo → archivo de checklist técnico. Si el modelo del
+// ticket (t.equipo_modelo) matchea (case-insensitive, trim) alguna de estas
+// claves, se muestra la tarjeta "Checklist técnico disponible" en el detalle.
+var CHECKLIST_POR_MODELO = {
+    'HBM-1':    'HBM-1.html',
+    'HOCT-1':   'HOCT-1F.html',
+    'HOCT-1F':  'HOCT-1F.html',
+    'HRK-1':    'HRK-1.html',
+    // Keeler — los 3 modelos comparten el mismo checklist
+    'KEELER PSL ONE':      'Keeler-Oftalmoscopio.html',
+    'KEELER PSL CLASSIC':  'Keeler-Oftalmoscopio.html',
+    'KEELER PSL CLASSIC LED': 'Keeler-Oftalmoscopio.html',
+};
+
+function _archivoChecklistParaModelo(modelo) {
+    if (!modelo) return null;
+    var key = modelo.toString().trim().toUpperCase();
+    for (var k in CHECKLIST_POR_MODELO) {
+        if (k.toUpperCase() === key) return CHECKLIST_POR_MODELO[k];
+    }
+    return null;
+}
 
 // ── Columnas del Kanban ───────────────────────────────────────────
 // ── D: ID internos fijos — labels editables desde RTDB /servicio_config/columnas ──
@@ -1175,6 +1198,25 @@ function _renderDetalle(t) {
     '</div>' +
     '</div>' +
 
+    // CHECKLIST TÉCNICO — solo si el modelo del equipo matchea el mapeo
+    (function(){
+      var archivoChecklist = _archivoChecklistParaModelo(t.equipo_modelo);
+      if (!archivoChecklist) return '';
+      var urlChecklist = CHECKLIST_URL_BASE + archivoChecklist + '?ticket=' + encodeURIComponent(t.id_ticket);
+      return '<div style="padding:0 16px 10px;">' +
+        '<div id="checklist-card-wrap" style="display:flex;align-items:center;gap:10px;padding:12px 14px;' +
+          'border-radius:10px;border:1px solid #3a86ff;background:rgba(58,134,255,.08);">' +
+          '<span style="font-size:18px;">📋</span>' +
+          '<div style="flex:1;">' +
+            '<div style="font-size:13px;font-weight:700;color:var(--text-main);">Checklist técnico disponible</div>' +
+            '<div id="checklist-estado-txt" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Consultando estado…</div>' +
+          '</div>' +
+          '<a href="' + urlChecklist + '" target="_blank" style="padding:8px 14px;border-radius:8px;background:#3a86ff;color:#fff;' +
+            'font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap;">Abrir</a>' +
+        '</div>' +
+      '</div>';
+    })() +
+
     // INFO PRINCIPAL
     '<div class="det-section">Información del equipo</div>' +
     '<div class="det-card">' +
@@ -1299,6 +1341,33 @@ function _renderDetalle(t) {
 
     // PELIGRO — botón eliminar removido (tickets son documentos permanentes)
     '';
+
+  _actualizarEstadoChecklistCard(t.id_ticket);
+}
+
+// Consulta en Firebase si el checklist técnico del ticket ya fue completado
+// y actualiza el texto de estado en la tarjeta (si la tarjeta está presente).
+async function _actualizarEstadoChecklistCard(idTicket) {
+  var txtEl = document.getElementById('checklist-estado-txt');
+  if (!txtEl) return; // no hay tarjeta (el modelo no matchea el mapeo)
+  try {
+    var resp = await fetch(RTDB_URL + '/servicio_tecnico/' + idTicket + '/checklist_tecnico.json', { cache: 'no-store' });
+    var data = await resp.json();
+    if (!document.getElementById('checklist-estado-txt')) return; // el detalle pudo haberse cerrado
+    if (data && data.completado) {
+      var fecha = data.fecha_completado ? new Date(data.fecha_completado).toLocaleDateString('es-AR') : '';
+      document.getElementById('checklist-estado-txt').innerHTML = '✅ Completado' + (data.completado_por ? ' por ' + _esc(data.completado_por) : '') + (fecha ? ' · ' + fecha : '');
+      document.getElementById('checklist-estado-txt').style.color = '#16a34a';
+    } else if (data) {
+      document.getElementById('checklist-estado-txt').textContent = '📝 En progreso (sin completar)';
+    } else {
+      document.getElementById('checklist-estado-txt').textContent = 'Todavía no se completó ningún registro.';
+    }
+  } catch (err) {
+    if (document.getElementById('checklist-estado-txt')) {
+      document.getElementById('checklist-estado-txt').textContent = 'No se pudo consultar el estado.';
+    }
+  }
 }
 
 // ── CAMPOS TÉCNICOS ──────────────────────────────────────────────
