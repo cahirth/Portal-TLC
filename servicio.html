@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.17.4 -->
+<!-- Portal TLC | servicio.html | v2026.07.17.5 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1500,7 +1500,7 @@ function _renderPanelMensajes(t) {
     '<div class="det-card" style="position:relative;">' +
       '<textarea id="mensaje-nuevo-txt" placeholder="Escribí un mensaje… usá @ para mencionar a alguien del equipo" ' +
         'style="width:100%;min-height:64px;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border-glow);' +
-        'color:var(--text-main);font-size:12px;font-family:inherit;resize:vertical;" oninput="_onMensajeInput(event)"></textarea>' +
+        'color:var(--text-main);font-size:12px;font-family:inherit;resize:vertical;" oninput="_onMensajeInput(event)" onkeydown="_onMensajeKeydown(event)"></textarea>' +
       '<div id="mencion-sugerencias" style="display:none;position:absolute;left:14px;right:14px;bottom:56px;background:var(--panel-dark);' +
         'border:1px solid var(--border-glow);border-radius:8px;max-height:160px;overflow-y:auto;z-index:20;box-shadow:0 4px 16px rgba(0,0,0,.3);"></div>' +
       '<button type="button" onclick="_enviarMensajeTicket(\'' + t.id_ticket + '\')" ' +
@@ -1511,27 +1511,63 @@ function _renderPanelMensajes(t) {
   _cargarInternosMenciones();
 }
 
+var _mencionCandidatos = [];
+var _mencionIndiceResaltado = -1;
+
+function _renderSugerenciasMencion() {
+  var box = document.getElementById('mencion-sugerencias');
+  if (!box) return;
+  box.innerHTML = _mencionCandidatos.map(function(p, i) {
+    var resaltado = i === _mencionIndiceResaltado;
+    return '<div onclick="_elegirMencion(\'' + p.nombre.replace(/'/g,"\\'") + '\')" ' +
+      'onmouseenter="_mencionIndiceResaltado=' + i + ';_renderSugerenciasMencion();" ' +
+      'style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border-glow);' +
+      (resaltado ? 'background:var(--bg);' : 'background:transparent;') + '">👤 ' + _esc(p.nombre) + '</div>';
+  }).join('');
+}
+
 window._onMensajeInput = function(ev) {
   var ta = ev.target;
   var cursor = ta.selectionStart;
   var textoHastaCursor = ta.value.slice(0, cursor);
   var match = textoHastaCursor.match(/@([^\s@]*)$/); // último "@parcial" antes del cursor
   var box = document.getElementById('mencion-sugerencias');
-  if (!match || !_internosCache) { box.style.display = 'none'; return; }
+  if (!match || !_internosCache) { box.style.display = 'none'; _mencionCandidatos = []; _mencionIndiceResaltado = -1; return; }
 
   var parcial = match[1].toLowerCase();
-  var candidatos = _internosCache.filter(function(p) {
+  _mencionCandidatos = _internosCache.filter(function(p) {
     return p.nombre.toLowerCase().indexOf(parcial) !== -1;
   }).slice(0, 6);
 
-  if (!candidatos.length) { box.style.display = 'none'; return; }
+  if (!_mencionCandidatos.length) { box.style.display = 'none'; _mencionIndiceResaltado = -1; return; }
 
-  box.innerHTML = candidatos.map(function(p) {
-    return '<div onclick="_elegirMencion(\'' + p.nombre.replace(/'/g,"\\'") + '\')" ' +
-      'style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border-glow);" ' +
-      'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'transparent\'">👤 ' + _esc(p.nombre) + '</div>';
-  }).join('');
+  _mencionIndiceResaltado = 0; // primer resultado resaltado por default, para poder confirmar con Enter directo
+  _renderSugerenciasMencion();
   box.style.display = 'block';
+};
+
+window._onMensajeKeydown = function(ev) {
+  var box = document.getElementById('mencion-sugerencias');
+  var sugerenciasVisibles = box && box.style.display === 'block' && _mencionCandidatos.length;
+  if (!sugerenciasVisibles) return; // comportamiento normal del textarea (Enter = salto de línea, etc.)
+
+  if (ev.key === 'ArrowDown') {
+    ev.preventDefault();
+    _mencionIndiceResaltado = (_mencionIndiceResaltado + 1) % _mencionCandidatos.length;
+    _renderSugerenciasMencion();
+  } else if (ev.key === 'ArrowUp') {
+    ev.preventDefault();
+    _mencionIndiceResaltado = (_mencionIndiceResaltado - 1 + _mencionCandidatos.length) % _mencionCandidatos.length;
+    _renderSugerenciasMencion();
+  } else if (ev.key === 'Enter') {
+    ev.preventDefault(); // evita el salto de línea, confirma la mención resaltada
+    var elegido = _mencionCandidatos[_mencionIndiceResaltado] || _mencionCandidatos[0];
+    if (elegido) _elegirMencion(elegido.nombre);
+  } else if (ev.key === 'Escape') {
+    box.style.display = 'none';
+    _mencionCandidatos = [];
+    _mencionIndiceResaltado = -1;
+  }
 };
 
 window._elegirMencion = function(nombre) {
@@ -1541,6 +1577,8 @@ window._elegirMencion = function(nombre) {
   var despues = ta.value.slice(cursor);
   ta.value = antes + despues;
   document.getElementById('mencion-sugerencias').style.display = 'none';
+  _mencionCandidatos = [];
+  _mencionIndiceResaltado = -1;
   ta.focus();
 };
 
