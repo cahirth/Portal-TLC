@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.17.1 -->
+<!-- Portal TLC | servicio.html | v2026.07.17.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1292,7 +1292,22 @@ function _renderDetalle(t) {
     // FOTOS
     '<div class="det-section">Fotos del equipo</div>' +
     '<div class="det-card">' +
-      _renderFotosTicket(t, puedeEditar) +
+      _renderFotosTicket(t, puedeEditar, 'fotos') +
+    '</div>' +
+
+    // FOTOS ANTES / DESPUÉS DE REPARAR — mismo renglón, 2 columnas
+    '<div class="det-section">Fotos de la reparación</div>' +
+    '<div class="det-card">' +
+      '<div class="form-row">' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Antes de reparar</div>' +
+          _renderFotosTicket(t, puedeEditar, 'fotos_antes_reparar') +
+        '</div>' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Después de reparar</div>' +
+          _renderFotosTicket(t, puedeEditar, 'fotos_despues_reparar') +
+        '</div>' +
+      '</div>' +
     '</div>' +
 
     // ASIGNACIÓN Y ESTADO
@@ -1982,24 +1997,27 @@ window._quitarFotoNuevo = function(i) {
 };
 
 // ── Fotos en el detalle de un ticket ya creado ──────────────────────
-function _renderFotosTicket(t, puedeEditar) {
-  var fotos = Array.isArray(t.fotos) ? t.fotos : [];
-  var bloqueadas = t.fotos_bloqueadas || 0;
+// campo: 'fotos' (ingreso, con protección fotos_bloqueadas) |
+//        'fotos_antes_reparar' | 'fotos_despues_reparar' (libres, sin bloqueo)
+function _renderFotosTicket(t, puedeEditar, campo) {
+  campo = campo || 'fotos';
+  var fotos = Array.isArray(t[campo]) ? t[campo] : [];
+  var bloqueadas = (campo === 'fotos') ? (t.fotos_bloqueadas || 0) : 0;
   var thumbs = fotos.map(function(src, i) {
     var protegida = i < bloqueadas;
     return '<div style="position:relative;">' +
-      '<img src="' + src + '" onclick="_verFotoGrande(' + i + ')" ' +
+      '<img src="' + src + '" onclick="_verFotoGrande(\'' + campo + '\',' + i + ')" ' +
         'style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border-glow);cursor:pointer;">' +
       (protegida
         ? '<span title="Foto del ingreso — no se puede borrar" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#64748b;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;">🔒</span>'
         : (puedeEditar
-            ? '<button type="button" onclick="_eliminarFotoTicket(\'' + t.id_ticket + '\',' + i + ')" ' +
+            ? '<button type="button" onclick="_eliminarFotoTicket(\'' + t.id_ticket + '\',' + i + ',\'' + campo + '\')" ' +
                 'style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:12px;cursor:pointer;line-height:1;">✕</button>'
             : '')) +
     '</div>';
   }).join('');
   var addBtn = (puedeEditar && fotos.length < 3)
-    ? '<button type="button" onclick="_agregarFotoTicket(\'' + t.id_ticket + '\')" ' +
+    ? '<button type="button" onclick="_agregarFotoTicket(\'' + t.id_ticket + '\',\'' + campo + '\')" ' +
         'style="width:72px;height:72px;border-radius:8px;border:1.5px dashed var(--border-glow);background:none;color:var(--text-muted);font-size:24px;cursor:pointer;">+</button>'
     : '';
   if (!thumbs && !addBtn) return '<div style="color:var(--text-muted);font-size:12px;">Sin fotos.</div>';
@@ -2007,9 +2025,11 @@ function _renderFotosTicket(t, puedeEditar) {
 }
 
 var _fotoTicketIdPendiente = null;
+var _fotoTicketCampoPendiente = 'fotos';
 
-window._agregarFotoTicket = function(idTicket) {
+window._agregarFotoTicket = function(idTicket, campo) {
   _fotoTicketIdPendiente = idTicket;
+  _fotoTicketCampoPendiente = campo || 'fotos';
   document.getElementById('det-foto-input').click();
 };
 
@@ -2018,17 +2038,18 @@ window._onDetFotoSeleccionada = function(event) {
   event.target.value = '';
   if (!file || !_fotoTicketIdPendiente) return;
   var idTicket = _fotoTicketIdPendiente;
+  var campo = _fotoTicketCampoPendiente || 'fotos';
   _comprimirImagen(file, function(dataUrl) {
     fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({ accion:'st_agregarFoto', id_ticket:idTicket, foto:dataUrl }) })
+      body: JSON.stringify({ accion:'st_agregarFoto', id_ticket:idTicket, foto:dataUrl, campo:campo }) })
     .then(function(r){ return r.json(); })
     .then(function(r){
       if (r.ok) {
         var fotosNuevas = r.fotos || [];
         var t2 = _tickets.find(function(x){ return x.id_ticket === idTicket; });
-        if (t2) t2.fotos = fotosNuevas;
+        if (t2) t2[campo] = fotosNuevas;
         if (_ticketActual && _ticketActual.id_ticket === idTicket) {
-          _ticketActual.fotos = fotosNuevas;
+          _ticketActual[campo] = fotosNuevas;
           _renderDetalle(_ticketActual);
         }
       } else {
@@ -2039,23 +2060,24 @@ window._onDetFotoSeleccionada = function(event) {
   });
 };
 
-window._eliminarFotoTicket = function(idTicket, idx) {
-  var bloqueadas = (_ticketActual && _ticketActual.id_ticket === idTicket) ? (_ticketActual.fotos_bloqueadas || 0) : 0;
+window._eliminarFotoTicket = function(idTicket, idx, campo) {
+  campo = campo || 'fotos';
+  var bloqueadas = (campo === 'fotos' && _ticketActual && _ticketActual.id_ticket === idTicket) ? (_ticketActual.fotos_bloqueadas || 0) : 0;
   if (idx < bloqueadas) {
     _stMostrarError('Esta foto se cargó en el ingreso del equipo y no se puede eliminar.');
     return;
   }
   if (!confirm('¿Eliminar esta foto?')) return;
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'st_eliminarFoto', id_ticket:idTicket, indice:idx }) })
+    body: JSON.stringify({ accion:'st_eliminarFoto', id_ticket:idTicket, indice:idx, campo:campo }) })
   .then(function(r){ return r.json(); })
   .then(function(r){
     if (r.ok) {
       var fotosNuevas = r.fotos || [];
       var t2 = _tickets.find(function(x){ return x.id_ticket === idTicket; });
-      if (t2) t2.fotos = fotosNuevas;
+      if (t2) t2[campo] = fotosNuevas;
       if (_ticketActual && _ticketActual.id_ticket === idTicket) {
-        _ticketActual.fotos = fotosNuevas;
+        _ticketActual[campo] = fotosNuevas;
         _renderDetalle(_ticketActual);
       }
     } else {
@@ -2065,9 +2087,10 @@ window._eliminarFotoTicket = function(idTicket, idx) {
   .catch(function(){ _stMostrarError('Error de conexión'); });
 };
 
-window._verFotoGrande = function(idx) {
-  if (!_ticketActual || !Array.isArray(_ticketActual.fotos)) return;
-  var src = _ticketActual.fotos[idx];
+window._verFotoGrande = function(campo, idx) {
+  if (typeof idx === 'undefined') { idx = campo; campo = 'fotos'; } // compat con llamadas viejas (1 solo argumento)
+  if (!_ticketActual || !Array.isArray(_ticketActual[campo])) return;
+  var src = _ticketActual[campo][idx];
   if (!src) return;
   document.getElementById('st-lightbox-img').src = src;
   document.getElementById('st-lightbox').style.display = 'flex';
