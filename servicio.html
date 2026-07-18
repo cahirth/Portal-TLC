@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.17.20 -->
+<!-- Portal TLC | servicio.html | v2026.07.18.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1268,10 +1268,12 @@ window._abrirDetalle = function(id) {
   _renderDetalle(t);
   document.getElementById('st-detalle-overlay').classList.add('open');
   document.getElementById('st-detalle-overlay').scrollTop = 0;
+  _iniciarPollingMensajes(id);
 };
 window._cerrarDetalle = function() {
   document.getElementById('st-detalle-overlay').classList.remove('open');
   _ticketActual = null;
+  _detenerPollingMensajes();
 };
 
 function _renderDetalle(t) {
@@ -1542,6 +1544,49 @@ function _resaltarMencionesTexto(textoEscapado) {
     out = out.replace(new RegExp(patron, 'g'), '<span style="color:#3a86ff;font-weight:700;">@' + _esc(p.nombre) + '</span>');
   });
   return out;
+}
+
+// ── Polling de mensajes nuevos — mientras el detalle está abierto,
+//    revisa cada 8s si llegaron mensajes de otros usuarios (no hay
+//    listener en vivo, es la app REST-based de siempre). Solo actualiza
+//    la lista de mensajes, nunca el textarea, para no interrumpir si
+//    el usuario está escribiendo.
+var _pollingMensajesId = null;
+var _pollingMensajesTicket = null;
+
+function _iniciarPollingMensajes(idTicket) {
+  _detenerPollingMensajes();
+  _pollingMensajesTicket = idTicket;
+  _pollingMensajesId = setInterval(function() {
+    _refrescarMensajesTicket(idTicket);
+  }, 8000);
+}
+
+function _detenerPollingMensajes() {
+  if (_pollingMensajesId) { clearInterval(_pollingMensajesId); _pollingMensajesId = null; }
+  _pollingMensajesTicket = null;
+}
+
+async function _refrescarMensajesTicket(idTicket) {
+  if (!_ticketActual || _ticketActual.id_ticket !== idTicket) return; // se cerró/cambió de ticket mientras esperaba
+  try {
+    var resp = await fetch(RTDB_URL + '/servicio_tecnico/' + encodeURIComponent(idTicket) + '/mensajes.json', { cache:'no-store' });
+    var mensajesNuevos = await resp.json();
+    mensajesNuevos = Array.isArray(mensajesNuevos) ? mensajesNuevos : [];
+    if (!_ticketActual || _ticketActual.id_ticket !== idTicket) return; // pudo cerrarse mientras esperaba la respuesta
+
+    var actuales = Array.isArray(_ticketActual.mensajes) ? _ticketActual.mensajes : [];
+    if (mensajesNuevos.length === actuales.length) return; // sin cambios, no re-pintar innecesariamente
+
+    _ticketActual.mensajes = mensajesNuevos;
+    var t2 = _tickets.find(function(x){ return x.id_ticket === idTicket; });
+    if (t2) t2.mensajes = mensajesNuevos;
+
+    var listaEl = document.getElementById('mensajes-lista');
+    if (listaEl) listaEl.innerHTML = _construirHtmlListaMensajes(_ticketActual);
+  } catch(e) {
+    // silencioso — un fallo de polling puntual no debería molestar al usuario
+  }
 }
 
 function _construirHtmlListaMensajes(t) {
