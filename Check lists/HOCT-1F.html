@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | checklist-HOCT-1F.html | v2026.07.17.1 -->
+<!-- Portal TLC | checklist-HOCT-1F.html | v2026.07.17.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -221,6 +221,13 @@
 </head>
 <body>
 <div class="page">
+
+  <div class="no-print" style="margin-bottom:14px;">
+    <button onclick="_volverChecklist()" style="display:flex;align-items:center;gap:6px;padding:9px 16px;
+      border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;font-size:13px;font-weight:700;cursor:pointer;">
+      ← Volver
+    </button>
+  </div>
 
   <div class="header">
     <div class="header-brand" style="display:flex; align-items:center;">
@@ -515,6 +522,20 @@ function _getTicketId() {
     const params = new URLSearchParams(window.location.search);
     return params.get('ticket') || '';
 }
+
+// Volver al ticket de origen (si se abrió con ?ticket=ID) o, si no,
+// usar el historial del navegador — necesario porque en iPhone, al
+// abrir el Portal como app instalada, no hay gesto nativo de "atrás".
+function _volverChecklist() {
+    const ticketId = _getTicketId();
+    if (ticketId) {
+        window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(ticketId);
+        return;
+    }
+    if (window.history.length > 1) { window.history.back(); return; }
+    window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html';
+}
+
 
 function _mostrarBannerCl(texto, tipo) {
     const b = document.getElementById('cl-status-banner');
