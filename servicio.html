@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.17.11 -->
+<!-- Portal TLC | servicio.html | v2026.07.17.12 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1547,8 +1547,16 @@ function _renderPanelMensajes(t) {
         'style="margin-top:8px;width:100%;padding:8px;border-radius:8px;background:#3a86ff;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;">Enviar</button>' +
     '</div>';
 
-  // Carga los internos en segundo plano (no bloquea el render inicial)
-  _cargarInternosMenciones();
+  // Carga los internos en segundo plano. Si todavía no estaban en caché,
+  // los mensajes recién pintados arriba no tienen las @menciones
+  // resaltadas (dependen de esta lista) — por eso, apenas termina de
+  // cargar, se vuelve a pintar el panel para aplicar el resaltado.
+  var yaEstabaCache = !!_internosCache;
+  _cargarInternosMenciones().then(function() {
+    if (!yaEstabaCache && _ticketActual && _ticketActual.id_ticket === t.id_ticket) {
+      _renderPanelMensajes(_ticketActual);
+    }
+  });
 }
 
 var _mencionCandidatos = [];
@@ -1564,7 +1572,7 @@ window._renderSugerenciasMencion = function _renderSugerenciasMencion() {
   if (!box) return;
   box.innerHTML = _mencionCandidatos.map(function(p, i) {
     var resaltado = i === _mencionIndiceResaltado;
-    return '<div onclick="_elegirMencion(\'' + p.nombre.replace(/'/g,"\\'") + '\')" ' +
+    return '<div onmousedown="event.preventDefault(); _elegirMencion(\'' + p.nombre.replace(/'/g,"\\'") + '\')" ' +
       'onmouseenter="_resaltarMencionHover(' + i + ')" ' +
       'style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border-glow);' +
       (resaltado ? 'background:#3a86ff;color:#fff;font-weight:700;' : 'background:transparent;color:var(--text-main);') + '">👤 ' + _esc(p.nombre) + '</div>';
