@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.17.12 -->
+<!-- Portal TLC | servicio.html | v2026.07.17.13 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -381,15 +381,15 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
           🔔 <span id="btn-activar-push-txt">Activar notificaciones</span>
         </button>
 
-        <!-- Cómo instalar la app (solo iPhone) -->
-        <button id="btn-como-instalar" onclick="_mostrarModalInstalarIOS()" style="display:none;
+        <!-- Cómo instalar la app (iPhone y Android, siempre visible salvo ya instalada) -->
+        <button id="btn-como-instalar" onclick="_manejarClickInstalarApp()" style="
           width:100%;padding:11px;border-radius:10px;background:transparent;
                  border:1px solid #1e3050;color:var(--text-main);font-size:13px;font-weight:600;
-                 cursor:pointer;align-items:center;justify-content:center;gap:8px;
+                 cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
                  transition:background .15s;margin-bottom:8px;"
           onmouseover="this.style.background='rgba(58,134,255,.08)'"
           onmouseout="this.style.background='transparent'">
-          📲 Cómo instalar la app
+          📲 <span id="btn-como-instalar-txt">Cómo instalar la app</span>
         </button>
 
         <!-- Cerrar sesión -->
@@ -646,6 +646,34 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
       <div style="font-size:13px;color:var(--text-main);">Confirmá tocando <strong>"Agregar"</strong>. Abrí el Portal desde el ícono nuevo (no desde Safari) y ahí sí activá las notificaciones.</div>
     </div>
     <button onclick="_cerrarModalInstalarIOS()" style="width:100%;padding:11px;border-radius:10px;background:#3a86ff;color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;">Entendido</button>
+  </div>
+</div>
+
+<!-- Instrucciones de instalación en Android (fallback manual, cuando el navegador no ofrece la invitación automática) -->
+<div id="modal-instalar-android" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:flex-end;justify-content:center;">
+  <div style="background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:16px 16px 0 0;
+              max-width:420px;width:100%;padding:22px 20px 26px;box-shadow:0 -8px 30px rgba(0,0,0,.4);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:800;color:var(--text-main);">📲 Instalá el Portal TLC</div>
+      <button onclick="_cerrarModalInstalarAndroid()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;line-height:1;padding:4px;">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--text-main);line-height:1.6;margin-bottom:16px;">
+      Instalá el Portal como app en tu celular para tenerlo a mano como cualquier otra
+      aplicación y que las notificaciones funcionen mejor.
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:10px;margin-bottom:8px;">
+      <div style="width:26px;height:26px;border-radius:50%;background:#3a86ff;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</div>
+      <div style="font-size:13px;color:var(--text-main);">Tocá el menú <strong>⋮</strong> (los tres puntos, arriba a la derecha del navegador).</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:10px;margin-bottom:8px;">
+      <div style="width:26px;height:26px;border-radius:50%;background:#3a86ff;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div>
+      <div style="font-size:13px;color:var(--text-main);">Elegí <strong>"Instalar aplicación"</strong> (o <strong>"Agregar a pantalla de inicio"</strong>, según la versión del navegador).</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:10px;margin-bottom:18px;">
+      <div style="width:26px;height:26px;border-radius:50%;background:#3a86ff;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</div>
+      <div style="font-size:13px;color:var(--text-main);">Confirmá. Va a aparecer un ícono nuevo en tu pantalla de inicio — abrí el Portal desde ahí de ahora en adelante.</div>
+    </div>
+    <button onclick="_cerrarModalInstalarAndroid()" style="width:100%;padding:11px;border-radius:10px;background:#3a86ff;color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;">Entendido</button>
   </div>
 </div>
 
@@ -1674,13 +1702,32 @@ window._enviarMensajeTicket = function(idTicket) {
 // NOTIFICACIONES PUSH (FCM) — pedido de permiso + guardado de token
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-// INSTALACIÓN PWA EN IPHONE — banner/modal manual (iOS no tiene el
-// prompt automático que sí tiene Android/Chrome)
+// INSTALACIÓN PWA — iPhone (modal manual, iOS no tiene prompt nativo) +
+// Android (intenta el prompt nativo del navegador; si no está
+// disponible, modal manual como respaldo). El botón queda SIEMPRE
+// visible en el menú de avatar (salvo que ya esté instalada y la
+// estén usando desde el ícono) — no se esconde después de la primera
+// vez, para que cualquiera lo pueda encontrar cuando quiera.
 // ══════════════════════════════════════════════════════════════════
 var IOS_INSTALL_DISMISSED_KEY = 'tlc_ios_install_dismissed';
+var _deferredInstallPrompt = null; // evento beforeinstallprompt capturado (Android/Chrome)
+
+// Captura el evento nativo de instalación apenas el navegador lo
+// dispara, y le hacemos preventDefault para controlar nosotros CUÁNDO
+// mostrarlo (con nuestro botón) en vez del mini-banner automático del
+// navegador. Tiene que registrarse fuera de cualquier función, apenas
+// carga la página, porque el evento puede disparar en cualquier momento.
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+});
 
 function _esIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+function _esAndroid() {
+  return /Android/.test(navigator.userAgent);
 }
 
 function _esStandalonePWA() {
@@ -1689,18 +1736,47 @@ function _esStandalonePWA() {
 }
 
 function _chequearInstalacionIOS() {
-  if (!_esIOS()) return; // Android/Desktop no lo necesitan
   var btn = document.getElementById('btn-como-instalar');
   if (_esStandalonePWA()) {
     // Ya está instalada y la están usando desde el ícono — no hace
-    // falta ni el botón del menú ni el aviso automático.
+    // falta ofrecer instalarla de nuevo.
+    if (btn) btn.style.display = 'none';
     return;
   }
-  if (btn) btn.style.display = 'flex'; // visible en el menú de avatar para verlo cuando quieran
-  if (!localStorage.getItem(IOS_INSTALL_DISMISSED_KEY)) {
+  // Visible siempre (iPhone, Android, y hasta desktop por si alguien
+  // quiere instalarla como app de escritorio) — permanente en el menú.
+  if (btn) btn.style.display = 'flex';
+
+  // Solo en iPhone se muestra el aviso automático la primera vez (en
+  // Android el navegador ya tiene su propio mecanismo de invitación).
+  if (_esIOS() && !localStorage.getItem(IOS_INSTALL_DISMISSED_KEY)) {
     _mostrarModalInstalarIOS();
   }
 }
+
+window._manejarClickInstalarApp = function() {
+  if (_esIOS()) {
+    _mostrarModalInstalarIOS();
+    return;
+  }
+  if (_deferredInstallPrompt) {
+    // Forzamos la invitación nativa del navegador (Android/Chrome) —
+    // esto es lo mismo que el mini-banner automático, pero disparado
+    // a demanda desde nuestro botón en vez de esperar a que aparezca solo.
+    _deferredInstallPrompt.prompt();
+    _deferredInstallPrompt.userChoice.then(function(resultado) {
+      if (resultado.outcome === 'accepted') {
+        _deferredInstallPrompt = null;
+        var btn = document.getElementById('btn-como-instalar');
+        if (btn) btn.style.display = 'none';
+      }
+    });
+    return;
+  }
+  // El navegador no disparó el evento nativo (ya se rechazó antes,
+  // versión vieja, o no es Chrome/Edge) — instrucciones manuales.
+  _mostrarModalInstalarAndroid();
+};
 
 window._mostrarModalInstalarIOS = function() {
   var m = document.getElementById('modal-instalar-ios');
@@ -1711,6 +1787,16 @@ window._cerrarModalInstalarIOS = function() {
   var m = document.getElementById('modal-instalar-ios');
   if (m) m.style.display = 'none';
   localStorage.setItem(IOS_INSTALL_DISMISSED_KEY, '1'); // no lo vuelve a mostrar solo, pero sigue en el menú
+};
+
+window._mostrarModalInstalarAndroid = function() {
+  var m = document.getElementById('modal-instalar-android');
+  if (m) m.style.display = 'flex';
+};
+
+window._cerrarModalInstalarAndroid = function() {
+  var m = document.getElementById('modal-instalar-android');
+  if (m) m.style.display = 'none';
 };
 
 function _actualizarBotonPush() {
