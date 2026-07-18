@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.17.17 -->
+<!-- Portal TLC | servicio.html | v2026.07.17.18 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1568,7 +1568,7 @@ function _renderPanelMensajes(t) {
     '<div class="det-card" style="position:relative;">' +
       '<textarea id="mensaje-nuevo-txt" placeholder="Escribí un mensaje… usá @ para mencionar a alguien del equipo" ' +
         'style="width:100%;min-height:64px;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border-glow);' +
-        'color:var(--text-main);font-size:12px;font-family:inherit;resize:vertical;" oninput="_onMensajeInput(event)" onkeydown="_onMensajeKeydown(event)"></textarea>' +
+        'color:var(--text-main);font-size:12px;font-family:inherit;resize:vertical;" oninput="_onMensajeInput(event)" onkeydown="_onMensajeKeydown(event)" onclick="_mencionUltimoCursor=this.selectionStart;" onkeyup="_mencionUltimoCursor=this.selectionStart;" ontouchend="_mencionUltimoCursor=this.selectionStart;"></textarea>' +
       '<div id="mencion-sugerencias" style="display:none;margin-top:6px;background:var(--bg);' +
         'border:1px solid var(--border-glow);border-radius:8px;max-height:160px;overflow-y:auto;"></div>' +
       '<button type="button" onclick="_enviarMensajeTicket(\'' + t.id_ticket + '\')" ' +
@@ -1589,7 +1589,7 @@ function _renderPanelMensajes(t) {
 
 var _mencionCandidatos = [];
 var _mencionIndiceResaltado = -1;
-var _mencionTouchY = 0; // posición Y del dedo al tocar, para distinguir tap de scroll
+var _mencionUltimoCursor = 0; // posición del cursor guardada en cada cambio — evita depender de selectionStart justo al tocar el botón, que en mobile puede quedar afectado por el blur del teclado
 
 window._resaltarMencionHover = function(i) {
   _mencionIndiceResaltado = i;
@@ -1601,9 +1601,7 @@ window._renderSugerenciasMencion = function _renderSugerenciasMencion() {
   if (!box) return;
   box.innerHTML = _mencionCandidatos.map(function(p, i) {
     var resaltado = i === _mencionIndiceResaltado;
-    return '<button type="button" ontouchstart="_mencionTouchY=event.touches[0].clientY;" ' +
-      'ontouchend="if (Math.abs(event.changedTouches[0].clientY-_mencionTouchY)<10){event.preventDefault();_elegirMencion(\'' + p.nombre.replace(/'/g,"\\'") + '\');}" ' +
-      'onclick="_elegirMencion(\'' + p.nombre.replace(/'/g,"\\'") + '\')" ' +
+    return '<button type="button" onclick="_elegirMencion(\'' + p.nombre.replace(/'/g,"\\'") + '\')" ' +
       'onmouseenter="_resaltarMencionHover(' + i + ')" ' +
       'style="display:block;width:100%;text-align:left;padding:9px 10px;font-size:12px;cursor:pointer;border:none;border-bottom:1px solid var(--border-glow);font-family:inherit;' +
       (resaltado ? 'background:#3a86ff;color:#fff;font-weight:700;' : 'background:transparent;color:var(--text-main);') + '">👤 ' + _esc(p.nombre) + '</button>';
@@ -1615,10 +1613,25 @@ window._renderSugerenciasMencion = function _renderSugerenciasMencion() {
 window._onMensajeInput = function(ev) {
   var ta = ev.target;
   var cursor = ta.selectionStart;
+  _mencionUltimoCursor = cursor; // guardado apenas se escribe, mientras el foco todavía está sano
   var textoHastaCursor = ta.value.slice(0, cursor);
   var match = textoHastaCursor.match(/@([^\s@]*)$/); // último "@parcial" antes del cursor
   var box = document.getElementById('mencion-sugerencias');
-  if (!match || !_internosCache) { box.style.display = 'none'; _mencionCandidatos = []; _mencionIndiceResaltado = -1; return; }
+  if (!match) { box.style.display = 'none'; _mencionCandidatos = []; _mencionIndiceResaltado = -1; return; }
+
+  if (!_internosCache) {
+    // Todavía no terminó de cargar la lista de internos (puede pasar la
+    // primera vez que se escribe "@" apenas se abre el ticket) — la
+    // pedimos y, si el "@..." sigue vigente cuando termine de cargar,
+    // recién ahí mostramos las sugerencias.
+    box.style.display = 'none';
+    _cargarInternosMenciones().then(function() {
+      var cursorActual = ta.selectionStart;
+      var textoActual = ta.value.slice(0, cursorActual);
+      if (/@([^\s@]*)$/.test(textoActual)) _onMensajeInput({ target: ta });
+    });
+    return;
+  }
 
   var parcial = match[1].toLowerCase();
   _mencionCandidatos = _internosCache.filter(function(p) {
@@ -1658,7 +1671,7 @@ window._onMensajeKeydown = function(ev) {
 
 window._elegirMencion = function(nombre) {
   var ta = document.getElementById('mensaje-nuevo-txt');
-  var cursor = ta.selectionStart;
+  var cursor = _mencionUltimoCursor || ta.selectionStart || ta.value.length;
   var antes = ta.value.slice(0, cursor).replace(/@([^\s@]*)$/, '@' + nombre + ' ');
   var despues = ta.value.slice(cursor);
   ta.value = antes + despues;
