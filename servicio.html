@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.18.3 -->
+<!-- Portal TLC | servicio.html | v2026.07.18.4 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1896,8 +1896,8 @@ function _configurarHandlerForegroundPush() {
     if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(FIREBASE_WEB_CONFIG);
     var messaging = firebase.messaging();
     messaging.onMessage(function(payload) {
-      var titulo = (payload.notification && payload.notification.title) || 'Portal TLC';
-      var cuerpo = (payload.notification && payload.notification.body) || '';
+      var titulo = (payload.data && payload.data.title) || 'Portal TLC';
+      var cuerpo = (payload.data && payload.data.body) || '';
       var link = (payload.fcmOptions && payload.fcmOptions.link) || (payload.data && payload.data.link) || '';
       if (Notification.permission === 'granted') {
         var n = new Notification(titulo, { body: cuerpo, icon: './icons/icon-512.png' });

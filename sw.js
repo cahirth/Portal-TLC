@@ -1,4 +1,4 @@
-// Portal TLC | sw.js | v15
+// Portal TLC | sw.js | v16
 // v15: Firebase Cloud Messaging — recepción de push en segundo plano.
 //      importScripts de firebase-app + firebase-messaging (compat, es
 //      lo único que funciona dentro de un Service Worker clásico sin
@@ -20,10 +20,9 @@ firebase.initializeApp({
 const _messaging = firebase.messaging();
 
 _messaging.onBackgroundMessage(function(payload) {
-    const titulo = (payload.notification && payload.notification.title) || 'Portal TLC';
-    const cuerpo = (payload.notification && payload.notification.body) || '';
-    const link = (payload.fcmOptions && payload.fcmOptions.link) ||
-                 (payload.data && payload.data.link) || './servicio.html';
+    const titulo = (payload.data && payload.data.title) || 'Portal TLC';
+    const cuerpo = (payload.data && payload.data.body) || '';
+    const link = (payload.data && payload.data.link) || './servicio.html';
     self.registration.showNotification(titulo, {
         body: cuerpo,
         icon: './icons/icon-512.png',
@@ -58,7 +57,7 @@ self.addEventListener('notificationclick', function(event) {
 //      Cache-first solo para assets externos (Font Awesome, etc.).
 //      Limpia cachés viejas automáticamente al activar.
 
-const CACHE_NAME = 'portal-tlc-v15';
+const CACHE_NAME = 'portal-tlc-v16';
 
 const HTML_LOCAL = [
     './',
