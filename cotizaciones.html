@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.14.2 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.17.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -363,8 +363,66 @@ body.tema-claro #cot-avatar-menu [style*="background:#0a1628"] { background:#f8f
         body.tema-claro select,body.tema-claro textarea,body.tema-claro input:not([type="checkbox"]):not([type="radio"]) { background:#ffffff !important; border-color:#cbd5e1 !important; color:#0f172a !important; }
       html, body { overscroll-behavior-x: none; }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 </head>
 <body>
+
+<!-- Instrucciones de instalación en iPhone (PWA) -->
+<div id="modal-instalar-ios" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:flex-end;justify-content:center;">
+  <div style="background:#0f1b2e;border:1px solid #1e3050;border-radius:16px 16px 0 0;
+              max-width:420px;width:100%;padding:22px 20px 26px;box-shadow:0 -8px 30px rgba(0,0,0,.4);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:800;color:#f1f5f9;">📲 Instalá el Portal TLC</div>
+      <button onclick="_cerrarModalInstalarIOS()" style="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;line-height:1;padding:4px;">✕</button>
+    </div>
+    <div style="font-size:13px;color:#f1f5f9;line-height:1.6;margin-bottom:16px;">
+      Instalá el Portal como app en tu iPhone para que las notificaciones te lleguen bien
+      (en Safari, sin instalar, iOS no las deja funcionar).
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#080d14;border-radius:10px;margin-bottom:8px;">
+      <div style="width:26px;height:26px;border-radius:50%;background:#3a86ff;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</div>
+      <div style="font-size:13px;color:#f1f5f9;">Tocá el ícono <strong>Compartir</strong> (el cuadrado con la flecha hacia arriba ⬆️) en la barra de Safari.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#080d14;border-radius:10px;margin-bottom:8px;">
+      <div style="width:26px;height:26px;border-radius:50%;background:#3a86ff;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div>
+      <div style="font-size:13px;color:#f1f5f9;">Deslizá hacia abajo y elegí <strong>"Agregar a pantalla de inicio"</strong>.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#080d14;border-radius:10px;margin-bottom:18px;">
+      <div style="width:26px;height:26px;border-radius:50%;background:#3a86ff;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</div>
+      <div style="font-size:13px;color:#f1f5f9;">Confirmá tocando <strong>"Agregar"</strong>. Abrí el Portal desde el ícono nuevo (no desde Safari) y ahí sí activá las notificaciones.</div>
+    </div>
+    <button onclick="_cerrarModalInstalarIOS()" style="width:100%;padding:11px;border-radius:10px;background:#3a86ff;color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;">Entendido</button>
+  </div>
+</div>
+
+<!-- Instrucciones de instalación en Android (fallback manual) -->
+<div id="modal-instalar-android" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:flex-end;justify-content:center;">
+  <div style="background:#0f1b2e;border:1px solid #1e3050;border-radius:16px 16px 0 0;
+              max-width:420px;width:100%;padding:22px 20px 26px;box-shadow:0 -8px 30px rgba(0,0,0,.4);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:800;color:#f1f5f9;">📲 Instalá el Portal TLC</div>
+      <button onclick="_cerrarModalInstalarAndroid()" style="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;line-height:1;padding:4px;">✕</button>
+    </div>
+    <div style="font-size:13px;color:#f1f5f9;line-height:1.6;margin-bottom:16px;">
+      Instalá el Portal como app en tu celular para tenerlo a mano como cualquier otra
+      aplicación y que las notificaciones funcionen mejor.
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#080d14;border-radius:10px;margin-bottom:8px;">
+      <div style="width:26px;height:26px;border-radius:50%;background:#3a86ff;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</div>
+      <div style="font-size:13px;color:#f1f5f9;">Tocá el menú <strong>⋮</strong> (los tres puntos, arriba a la derecha del navegador).</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#080d14;border-radius:10px;margin-bottom:8px;">
+      <div style="width:26px;height:26px;border-radius:50%;background:#3a86ff;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div>
+      <div style="font-size:13px;color:#f1f5f9;">Elegí <strong>"Instalar aplicación"</strong> (o <strong>"Agregar a pantalla de inicio"</strong>, según la versión del navegador).</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#080d14;border-radius:10px;margin-bottom:18px;">
+      <div style="width:26px;height:26px;border-radius:50%;background:#3a86ff;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</div>
+      <div style="font-size:13px;color:#f1f5f9;">Confirmá. Va a aparecer un ícono nuevo en tu pantalla de inicio — abrí el Portal desde ahí de ahora en adelante.</div>
+    </div>
+    <button onclick="_cerrarModalInstalarAndroid()" style="width:100%;padding:11px;border-radius:10px;background:#3a86ff;color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;">Entendido</button>
+  </div>
+</div>
 
 <!-- HEADER -->
 <div class="header">
@@ -446,6 +504,28 @@ body.tema-claro #cot-avatar-menu [style*="background:#0a1628"] { background:#f8f
                         oninput="_guardarSaludoWspCot(this.value)"></textarea>
                     <div style="font-size:10px; color:#334155; margin-top:3px;">Se guarda automáticamente · URL se agrega al final</div>
                 </div>
+
+                <!-- Notificaciones push -->
+                <button id="btn-activar-push" onclick="_activarNotificacionesPush()"
+                    style="width:100%; padding:11px; border-radius:10px; background:transparent;
+                           border:1px solid #1e3050; color:var(--text-main,#f1f5f9); font-size:13px; font-weight:600;
+                           cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+                           transition:background .15s; margin-bottom:8px;"
+                    onmouseover="this.style.background='rgba(58,134,255,.08)'"
+                    onmouseout="this.style.background='transparent'">
+                    🔔 <span id="btn-activar-push-txt">Activar notificaciones</span>
+                </button>
+
+                <!-- Cómo instalar la app -->
+                <button id="btn-como-instalar" onclick="_manejarClickInstalarApp()"
+                    style="width:100%; padding:11px; border-radius:10px; background:transparent;
+                           border:1px solid #1e3050; color:var(--text-main,#f1f5f9); font-size:13px; font-weight:600;
+                           cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+                           transition:background .15s; margin-bottom:8px;"
+                    onmouseover="this.style.background='rgba(58,134,255,.08)'"
+                    onmouseout="this.style.background='transparent'">
+                    📲 <span id="btn-como-instalar-txt">Cómo instalar la app</span>
+                </button>
 
                 <!-- Cerrar sesión -->
                 <button onclick="_cerrarSesionCot()"
@@ -687,6 +767,104 @@ function _leerSesionCompartida() {
         return payload.account;
     } catch(e) { return null; }
 }
+
+// ══════════════════════════════════════════════════════════════════
+// NOTIFICACIONES PUSH (FCM) + INSTALACIÓN PWA — iPhone y Android
+// ══════════════════════════════════════════════════════════════════
+var FIREBASE_WEB_CONFIG = {
+  apiKey: "AIzaSyBWErT79w26PGaWDCxzmcbvMzWaRJ-GzDU",
+  authDomain: "portal-tlc.firebaseapp.com",
+  databaseURL: "https://portal-tlc-default-rtdb.firebaseio.com",
+  projectId: "portal-tlc",
+  storageBucket: "portal-tlc.firebasestorage.app",
+  messagingSenderId: "379089734539",
+  appId: "1:379089734539:web:60fc2a3425d572e11cfd8e",
+};
+var FCM_VAPID_KEY = 'BB6mDz49NUdVV_C3tzMskY3_r9JU6A2UXtqFKxYaQsogj9sCQmTQsEF7AllTNT7fOqcjg1FT6tXoOacux05GpQM';
+var IOS_INSTALL_DISMISSED_KEY = 'tlc_ios_install_dismissed';
+var _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+});
+
+function _esIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+function _esStandalonePWA() {
+  return (window.navigator.standalone === true) ||
+         (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+}
+function _chequearInstalacionIOS() {
+  var btn = document.getElementById('btn-como-instalar');
+  if (_esStandalonePWA()) { if (btn) btn.style.display = 'none'; return; }
+  if (btn) btn.style.display = 'flex';
+  if (_esIOS() && !localStorage.getItem(IOS_INSTALL_DISMISSED_KEY)) _mostrarModalInstalarIOS();
+}
+window._manejarClickInstalarApp = function() {
+  if (_esIOS()) { _mostrarModalInstalarIOS(); return; }
+  if (_deferredInstallPrompt) {
+    _deferredInstallPrompt.prompt();
+    _deferredInstallPrompt.userChoice.then(function(r) {
+      if (r.outcome === 'accepted') {
+        _deferredInstallPrompt = null;
+        var btn = document.getElementById('btn-como-instalar');
+        if (btn) btn.style.display = 'none';
+      }
+    });
+    return;
+  }
+  _mostrarModalInstalarAndroid();
+};
+window._mostrarModalInstalarIOS = function() { var m = document.getElementById('modal-instalar-ios'); if (m) m.style.display = 'flex'; };
+window._cerrarModalInstalarIOS = function() {
+  var m = document.getElementById('modal-instalar-ios'); if (m) m.style.display = 'none';
+  localStorage.setItem(IOS_INSTALL_DISMISSED_KEY, '1');
+};
+window._mostrarModalInstalarAndroid = function() { var m = document.getElementById('modal-instalar-android'); if (m) m.style.display = 'flex'; };
+window._cerrarModalInstalarAndroid = function() { var m = document.getElementById('modal-instalar-android'); if (m) m.style.display = 'none'; };
+
+function _actualizarBotonPushCot() {
+  var txt = document.getElementById('btn-activar-push-txt');
+  if (!txt) return;
+  if (!('Notification' in window)) { txt.textContent = 'No disponible en este navegador'; return; }
+  if (Notification.permission === 'granted') txt.textContent = 'Notificaciones activadas ✓';
+  else if (Notification.permission === 'denied') txt.textContent = 'Notificaciones bloqueadas (revisar navegador)';
+  else txt.textContent = 'Activar notificaciones';
+}
+
+window._activarNotificacionesPush = async function() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) { alert('Este navegador no soporta notificaciones push.'); return; }
+  try {
+    var permiso = await Notification.requestPermission();
+    _actualizarBotonPushCot();
+    if (permiso !== 'granted') {
+      if (permiso === 'denied') alert('Bloqueaste las notificaciones. Para activarlas, habilitalas en la configuración del sitio del navegador.');
+      return;
+    }
+    if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(FIREBASE_WEB_CONFIG);
+    var messaging = firebase.messaging();
+    var registration = await navigator.serviceWorker.ready;
+    var token = await messaging.getToken({ vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: registration });
+    if (!token) { alert('No se pudo generar el token de notificaciones.'); return; }
+    var cuenta = _leerSesionCompartida();
+    var email = cuenta ? cuenta.username : '';
+    if (!email) return;
+    var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'guardarTokenPush', email:email, token:token }) });
+    var r = await resp.json();
+    if (!r.ok) alert('No se pudo guardar el token: ' + (r.error||'desconocido'));
+  } catch(err) {
+    console.error('[Push] Error activando notificaciones:', err);
+    alert('Error activando notificaciones: ' + err.message);
+  }
+};
+
+window.addEventListener('DOMContentLoaded', function() {
+  _chequearInstalacionIOS();
+  _actualizarBotonPushCot();
+});
 
 async function init() {
     const account = _leerSesionCompartida();
