@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.17.18 -->
+<!-- Portal TLC | servicio.html | v2026.07.17.19 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1544,27 +1544,28 @@ function _resaltarMencionesTexto(textoEscapado) {
   return out;
 }
 
+function _construirHtmlListaMensajes(t) {
+  var mensajes = Array.isArray(t.mensajes) ? t.mensajes : [];
+  if (!mensajes.length) return '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:16px 0;">Todavía no hay mensajes en este ticket.</div>';
+  return mensajes.map(function(m) {
+    var fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    return '<div style="padding:8px 10px;border-radius:10px;background:var(--panel-dark);border:1px solid var(--border-glow);margin-bottom:8px;">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
+        '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
+        '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + '</span>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text-main);white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTexto(_esc(m.texto || '')) + '</div>' +
+    '</div>';
+  }).join('');
+}
+
 function _renderPanelMensajes(t) {
   var panel = document.getElementById('det-mensajes-panel');
   if (!panel) return;
-  var mensajes = Array.isArray(t.mensajes) ? t.mensajes : [];
-
-  var listaHtml = mensajes.length
-    ? mensajes.map(function(m) {
-        var fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
-        return '<div style="padding:8px 10px;border-radius:10px;background:var(--panel-dark);border:1px solid var(--border-glow);margin-bottom:8px;">' +
-          '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
-            '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
-            '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + '</span>' +
-          '</div>' +
-          '<div style="font-size:12px;color:var(--text-main);white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTexto(_esc(m.texto || '')) + '</div>' +
-        '</div>';
-      }).join('')
-    : '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:16px 0;">Todavía no hay mensajes en este ticket.</div>';
 
   panel.innerHTML =
     '<div class="det-section" style="margin-top:0;">💬 Mensajes internos</div>' +
-    '<div class="det-card" style="max-height:340px;overflow-y:auto;" id="mensajes-lista">' + listaHtml + '</div>' +
+    '<div class="det-card" style="max-height:340px;overflow-y:auto;" id="mensajes-lista">' + _construirHtmlListaMensajes(t) + '</div>' +
     '<div class="det-card" style="position:relative;">' +
       '<textarea id="mensaje-nuevo-txt" placeholder="Escribí un mensaje… usá @ para mencionar a alguien del equipo" ' +
         'style="width:100%;min-height:64px;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border-glow);' +
@@ -1578,11 +1579,15 @@ function _renderPanelMensajes(t) {
   // Carga los internos en segundo plano. Si todavía no estaban en caché,
   // los mensajes recién pintados arriba no tienen las @menciones
   // resaltadas (dependen de esta lista) — por eso, apenas termina de
-  // cargar, se vuelve a pintar el panel para aplicar el resaltado.
+  // cargar, se vuelve a pintar SOLO la lista de mensajes (nunca el
+  // textarea de abajo, para no interrumpir al usuario si ya está
+  // escribiendo — reemplazar el panel entero le borraba lo escrito y
+  // lo "sacaba" del campo).
   var yaEstabaCache = !!_internosCache;
   _cargarInternosMenciones().then(function() {
     if (!yaEstabaCache && _ticketActual && _ticketActual.id_ticket === t.id_ticket) {
-      _renderPanelMensajes(_ticketActual);
+      var listaEl = document.getElementById('mensajes-lista');
+      if (listaEl) listaEl.innerHTML = _construirHtmlListaMensajes(_ticketActual);
     }
   });
 }
