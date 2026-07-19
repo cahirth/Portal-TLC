@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.18.4 -->
+<!-- Portal TLC | servicio.html | v2026.07.18.5 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1009,12 +1009,33 @@ async function _cargarTickets() {
     loading.style.display = 'none';
     _setVista(_vistaActual, true);
     _aplicarFiltros();
+    _abrirTicketDesdeUrlSiCorresponde();
   } catch(e) {
     console.error('Error cargando tickets ST:', e);
     loading.innerHTML = '<span style="color:#ef4444">Error cargando datos. Reintentá.</span>';
   }
 }
 window._recargarTickets = _cargarTickets;
+
+// Si el Portal se abrió con ?ticket=ID en la URL (viene de un link de
+// notificación push, email, o desde otro documento como orden-servicio.html
+// o los checklists), abre directo el detalle de ese ticket y lo scrollea
+// hasta el chat de mensajes, dejando visible el último mensaje.
+function _abrirTicketDesdeUrlSiCorresponde() {
+  var params = new URLSearchParams(window.location.search);
+  var id = params.get('ticket');
+  if (!id) return;
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (!t) return;
+  window._abrirDetalle(id);
+  // Esperar al próximo frame para que el panel ya esté pintado en el DOM
+  setTimeout(function() {
+    var panel = document.getElementById('det-mensajes-panel');
+    if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var lista = document.getElementById('mensajes-lista');
+    if (lista) lista.scrollTop = lista.scrollHeight; // el último mensaje queda visible
+  }, 300);
+}
 
 // ── Filtros ────────────────────────────────────────────────────────
 window._selFiltro = function(btn, tipo) {
