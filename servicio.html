@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.18.5 -->
+<!-- Portal TLC | servicio.html | v2026.07.18.6 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -309,6 +309,27 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
   </div>
 
   <button class="btn-icon" onclick="_recargarTickets()" title="Actualizar">↺</button>
+
+  <!-- Campanita de notificaciones -->
+  <div style="position:relative;" id="campana-wrap">
+    <button class="btn-icon" onclick="_toggleCampanaNotificaciones(event)" title="Notificaciones" style="position:relative;">
+      🔔
+      <span id="campana-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:#ef4444;color:#fff;
+        font-size:9px;font-weight:800;border-radius:10px;min-width:16px;height:16px;padding:0 4px;
+        display:flex;align-items:center;justify-content:center;line-height:1;">0</span>
+    </button>
+    <div id="campana-panel" style="display:none;position:absolute;top:44px;right:0;width:340px;max-height:440px;
+      background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:12px;
+      box-shadow:0 8px 30px rgba(0,0,0,.35);z-index:200;overflow:hidden;display:flex;flex-direction:column;">
+      <div style="padding:12px 14px;border-bottom:1px solid var(--border-glow);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:13px;font-weight:800;color:var(--text-main);">🔔 Actividad</span>
+        <button onclick="_marcarTodasLeidasClick()" style="background:none;border:none;color:#3a86ff;font-size:11px;font-weight:700;cursor:pointer;">Marcar todo leído</button>
+      </div>
+      <div id="campana-lista" style="overflow-y:auto;flex:1;">
+        <div style="padding:24px;text-align:center;font-size:12px;color:var(--text-muted);">Cargando...</div>
+      </div>
+    </div>
+  </div>
 
   <!-- Avatar con menú — igual a index.html -->
   <div style="position:relative;" id="avatar-wrap-st">
@@ -836,6 +857,8 @@ function _cargarSesion() {
 
     _cargarTickets();
     _cargarMarcasModelosDesdeFirebase();
+    _cargarNotificaciones();
+    _iniciarPollingCampana();
   } catch(e) {
     console.error('Error cargando sesión:', e);
     _redirigirLogin();
@@ -1899,6 +1922,133 @@ window._cerrarModalInstalarAndroid = function() {
   if (m) m.style.display = 'none';
 };
 
+// ══════════════════════════════════════════════════════════════════
+// CAMPANITA DE NOTIFICACIONES — estilo Planner/Teams
+// ══════════════════════════════════════════════════════════════════
+var _notificacionesCache = [];
+var _campanaPollingId = null;
+
+function _iconoTipoNotificacion(tipo) {
+  if (tipo === 'mencion') return '💬';
+  if (tipo === 'ticket_nuevo') return '🆕';
+  return '📋';
+}
+
+function _tiempoRelativo(fechaIso) {
+  if (!fechaIso) return '';
+  var diffMs = Date.now() - new Date(fechaIso).getTime();
+  var min = Math.floor(diffMs / 60000);
+  if (min < 1) return 'ahora';
+  if (min < 60) return min + ' min';
+  var hs = Math.floor(min / 60);
+  if (hs < 24) return hs + ' h';
+  var dias = Math.floor(hs / 24);
+  return dias + ' d';
+}
+
+async function _cargarNotificaciones(silencioso) {
+  var email = (_session && _session.username) || '';
+  if (!email) return;
+  try {
+    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'listarNotificaciones', email:email }) });
+    var r = await resp.json();
+    if (!r.ok) return;
+    _notificacionesCache = r.notificaciones || [];
+    _renderCampanaBadge();
+    if (!silencioso) _renderCampanaLista();
+    else {
+      // Si el panel está abierto en ese momento, refrescar igual la lista visible
+      var panel = document.getElementById('campana-panel');
+      if (panel && panel.style.display === 'flex') _renderCampanaLista();
+    }
+  } catch(e) { /* silencioso */ }
+}
+
+function _renderCampanaBadge() {
+  var badge = document.getElementById('campana-badge');
+  if (!badge) return;
+  var noLeidas = _notificacionesCache.filter(function(n){ return !n.leido; }).length;
+  if (noLeidas > 0) {
+    badge.textContent = noLeidas > 9 ? '9+' : String(noLeidas);
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function _renderCampanaLista() {
+  var cont = document.getElementById('campana-lista');
+  if (!cont) return;
+  if (!_notificacionesCache.length) {
+    cont.innerHTML = '<div style="padding:24px;text-align:center;font-size:12px;color:var(--text-muted);">Sin notificaciones todavía.</div>';
+    return;
+  }
+  cont.innerHTML = _notificacionesCache.map(function(n) {
+    var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.08)';
+    return '<div onclick="_clickNotificacion(\'' + n.id + '\',\'' + n.ticket_id + '\')" ' +
+      'style="padding:11px 14px;border-bottom:1px solid var(--border-glow);cursor:pointer;background:' + noLeidaBg + ';display:flex;gap:10px;align-items:flex-start;">' +
+      '<span style="font-size:16px;flex-shrink:0;">' + _iconoTipoNotificacion(n.tipo) + '</span>' +
+      '<div style="flex:1;min-width:0;">' +
+        (n.autor_nombre ? '<div style="font-size:12px;font-weight:700;color:var(--text-main);">' + _esc(n.autor_nombre) + '</div>' : '') +
+        '<div style="font-size:12px;color:var(--text-main);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(n.texto || '') + '</div>' +
+        '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">' + _esc(n.ticket_titulo || '') + (n.ticket_titulo ? ' · ' : '') + _tiempoRelativo(n.fecha) + '</div>' +
+      '</div>' +
+      (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
+    '</div>';
+  }).join('');
+}
+
+window._toggleCampanaNotificaciones = function(ev) {
+  ev.stopPropagation();
+  var panel = document.getElementById('campana-panel');
+  if (!panel) return;
+  var abrir = panel.style.display !== 'flex';
+  panel.style.display = abrir ? 'flex' : 'none';
+  if (abrir) { _renderCampanaLista(); _cargarNotificaciones(); }
+};
+
+document.addEventListener('click', function(ev) {
+  var wrap = document.getElementById('campana-wrap');
+  var panel = document.getElementById('campana-panel');
+  if (panel && panel.style.display === 'flex' && wrap && !wrap.contains(ev.target)) {
+    panel.style.display = 'none';
+  }
+});
+
+window._clickNotificacion = function(idNoti, ticketId) {
+  var email = (_session && _session.username) || '';
+  if (email) {
+    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'marcarNotificacionLeida', email:email, id:idNoti }) })
+      .then(function(){ _cargarNotificaciones(true); });
+  }
+  document.getElementById('campana-panel').style.display = 'none';
+  if (ticketId) {
+    window._abrirDetalle(ticketId);
+    setTimeout(function() {
+      var panel = document.getElementById('det-mensajes-panel');
+      if (panel) panel.scrollIntoView({ behavior:'smooth', block:'start' });
+      var lista = document.getElementById('mensajes-lista');
+      if (lista) lista.scrollTop = lista.scrollHeight;
+    }, 300);
+  }
+};
+
+window._marcarTodasLeidasClick = function(ev) {
+  if (ev) ev.stopPropagation();
+  var email = (_session && _session.username) || '';
+  if (!email) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'marcarTodasNotificacionesLeidas', email:email }) })
+    .then(function(){ _cargarNotificaciones(); });
+};
+
+function _iniciarPollingCampana() {
+  if (_campanaPollingId) return;
+  _campanaPollingId = setInterval(function(){ _cargarNotificaciones(true); }, 30000);
+}
+
 function _actualizarBotonPush() {
   var txt = document.getElementById('btn-activar-push-txt');
   if (!txt) return;
@@ -1924,6 +2074,7 @@ function _configurarHandlerForegroundPush() {
         var n = new Notification(titulo, { body: cuerpo, icon: './icons/icon-512.png' });
         if (link) n.onclick = function() { window.focus(); window.location.href = link; };
       }
+      if (typeof _cargarNotificaciones === 'function') setTimeout(function(){ _cargarNotificaciones(true); }, 1000);
     });
   } catch(e) {
     console.warn('[Push] No se pudo configurar el handler de primer plano:', e.message);
