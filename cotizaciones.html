@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.2 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.3 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -912,7 +912,7 @@ function _renderSugerenciasMencionCot() {
     if (!box) return;
     box.innerHTML = _mencionCandidatosCot.map(function(p, i) {
         var resaltado = i === _mencionIndiceResaltadoCot;
-        return '<button type="button" onclick="_elegirMencionUnaVezCot(\'' + p.nombre.replace(/'/g,"\\'") + '\')" ' +
+        return '<button type="button" onmousedown="event.preventDefault(); _elegirMencionUnaVezCot(\'' + p.nombre.replace(/'/g,"\\'") + '\');" onclick="_elegirMencionUnaVezCot(\'' + p.nombre.replace(/'/g,"\\'") + '\')" ' +
             'onmouseenter="_mencionIndiceResaltadoCot=' + i + ';_renderSugerenciasMencionCot();" ' +
             'style="display:block;width:100%;text-align:left;padding:9px 10px;font-size:12px;cursor:pointer;border:none;border-bottom:1px solid #1e3050;font-family:inherit;' +
             (resaltado ? 'background:#3a86ff;color:#fff;font-weight:700;' : 'background:transparent;color:#f1f5f9;') + '">👤 ' + _escCot(p.nombre) + '</button>';
