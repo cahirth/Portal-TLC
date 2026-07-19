@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.19.1 -->
+<!-- Portal TLC | servicio.html | v2026.07.19.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2038,7 +2038,7 @@ function _renderCampanaLista() {
   }
   cont.innerHTML = items.map(function(n) {
     var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.08)';
-    return '<div onclick="_clickNotificacion(\'' + n.id + '\',\'' + n.ticket_id + '\')" ' +
+    return '<div onclick="_clickNotificacion(\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen || 'servicio') + '\')" ' +
       'style="padding:11px 14px;border-bottom:1px solid var(--border-glow);cursor:pointer;background:' + noLeidaBg + ';display:flex;gap:10px;align-items:flex-start;">' +
       '<span style="font-size:16px;flex-shrink:0;">' + _iconoTipoNotificacion(n.tipo) + '</span>' +
       '<div style="flex:1;min-width:0;">' +
@@ -2068,7 +2068,7 @@ document.addEventListener('click', function(ev) {
   }
 });
 
-window._clickNotificacion = function(idNoti, ticketId) {
+window._clickNotificacion = function(idNoti, ticketId, origen) {
   var email = (_session && _session.username) || '';
   if (email) {
     fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
@@ -2076,15 +2076,20 @@ window._clickNotificacion = function(idNoti, ticketId) {
       .then(function(){ _cargarNotificaciones(true); });
   }
   document.getElementById('campana-panel').style.display = 'none';
-  if (ticketId) {
-    window._abrirDetalle(ticketId);
-    setTimeout(function() {
-      var panel = document.getElementById('det-mensajes-panel');
-      if (panel) panel.scrollIntoView({ behavior:'smooth', block:'start' });
-      var lista = document.getElementById('mensajes-lista');
-      if (lista) lista.scrollTop = lista.scrollHeight;
-    }, 300);
+  if (!ticketId) return;
+
+  if (origen === 'cotizacion') {
+    window.location.href = 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(ticketId);
+    return;
   }
+
+  window._abrirDetalle(ticketId);
+  setTimeout(function() {
+    var panel = document.getElementById('det-mensajes-panel');
+    if (panel) panel.scrollIntoView({ behavior:'smooth', block:'start' });
+    var lista = document.getElementById('mensajes-lista');
+    if (lista) lista.scrollTop = lista.scrollHeight;
+  }, 300);
 };
 
 window._marcarTodasLeidasClick = function(ev) {

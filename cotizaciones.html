@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.6 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.7 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -273,6 +273,11 @@
         body.tema-claro .cot-equipo { color:#1a4b8c !important; }
         body.tema-claro .cot-fecha  { color:#64748b !important; }
         body.tema-claro .cot-btn-presupuesto { background:#ffffff !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+        body.tema-claro #campana-wrap button[style*="background:#1c2541"] { background:#ffffff !important; border-color:#cbd5e1 !important; color:#374151 !important; }
+        body.tema-claro #campana-panel { background:#ffffff !important; border-color:#e2e8f0 !important; }
+        body.tema-claro #campana-panel [style*="border-bottom:1px solid #1e3050"] { border-bottom-color:#e2e8f0 !important; }
+        body.tema-claro #campana-panel [style*="color:#f1f5f9"] { color:#0f172a !important; }
+        body.tema-claro #campana-panel [style*="color:#94a3b8"] { color:#64748b !important; }
         body.tema-claro #mencion-sugerencias-cot { background:#ffffff !important; border-color:#e2e8f0 !important; }
         body.tema-claro #mencion-sugerencias-cot button { border-bottom-color:#e2e8f0 !important; }
         body.tema-claro #mencion-sugerencias-cot button[style*="background:transparent"] { color:#0f172a !important; }
@@ -452,6 +457,29 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
     <div class="vista-toggle">
         <button class="vista-btn active" id="btn-vista-lista" onclick="setVista('lista')">≡ Lista</button>
         <button class="vista-btn" id="btn-vista-kanban" onclick="setVista('kanban')">⊞ Kanban</button>
+    </div>
+
+    <!-- Campanita de notificaciones -->
+    <div style="position:relative;" id="campana-wrap">
+        <button class="btn-icon" onclick="_toggleCampanaNotificaciones(event)" title="Notificaciones"
+            style="width:34px;height:34px;border-radius:50%;background:#1c2541;border:1px solid #1e3050;color:#f8fafc;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;">
+            🔔
+            <span id="campana-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:#ef4444;color:#fff;
+                font-size:9px;font-weight:800;border-radius:10px;min-width:16px;height:16px;padding:0 4px;
+                display:flex;align-items:center;justify-content:center;line-height:1;">0</span>
+        </button>
+        <div id="campana-panel" style="display:none;position:absolute;top:44px;right:0;width:340px;max-height:440px;
+            background:#0f1b2e;border:1px solid #1e3050;border-radius:12px;
+            box-shadow:0 8px 30px rgba(0,0,0,.35);z-index:200;overflow:hidden;display:flex;flex-direction:column;">
+            <div style="padding:12px 14px;border-bottom:1px solid #1e3050;display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:13px;font-weight:800;color:#f1f5f9;">🔔 Actividad</span>
+                <button onclick="_marcarTodasLeidasClick()" style="background:none;border:none;color:#3a86ff;font-size:11px;font-weight:700;cursor:pointer;">Marcar todo leído</button>
+            </div>
+            <div id="campana-filtros" style="display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid #1e3050;flex-wrap:wrap;"></div>
+            <div id="campana-lista" style="overflow-y:auto;flex:1;">
+                <div style="padding:24px;text-align:center;font-size:12px;color:#94a3b8;">Cargando...</div>
+            </div>
+        </div>
     </div>
 
     <!-- AVATAR CON DROPDOWN DE PERFIL -->
@@ -1093,6 +1121,175 @@ window._cerrarModalInstalarIOS = function() {
 window._mostrarModalInstalarAndroid = function() { var m = document.getElementById('modal-instalar-android'); if (m) m.style.display = 'flex'; };
 window._cerrarModalInstalarAndroid = function() { var m = document.getElementById('modal-instalar-android'); if (m) m.style.display = 'none'; };
 
+// ══════════════════════════════════════════════════════════════════
+// CAMPANITA DE NOTIFICACIONES — estilo Planner/Teams (igual a servicio.html)
+// ══════════════════════════════════════════════════════════════════
+var _notificacionesCacheCot2 = [];
+var _campanaFiltroActivoCot = 'todo';
+var _campanaPollingIdCot = null;
+
+function _iconoTipoNotificacionCot(tipo) {
+    if (tipo === 'mencion') return '💬';
+    if (tipo === 'ticket_nuevo') return '🆕';
+    return '📋';
+}
+
+function _tiempoRelativoCampanaCot(fechaIso) {
+    if (!fechaIso) return '';
+    var diffMs = Date.now() - new Date(fechaIso).getTime();
+    var min = Math.floor(diffMs / 60000);
+    if (min < 1) return 'ahora';
+    if (min < 60) return min + ' min';
+    var hs = Math.floor(min / 60);
+    if (hs < 24) return hs + ' h';
+    return Math.floor(hs / 24) + ' d';
+}
+
+async function _cargarNotificaciones(silencioso) {
+    var cuenta = _leerSesionCompartida();
+    var email = cuenta ? cuenta.username : '';
+    if (!email) return;
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'listarNotificaciones', email:email }) });
+        var r = await resp.json();
+        if (!r.ok) return;
+        _notificacionesCacheCot2 = r.notificaciones || [];
+        _renderCampanaBadgeCot();
+        if (!silencioso) _renderCampanaListaCot();
+        else {
+            var panel = document.getElementById('campana-panel');
+            if (panel && panel.style.display === 'flex') _renderCampanaListaCot();
+        }
+    } catch(e) {}
+}
+
+function _renderCampanaBadgeCot() {
+    var badge = document.getElementById('campana-badge');
+    if (!badge) return;
+    var noLeidas = _notificacionesCacheCot2.filter(function(n){ return !n.leido; }).length;
+    if (noLeidas > 0) { badge.textContent = noLeidas > 9 ? '9+' : String(noLeidas); badge.style.display = 'flex'; }
+    else badge.style.display = 'none';
+}
+
+function _notificacionesFiltradasCot() {
+    if (_campanaFiltroActivoCot === 'no_leido') return _notificacionesCacheCot2.filter(function(n){ return !n.leido; });
+    if (_campanaFiltroActivoCot === 'mencion') return _notificacionesCacheCot2.filter(function(n){ return n.tipo === 'mencion'; });
+    return _notificacionesCacheCot2;
+}
+
+function _renderCampanaFiltrosCot() {
+    var cont = document.getElementById('campana-filtros');
+    if (!cont) return;
+    var noLeidas = _notificacionesCacheCot2.filter(function(n){ return !n.leido; }).length;
+    var menciones = _notificacionesCacheCot2.filter(function(n){ return n.tipo === 'mencion'; }).length;
+    var tabs = [
+        { key:'todo', label:'Todo' },
+        { key:'no_leido', label:'No leído' + (noLeidas ? ' (' + noLeidas + ')' : '') },
+        { key:'mencion', label:'@Menciones' + (menciones ? ' (' + menciones + ')' : '') },
+    ];
+    cont.innerHTML = tabs.map(function(tab) {
+        var activo = tab.key === _campanaFiltroActivoCot;
+        return '<button onclick="event.stopPropagation(); _seleccionarFiltroCampanaCot(\'' + tab.key + '\')" style="padding:5px 11px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;' +
+            (activo ? 'background:#3a86ff;color:#fff;border:1px solid #3a86ff;' : 'background:transparent;color:#94a3b8;border:1px solid #1e3050;') + '">' + tab.label + '</button>';
+    }).join('');
+}
+
+window._seleccionarFiltroCampanaCot = function(key) {
+    _campanaFiltroActivoCot = key;
+    _renderCampanaFiltrosCot();
+    _renderCampanaListaCot();
+};
+
+function _renderCampanaListaCot() {
+    var cont = document.getElementById('campana-lista');
+    if (!cont) return;
+    _renderCampanaFiltrosCot();
+    var items = _notificacionesFiltradasCot();
+    if (!items.length) {
+        var msg = _campanaFiltroActivoCot === 'no_leido' ? 'No tenés notificaciones sin leer.' :
+                  _campanaFiltroActivoCot === 'mencion' ? 'Todavía no te mencionaron en nada.' :
+                  'Sin notificaciones todavía.';
+        cont.innerHTML = '<div style="padding:24px;text-align:center;font-size:12px;color:#94a3b8;">' + msg + '</div>';
+        return;
+    }
+    cont.innerHTML = items.map(function(n) {
+        var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.08)';
+        return '<div onclick="_clickNotificacionCot(\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'servicio') + '\')" ' +
+            'style="padding:11px 14px;border-bottom:1px solid #1e3050;cursor:pointer;background:' + noLeidaBg + ';display:flex;gap:10px;align-items:flex-start;">' +
+            '<span style="font-size:16px;flex-shrink:0;">' + _iconoTipoNotificacionCot(n.tipo) + '</span>' +
+            '<div style="flex:1;min-width:0;">' +
+                (n.autor_nombre ? '<div style="font-size:12px;font-weight:700;color:#f1f5f9;">' + _escCot(n.autor_nombre) + '</div>' : '') +
+                '<div style="font-size:12px;color:#f1f5f9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _escCot(n.texto || '') + '</div>' +
+                '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + _escCot(n.ticket_titulo || '') + (n.ticket_titulo ? ' · ' : '') + _tiempoRelativoCampanaCot(n.fecha) + '</div>' +
+            '</div>' +
+            (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
+        '</div>';
+    }).join('');
+}
+
+window._toggleCampanaNotificaciones = function(ev) {
+    ev.stopPropagation();
+    var panel = document.getElementById('campana-panel');
+    if (!panel) return;
+    var abrir = panel.style.display !== 'flex';
+    panel.style.display = abrir ? 'flex' : 'none';
+    if (abrir) { _renderCampanaListaCot(); _cargarNotificaciones(); }
+};
+
+document.addEventListener('click', function(ev) {
+    var wrap = document.getElementById('campana-wrap');
+    var panel = document.getElementById('campana-panel');
+    if (panel && panel.style.display === 'flex' && wrap && !wrap.contains(ev.target)) panel.style.display = 'none';
+});
+
+// Enruta el clic según el origen: si es una cotización, la abre en este
+// mismo módulo (busca el índice y llama a abrirDetalle); si es un ticket
+// de Servicio Técnico, navega a servicio.html.
+window._clickNotificacionCot = function(idNoti, idOrigen, origen) {
+    var cuenta = _leerSesionCompartida();
+    var email = cuenta ? cuenta.username : '';
+    if (email) {
+        fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'marcarNotificacionLeida', email:email, id:idNoti }) })
+            .then(function(){ _cargarNotificaciones(true); });
+    }
+    document.getElementById('campana-panel').style.display = 'none';
+    if (!idOrigen) return;
+
+    if (origen === 'servicio') {
+        window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(idOrigen);
+        return;
+    }
+
+    // origen === 'cotizacion' — abrir acá mismo
+    var idx = todasLasCot.findIndex(function(x) { return String(x.idCot || x.id_cotizacion || x.id || '') === String(idOrigen); });
+    if (idx !== -1) {
+        abrirDetalle(idx);
+        setTimeout(function() {
+            var panel = document.getElementById('det-mensajes-panel');
+            if (panel) panel.scrollIntoView({ behavior:'smooth', block:'start' });
+        }, 300);
+    } else {
+        window.location.href = 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(idOrigen);
+    }
+};
+
+window._marcarTodasLeidasClick = function(ev) {
+    if (ev) ev.stopPropagation();
+    var cuenta = _leerSesionCompartida();
+    var email = cuenta ? cuenta.username : '';
+    if (!email) return;
+    fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ accion:'marcarTodasNotificacionesLeidas', email:email }) })
+        .then(function(){ _cargarNotificaciones(); });
+};
+
+function _iniciarPollingCampanaCot() {
+    if (_campanaPollingIdCot) return;
+    _campanaPollingIdCot = setInterval(function(){ _cargarNotificaciones(true); }, 30000);
+}
+
 function _actualizarBotonPushCot() {
   var txt = document.getElementById('btn-activar-push-txt');
   if (!txt) return;
@@ -1114,6 +1311,7 @@ function _configurarHandlerForegroundPushCot() {
         var n = new Notification(titulo, { body: cuerpo, icon: './icons/icon-512.png' });
         if (link) n.onclick = function() { window.focus(); window.location.href = link; };
       }
+      if (typeof _cargarNotificaciones === 'function') setTimeout(function(){ _cargarNotificaciones(true); }, 1000);
     });
   } catch(e) { console.warn('[Push] No se pudo configurar el handler de primer plano:', e.message); }
 }
@@ -1150,6 +1348,8 @@ window._activarNotificacionesPush = async function() {
 window.addEventListener('DOMContentLoaded', function() {
   _chequearInstalacionIOS();
   _actualizarBotonPushCot();
+  _cargarNotificaciones();
+  _iniciarPollingCampanaCot();
 });
 
 async function init() {
