@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.18.6 -->
+<!-- Portal TLC | servicio.html | v2026.07.18.7 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -325,6 +325,7 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
         <span style="font-size:13px;font-weight:800;color:var(--text-main);">🔔 Actividad</span>
         <button onclick="_marcarTodasLeidasClick()" style="background:none;border:none;color:#3a86ff;font-size:11px;font-weight:700;cursor:pointer;">Marcar todo leído</button>
       </div>
+      <div id="campana-filtros" style="display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--border-glow);flex-wrap:wrap;"></div>
       <div id="campana-lista" style="overflow-y:auto;flex:1;">
         <div style="padding:24px;text-align:center;font-size:12px;color:var(--text-muted);">Cargando...</div>
       </div>
@@ -1926,6 +1927,7 @@ window._cerrarModalInstalarAndroid = function() {
 // CAMPANITA DE NOTIFICACIONES — estilo Planner/Teams
 // ══════════════════════════════════════════════════════════════════
 var _notificacionesCache = [];
+var _campanaFiltroActivo = 'todo'; // 'todo' | 'no_leido' | 'mencion'
 var _campanaPollingId = null;
 
 function _iconoTipoNotificacion(tipo) {
@@ -1977,14 +1979,48 @@ function _renderCampanaBadge() {
   }
 }
 
+function _notificacionesFiltradas() {
+  if (_campanaFiltroActivo === 'no_leido') return _notificacionesCache.filter(function(n){ return !n.leido; });
+  if (_campanaFiltroActivo === 'mencion') return _notificacionesCache.filter(function(n){ return n.tipo === 'mencion'; });
+  return _notificacionesCache;
+}
+
+function _renderCampanaFiltros() {
+  var cont = document.getElementById('campana-filtros');
+  if (!cont) return;
+  var noLeidas = _notificacionesCache.filter(function(n){ return !n.leido; }).length;
+  var menciones = _notificacionesCache.filter(function(n){ return n.tipo === 'mencion'; }).length;
+  var tabs = [
+    { key:'todo',     label:'Todo' },
+    { key:'no_leido', label:'No leído' + (noLeidas ? ' (' + noLeidas + ')' : '') },
+    { key:'mencion',  label:'@Menciones' + (menciones ? ' (' + menciones + ')' : '') },
+  ];
+  cont.innerHTML = tabs.map(function(tab) {
+    var activo = tab.key === _campanaFiltroActivo;
+    return '<button onclick="_seleccionarFiltroCampana(\'' + tab.key + '\')" style="padding:5px 11px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;' +
+      (activo ? 'background:#3a86ff;color:#fff;border:1px solid #3a86ff;' : 'background:transparent;color:var(--text-muted);border:1px solid var(--border-glow);') + '">' + tab.label + '</button>';
+  }).join('');
+}
+
+window._seleccionarFiltroCampana = function(key) {
+  _campanaFiltroActivo = key;
+  _renderCampanaFiltros();
+  _renderCampanaLista();
+};
+
 function _renderCampanaLista() {
   var cont = document.getElementById('campana-lista');
   if (!cont) return;
-  if (!_notificacionesCache.length) {
-    cont.innerHTML = '<div style="padding:24px;text-align:center;font-size:12px;color:var(--text-muted);">Sin notificaciones todavía.</div>';
+  _renderCampanaFiltros();
+  var items = _notificacionesFiltradas();
+  if (!items.length) {
+    var msg = _campanaFiltroActivo === 'no_leido' ? 'No tenés notificaciones sin leer.' :
+              _campanaFiltroActivo === 'mencion' ? 'Todavía no te mencionaron en ningún ticket.' :
+              'Sin notificaciones todavía.';
+    cont.innerHTML = '<div style="padding:24px;text-align:center;font-size:12px;color:var(--text-muted);">' + msg + '</div>';
     return;
   }
-  cont.innerHTML = _notificacionesCache.map(function(n) {
+  cont.innerHTML = items.map(function(n) {
     var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.08)';
     return '<div onclick="_clickNotificacion(\'' + n.id + '\',\'' + n.ticket_id + '\')" ' +
       'style="padding:11px 14px;border-bottom:1px solid var(--border-glow);cursor:pointer;background:' + noLeidaBg + ';display:flex;gap:10px;align-items:flex-start;">' +
