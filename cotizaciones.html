@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.4 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.5 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -986,7 +986,12 @@ window._elegirMencionUnaVezCot = function(nombre) {
 window._enviarMensajeCot = function() {
     var ta = document.getElementById('mensaje-nuevo-txt-cot');
     var texto = (ta.value || '').trim();
-    if (!texto || !_idCotActual) return;
+    // Respaldo: si _idCotActual quedó vacío por lo que sea, lo recalculamos
+    // directo desde cotActual (la cotización abierta en este momento).
+    var idParaEnviar = _idCotActual || (typeof cotActual !== 'undefined' && cotActual
+        ? String(cotActual.idCot || cotActual.id_cotizacion || cotActual.id || '') : '');
+    if (!texto || !idParaEnviar) return;
+    _idCotActual = idParaEnviar;
 
     var menciones = [];
     (_internosCacheCot || []).forEach(function(p) { if (texto.indexOf('@' + p.nombre) !== -1) menciones.push(p.email); });
@@ -998,7 +1003,7 @@ window._enviarMensajeCot = function() {
     var titulo = tituloEl ? tituloEl.textContent : '';
 
     fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({ accion:'cot_agregarMensaje', id_cotizacion:_idCotActual, texto:texto,
+        body: JSON.stringify({ accion:'cot_agregarMensaje', id_cotizacion:idParaEnviar, texto:texto,
             autor_nombre:autorNombre, autor_email:autorEmail, menciones:menciones, titulo:titulo }) })
     .then(function(r){ return r.json(); })
     .then(function(r){
