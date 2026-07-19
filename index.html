@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.07.18.3 -->
+<!-- Portal TLC | index.html | v2026.07.18.5 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -684,7 +684,7 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
         <!-- DETALLE COTIZACION OVERLAY -->
         <div id="cot-detalle-overlay" style="display:none; position:absolute; inset:0; background:#0d1526; z-index:100; overflow-y:auto; flex-direction:column;">
             <div style="display:flex; align-items:center; gap:12px; padding:16px; border-bottom:1px solid #222e50;">
-                <button onclick="cerrarDetalleCot()" style="background:none; border:none; color:#94a3b8; font-size:22px; cursor:pointer; padding:0 8px 0 0; line-height:1;">←</button>
+                <button onclick="cerrarDetalleCot()" style="background:#3a86ff; border:none; color:#fff; font-size:20px; cursor:pointer; padding:6px 10px; border-radius:8px; line-height:1;">←</button>
                 <div>
                     <div id="cot-det-titulo" style="font-size:15px; font-weight:700; color:#f1f5f9;"></div>
                     <div id="cot-det-subtitulo" style="font-size:11px; color:#64748b;"></div>
@@ -1247,6 +1247,19 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
             const account = { name: data.nombre || email, username: email, rol: data.rol || 'Vend_Externo' };
             _guardarSesionIdx(account);
             currentUserIndex = account;
+
+            // Si llegó acá porque un link (mención, push, email) lo mandó a
+            // loguearse primero, volver directo a donde quería ir en vez de
+            // dejarlo en el menú principal.
+            try {
+                var destino = sessionStorage.getItem('tlc_redirect_after_login');
+                if (destino) {
+                    sessionStorage.removeItem('tlc_redirect_after_login');
+                    window.location.href = destino;
+                    return;
+                }
+            } catch(e) {}
+
             document.getElementById('login-wall').style.display = 'none';
             document.getElementById('phone-app-content').style.display = 'flex';
             updateUserDisplay();
