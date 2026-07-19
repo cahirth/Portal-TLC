@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.5 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.6 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -921,13 +921,30 @@ function _renderSugerenciasMencionCot() {
     box.innerHTML = _mencionCandidatosCot.map(function(p, i) {
         var resaltado = i === _mencionIndiceResaltadoCot;
         return '<button type="button" onmousedown="event.preventDefault(); _elegirMencionUnaVezCot(\'' + p.nombre.replace(/'/g,"\\'") + '\');" onclick="_elegirMencionUnaVezCot(\'' + p.nombre.replace(/'/g,"\\'") + '\')" ' +
-            'onmouseenter="_mencionIndiceResaltadoCot=' + i + ';_renderSugerenciasMencionCot();" ' +
+            'onmouseenter="_resaltarMencionHoverCot(' + i + ')" ' +
             'style="display:block;width:100%;text-align:left;padding:9px 10px;font-size:12px;cursor:pointer;border:none;border-bottom:1px solid #1e3050;font-family:inherit;' +
             (resaltado ? 'background:#3a86ff;color:#fff;font-weight:700;' : 'background:transparent;color:#f1f5f9;') + '">👤 ' + _escCot(p.nombre) + '</button>';
     }).join('');
     var elResaltado = box.children[_mencionIndiceResaltadoCot];
     if (elResaltado) elResaltado.scrollIntoView({ block:'nearest' });
 }
+
+// Resaltado por hover del mouse — SOLO cambia estilos de los botones ya
+// existentes, sin reconstruir la lista (reconstruirla en cada mouseenter
+// destruía el botón justo debajo del cursor en el momento del clic, y el
+// clic se perdía en el reemplazo).
+window._resaltarMencionHoverCot = function(i) {
+    _mencionIndiceResaltadoCot = i;
+    var box = document.getElementById('mencion-sugerencias-cot');
+    if (!box) return;
+    Array.from(box.children).forEach(function(btn, idx) {
+        if (idx === i) {
+            btn.style.background = '#3a86ff'; btn.style.color = '#fff'; btn.style.fontWeight = '700';
+        } else {
+            btn.style.background = 'transparent'; btn.style.color = '#f1f5f9'; btn.style.fontWeight = 'normal';
+        }
+    });
+};
 
 window._onMensajeInputCot = function(ev) {
     var ta = ev.target;
