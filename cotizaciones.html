@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.3 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.4 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -852,6 +852,14 @@ function _construirHtmlListaMensajesCot() {
 async function _renderPanelMensajesCot(id) {
     var panel = document.getElementById('det-mensajes-panel');
     if (!panel) return;
+    if (_idCotActual === id && document.getElementById('mensaje-nuevo-txt-cot')) {
+        // El panel ya está armado para esta misma cotización — pasa cuando
+        // el refresh en segundo plano de abrirDetalle() (historico.json)
+        // termina y vuelve a llamar a _renderDetalle mientras el usuario ya
+        // estaba escribiendo. Reconstruir todo de nuevo le borraría el
+        // mensaje a medio escribir y perdía la referencia al ID.
+        return;
+    }
     _idCotActual = id;
     _mensajesCotActual = [];
 
