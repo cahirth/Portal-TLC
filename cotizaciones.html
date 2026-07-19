@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.1 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -272,6 +272,10 @@
         body.tema-claro .cot-nombre { color:#0f172a !important; }
         body.tema-claro .cot-equipo { color:#1a4b8c !important; }
         body.tema-claro .cot-fecha  { color:#64748b !important; }
+        body.tema-claro .cot-btn-presupuesto { background:#ffffff !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+        body.tema-claro #mencion-sugerencias-cot { background:#ffffff !important; border-color:#e2e8f0 !important; }
+        body.tema-claro #mencion-sugerencias-cot button { border-bottom-color:#e2e8f0 !important; }
+        body.tema-claro #mencion-sugerencias-cot button[style*="background:transparent"] { color:#0f172a !important; }
 
         /* Panel de mensajes internos — respeta el tema claro/oscuro */
         body.tema-claro #det-mensajes-panel [style*="background:#0a1424"] { background:#ffffff !important; border-color:#e2e8f0 !important; }
@@ -676,7 +680,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 const HISTORICO_URL = 'https://raw.githubusercontent.com/cahirth/Portal-TLC/main/historico.json';
-const PRECIOS_URL     = 'https://cahirth.github.io/Portal-TLC/precios.json';
+const PRECIOS_URL     = './precios.json';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 
 let _preciosCache = null; // cache lazy de precios.json
@@ -1604,9 +1608,9 @@ function _renderDetalle(c) {
                 </button>` : ''}
             </div>
         </div>
-        ${linkPdf ? `<a href="${linkPdf}" target="_blank"
-            style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;
-                   background:#0f2a52;border:1px solid #1e3a6e;color:#60a5fa;font-size:12px;
+        ${linkPdf ? `<a href="${linkPdf}" target="_blank" class="cot-btn-presupuesto"
+            style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;
+                   background:#0f1a30;border:1px solid #1e3050;color:#f1f5f9;font-size:12px;
                    font-weight:600;text-decoration:none;">
             📄 Ver presupuesto
         </a>` : ''}
