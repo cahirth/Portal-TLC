@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.19.3 -->
+<!-- Portal TLC | servicio.html | v2026.07.19.4 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1672,7 +1672,7 @@ function _renderPanelMensajes(t) {
         'color:var(--text-main);font-size:12px;font-family:inherit;resize:vertical;" oninput="_onMensajeInput(event)" onkeydown="_onMensajeKeydown(event)" onclick="_mencionUltimoCursor=this.selectionStart;" onkeyup="_mencionUltimoCursor=this.selectionStart;" ontouchend="_mencionUltimoCursor=this.selectionStart;"></textarea>' +
       '<div id="mencion-sugerencias" style="display:none;margin-top:6px;background:var(--bg);' +
         'border:1px solid var(--border-glow);border-radius:8px;max-height:160px;overflow-y:auto;"></div>' +
-      '<button type="button" onclick="_enviarMensajeTicket(\'' + t.id_ticket + '\')" ' +
+      '<button type="button" id="btn-enviar-mensaje-st" onclick="_enviarMensajeTicket(\'' + t.id_ticket + '\')" ' +
         'style="margin-top:8px;width:100%;padding:8px;border-radius:8px;background:#3a86ff;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;">Enviar</button>' +
     '</div>';
 
@@ -1807,7 +1807,10 @@ window._elegirMencionUnaVez = function(nombre) {
   _elegirMencion(nombre);
 };
 
+var _enviandoMensajeTicket = false;
+
 window._enviarMensajeTicket = function(idTicket) {
+  if (_enviandoMensajeTicket) return; // ya hay un envío en curso, ignora clicks de más
   var ta = document.getElementById('mensaje-nuevo-txt');
   var texto = (ta.value || '').trim();
   if (!texto) return;
@@ -1819,6 +1822,16 @@ window._enviarMensajeTicket = function(idTicket) {
 
   var autorNombre = (_session && _session.name) || '';
   var autorEmail  = (_session && _session.username) || '';
+
+  // Feedback inmediato: limpia el campo y deshabilita el botón apenas
+  // tocás Enviar, en vez de esperar la respuesta del servidor — así no
+  // da la sensación de que no pasó nada y tienta a tocar de nuevo.
+  _enviandoMensajeTicket = true;
+  var btnEnviar = document.getElementById('btn-enviar-mensaje-st');
+  if (btnEnviar) { btnEnviar.disabled = true; btnEnviar.textContent = 'Enviando...'; btnEnviar.style.opacity = '.6'; }
+  ta.value = '';
+  var boxSugerencias = document.getElementById('mencion-sugerencias');
+  if (boxSugerencias) boxSugerencias.style.display = 'none';
 
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_agregarMensaje', id_ticket:idTicket, texto:texto,
@@ -1835,9 +1848,20 @@ window._enviarMensajeTicket = function(idTicket) {
       }
     } else {
       _stMostrarError('Error al enviar mensaje: ' + (r.error||'desconocido'));
+      var taRestore = document.getElementById('mensaje-nuevo-txt');
+      if (taRestore) taRestore.value = texto; // devuelve el texto si falló, para no perderlo
     }
   })
-  .catch(function(){ _stMostrarError('Error de conexión al enviar mensaje'); });
+  .catch(function(){
+    _stMostrarError('Error de conexión al enviar mensaje');
+    var taRestore = document.getElementById('mensaje-nuevo-txt');
+    if (taRestore) taRestore.value = texto;
+  })
+  .finally(function() {
+    _enviandoMensajeTicket = false;
+    var btn = document.getElementById('btn-enviar-mensaje-st');
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; btn.style.opacity = '1'; }
+  });
 };
 
 // ══════════════════════════════════════════════════════════════════

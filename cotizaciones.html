@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.11 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.13 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -913,7 +913,7 @@ async function _renderPanelMensajesCot(id) {
                 'color:#f1f5f9;font-size:12px;font-family:inherit;resize:vertical;" oninput="_onMensajeInputCot(event)" onkeydown="_onMensajeKeydownCot(event)" ' +
                 'onclick="_mencionUltimoCursorCot=this.selectionStart;" onkeyup="_mencionUltimoCursorCot=this.selectionStart;" ontouchend="_mencionUltimoCursorCot=this.selectionStart;"></textarea>' +
             '<div id="mencion-sugerencias-cot" style="display:none;margin-top:6px;background:#0f1b2e;border:1px solid #1e3050;border-radius:8px;max-height:160px;overflow-y:auto;"></div>' +
-            '<button type="button" onclick="_enviarMensajeCot()" ' +
+            '<button type="button" id="btn-enviar-mensaje-cot" onclick="_enviarMensajeCot()" ' +
                 'style="margin-top:8px;width:100%;padding:8px;border-radius:8px;background:#3a86ff;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;">Enviar</button>' +
         '</div>';
 
@@ -1035,7 +1035,10 @@ window._elegirMencionUnaVezCot = function(nombre) {
     _elegirMencionCot(nombre);
 };
 
+var _enviandoMensajeCot = false;
+
 window._enviarMensajeCot = function() {
+    if (_enviandoMensajeCot) return; // ya hay un envío en curso, ignora clicks de más
     var ta = document.getElementById('mensaje-nuevo-txt-cot');
     var texto = (ta.value || '').trim();
     // Respaldo: si _idCotActual quedó vacío por lo que sea, lo recalculamos
@@ -1054,6 +1057,15 @@ window._enviarMensajeCot = function() {
     var tituloEl = document.getElementById('det-titulo');
     var titulo = tituloEl ? tituloEl.textContent : '';
 
+    // Feedback inmediato: limpia el campo y deshabilita el botón apenas
+    // tocás Enviar, en vez de esperar la respuesta del servidor.
+    _enviandoMensajeCot = true;
+    var btnEnviar = document.getElementById('btn-enviar-mensaje-cot');
+    if (btnEnviar) { btnEnviar.disabled = true; btnEnviar.textContent = 'Enviando...'; btnEnviar.style.opacity = '.6'; }
+    ta.value = '';
+    var boxSugerencias = document.getElementById('mencion-sugerencias-cot');
+    if (boxSugerencias) boxSugerencias.style.display = 'none';
+
     fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ accion:'cot_agregarMensaje', id_cotizacion:idParaEnviar, texto:texto,
             autor_nombre:autorNombre, autor_email:autorEmail, menciones:menciones, titulo:titulo }) })
@@ -1063,12 +1075,22 @@ window._enviarMensajeCot = function() {
             _mensajesCotActual = r.mensajes || [];
             var lista = document.getElementById('mensajes-lista-cot');
             if (lista) lista.innerHTML = _construirHtmlListaMensajesCot();
-            ta.value = '';
         } else {
             alert('Error al enviar mensaje: ' + (r.error || 'desconocido'));
+            var taRestore = document.getElementById('mensaje-nuevo-txt-cot');
+            if (taRestore) taRestore.value = texto;
         }
     })
-    .catch(function(){ alert('Error de conexión al enviar mensaje'); });
+    .catch(function(){
+        alert('Error de conexión al enviar mensaje');
+        var taRestore = document.getElementById('mensaje-nuevo-txt-cot');
+        if (taRestore) taRestore.value = texto;
+    })
+    .finally(function() {
+        _enviandoMensajeCot = false;
+        var btn = document.getElementById('btn-enviar-mensaje-cot');
+        if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; btn.style.opacity = '1'; }
+    });
 };
 
 // ══════════════════════════════════════════════════════════════════
