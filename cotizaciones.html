@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.7 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.8 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -273,20 +273,23 @@
         body.tema-claro .cot-equipo { color:#1a4b8c !important; }
         body.tema-claro .cot-fecha  { color:#64748b !important; }
         body.tema-claro .cot-btn-presupuesto { background:#ffffff !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
-        body.tema-claro #campana-wrap button[style*="background:#1c2541"] { background:#ffffff !important; border-color:#cbd5e1 !important; color:#374151 !important; }
+        .mencion-item-cot { background:transparent; color:#f1f5f9; font-weight:normal; }
+        .mencion-item-cot.mencion-activo-cot { background:#3a86ff; color:#fff; font-weight:700; }
+        body.tema-claro .mencion-item-cot { color:#0f172a; }
+        body.tema-claro .mencion-item-cot.mencion-activo-cot { background:#3a86ff; color:#fff; }
+        body.tema-claro #campana-wrap button[style*="background:#1c2541"],body.tema-claro #campana-wrap button[style*="background: #1c2541"] { background:#ffffff !important; border-color:#cbd5e1 !important; color:#374151 !important; }
         body.tema-claro #campana-panel { background:#ffffff !important; border-color:#e2e8f0 !important; }
         body.tema-claro #campana-panel [style*="border-bottom:1px solid #1e3050"] { border-bottom-color:#e2e8f0 !important; }
-        body.tema-claro #campana-panel [style*="color:#f1f5f9"] { color:#0f172a !important; }
-        body.tema-claro #campana-panel [style*="color:#94a3b8"] { color:#64748b !important; }
+        body.tema-claro #campana-panel [style*="color:#f1f5f9"],body.tema-claro #campana-panel [style*="color: #f1f5f9"] { color:#0f172a !important; }
+        body.tema-claro #campana-panel [style*="color:#94a3b8"],body.tema-claro #campana-panel [style*="color: #94a3b8"] { color:#64748b !important; }
         body.tema-claro #mencion-sugerencias-cot { background:#ffffff !important; border-color:#e2e8f0 !important; }
         body.tema-claro #mencion-sugerencias-cot button { border-bottom-color:#e2e8f0 !important; }
-        body.tema-claro #mencion-sugerencias-cot button[style*="background:transparent"] { color:#0f172a !important; }
 
         /* Panel de mensajes internos — respeta el tema claro/oscuro */
-        body.tema-claro #det-mensajes-panel [style*="background:#0a1424"] { background:#ffffff !important; border-color:#e2e8f0 !important; }
-        body.tema-claro #det-mensajes-panel [style*="background:#0f1b2e"] { background:#f8fafc !important; border-color:#e2e8f0 !important; }
-        body.tema-claro #det-mensajes-panel [style*="color:#f1f5f9"] { color:#0f172a !important; }
-        body.tema-claro #det-mensajes-panel [style*="color:#94a3b8"] { color:#64748b !important; }
+        body.tema-claro #det-mensajes-panel [style*="background:#0a1424"],body.tema-claro #det-mensajes-panel [style*="background: #0a1424"] { background:#ffffff !important; border-color:#e2e8f0 !important; }
+        body.tema-claro #det-mensajes-panel [style*="background:#0f1b2e"],body.tema-claro #det-mensajes-panel [style*="background: #0f1b2e"] { background:#f8fafc !important; border-color:#e2e8f0 !important; }
+        body.tema-claro #det-mensajes-panel [style*="color:#f1f5f9"],body.tema-claro #det-mensajes-panel [style*="color: #f1f5f9"] { color:#0f172a !important; }
+        body.tema-claro #det-mensajes-panel [style*="color:#94a3b8"],body.tema-claro #det-mensajes-panel [style*="color: #94a3b8"] { color:#64748b !important; }
         body.tema-claro #det-mensajes-panel textarea { background:#f8fafc !important; color:#0f172a !important; border-color:#cbd5e1 !important; }
         body.tema-claro #det-mensajes-panel textarea::placeholder { color:#94a3b8 !important; }
         body.tema-claro .cot-monto  { color:#059669 !important; }
@@ -950,8 +953,8 @@ function _renderSugerenciasMencionCot() {
         var resaltado = i === _mencionIndiceResaltadoCot;
         return '<button type="button" onmousedown="event.preventDefault(); _elegirMencionUnaVezCot(\'' + p.nombre.replace(/'/g,"\\'") + '\');" onclick="_elegirMencionUnaVezCot(\'' + p.nombre.replace(/'/g,"\\'") + '\')" ' +
             'onmouseenter="_resaltarMencionHoverCot(' + i + ')" ' +
-            'style="display:block;width:100%;text-align:left;padding:9px 10px;font-size:12px;cursor:pointer;border:none;border-bottom:1px solid #1e3050;font-family:inherit;' +
-            (resaltado ? 'background:#3a86ff;color:#fff;font-weight:700;' : 'background:transparent;color:#f1f5f9;') + '">👤 ' + _escCot(p.nombre) + '</button>';
+            'class="mencion-item-cot' + (resaltado ? ' mencion-activo-cot' : '') + '" ' +
+            'style="display:block;width:100%;text-align:left;padding:9px 10px;font-size:12px;cursor:pointer;border:none;border-bottom:1px solid #1e3050;font-family:inherit;">👤 ' + _escCot(p.nombre) + '</button>';
     }).join('');
     var elResaltado = box.children[_mencionIndiceResaltadoCot];
     if (elResaltado) elResaltado.scrollIntoView({ block:'nearest' });
@@ -966,11 +969,7 @@ window._resaltarMencionHoverCot = function(i) {
     var box = document.getElementById('mencion-sugerencias-cot');
     if (!box) return;
     Array.from(box.children).forEach(function(btn, idx) {
-        if (idx === i) {
-            btn.style.background = '#3a86ff'; btn.style.color = '#fff'; btn.style.fontWeight = '700';
-        } else {
-            btn.style.background = 'transparent'; btn.style.color = '#f1f5f9'; btn.style.fontWeight = 'normal';
-        }
+        btn.classList.toggle('mencion-activo-cot', idx === i);
     });
 };
 
@@ -1664,14 +1663,11 @@ function renderKanban() {
             ).join('');
 
             const linkHtml = linkPdf
-                ? `<a href="${linkPdf}" target="_blank" onclick="event.stopPropagation()"
+                ? `<a href="${linkPdf}" target="_blank" onclick="event.stopPropagation()" class="cot-btn-presupuesto"
                     style="display:flex;align-items:center;justify-content:center;gap:5px;width:100%;
                            padding:6px;margin-top:6px;border-radius:7px;
-                           background:#0f2a52;border:1px solid #1e3a6e;
-                           color:#60a5fa;font-size:10px;font-weight:600;text-decoration:none;
-                           transition:all .15s;"
-                    onmouseover="this.style.background='#1e3a6e'"
-                    onmouseout="this.style.background='#0f2a52'">
+                           background:#0f1a30;border:1px solid #1e3050;
+                           color:#f1f5f9;font-size:10px;font-weight:600;text-decoration:none;">
                     📄 Ver Presupuesto
                    </a>`
                 : '';
