@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.9 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.10 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -374,6 +374,10 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
         body.tema-claro .pc-search-result .pc-res-precio { color:#059669 !important; }
         /* Complemento agresivo: fondos inline oscuros */
         body.tema-claro [style*="background:#0f1a30"],body.tema-claro [style*="background: #0f1a30"] { background:#ffffff !important; border-color:#e2e8f0 !important; }
+        body.tema-claro [style*="background:#0f2a52"],body.tema-claro [style*="background: #0f2a52"] { background:#e8f0fc !important; border-color:#93c5fd !important; }
+        body.tema-claro [style*="color:#60a5fa"],body.tema-claro [style*="color: #60a5fa"] { color:#1a4b8c !important; }
+        body.tema-claro [style*="background:#2d0a0a"],body.tema-claro [style*="background: #2d0a0a"] { background:#fef2f2 !important; border-color:#fecaca !important; }
+        body.tema-claro [style*="color:#f87171"],body.tema-claro [style*="color: #f87171"] { color:#dc2626 !important; }
         body.tema-claro [style*="background:#0a1628"],body.tema-claro [style*="background: #0a1628"] { background:#f8fafc !important; border-color:#e2e8f0 !important; }
         body.tema-claro [style*="background:#080d14"],body.tema-claro [style*="background: #080d14"] { background:#ffffff !important; border-color:#cbd5e1 !important; }
         body.tema-claro [style*="background:#0d1520"],body.tema-claro [style*="background: #0d1520"] { background:#ffffff !important; border-color:#e2e8f0 !important; }
@@ -1896,12 +1900,12 @@ function _renderDetalle(c) {
                     <div class="equipo-nombre"><span style="color:#3a86ff;">${i.cantidad||1}×</span> ${_fixEncoding(i.nombre)}</div>
                     ${i.descuentoValor > 0 ? `<div class="equipo-desc">−${i.descuentoTipo==='%'?i.descuentoValor+'%':'USD '+i.descuentoValor}</div>` : ''}
                     ${folleto || video ? `<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;">
-                        ${folleto ? `<a href="${folleto}" target="_blank" onclick="event.stopPropagation()"
+                        ${folleto ? `<a href="${folleto}" target="_blank" onclick="event.stopPropagation()" class="cot-btn-folleto"
                             style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;
                                    color:#60a5fa;text-decoration:none;padding:3px 8px;
                                    background:#0f2a52;border:1px solid #1e3a6e;border-radius:8px;">
                             📄 Folleto</a>` : ''}
-                        ${video ? `<a href="${video}" target="_blank" onclick="event.stopPropagation()"
+                        ${video ? `<a href="${video}" target="_blank" onclick="event.stopPropagation()" class="cot-btn-video"
                             style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;
                                    color:#f87171;text-decoration:none;padding:3px 8px;
                                    background:#2d0a0a;border:1px solid #7f1d1d;border-radius:8px;">
@@ -1997,7 +2001,7 @@ function _renderDetalle(c) {
 
         // Versión original (link principal)
         if (linkPdf) {
-            html += `<a href="${linkPdf}" target="_blank"
+            html += `<a href="${linkPdf}" target="_blank" class="cot-historial-item"
                 style="display:flex;align-items:center;gap:10px;background:#0f1a30;
                        border:1px solid #1e3050;border-radius:10px;padding:10px 14px;
                        text-decoration:none;transition:border-color .15s;"
@@ -2026,7 +2030,7 @@ function _renderDetalle(c) {
                                           padding:1px 7px;border-radius:8px;">/v${v.version}</span>`;
             const disponible = !!vLink;
             if (disponible) {
-                html += `<a href="${vLink}" target="_blank"
+                html += `<a href="${vLink}" target="_blank" class="cot-historial-item"
                     style="display:flex;align-items:center;gap:10px;background:#0f1a30;
                            border:1px solid #1e3050;border-radius:10px;padding:10px 14px;
                            text-decoration:none;transition:border-color .15s;"
