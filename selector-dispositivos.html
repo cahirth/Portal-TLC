@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.19.4 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.19.5 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -4063,6 +4063,23 @@ function _mrIrPaso1() {
 // y el "lista" tachado arriba), sin reconstruir toda la tarjeta — evita
 // que el campo de precio (u otro input activo) pierda el valor recién
 // tipeado al reconstruirse en medio de la edición.
+// Escribe el precio editado a mano en la columna que REALMENTE usa el
+// cálculo según la modalidad de pago activa (precioCNO para modalidades
+// "usaCNO", precioLista para el resto) — sin esto, si la modalidad
+// activa era "Contado USD" (usaCNO:true), el campo guardaba el cambio
+// en precioLista pero el cálculo seguía leyendo precioCNO (sin tocar),
+// y el precio final nunca se movía aunque el campo mostrara el nuevo
+// valor tipeado.
+function _mrSetPrecioManual(idx, valorStr) {
+    const item = carrito[idx];
+    if (!item) return;
+    const val = parseFloat(valorStr) || 0;
+    const mod = MODAL_CARRITO.find(m => m.key === modalidadCarrito) || MODAL_CARRITO[0];
+    if (mod.usaCNO) item.precioCNO = val;
+    item.precioLista = val; // se actualiza siempre, para que quede consistente si cambia de modalidad después
+    _mrActualizarPrecioItemDom(idx);
+}
+
 function _mrActualizarPrecioItemDom(idx) {
     const item = carrito[idx];
     if (!item) return;
@@ -4163,8 +4180,8 @@ function _mrRenderPaso2() {
                                </div>
                                <input type="number" min="0" step="any" value="${precioListaRaw || 0}"
                                  style="width:110px;background:transparent;border:none;border-bottom:1px dashed #475569;color:inherit;font-size:13px;font-weight:600;padding:3px 4px;outline:none;"
-                                 oninput="carrito[${idx}].precioLista=parseFloat(this.value)||0; _mrActualizarPrecioItemDom(${idx});"
-                                 onblur="carrito[${idx}].precioLista=parseFloat(this.value)||0; _mrActualizarPrecioItemDom(${idx});"
+                                 oninput="_mrSetPrecioManual(${idx}, this.value);"
+                                 onblur="_mrSetPrecioManual(${idx}, this.value);"
                                  onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"> lista`
                             : `${monedaItem === 'ARS' ? fmtARS(precioListaRaw) : fmtUSD(base)} lista`
                         }
