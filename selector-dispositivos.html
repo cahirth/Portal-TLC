@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.19.5 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.19.6 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -4385,12 +4385,22 @@ function _mrCambiarMonedaItem(idx, monedaDestino) {
         return;
     }
 
-    const precioActual = item.precioLista || 0;
+    // Igual que en la edición manual del precio: hay que convertir la
+    // columna que REALMENTE usa el cálculo según la modalidad de pago
+    // activa (precioCNO para modalidades "usaCNO", como "Contado USD",
+    // que es la modalidad por default) — antes solo se convertía
+    // precioLista, y si la modalidad activa usaba precioCNO, el precio
+    // mostrado no cambiaba nunca al cambiar de moneda.
+    const mod = MODAL_CARRITO.find(m => m.key === modalidadCarrito) || MODAL_CARRITO[0];
+    const precioActual = (mod.usaCNO ? (item.precioCNO || item.precioLista) : item.precioLista) || 0;
+    let precioConvertido;
     if (monedaActual === 'USD' && monedaDestino === 'ARS') {
-        item.precioLista = Math.round(precioActual * _tcBNA);
+        precioConvertido = Math.round(precioActual * _tcBNA);
     } else if (monedaActual === 'ARS' && monedaDestino === 'USD') {
-        item.precioLista = Math.round((precioActual / _tcBNA) * 100) / 100;
+        precioConvertido = Math.round((precioActual / _tcBNA) * 100) / 100;
     }
+    if (mod.usaCNO) item.precioCNO = precioConvertido;
+    item.precioLista = precioConvertido; // se actualiza siempre, para quedar consistente si cambia de modalidad
     item.moneda = monedaDestino;
 
     if (item.descuentoTipo === 'USD' || item.descuentoTipo === 'ARS') {
@@ -4418,16 +4428,20 @@ function _mrConvertirMonedaGlobal(monedaDestino) {
     // ítems seguían guardados en USD por dentro, y el presupuesto final
     // salía en USD aunque en pantalla decía pesos.)
 
+    const mod = MODAL_CARRITO.find(m => m.key === modalidadCarrito) || MODAL_CARRITO[0];
     carrito.forEach(item => {
         const monedaActual = item.moneda || 'USD';
         if (monedaActual === monedaDestino) return; // ya está en esa moneda
 
-        const precioActual = item.precioLista || 0;
+        const precioActual = (mod.usaCNO ? (item.precioCNO || item.precioLista) : item.precioLista) || 0;
+        let precioConvertido;
         if (monedaActual === 'USD' && monedaDestino === 'ARS') {
-            item.precioLista = Math.round(precioActual * _tcBNA);
+            precioConvertido = Math.round(precioActual * _tcBNA);
         } else if (monedaActual === 'ARS' && monedaDestino === 'USD') {
-            item.precioLista = Math.round((precioActual / _tcBNA) * 100) / 100;
+            precioConvertido = Math.round((precioActual / _tcBNA) * 100) / 100;
         }
+        if (mod.usaCNO) item.precioCNO = precioConvertido;
+        item.precioLista = precioConvertido;
         item.moneda = monedaDestino;
 
         // Si el ítem tenía descuento en valor absoluto (no %), también
