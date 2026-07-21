@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.19.2 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.19.3 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -4080,9 +4080,14 @@ function _mrRenderPaso2() {
         const dVal   = parseFloat(item.descuentoValor) || 0;
         const dTipo  = item.descuentoTipo || '%';
         const ivaPct = item.ivaPct ?? null;   // null = sin seleccionar
+        // dVal (para descuento fijo, no %) está guardado en la MISMA moneda
+        // que el ítem (monedaItem) — pero "bruto" siempre está en USD
+        // equivalente. Sin esta conversión, restaba pesos de dólares
+        // directamente y daba resultados negativos (se veía como $0).
+        const dValUSD = (dTipo !== '%' && monedaItem === 'ARS' && _tcBNA) ? (dVal / _tcBNA) : dVal;
         const neto   = dTipo === '%'
             ? Math.max(0, bruto - bruto * (dVal / 100))
-            : Math.max(0, bruto - dVal);
+            : Math.max(0, bruto - dValUSD);
         const hayDesc = dVal > 0;
         const sinIva  = ivaPct === null;
 
@@ -4163,7 +4168,8 @@ function _mrRenderPaso2() {
                 <input type="number" class="item-descuento-input" style="flex:1; min-width:50px;"
                     min="0" step="any" value="${dVal || ''}" placeholder="0"
                     oninput="carrito[${idx}].descuentoValor=parseFloat(this.value)||0;"
-                    onblur="_mrRenderPaso2();" onchange="_mrRenderPaso2();">
+                    onblur="_mrRenderPaso2();"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}">
                 <div class="desc-tipo-toggle" style="flex-shrink:0;">
                     <button class="desc-tipo-btn ${dTipo==='%'?'active':''}"
                         onclick="carrito[${idx}].descuentoTipo='%'; _mrRenderPaso2();">%</button>
