@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.19.1 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.19.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1137,7 +1137,7 @@
     <!-- PANTALLA CATEGORÍAS -->
     <div id="vista-categorias" style="display:flex; flex-direction:column; gap:0;">
         <!-- Buscador universal — filtra en todas las categorías y equipos -->
-        <div style="position:sticky; top:62px; z-index:50; background:#030712; padding:8px 16px 8px; border-bottom:1px solid #1c2541;">
+        <div style="display:none; position:sticky; top:62px; z-index:50; background:#030712; padding:8px 16px 8px; border-bottom:1px solid #1c2541;">
             <input type="text" id="buscador-cats"
                 placeholder="Buscar equipos, marcas o subcategorías..."
                 oninput="busquedaDesdeCategoria(this.value)"
@@ -1264,7 +1264,7 @@
 
 <!-- MODAL RESUMEN COMERCIAL -->
 <div class="form-overlay" id="modal-resumen" style="display:none; position:fixed; inset:0; z-index:300; background:rgba(3,7,18,0.97); overflow-y:auto; padding:16px;">
-    <div id="modal-resumen-box" style="background:#0d1520; border:1px solid #1e3050; border-radius:20px; max-width:680px; margin:20px auto; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.6);">
+    <div id="modal-resumen-box" style="background:#0d1520; border:1px solid #1e3050; border-radius:20px; max-width:900px; margin:20px auto; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.6);">
 
     <!-- ═══════════════════════════════════════════════════
          PASO 1 — PANTALLA FISCAL (Buscador + Datos cliente)
@@ -4095,12 +4095,14 @@ function _mrRenderPaso2() {
         const categoriaItem = (item._data && item._data['Categoria']) || '';
         // Si en algún momento el ítem calificó como editable (categoría
         // Servicio, o precio inicial 0), se marca permanentemente con
-        // item.editable=true para que no "deje de ser editable" después
-        // de la primera edición (cuando precioLista pasa a ser > 0).
+        // Nombre: editable solo cuando es un ítem "libre" (Servicio
+        // Técnico o sin precio en la planilla) — como estaba antes.
         if (item.editable !== true && (categoriaItem === 'SERV_TECNICO' || !(item.precioLista > 0))) {
             item.editable = true;
         }
-        const esEditable = item.editable === true;
+        const esEditable = item.editable === true; // controla el nombre (textarea vs texto fijo)
+        // Precio: SIEMPRE editable ahora, venga o no de la planilla.
+        const esPrecioEditable = true;
 
         return `<div class="mr-item-card" id="mr-item-card-${idx}">
 
@@ -4117,7 +4119,7 @@ function _mrRenderPaso2() {
                     }
                     ${item._equipoDesc ? `<div style="font-size:11px; color:#94a3b8; margin-top:2px;">🔧 Equipo: ${_esc(item._equipoDesc)}</div>` : ''}
                     <div style="font-size:11px; color:#64748b; margin-top:2px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                        ${esEditable
+                        ${esPrecioEditable
                             ? `<div class="desc-tipo-toggle" style="flex-shrink:0;">
                                  <button type="button" class="desc-tipo-btn ${monedaItem==='USD'?'active':''}"
                                    onclick="_mrCambiarMonedaItem(${idx}, 'USD'); return false;">USD</button>
@@ -4140,11 +4142,9 @@ function _mrRenderPaso2() {
                 </div>
             </div>
 
-            <!-- Fila controles: 2 filas para evitar wrap en mobile -->
-            <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
-
-              <!-- Fila 1: Cantidad + Descuento -->
-              <div class="item-descuento-row" style="flex-wrap:nowrap; gap:8px; align-items:center;">
+            <!-- Fila controles: una sola fila en desktop (clase mr-controles-row,
+                 con media query más abajo), apilada en 2 filas en mobile -->
+            <div class="mr-controles-row" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px;">
 
                 <!-- Cantidad -->
                 <div class="item-cant-ctrl" style="flex-shrink:0;">
@@ -4170,10 +4170,7 @@ function _mrRenderPaso2() {
                     <button class="desc-tipo-btn ${dTipo==='USD'?'active':''}"
                         onclick="carrito[${idx}].descuentoTipo='USD'; _mrRenderPaso2();">USD</button>
                 </div>
-              </div>
 
-              <!-- Fila 2: IVA + botón eliminar -->
-              <div style="display:flex; align-items:center; gap:8px;">
                 <!-- IVA -->
                 <select class="item-iva-select ${sinIva ? 'sin-seleccionar' : ''}"
                     style="flex:1; min-width:80px;"
@@ -4192,9 +4189,8 @@ function _mrRenderPaso2() {
                            cursor:pointer; white-space:nowrap; flex-shrink:0;">
                     ✕ Quitar
                 </button>
-              </div>
-
             </div>
+
         </div>`;
     }).join('');
 
