@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.13 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.14 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -999,7 +999,11 @@ window._onMensajeInputCot = function(ev) {
     }
 
     var parcial = match[1].toLowerCase();
-    _mencionCandidatosCot = _internosCacheCot.filter(function(p) { return p.nombre.toLowerCase().indexOf(parcial) !== -1; }).slice(0, 20);
+    var cuentaActualCl = _leerSesionCompartida();
+    var miEmailCl = (cuentaActualCl ? cuentaActualCl.username : '').toLowerCase();
+    _mencionCandidatosCot = _internosCacheCot.filter(function(p) {
+        return p.nombre.toLowerCase().indexOf(parcial) !== -1 && (p.email || '').toLowerCase() !== miEmailCl;
+    }).slice(0, 20);
     if (!_mencionCandidatosCot.length) { box.style.display = 'none'; _mencionIndiceResaltadoCot = -1; return; }
     _mencionIndiceResaltadoCot = 0;
     _renderSugerenciasMencionCot();
