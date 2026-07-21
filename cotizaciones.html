@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.14 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.15 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2705,10 +2705,10 @@ function _pcToggleBuscador() {
     document.getElementById('pc-search-results').style.display = 'none';
 }
 
-function _pcBuscarEquipo(q) {
+async function _pcBuscarEquipo(q) {
     const resWrap = document.getElementById('pc-search-results');
-    const precios = _preciosCache || [];
     if (!q || q.length < 2) { resWrap.style.display = 'none'; return; }
+    const precios = await _getPrecios(); // espera a que termine de cargar (antes corría contra caché vacía si se escribía rápido)
     const matches = precios.filter(d => {
         const nombre = (d['Nombre de Dispositivo'] || '').toLowerCase();
         return nombre.includes(q.toLowerCase());
