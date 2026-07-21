@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.19.6 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.19.7 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -972,6 +972,10 @@
 
 <div id="app-wrapper">
 
+<div id="banner-agregar-cotizacion" style="display:none; background:#1a4b8c; color:#fff; text-align:center; padding:8px 16px; font-size:12px; font-weight:600;">
+    📋 Elegí un equipo para agregar a la cotización — al confirmarlo, volvés directo ahí
+</div>
+
 <!-- HEADER -->
 <div class="header">
     <button id="btn-nav-back" style="background:#3a86ff; border:none; color:#fff; font-size:20px; cursor:pointer; padding:4px 10px; line-height:1; flex-shrink:0; border-radius:8px; font-weight:700;">←</button>
@@ -1823,6 +1827,17 @@ window.addEventListener('DOMContentLoaded', function() {
 });
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
+// Puente con cotizaciones.html: si viene ?agregarA=ID, el próximo
+// "Agregar al carrito" vuelve directo a esa cotización en vez de armar
+// un carrito nuevo (ver agregarAlCarrito()).
+const _agregarACotizacionId = new URLSearchParams(window.location.search).get('agregarA') || '';
+if (_agregarACotizacionId) {
+    document.addEventListener('DOMContentLoaded', function() {
+        const banner = document.getElementById('banner-agregar-cotizacion');
+        if (banner) banner.style.display = 'block';
+    });
+}
+
 async function initLogin() {
     const account = _leerSesion();
     if (account) { await mostrarApp(account); return; }
@@ -3257,6 +3272,10 @@ document.getElementById('btn-back').addEventListener('click', () => {
 
 // ─── FORMULARIO ───────────────────────────────────────────────────────────────
 document.getElementById('btn-cotizar').addEventListener('click', agregarAlCarrito);
+if (_agregarACotizacionId) {
+    const btnCot = document.getElementById('btn-cotizar');
+    if (btnCot) btnCot.textContent = '➕ Agregar a la cotización';
+}
 
 // Aplicar estilo según rol al abrir cualquier detalle
 (function _aplicarRolBtnCotizar() {
@@ -3425,6 +3444,23 @@ function agregarAlCarrito() {
     }
     const d = dispositivoActual;
     if (!d) return;
+
+    // Puente: si llegamos acá con ?agregarA=ID (desde "Editar cotización"
+    // en cotizaciones.html), no armamos un carrito nuevo — guardamos el
+    // ítem elegido y volvemos directo a esa cotización existente, que lo
+    // agrega sola apenas carga.
+    if (_agregarACotizacionId) {
+        const precioListaP = parseNum(d['Precio LISTA']);
+        try {
+            sessionStorage.setItem('tlc_item_pendiente_cotizacion', JSON.stringify({
+                nombre: d['Nombre de Dispositivo'] || '',
+                precio: isNaN(precioListaP) ? 0 : precioListaP,
+                foto: fotoUrl(d['Foto'] || ''),
+            }));
+        } catch(e) {}
+        window.location.href = 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(_agregarACotizacionId) + '&agregarItem=1';
+        return;
+    }
 
     const precioLista = parseNum(d['Precio LISTA']);
     const precioCNO   = parseNum(d['Precio CONTADO CNO']);

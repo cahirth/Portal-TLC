@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.19.15 -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.19.16 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -679,7 +679,7 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
                 <div class="pc-search-results" id="pc-search-results" style="display:none;"></div>
             </div>
 
-            <button class="pc-btn-add" onclick="_pcToggleBuscador()">+ Agregar ítem a la cotización</button>
+            <button class="pc-btn-add" onclick="_pcIrASelector()">+ Agregar ítem a la cotización</button>
 
             <!-- Totales -->
             <div class="pc-totales" id="pc-totales">
@@ -1574,6 +1574,7 @@ async function cargar(forzar = false) {
         // Deep-link: si la URL trae ?id=TLC-XXX (ej: desde "Mis Pendientes"
         // del Radar en index.html), abrir directo el detalle de ese negocio.
         _abrirDetallePorIdEnUrl();
+        _pcProcesarItemPendiente();
 
     } catch(e) {
         document.getElementById('loading-inicial').innerHTML =
@@ -1795,6 +1796,36 @@ function _abrirDetallePorIdEnUrl() {
             console.warn('Deep-link: negocio no encontrado en la vista actual:', idBuscado);
         }
     } catch(e) { console.warn('_abrirDetallePorIdEnUrl:', e); }
+}
+
+// Navega al catálogo por categorías (selector-dispositivos.html) para
+// elegir un equipo y agregarlo a ESTA cotización — reemplaza al viejo
+// buscador de texto inline, que los vendedores encontraban limitado.
+// Al elegir el equipo allá, vuelve solo acá con el ítem ya cargado
+// (ver _pcProcesarItemPendiente, llamada al arrancar la página).
+function _pcIrASelector() {
+    if (!_pcIdCot) return;
+    window.location.href = 'https://cahirth.github.io/Portal-TLC/selector-dispositivos.html?agregarA=' + encodeURIComponent(_pcIdCot);
+}
+
+// Si volvimos desde el selector con un ítem elegido (?agregarItem=1 +
+// sessionStorage), abre la Pantalla Comercial de esta cotización y lo
+// agrega automáticamente.
+function _pcProcesarItemPendiente() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('agregarItem') !== '1') return;
+        const idCot = (params.get('id') || '').trim();
+        const raw = sessionStorage.getItem('tlc_item_pendiente_cotizacion');
+        if (!idCot || !raw) return;
+        const item = JSON.parse(raw);
+        sessionStorage.removeItem('tlc_item_pendiente_cotizacion');
+
+        _pcAbrir(idCot);
+        setTimeout(function() {
+            _pcAgregarEquipo(item.nombre, item.precio, item.foto);
+        }, 200); // esperar a que _pcAbrir termine de pintar el modal
+    } catch(e) { console.warn('_pcProcesarItemPendiente:', e); }
 }
 
 // Fotos de equipos en el header del detalle. _buscarPrecio() es síncrona y
