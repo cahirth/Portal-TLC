@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.21.3 -->
+<!-- Portal TLC | servicio.html | v2026.07.21.4 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2465,18 +2465,18 @@ function _renderCamposTecnicos(t, puedeEditar) {
     '</div>' +
   '</div>';
 
-  // ── Partes utilizadas (activo desde reparación) ──
-  var repDisabled = (idxDep < FLUJO_ETAPAS.indexOf('reparacion')) || soloLectura;
+  // ── Partes utilizadas (activo desde diagnóstico) ──
+  var repDisabled = (idxDep < FLUJO_ETAPAS.indexOf('diagnostico')) || soloLectura;
   var partesHtml = '<div class="campo-tecnico-wrap">' +
-    '<div class="campo-tecnico-label">Partes utilizadas ' + _campoBadge(dep,'reparacion') + '</div>' +
+    '<div class="campo-tecnico-label">Partes utilizadas ' + _campoBadge(dep,'diagnostico') + '</div>' +
     '<textarea class="campo-tecnico-textarea" placeholder="Listá los repuestos y partes usadas en la reparación..." ' +
       (repDisabled ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'partes_utilizadas\',this.value)"') + '>' +
       _esc(t.partes_utilizadas||'') + '</textarea>' +
   '</div>';
 
-  // ── Tareas realizadas (activo desde reparación) ──
+  // ── Tareas realizadas (activo desde diagnóstico) ──
   var tareasHtml = '<div class="campo-tecnico-wrap">' +
-    '<div class="campo-tecnico-label">Tareas realizadas ' + _campoBadge(dep,'reparacion') + '</div>' +
+    '<div class="campo-tecnico-label">Tareas realizadas ' + _campoBadge(dep,'diagnostico') + '</div>' +
     '<textarea class="campo-tecnico-textarea" placeholder="Describí las tareas realizadas durante la reparación..." ' +
       (repDisabled ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'tareas_realizadas\',this.value)"') + '>' +
       _esc(t.tareas_realizadas||'') + '</textarea>' +
