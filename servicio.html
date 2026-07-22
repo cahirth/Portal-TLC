@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.21.2 -->
+<!-- Portal TLC | servicio.html | v2026.07.21.3 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1458,8 +1458,12 @@ function _validarGate(t, destino) {
   if (idxOrigen < 0 || idxDestino < 0 || idxDestino <= idxOrigen) return errores; // libre hacia atrás o fuera del flujo
 
   // Gate 1: Recepción → Diagnóstico (o más adelante)
+  // La exigencia de "técnico asignado" se sacó de acá — ahora la
+  // resuelve el modal de asignación por etapa durante el propio
+  // movimiento (si hay 2+ técnicos configurados para Diagnóstico,
+  // pregunta ahí mismo; si hay 1, lo asigna solo; si hay 0, pasa sin
+  // asignar, igual que antes cuando no había nadie cargado a mano).
   if (idxOrigen <= FLUJO_ETAPAS.indexOf('recepcion') && idxDestino >= FLUJO_ETAPAS.indexOf('diagnostico')) {
-    if (!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') errores.push('Asigná un técnico responsable');
     if (errores.length) return errores;
   }
 
