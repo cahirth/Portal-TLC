@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.21.1 -->
+<!-- Portal TLC | servicio.html | v2026.07.21.2 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -30,6 +30,12 @@ body{background:var(--bg);color:var(--text-main);font-family:-apple-system,Blink
 .st-header-logo{height:28px;width:auto;}
 .st-header-title{font-size:14px;font-weight:700;flex:1;}
 .st-header-sub{font-size:10px;color:var(--text-muted);}
+.modal-asignar-opcion{display:flex;align-items:center;gap:8px;width:100%;padding:11px 14px;border-radius:10px;
+  background:var(--bg,#080d14);border:1px solid var(--border-glow);color:var(--text-main);font-size:13px;font-weight:600;
+  cursor:pointer;text-align:left;transition:border-color .15s,background .15s;}
+.modal-asignar-opcion:hover{border-color:var(--accent-blue,#3a86ff);background:rgba(58,134,255,.08);}
+body.tema-claro .modal-asignar-opcion{background:#fff;}
+
 .btn-icon{width:34px;height:34px;border-radius:50%;background:var(--panel-dark);border:1px solid var(--border-glow);
   color:var(--text-main);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .btn-icon:hover{border-color:var(--accent-blue);}
@@ -619,6 +625,16 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
   </div>
 </div>
 
+<!-- MODAL: resolución de ambigüedad al asignar responsable de etapa -->
+<div id="modal-asignar-etapa" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(3,7,18,0.75);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:16px;padding:22px;max-width:340px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.5);">
+    <div style="font-size:15px;font-weight:800;color:var(--text-main);margin-bottom:4px;">¿A quién asignás esta tarjeta?</div>
+    <div id="modal-asignar-etapa-nombre" style="font-size:12px;color:var(--text-muted);margin-bottom:16px;"></div>
+    <div id="modal-asignar-lista" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
+    <button type="button" onclick="_cerrarModalAsignar()" style="width:100%;padding:10px;border-radius:8px;background:transparent;border:1px solid var(--border-glow);color:var(--text-muted);font-size:12px;font-weight:600;cursor:pointer;">Cancelar</button>
+  </div>
+</div>
+
 <!-- OVERLAY DETALLE TICKET -->
 <div class="detalle-overlay" id="st-detalle-overlay">
   <div class="detalle-header">
@@ -781,6 +797,20 @@ var COLUMNAS_DEF = [
   { key:'cancelado',                label:'Cancelado',             color:'#94a3b8', bg:'rgba(148,163,184,.1)', border:'rgba(148,163,184,.2)' },
 ];
 var COLUMNAS = COLUMNAS_DEF.slice();
+
+// ── Asignación dinámica de responsables por etapa (solo ADMIN edita) ──
+// { etapaKey: ['juan_garro','damian_sosa', ...] } — códigos de ST_TECNICOS
+var _asignadosPorEtapa = {};
+var TECNICOS_LISTA = [
+  { v:'juan_garro',         l:'Juan Garro' },
+  { v:'damian_sosa',        l:'Damián Sosa' },
+  { v:'fernando_del_campo', l:'Fernando Del Campo' },
+  { v:'cristian_hirth',     l:'Cristian Hirth' },
+  { v:'veronica_ribaita',   l:'Verónica Ribaita' },
+  { v:'lourdes_davalos',    l:'Lourdes Dávalos' },
+  { v:'lucio_raineri',      l:'Lucio Raineri' },
+];
+var _pendienteMovimientoEtapa = null; // { t, nuevaCol, depositoAnterior } — mientras el modal de ambigüedad está abierto
 
 var TECNICO_LABEL = {
   sin_asignar:'—', fernando_del_campo:'FC', cristian_hirth:'CH',
@@ -993,6 +1023,22 @@ window._setVista = function(vista, sinGuardar) {
 };
 
 // ── D: Cargar labels de columnas desde RTDB ──────────────────────
+// Carga la config de responsables por etapa — mismo patrón de lectura
+// directa desde RTDB que _cargarColumnas() (labels de columna), para
+// no depender de un listener con SDK completo de Firebase (esta app no
+// lo usa en ningún otro lado — todo es fetch REST + polling/refresco).
+async function _cargarAsignadosPorEtapa() {
+  try {
+    var res = await fetch(RTDB_URL + '/servicio_config/asignados_por_etapa.json', { cache:'no-store' });
+    if (res.ok) {
+      var data = await res.json();
+      _asignadosPorEtapa = (data && typeof data === 'object') ? data : {};
+    } else {
+      _asignadosPorEtapa = {};
+    }
+  } catch(e) { _asignadosPorEtapa = {}; }
+}
+
 async function _cargarColumnas() {
   try {
     var res  = await fetch(RTDB_URL + '/servicio_config/columnas.json', { cache:'no-store' });
@@ -1031,6 +1077,7 @@ async function _cargarTickets() {
   if (lista)  lista.style.display  = 'none';
   try {
     await _cargarColumnas();
+    await _cargarAsignadosPorEtapa();
     var res  = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now(), { cache:'no-store' });
     var data = await res.json();
     _tickets = data ? Object.values(data) : [];
@@ -1158,12 +1205,42 @@ function _renderKanban(tickets) {
       ? cols_tickets.map(_renderTarjeta).join('')
       : '<div class="st-empty-col">Sin tickets</div>';
 
+    var asignadosEtapa = _asignadosPorEtapa[col.key] || [];
+    var asignacionHtml;
+    if (_permisos.admin) {
+      asignacionHtml =
+        '<div class="st-col-asignar-wrap" style="position:relative;margin-top:4px;">' +
+          '<button type="button" class="st-col-asignar-btn" id="asignar-btn-' + col.key + '" ' +
+            'onclick="event.stopPropagation(); _toggleAsignarDropdown(\'' + col.key + '\')" ' +
+            'style="background:transparent;border:1px dashed ' + col.color + '55;color:' + col.color + ';font-size:10px;font-weight:700;padding:3px 8px;border-radius:12px;cursor:pointer;">' +
+            '👤 ' + (asignadosEtapa.length ? asignadosEtapa.length + ' asignado' + (asignadosEtapa.length > 1 ? 's' : '') : 'Asignar') +
+          '</button>' +
+          '<div class="st-col-asignar-dropdown" id="asignar-dd-' + col.key + '" style="display:none;position:absolute;top:26px;left:0;z-index:50;background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:10px;padding:6px;min-width:170px;box-shadow:0 8px 24px rgba(0,0,0,.35);">' +
+            TECNICOS_LISTA.map(function(tec) {
+              var checked = asignadosEtapa.indexOf(tec.v) !== -1;
+              return '<label style="display:flex;align-items:center;gap:7px;padding:5px 6px;font-size:12px;color:var(--text-main);cursor:pointer;border-radius:6px;" onmouseover="this.style.background=\'rgba(58,134,255,.08)\'" onmouseout="this.style.background=\'transparent\'">' +
+                '<input type="checkbox" value="' + tec.v + '" ' + (checked ? 'checked' : '') + ' onchange="_toggleAsignadoEtapa(\'' + col.key + '\',\'' + tec.v + '\',this.checked)"> ' + tec.l +
+              '</label>';
+            }).join('') +
+          '</div>' +
+        '</div>';
+    } else {
+      asignacionHtml = asignadosEtapa.length
+        ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">' +
+            asignadosEtapa.map(function(cod) {
+              return '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;background:' + col.bg + ';color:' + col.color + ';">' + (TECNICO_LABEL[cod] || cod) + '</span>';
+            }).join('') +
+          '</div>'
+        : '<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">Sin asignar</div>';
+    }
+
     return '<div class="st-col">' +
       '<div class="st-col-header" style="' + headerStyle + '">' +
         '<div class="st-col-label" style="color:' + col.color + '">' + col.label + '</div>' +
         '<div class="st-col-meta">' +
           '<span class="st-col-count" style="color:' + col.color + '">' + cols_tickets.length + '</span>' +
         '</div>' +
+        asignacionHtml +
       '</div>' +
       '<div class="st-cards" id="col-' + col.key + '" data-col="' + col.key + '" ' +
         'ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ' +
@@ -1223,6 +1300,125 @@ function _esc(s) {
 
 // ── Drag & Drop ────────────────────────────────────────────────────
 var _dragId = null;
+// ── Asignación de responsables por etapa (multiselect en el header) ──
+window._toggleAsignarDropdown = function(etapa) {
+  document.querySelectorAll('.st-col-asignar-dropdown').forEach(function(dd) {
+    if (dd.id !== 'asignar-dd-' + etapa) dd.style.display = 'none';
+  });
+  var dd = document.getElementById('asignar-dd-' + etapa);
+  if (dd) dd.style.display = (dd.style.display === 'block') ? 'none' : 'block';
+};
+document.addEventListener('click', function(ev) {
+  if (!ev.target.closest('.st-col-asignar-wrap')) {
+    document.querySelectorAll('.st-col-asignar-dropdown').forEach(function(dd){ dd.style.display = 'none'; });
+  }
+});
+
+window._toggleAsignadoEtapa = function(etapa, codigo, activo) {
+  var lista = (_asignadosPorEtapa[etapa] || []).slice();
+  if (activo) { if (lista.indexOf(codigo) === -1) lista.push(codigo); }
+  else { lista = lista.filter(function(c){ return c !== codigo; }); }
+  _asignadosPorEtapa[etapa] = lista;
+
+  // Actualiza solo el contador del botón — no re-renderiza todo el Kanban
+  // para no cerrar el dropdown que se está usando en este momento.
+  var btn = document.getElementById('asignar-btn-' + etapa);
+  if (btn) btn.textContent = '👤 ' + (lista.length ? lista.length + ' asignado' + (lista.length > 1 ? 's' : '') : 'Asignar');
+
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'guardarAsignadosEtapa', etapa: etapa, codigos: lista }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r){ if (!r.ok) console.warn('Error guardando asignados de etapa:', r.error); })
+    .catch(function(e){ console.warn(e); });
+};
+
+// Determina el responsable al mover un ticket a una nueva etapa:
+// - 0 o 1 configurado → sigue directo, sin preguntar nada.
+// - 2 o más → abre el modal para elegir, y NO mueve la tarjeta hasta confirmar.
+// No toca en absoluto la validación de _validarGate — se llama SIEMPRE
+// después de que esa validación ya haya pasado, tanto desde el drag&drop
+// como desde el select del detalle.
+function _resolverAsignacionYMover(t, nuevaCol, depositoAnterior) {
+  var candidatos = _asignadosPorEtapa[nuevaCol] || [];
+  if (candidatos.length <= 1) {
+    _ejecutarMovimientoEtapa(t, nuevaCol, candidatos.length === 1 ? candidatos[0] : null, depositoAnterior);
+    return;
+  }
+  _pendienteMovimientoEtapa = { t: t, nuevaCol: nuevaCol, depositoAnterior: depositoAnterior };
+  var colDef = COLUMNAS.find(function(c){ return c.key === nuevaCol; });
+  var elNombreEtapa = document.getElementById('modal-asignar-etapa-nombre');
+  if (elNombreEtapa) elNombreEtapa.textContent = 'Etapa: ' + (colDef ? colDef.label : nuevaCol);
+  var elLista = document.getElementById('modal-asignar-lista');
+  if (elLista) {
+    elLista.innerHTML = candidatos.map(function(cod) {
+      return '<button type="button" class="modal-asignar-opcion" onclick="_confirmarAsignacionModal(\'' + cod + '\')">' +
+        '<i class="fa-solid fa-user"></i> ' + (TECNICO_LABEL[cod] || cod) +
+      '</button>';
+    }).join('');
+  }
+  var modal = document.getElementById('modal-asignar-etapa');
+  if (modal) modal.style.display = 'flex';
+}
+
+window._confirmarAsignacionModal = function(codigo) {
+  if (!_pendienteMovimientoEtapa) return;
+  var p = _pendienteMovimientoEtapa;
+  _pendienteMovimientoEtapa = null;
+  var modal = document.getElementById('modal-asignar-etapa');
+  if (modal) modal.style.display = 'none';
+  _ejecutarMovimientoEtapa(p.t, p.nuevaCol, codigo, p.depositoAnterior);
+};
+
+window._cerrarModalAsignar = function() {
+  _pendienteMovimientoEtapa = null;
+  var modal = document.getElementById('modal-asignar-etapa');
+  if (modal) modal.style.display = 'none';
+  // No se movió nada todavía (el modal ambiguo no aplica cambios
+  // optimistas hasta confirmar), así que cancelar no necesita revertir
+  // nada — el select del detalle, si vino de ahí, se re-pinta solo.
+  if (_ticketActual) _renderDetalle(_ticketActual);
+};
+
+function _ejecutarMovimientoEtapa(t, nuevaCol, asignado, depositoAnterior) {
+  var tecAnterior = t.tecnico_asignado;
+  t.deposito = nuevaCol;
+  if (asignado) t.tecnico_asignado = asignado;
+  _aplicarFiltros();
+  if (_ticketActual && _ticketActual.id_ticket === t.id_ticket) _renderDetalle(t);
+
+  var body = { accion:'st_actualizarDeposito', id_ticket:t.id_ticket, deposito:nuevaCol };
+  if (asignado) body.tecnico_asignado = asignado;
+
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) })
+    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if (!r.ok) {
+        t.deposito = depositoAnterior;
+        if (asignado) t.tecnico_asignado = tecAnterior;
+        _aplicarFiltros();
+        if (_ticketActual && _ticketActual.id_ticket === t.id_ticket) _renderDetalle(t);
+        _stMostrarError('⚠ No se pudo mover el ticket: ' + (r.error || 'error desconocido'));
+      }
+    })
+    .catch(function(e) {
+      t.deposito = depositoAnterior;
+      if (asignado) t.tecnico_asignado = tecAnterior;
+      _aplicarFiltros();
+      if (_ticketActual && _ticketActual.id_ticket === t.id_ticket) _renderDetalle(t);
+      _stMostrarError('⚠ Error de conexión al mover el ticket');
+    });
+}
+
+// Cambio de etapa desde el <select> del detalle — mismo flujo de
+// asignación que el drag&drop, sin agregar validaciones nuevas (el
+// select nunca llamó a _validarGate, se mantiene ese comportamiento).
+window._cambiarEtapaDesdeDropdown = function(id, nuevoValor, valorAnterior) {
+  if (nuevoValor === valorAnterior) return;
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (!t) return;
+  _resolverAsignacionYMover(t, nuevoValor, valorAnterior);
+};
+
 window._onDragStart = function(e, id) {
   _dragId = id;
   e.dataTransfer.effectAllowed = 'move';
@@ -1245,27 +1441,10 @@ window._onDrop = function(e, nuevaCol) {
     return;
   }
 
-  // Optimistic update
-  var depositoAnterior = t.deposito;
-  t.deposito = nuevaCol;
-  _aplicarFiltros();
-
-  // Persistir vía GAS
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'st_actualizarDeposito', id_ticket:id, deposito:nuevaCol }) })
-  .then(function(r){ return r.json(); })
-  .then(function(r){
-    if(!r.ok) {
-      // Revertir si falla
-      t.deposito = depositoAnterior;
-      _aplicarFiltros();
-      console.warn('Error actualizando depósito:', r.error);
-    }
-  })
-  .catch(function(){
-    t.deposito = depositoAnterior;
-    _aplicarFiltros();
-  });
+  // Determina el responsable según la config de asignados por etapa —
+  // si hay ambigüedad (2+ configurados), abre el modal y NO mueve la
+  // tarjeta hasta confirmar; si hay 0 o 1, sigue directo como siempre.
+  _resolverAsignacionYMover(t, nuevaCol, t.deposito);
 };
 
 // ── Validación de gates reutilizable (drag & drop + botón siguiente) ──
@@ -1485,7 +1664,7 @@ function _renderDetalle(t) {
         '<div class="det-field">' +
           '<div class="det-field-label">Depósito (etapa)</div>' +
           (puedeEditar
-            ? '<select class="det-field-select" onchange="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'deposito_directo\',this.value,\'\')">' + _optsDeposito(t.deposito) + '</select>'
+            ? '<select class="det-field-select" onchange="_cambiarEtapaDesdeDropdown(\'' + t.id_ticket + '\',this.value,\'' + t.deposito + '\')">' + _optsDeposito(t.deposito) + '</select>'
             : '<div class="det-field-val">' + (t.deposito||'—') + '</div>') +
         '</div>' +
         '<div class="det-field">' +
