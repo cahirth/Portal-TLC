@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.19.5 -->
+<!-- Portal TLC | servicio.html | v2026.07.21.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1372,6 +1372,10 @@ function _renderDetalle(t) {
     '<div class="btn-orden-row">' +
       '<a class="btn-orden" href="' + ORDEN_URL + encodeURIComponent(t.id_ticket) + '" target="_blank">' +
         '<i class="fa-solid fa-file-lines"></i> Ver Orden</a>' +
+      ((t.deposito || 'recepcion') === 'recepcion'
+        ? '<a class="btn-orden" href="https://cahirth.github.io/Portal-TLC/remito-ingreso.html?id=' + encodeURIComponent(t.id_ticket) + '" target="_blank">' +
+            '<i class="fa-solid fa-file-import"></i> Remito de Ingreso</a>'
+        : '') +
       (_permisos.admin
         ? '<button class="btn-orden presupuesto" onclick="_generarPresupuestoTecnico(\'' + t.id_ticket + '\')">' +
             '<i class="fa-solid fa-file-invoice-dollar"></i> ' + (t.presupuesto_link ? 'Modificar Presupuesto' : 'Generar Presupuesto') + '</button>'

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<!-- Portal TLC | remito-ingreso.html | v2026.07.21.1 -->
+<html lang="es">
+<head>
+<script src="version.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TLC SRL - Remito de Ingreso de Equipo</title>
+    <meta property="og:title" content="Remito de Ingreso — Tecnología Láser Corneal">
+    <meta property="og:description" content="Remito de Ingreso de equipo al servicio técnico de TLC SRL. Tocá para ver el detalle completo.">
+    <meta property="og:image" content="https://cahirth.github.io/Portal-TLC/icons/og-image.png">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cahirth.github.io/Portal-TLC/remito-ingreso.html">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-body: #f8f9fa;
+            --bg-card: #ffffff;
+            --bg-muted: #f1f3f5;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --navy-tlc: #0b132b;
+            --green-tlc: #10b981;
+            --orange-tlc: #f97316;
+        }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-dark); margin: 0; padding: 40px 20px; display: flex; justify-content: center; }
+
+        /* Contenedor principal — mismo ancho fijo que el resto de los documentos del Portal */
+        .document-wrapper { width: 860px; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 4px; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); position: relative; }
+
+        /* HEADER IDENTIDAD TLC */
+        .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; }
+        .logo-box { width: 45%; display: flex; align-items: center; gap: 12px; }
+        .doc-meta-box { width: 50%; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+        .non-fiscal-badge { border: 1px solid var(--border-color); padding: 2px 10px; font-size: 11px; color: var(--text-muted); background-color: #fff; margin-bottom: 4px; }
+        .doc-title { font-size: 16px; font-weight: 700; color: var(--text-dark); margin: 0; }
+        .doc-subdata { font-size: 13px; color: #334155; margin: 0; }
+
+        /* SECCIÓN CLIENTE */
+        .client-card { background-color: #f8fafc; border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 30px; line-height: 1.5; font-size: 14px; }
+        .client-card strong { color: var(--text-dark); font-weight: 700; }
+        .client-card .row-item { margin-bottom: 4px; }
+        .client-card .row-item:last-child { margin-bottom: 0; }
+
+        /* SECCIONES */
+        .section-title { font-size: 12px; color: var(--navy-tlc); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin: 25px 0 12px 0; border-bottom: 2px solid var(--navy-tlc); padding-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+
+        .equipment-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; background-color: #fff; border: 1px solid var(--border-color); padding: 15px; border-radius: 6px; font-size: 13px; }
+        .grid-item { display: flex; flex-direction: column; gap: 2px; }
+        .grid-item label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; }
+        .grid-item span { font-size: 13px; color: var(--text-dark); font-weight: 600; }
+
+        .form-textarea-static { width: 100%; border: 1px solid var(--border-color); color: var(--text-dark); padding: 12px; border-radius: 6px; font-size: 13px; min-height: 60px; background-color: #fff; line-height: 1.5; white-space: pre-wrap; }
+
+        /* Cuadrícula de fotos */
+        .fotos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .foto-item { border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #f8fafc; aspect-ratio: 4/3; }
+        .foto-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .sin-fotos { font-size: 13px; color: var(--text-muted); font-style: italic; padding: 10px 0; }
+
+        .legal-footer { margin-top: 35px; border-top: 1px solid var(--border-color); padding-top: 15px; font-size: 11px; color: var(--text-muted); line-height: 1.5; text-align: justify; }
+
+        .wsp-bar { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+        .btn-wsp { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 700; text-decoration: none; border: none; }
+        .btn-wsp-orden { background: #25d366; color: #fff; }
+        @media print { .wsp-bar { display: none; } }
+
+        .error-box { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 14px; }
+
+        @media (max-width: 900px) {
+            body { padding: 12px; }
+            .document-wrapper { width: 100%; padding: 20px; }
+            .header-container { flex-direction: column; gap: 16px; }
+            .logo-box, .doc-meta-box { width: 100%; text-align: left; align-items: flex-start; }
+            .equipment-grid, .fotos-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="document-wrapper" id="doc-wrapper">
+        <div class="header-container">
+            <div class="logo-box">
+                <img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25"
+                     onclick="window.location.href='index.html'" title="Ir al inicio"
+                     onerror="this.src='https://lh3.googleusercontent.com/d/17BHTnlH3L1Eh5GEr7D-LuK4IEXg4RSDq';this.onerror=null;"
+                     style="max-width:260px;width:100%;height:auto;cursor:pointer;" alt="TLC Logo">
+            </div>
+
+            <div class="doc-meta-box">
+                <div class="non-fiscal-badge">Documento No Válido como Factura</div>
+                <div class="doc-title" id="ri-titulo">Remito de Ingreso de Equipo</div>
+                <div class="doc-subdata" style="margin-top: 4px;"><strong>Fecha de Ingreso:</strong> <span id="ri-fecha">—</span></div>
+                <div class="doc-subdata"><strong>Ticket N°:</strong> <span id="ri-id">—</span></div>
+            </div>
+        </div>
+
+        <div class="client-card">
+            <div class="row-item"><strong>Señores:</strong> <span id="ri-cliente">—</span></div>
+            <div class="row-item"><strong>Contacto:</strong> <span id="ri-contacto">—</span></div>
+            <div class="row-item"><strong>Domicilio:</strong> <span id="ri-domicilio">—</span></div>
+            <div class="row-item"><strong>Teléfono:</strong> <span id="ri-telefono">—</span></div>
+        </div>
+
+        <div class="section-title"><i class="fa-solid fa-microscope"></i> Equipo Recibido</div>
+        <div class="equipment-grid">
+            <div class="grid-item">
+                <label>Marca</label>
+                <span id="ri-marca">—</span>
+            </div>
+            <div class="grid-item">
+                <label>Modelo / Sistema</label>
+                <span id="ri-modelo">—</span>
+            </div>
+            <div class="grid-item">
+                <label>Serie Nº</label>
+                <span id="ri-serie" style="color:var(--navy-tlc);">—</span>
+            </div>
+        </div>
+
+        <div class="section-title"><i class="fa-solid fa-box-open"></i> Accesorios Declarados</div>
+        <div class="form-textarea-static" id="ri-accesorios">—</div>
+
+        <div class="section-title"><i class="fa-solid fa-camera"></i> Registro Fotográfico al Ingreso</div>
+        <div class="fotos-grid" id="ri-fotos-grid"></div>
+
+        <div class="section-title"><i class="fa-solid fa-comment-medical"></i> Motivo de Ingreso / Observaciones</div>
+        <div class="form-textarea-static" id="ri-motivo">—</div>
+
+        <div class="legal-footer">
+            <strong>REMITO DE INGRESO DE EQUIPO:</strong> El presente documento constituye la constancia de recepción del equipamiento detallado, entregado por el cliente para su ingreso al servicio técnico de Tecnología Láser Corneal S.R.L. El diagnóstico y presupuesto correspondiente se comunicarán por separado una vez evaluado el equipo. Ante cualquier consulta, contactarse con TLC SRL.
+        </div>
+
+        <div class="wsp-bar">
+            <button class="btn-wsp" onclick="_volverRemito()"
+                style="background:#3a86ff;color:#fff;border:none;cursor:pointer;font-weight:700;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                Volver
+            </button>
+            <a class="btn-wsp btn-wsp-orden" href="#" onclick="enviarWspRemito(event)">
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                Enviar Remito por WhatsApp
+            </a>
+            <button class="btn-wsp" onclick="window.print()"
+                style="background:#1e3a5f;color:#fff;cursor:pointer;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
+                    <path d="M12 17v-6M9 14l3 3 3-3"/>
+                    <rect x="3" y="3" width="18" height="4" rx="1"/>
+                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V7"/>
+                </svg>
+                Guardar PDF
+            </button>
+        </div>
+    </div>
+
+    <script>
+    var RTDB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+    var _clienteTelefono  = ''; // teléfono real del cliente, se completa en _cargarTicket()
+    var _idTicketActual   = '';
+    var _clienteNombre    = '';
+    var _equipoModeloTxt  = '';
+    var _equipoSerieTxt   = '';
+
+    window._volverRemito = function() {
+        var params = new URLSearchParams(window.location.search);
+        var id = params.get('id') || _idTicketActual;
+        if (id) {
+            window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(id);
+            return;
+        }
+        if (window.history.length > 1) { window.history.back(); return; }
+        window.location.href = 'https://cahirth.github.io/Portal-TLC/index.html';
+    };
+
+    function _esc(s) {
+        return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // Misma lógica que orden-servicio.html/presupuesto.html para armar el
+    // número en formato WhatsApp (549 + área + número, sin el "15" del medio).
+    function formatearTelefonoWsp(raw) {
+        var d = String(raw || '').replace(/\D/g, '');
+        if (!d) return '';
+        if (d.charAt(0) === '0' && d.length > 10) d = d.slice(1);
+        if (d.indexOf('5499') === 0) d = '549' + d.slice(4);
+        if (d.indexOf('549') === 0) {
+            d = '549' + d.slice(3).replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2');
+        } else if (d.length <= 10) {
+            d = '549' + d.replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2');
+        }
+        return d;
+    }
+
+    function _fechaLinda(iso) {
+        if (!iso) return '—';
+        try {
+            var d = new Date(iso);
+            return d.toLocaleDateString('es-AR', { day:'numeric', month:'long', year:'numeric' });
+        } catch(e) { return iso; }
+    }
+
+    function enviarWspRemito(e) {
+        e.preventDefault();
+        var linkCorto = _idTicketActual ? ('https://ir.tlcsrl.com.ar/remito-ingreso.html?id=' + encodeURIComponent(_idTicketActual)) : window.location.href;
+        var msg = encodeURIComponent(
+            'Hola ' + (_clienteNombre || '') + ', adjuntamos el Remito de Ingreso del equipo ' +
+            (_equipoModeloTxt || '') + (_equipoSerieTxt ? ' (S/N: ' + _equipoSerieTxt + ')' : '') +
+            ' recibido en nuestro servicio técnico TLC SRL. Podés ver el comprobante aquí: ' + linkCorto
+        );
+        var telWsp = formatearTelefonoWsp(_clienteTelefono);
+        var url = telWsp ? ('https://wa.me/' + telWsp + '?text=' + msg) : ('https://wa.me/?text=' + msg);
+        window.open(url, '_blank');
+    }
+
+    async function _cargarTicket() {
+        var params = new URLSearchParams(window.location.search);
+        var id     = params.get('id');
+        if (!id) { _mostrarError('No se especificó un ID de ticket en la URL.'); return; }
+
+        try {
+            var res = await fetch(RTDB_URL + '/servicio_tecnico/' + encodeURIComponent(id) + '.json', { cache:'no-store' });
+            var t   = await res.json();
+            if (!t) { _mostrarError('Ticket no encontrado: ' + id); return; }
+
+            _idTicketActual  = t.id_ticket || '';
+            _clienteTelefono = t.telefono || '';
+            _clienteNombre   = t.cliente || '';
+            _equipoModeloTxt = t.equipo_modelo || '';
+            _equipoSerieTxt  = t.equipo_serie || '';
+
+            document.getElementById('ri-id').textContent    = t.id_ticket || '—';
+            document.getElementById('ri-fecha').textContent = _fechaLinda(t.creado_en);
+
+            document.getElementById('ri-cliente').textContent   = t.cliente || '—';
+            document.getElementById('ri-contacto').textContent  = t.nombre_medico || '—';
+            document.getElementById('ri-domicilio').textContent = t.domicilio || '—';
+            document.getElementById('ri-telefono').textContent  = t.telefono || '—';
+
+            document.getElementById('ri-marca').textContent  = t.equipo_marca  || '—';
+            document.getElementById('ri-modelo').textContent = t.equipo_modelo || '—';
+            document.getElementById('ri-serie').textContent  = t.equipo_serie  || '—';
+
+            // Accesorios y motivo: campos propios en tickets nuevos (v103+);
+            // en tickets viejos, respaldo parseando la nota inicial armada
+            // como "Falla reportada por el cliente: X | Accesorios recibidos: Y".
+            var accesorios = t.accesorios || '';
+            var motivo     = t.falla_reportada || '';
+            if ((!accesorios || !motivo) && Array.isArray(t.notas_comentarios) && t.notas_comentarios.length) {
+                var notaTexto = t.notas_comentarios[0].texto || '';
+                if (!motivo) {
+                    var mFalla = notaTexto.match(/Falla reportada por el cliente:\s*([^|]*)/);
+                    if (mFalla) motivo = mFalla[1].trim();
+                }
+                if (!accesorios) {
+                    var mAcc = notaTexto.match(/Accesorios recibidos:\s*([^|]*)/);
+                    if (mAcc) accesorios = mAcc[1].trim();
+                }
+            }
+            document.getElementById('ri-accesorios').textContent = accesorios || '—';
+            document.getElementById('ri-motivo').textContent     = motivo || '—';
+
+            // Fotos
+            var fotosWrap = document.getElementById('ri-fotos-grid');
+            var fotos = Array.isArray(t.fotos) ? t.fotos : [];
+            if (fotos.length) {
+                fotosWrap.innerHTML = fotos.map(function(f) {
+                    var src = (typeof f === 'string') ? f : (f && f.data ? f.data : '');
+                    if (!src) return '';
+                    var srcFinal = src.indexOf('data:') === 0 ? src : ('data:image/jpeg;base64,' + src);
+                    return '<div class="foto-item"><img src="' + srcFinal + '" alt="Foto del equipo al ingreso"></div>';
+                }).join('');
+            } else {
+                fotosWrap.innerHTML = '<div class="sin-fotos">No se cargaron fotos al momento del ingreso.</div>';
+            }
+
+        } catch(err) {
+            console.error(err);
+            _mostrarError('Error al cargar los datos del ticket.');
+        }
+    }
+
+    function _mostrarError(msg) {
+        document.getElementById('doc-wrapper').innerHTML = '<div class="error-box"><i class="fa-solid fa-triangle-exclamation" style="font-size:32px;margin-bottom:12px;display:block;"></i>' + _esc(msg) + '</div>';
+    }
+
+    _cargarTicket();
+    </script>
+
+</body>
+</html>
