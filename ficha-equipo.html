@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.23.5 -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.23.6 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -249,8 +249,10 @@ function _tieneValor(v) { return v !== undefined && v !== null && String(v).trim
 // mostrar en ese envío puntual). Viaja codificado en el link cuando se
 // comparte, para que la persona que lo recibe vea exactamente lo mismo.
 var _variantesOcultas = [];
+var _modoReceptor = false; // true = link ya armado/compartido, vista fija sin checkboxes
 
 function _checkboxVariante(key, marcado) {
+    if (_modoReceptor) return ''; // vista fija para quien recibe el link — sin control para volver a mostrar nada
     return '<label class="fin-check-wrap" onclick="event.stopPropagation();">' +
         '<input type="checkbox" class="fin-check" ' + (marcado ? 'checked' : '') + ' onchange="_toggleVarianteFinanciacion(\'' + key + '\', this.checked)">' +
     '</label>';
@@ -275,6 +277,14 @@ async function _cargarFicha() {
     // así, mostramos únicamente lo que el vendedor eligió, ya elegido.
     var ocultarParam = params.get('ocultar') || '';
     _variantesOcultas = ocultarParam ? ocultarParam.split(',') : [];
+
+    // "modo=cliente" viaja SIEMPRE que se comparte por WhatsApp (haya o
+    // no algo oculto) — marca que este link ya fue armado y enviado, así
+    // que quien lo recibe ve una versión fija: sin checkboxes, y lo que
+    // se ocultó queda realmente afuera, no solo atenuado. Sin este
+    // parámetro (por ejemplo, entrando desde "Ver ficha" en el Portal),
+    // se ve el modo editable de siempre.
+    _modoReceptor = params.get('modo') === 'cliente';
 
     // El fotoMap (Apps Script) es mucho más lento que precios.json (RTDB
     // directa) — arranca en paralelo pero SIN esperarlo, para no atrasar
@@ -313,12 +323,14 @@ async function _cargarFicha() {
         var contado = parseFloat(d['Precio CONTADO CNO']);
         if (!isNaN(contado) && contado > 0) {
             var ocultoContado = _variantesOcultas.indexOf('contado') !== -1;
-            tarjetas += '<div class="fin-card' + (ocultoContado ? ' fin-card-oculta' : '') + '" data-key="contado">' +
-                _checkboxVariante('contado', !ocultoContado) +
-                '<div class="fin-titulo">💵 Contado</div>' +
-                '<div class="fin-row"><span>Precio</span><span class="val contado-val">' + _fmtMoneda(contado, 'USD') + '</span></div>' +
-                (d.Descripcion_USD_CONTADO ? '<div class="fin-desc">' + _esc(d.Descripcion_USD_CONTADO) + '</div>' : '') +
-            '</div>';
+            if (!(_modoReceptor && ocultoContado)) {
+                tarjetas += '<div class="fin-card' + (ocultoContado ? ' fin-card-oculta' : '') + '" data-key="contado">' +
+                    _checkboxVariante('contado', !ocultoContado) +
+                    '<div class="fin-titulo">💵 Contado</div>' +
+                    '<div class="fin-row"><span>Precio</span><span class="val contado-val">' + _fmtMoneda(contado, 'USD') + '</span></div>' +
+                    (d.Descripcion_USD_CONTADO ? '<div class="fin-desc">' + _esc(d.Descripcion_USD_CONTADO) + '</div>' : '') +
+                '</div>';
+            }
         }
         VARIANTES_FINANCIACION.forEach(function(v) {
             var adelanto = d[v.adelanto];
@@ -326,6 +338,7 @@ async function _cargarFicha() {
             if (!_tieneValor(adelanto) && !_tieneValor(cuota)) return; // sin datos para esta variante en este equipo
             var key = v.adelanto; // estable y único por variante
             var oculta = _variantesOcultas.indexOf(key) !== -1;
+            if (_modoReceptor && oculta) return; // en modo receptor, lo oculto ni se dibuja
             tarjetas += '<div class="fin-card' + (oculta ? ' fin-card-oculta' : '') + '" data-key="' + key + '">' +
                 _checkboxVariante(key, !oculta) +
                 '<div class="fin-titulo">' + v.titulo + '</div>' +
@@ -366,7 +379,7 @@ function _formatearTelefonoWsp(raw) {
 
 function _compartirFichaWsp(e) {
     e.preventDefault();
-    var link = 'https://ir.tlcsrl.com.ar/ficha-equipo.html?nombre=' + encodeURIComponent(_fichaNombreActual);
+    var link = 'https://ir.tlcsrl.com.ar/ficha-equipo.html?nombre=' + encodeURIComponent(_fichaNombreActual) + '&modo=cliente';
     if (_variantesOcultas.length) link += '&ocultar=' + encodeURIComponent(_variantesOcultas.join(','));
     var msg = encodeURIComponent('Te comparto la ficha técnica de ' + _fichaNombreActual + ' — TLC SRL: ' + link);
     var telRaw = (document.getElementById('fi-telefono-destino') || {}).value || '';
