@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.24.2 (arreglos: texto invisible en buscador claro, orden alfabético, menos negrita) -->
+<!-- Portal TLC | empresas.html | v2026.07.24.3 (+ editar contactos existentes) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -239,6 +239,7 @@
         <div id="lista-contactos"></div>
         <button class="btn-agregar-contacto" onclick="_toggleFormContacto()">+ Agregar contacto</button>
         <div class="form-contacto" id="form-contacto" style="display:none;">
+          <div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:10px;" id="fc-titulo">+ Agregar contacto</div>
           <div class="det-grid">
             <div class="det-campo">
               <label>Nombre *</label>
@@ -257,7 +258,10 @@
               <input type="text" id="fc-telefono">
             </div>
           </div>
-          <button class="btn-guardar-empresa" onclick="_guardarContacto()">✓ Guardar contacto</button>
+          <div class="acciones-empresa">
+            <button class="btn-guardar-empresa" onclick="_guardarContacto()">✓ Guardar contacto</button>
+            <button class="btn-borrar-empresa" onclick="_toggleFormContacto()" style="color:var(--text-muted);background:transparent;border-color:var(--border-glow);">Cancelar</button>
+          </div>
         </div>
       </div>
 
@@ -469,14 +473,42 @@ function _renderContactos(e) {
         '<div class="datos">' + [c.email, c.telefono].filter(Boolean).join(' · ') + '</div>' +
       '</div>' +
       '<div class="contacto-acciones">' +
+        '<button class="btn-icon-mini" onclick="_editarContacto(\'' + c.id + '\')" title="Editar">✎</button>' +
         '<button class="btn-icon-mini danger" onclick="_borrarContacto(\'' + c.id + '\')" title="Borrar">✕</button>' +
       '</div>' +
     '</div>';
   }).join('');
 }
 
-window._toggleFormContacto = function() { document.getElementById('form-contacto').style.display =
-  document.getElementById('form-contacto').style.display === 'block' ? 'none' : 'block'; };
+var _contactoEditandoId = null; // null = modo "agregar nuevo", con valor = editando ese contacto
+
+window._toggleFormContacto = function() {
+  var form = document.getElementById('form-contacto');
+  var abrir = form.style.display !== 'block';
+  form.style.display = abrir ? 'block' : 'none';
+  if (abrir) {
+    _contactoEditandoId = null;
+    document.getElementById('fc-titulo').textContent = '+ Agregar contacto';
+    ['fc-nombre','fc-cargo','fc-email','fc-telefono'].forEach(function(id){ document.getElementById(id).value = ''; });
+    document.getElementById('fc-nombre').focus();
+  }
+};
+
+window._editarContacto = function(contactoId) {
+  var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
+  if (!e) return;
+  var c = e.contactos.find(function(x){ return x.id === contactoId; });
+  if (!c) return;
+  _contactoEditandoId = contactoId;
+  document.getElementById('fc-titulo').textContent = '✎ Editando: ' + c.nombre;
+  document.getElementById('fc-nombre').value = c.nombre || '';
+  document.getElementById('fc-cargo').value = c.cargo || '';
+  document.getElementById('fc-email').value = c.email || '';
+  document.getElementById('fc-telefono').value = c.telefono || '';
+  document.getElementById('form-contacto').style.display = 'block';
+  document.getElementById('fc-nombre').focus();
+  document.getElementById('form-contacto').scrollIntoView({ behavior:'smooth', block:'center' });
+};
 
 window._guardarContacto = function() {
   var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
@@ -486,12 +518,21 @@ window._guardarContacto = function() {
   var cargo = document.getElementById('fc-cargo').value.trim();
   var email = document.getElementById('fc-email').value.trim();
   var telefono = document.getElementById('fc-telefono').value.trim();
+  var payload = { accion:'guardarContacto', empresaId:e.id, nombre:nombre, cargo:cargo, email:email, telefono:telefono };
+  if (_contactoEditandoId) payload.id = _contactoEditandoId;
+
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'guardarContacto', empresaId:e.id, nombre:nombre, cargo:cargo, email:email, telefono:telefono }) })
+    body: JSON.stringify(payload) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert('Error al guardar el contacto: ' + (r.error||'desconocido')); return; }
-      e.contactos.push({ id:r.id, nombre:nombre, cargo:cargo, email:email, telefono:telefono });
+      if (_contactoEditandoId) {
+        var c = e.contactos.find(function(x){ return x.id === _contactoEditandoId; });
+        if (c) { c.nombre = nombre; c.cargo = cargo; c.email = email; c.telefono = telefono; }
+      } else {
+        e.contactos.push({ id:r.id, nombre:nombre, cargo:cargo, email:email, telefono:telefono });
+      }
+      _contactoEditandoId = null;
       ['fc-nombre','fc-cargo','fc-email','fc-telefono'].forEach(function(id){ document.getElementById(id).value = ''; });
       document.getElementById('form-contacto').style.display = 'none';
       _renderContactos(e);
