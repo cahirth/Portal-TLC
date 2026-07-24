@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.23.2 (+ autocompletado por CUIT vía ARCA/HubSpot al crear empresa nueva) -->
+<!-- Portal TLC | empresas.html | v2026.07.23.3 (consulta CUIT solo a ARCA, sin HubSpot; carga version.js) -->
 <html lang="es">
 <head>
+<script src="version.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Empresas — Portal TLC</title>
@@ -260,10 +261,12 @@
   </div>
 
 <script>
+const APP_VERSION = (typeof PORTAL_TLC_VERSION !== 'undefined') ? PORTAL_TLC_VERSION : '?';
+console.log("%c TLC Empresas v" + APP_VERSION + " ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 // ══════════════════════════════════════════════════════════════════
-// ESQUELETO DE DISEÑO — datos de ejemplo en memoria. Cuando la base
-// esté armada, esto se reemplaza por fetch()/GAS reales a /empresas,
-// /contactos y los índices de cotizaciones + tickets.
+// Empresas y Contactos conectados a Firebase (empresas/{id},
+// contactos/{id}) vía GAS. "Negocios asociados" todavía sin cruzar
+// con cotizaciones/tickets reales — próxima etapa.
 // ══════════════════════════════════════════════════════════════════
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 var EMPRESAS = []; // se llena con _cargarEmpresas() — ya no hay datos de prueba
@@ -354,7 +357,7 @@ function _consultarCuitNuevaEmpresa(cuit) {
   var estado = document.getElementById('ne-estado-cuit');
   estado.textContent = 'Buscando en ARCA...';
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'consultarCuit', cuit:cuit }) })
+    body: JSON.stringify({ accion:'consultarCuitArca', cuit:cuit }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { estado.textContent = 'No se pudo consultar.'; return; }
