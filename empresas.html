@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.23.3 (consulta CUIT solo a ARCA, sin HubSpot; carga version.js) -->
+<!-- Portal TLC | empresas.html | v2026.07.23.4 (mensaje de error más claro en la consulta a ARCA) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -360,11 +360,14 @@ function _consultarCuitNuevaEmpresa(cuit) {
     body: JSON.stringify({ accion:'consultarCuitArca', cuit:cuit }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
+      console.log('Respuesta consulta ARCA:', r);
       if (!r.ok) { estado.textContent = 'No se pudo consultar.'; return; }
       if (r.razonSocial) {
         document.getElementById('ne-razon').value = r.razonSocial;
         document.getElementById('ne-domicilio').value = r.domicilio || '';
         estado.textContent = '✓ Encontrado en ' + r.origen;
+      } else if (r.arcaOk === false) {
+        estado.textContent = 'El servicio de ARCA no respondió — cargalo a mano.';
       } else {
         estado.textContent = 'No se encontró — cargalo a mano.';
       }
