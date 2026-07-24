@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.24.1 (+ importar desde Excel, chequeo de duplicados antes de crear) -->
+<!-- Portal TLC | empresas.html | v2026.07.24.2 (arreglos: texto invisible en buscador claro, orden alfabético, menos negrita) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -50,7 +50,7 @@
     margin-bottom:10px; cursor:pointer; transition:border-color .15s; }
   .empresa-card:hover { border-color:var(--accent-blue); }
   .empresa-card-top { display:flex; justify-content:space-between; align-items:flex-start; }
-  .empresa-card-razon { font-size:15px; font-weight:800; color:var(--text-main); }
+  .empresa-card-razon { font-size:15px; font-weight:500; color:var(--text-main); }
   .empresa-card-cuit { font-size:11px; color:var(--text-muted); margin-top:2px; }
   .empresa-card-meta { display:flex; gap:14px; margin-top:10px; }
   .empresa-card-meta span { font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:5px; }
@@ -127,7 +127,7 @@
   body.tema-claro .negocio-card { background:#ffffff; border-color:#e2e8f0; }
   body.tema-claro .empresa-card:hover { border-color:#1a4b8c; }
   body.tema-claro .empresa-card-razon, body.tema-claro .det-campo input, body.tema-claro .contacto-info .nombre,
-  body.tema-claro .negocio-id, body.tema-claro .section-title .hint { color:#0f172a; }
+  body.tema-claro .negocio-id, body.tema-claro .section-title .hint, body.tema-claro .buscador-input { color:#0f172a; }
   body.tema-claro .section-title .hint { color:#94a3b8; }
   body.tema-claro .btn-icon-mini { border-color:#e2e8f0; color:#64748b; }
   body.tema-claro .form-contacto { border-color:#1a4b8c; }
@@ -328,7 +328,7 @@ function _renderListaEmpresas(filtro) {
   var q = (filtro || '').toLowerCase();
   var lista = EMPRESAS.filter(function(e) {
     return !q || e.razonSocial.toLowerCase().includes(q) || (e.cuit||'').includes(q);
-  });
+  }).sort(function(a, b) { return a.razonSocial.localeCompare(b.razonSocial, 'es', { sensitivity:'base' }); });
   if (!lista.length) { cont.innerHTML = '<div class="empty-lista">' + (EMPRESAS.length ? 'Sin resultados.' : 'Todavía no cargaste ninguna empresa.') + '</div>'; return; }
   cont.innerHTML = lista.map(function(e) {
     return '<div class="empresa-card" onclick="_abrirDetalleEmpresa(\'' + e.id + '\')">' +
