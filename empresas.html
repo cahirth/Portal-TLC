@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.23.1 (Empresas y Contactos ya conectados a Firebase — "Negocios asociados" todavía pendiente) -->
+<!-- Portal TLC | empresas.html | v2026.07.23.2 (+ autocompletado por CUIT vía ARCA/HubSpot al crear empresa nueva) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -158,8 +158,35 @@
     <div id="vista-lista">
       <div class="buscador-row">
         <input type="text" class="buscador-input" id="buscador-empresas" placeholder="Buscar por razón social o CUIT..." oninput="_filtrarEmpresas(this.value)">
-        <button class="btn-nueva" onclick="_abrirFormNuevaEmpresa()">+ Nueva empresa</button>
+        <button class="btn-nueva" onclick="_toggleFormNuevaEmpresa()">+ Nueva empresa</button>
       </div>
+
+      <div class="section" id="form-nueva-empresa-panel" style="display:none;">
+        <div class="section-title">🏢 Nueva empresa <span class="hint" id="ne-estado-cuit"></span></div>
+        <div class="det-grid">
+          <div class="det-campo">
+            <label>CUIT <span style="font-weight:400;">(autocompleta con ARCA)</span></label>
+            <input type="text" id="ne-cuit" placeholder="30-XXXXXXXX-X" oninput="_onEscribirCuitNuevaEmpresa(this.value)">
+          </div>
+          <div class="det-campo">
+            <label>Teléfono</label>
+            <input type="text" id="ne-telefono" placeholder="+54...">
+          </div>
+          <div class="det-campo full">
+            <label>Razón Social *</label>
+            <input type="text" id="ne-razon" placeholder="Se completa sola al poner el CUIT, o cargala a mano">
+          </div>
+          <div class="det-campo full">
+            <label>Domicilio</label>
+            <input type="text" id="ne-domicilio" placeholder="Domicilio fiscal">
+          </div>
+        </div>
+        <div class="acciones-empresa">
+          <button class="btn-guardar-empresa" onclick="_crearNuevaEmpresa()">✓ Crear empresa</button>
+          <button class="btn-borrar-empresa" onclick="_toggleFormNuevaEmpresa()" style="color:var(--text-muted);background:transparent;border-color:var(--border-glow);">Cancelar</button>
+        </div>
+      </div>
+
       <div id="lista-empresas"></div>
     </div>
 
@@ -300,14 +327,60 @@ function _renderListaEmpresas(filtro) {
 }
 window._filtrarEmpresas = function(q) { _renderListaEmpresas(q); };
 
-window._abrirFormNuevaEmpresa = function() {
-  var razon = prompt('Razón Social de la nueva empresa:');
-  if (!razon) return;
+window._toggleFormNuevaEmpresa = function() {
+  var panel = document.getElementById('form-nueva-empresa-panel');
+  var abrir = panel.style.display !== 'block';
+  panel.style.display = abrir ? 'block' : 'none';
+  if (abrir) {
+    ['ne-cuit','ne-telefono','ne-razon','ne-domicilio'].forEach(function(id){ document.getElementById(id).value = ''; });
+    document.getElementById('ne-estado-cuit').textContent = '';
+    document.getElementById('ne-cuit').focus();
+  }
+};
+
+// Consulta ARCA (con respaldo en HubSpot) apenas se completa un CUIT
+// válido — mismo mecanismo que ya usa selector-dispositivos.html al
+// cargar un cliente nuevo. Con debounce para no disparar la consulta
+// en cada tecla mientras todavía se está escribiendo.
+var _timeoutCuitNuevaEmpresa = null;
+window._onEscribirCuitNuevaEmpresa = function(valor) {
+  clearTimeout(_timeoutCuitNuevaEmpresa);
+  var soloDigitos = valor.replace(/\D/g, '');
+  if (soloDigitos.length < 10) { document.getElementById('ne-estado-cuit').textContent = ''; return; }
+  _timeoutCuitNuevaEmpresa = setTimeout(function() { _consultarCuitNuevaEmpresa(soloDigitos); }, 600);
+};
+
+function _consultarCuitNuevaEmpresa(cuit) {
+  var estado = document.getElementById('ne-estado-cuit');
+  estado.textContent = 'Buscando en ARCA...';
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:razon }) })
+    body: JSON.stringify({ accion:'consultarCuit', cuit:cuit }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { estado.textContent = 'No se pudo consultar.'; return; }
+      if (r.razonSocial) {
+        document.getElementById('ne-razon').value = r.razonSocial;
+        document.getElementById('ne-domicilio').value = r.domicilio || '';
+        estado.textContent = '✓ Encontrado en ' + r.origen;
+      } else {
+        estado.textContent = 'No se encontró — cargalo a mano.';
+      }
+    })
+    .catch(function(){ estado.textContent = 'Error al consultar.'; });
+}
+
+window._crearNuevaEmpresa = function() {
+  var razon = document.getElementById('ne-razon').value.trim();
+  if (!razon) { alert('Falta la Razón Social — se completa sola con el CUIT, o cargala vos.'); return; }
+  var cuit = document.getElementById('ne-cuit').value.trim();
+  var telefono = document.getElementById('ne-telefono').value.trim();
+  var domicilio = document.getElementById('ne-domicilio').value.trim();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:razon, cuit:cuit, telefono:telefono, domicilio:domicilio }) })
     .then(function(r){ return r.json(); })
     .then(async function(r) {
       if (!r.ok) { alert('Error al crear la empresa: ' + (r.error||'desconocido')); return; }
+      document.getElementById('form-nueva-empresa-panel').style.display = 'none';
       await _cargarEmpresas();
       _abrirDetalleEmpresa(r.id);
     })
