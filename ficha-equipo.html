@@ -1,11 +1,15 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.22.7 -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.23.3 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ficha Técnica — TLC SRL</title>
+    <meta property="og:title" content="Ficha Técnica — Tecnología Láser Corneal">
+    <meta property="og:description" content="Características, precio y financiación disponible. Tocá para ver el detalle completo.">
+    <meta property="og:image" content="https://cahirth.github.io/Portal-TLC/icons/og-image.png">
     <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cahirth.github.io/Portal-TLC/ficha-equipo.html">
     <style>
         :root {
             --bg-body:#f8f9fa; --bg-card:#ffffff; --bg-muted:#f1f3f5;
@@ -23,7 +27,13 @@
         .logo-img { height:34px; }
         .tag-ficha { font-size:11px; font-weight:700; color:var(--text-muted); background:var(--bg-muted); padding:5px 12px; border-radius:20px; }
 
-        .foto-wrap { background:var(--bg-muted); display:flex; align-items:center; justify-content:center; padding:24px; }
+        .foto-wrap { background:var(--bg-muted); display:flex; align-items:center; justify-content:center; padding:24px; min-height:120px; }
+        .foto-wrap.foto-cargando { position:relative; }
+        .foto-wrap.foto-cargando::after {
+            content:''; width:28px; height:28px; border-radius:50%; border:3px solid #dbe4ee; border-top-color:var(--blue-tlc);
+            animation:girar .7s linear infinite;
+        }
+        @keyframes girar { to { transform:rotate(360deg); } }
         .foto-wrap img { max-width:100%; max-height:340px; object-fit:contain; }
 
         .marca-cat { font-size:12px; font-weight:700; color:var(--blue-tlc); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
@@ -44,7 +54,10 @@
             padding:16px 24px; border-bottom:1px solid var(--border-color); background:var(--bg-muted); }
 
         .financiacion-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; padding:18px 24px; }
-        .fin-card { border:1px solid var(--border-color); border-radius:10px; padding:14px; background:#fff; }
+        .fin-card { border:1px solid var(--border-color); border-radius:10px; padding:14px; background:#fff; position:relative; }
+        .fin-card-oculta { display:none; }
+        .fin-check-wrap { position:absolute; top:8px; right:8px; }
+        .fin-check { width:17px; height:17px; cursor:pointer; accent-color:var(--blue-tlc); }
         .fin-card .fin-titulo { font-size:13px; font-weight:800; color:var(--text-dark); margin-bottom:8px; }
         .fin-card .fin-row { display:flex; justify-content:space-between; font-size:13px; color:var(--text-muted); padding:3px 0; }
         .fin-card .fin-row .val { font-weight:700; color:var(--green-tlc); }
@@ -82,6 +95,10 @@
             .fin-card { padding:9px; break-inside:avoid; page-break-inside:avoid; }
             .fin-card .fin-row .val.contado-val { font-size:17px; }
             .footer-tlc { padding:8px; }
+            .btn-link { text-decoration:underline; }
+            .btn-link::after { content:" → " attr(href); display:block; font-size:9px; font-weight:400; word-break:break-all; margin-top:2px; color:#475569; }
+            .fin-check-wrap { display:none; }
+            .section-title span { display:none; }
         }
 
         .error-box { text-align:center; padding:60px 20px; color:var(--text-muted); font-size:14px; }
@@ -101,7 +118,7 @@
             </div>
             <span class="tag-ficha">Ficha Técnica</span>
         </div>
-        <div class="foto-wrap"><img id="fi-foto" src="" alt=""></div>
+        <div class="foto-wrap foto-cargando"><img id="fi-foto" src="" alt="" style="display:none;"></div>
         <div class="card-pad">
             <div class="marca-cat" id="fi-marca-cat">—</div>
             <div class="nombre-equipo" id="fi-nombre">—</div>
@@ -117,7 +134,7 @@
     </div>
 
     <div class="card" id="fi-financiacion-card">
-        <div class="section-title">💳 Modalidades de pago</div>
+        <div class="section-title">💳 Modalidades de pago <span style="font-size:9px;font-weight:400;color:#94a3b8;text-transform:none;">Destildá las que no quieras incluir</span></div>
         <div class="financiacion-grid" id="fi-financiacion-grid"></div>
     </div>
 
@@ -153,6 +170,24 @@
 var PRECIOS_URL = './precios.json';
 var FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 var fotoMap = {};
+
+// Se llama recién cuando el fotoMap termina de cargar (puede ser antes
+// o después de que el resto de la ficha ya se haya pintado). Si para
+// entonces la foto ya se había ocultado por "sin foto", no vuelve a
+// tocarla — solo actúa si sigue en el estado "cargando" inicial.
+function _resolverFotoDiferida(fotoRaw) {
+    var wrap = document.querySelector('.foto-wrap');
+    var foto = document.getElementById('fi-foto');
+    if (!wrap || !foto) return;
+    var fotoResuelta = fotoUrl(fotoRaw);
+    if (fotoResuelta) {
+        foto.src = fotoResuelta;
+        foto.style.display = 'block';
+        wrap.classList.remove('foto-cargando');
+    } else {
+        wrap.style.display = 'none';
+    }
+}
 
 async function _cargarFotoMap() {
     try {
@@ -210,18 +245,47 @@ var VARIANTES_FINANCIACION = [
 
 function _tieneValor(v) { return v !== undefined && v !== null && String(v).trim() !== ''; }
 
+// Qué modalidades de financiación decidió ocultar quien arma la ficha
+// (para no mandar, por ejemplo, la opción a 36 cuotas si no la quiere
+// mostrar en ese envío puntual). Viaja codificado en el link cuando se
+// comparte, para que la persona que lo recibe vea exactamente lo mismo.
+var _variantesOcultas = [];
+
+function _checkboxVariante(key, marcado) {
+    return '<label class="fin-check-wrap" onclick="event.stopPropagation();">' +
+        '<input type="checkbox" class="fin-check" ' + (marcado ? 'checked' : '') + ' onchange="_toggleVarianteFinanciacion(\'' + key + '\', this.checked)">' +
+    '</label>';
+}
+
+window._toggleVarianteFinanciacion = function(key, mostrar) {
+    var card = document.querySelector('.fin-card[data-key="' + key + '"]');
+    if (card) card.classList.toggle('fin-card-oculta', !mostrar);
+    var idx = _variantesOcultas.indexOf(key);
+    if (mostrar && idx !== -1) _variantesOcultas.splice(idx, 1);
+    if (!mostrar && idx === -1) _variantesOcultas.push(key);
+};
+
 async function _cargarFicha() {
     var params = new URLSearchParams(window.location.search);
     var nombre = params.get('nombre');
     if (!nombre) { _mostrarError('No se especificó qué equipo mostrar.'); return; }
     _fichaNombreActual = nombre;
 
+    // Variantes que quien comparte decidió ocultar (vienen codificadas en
+    // el link, ej. ?ocultar=contado,Leasing_L$_36) — si el link se abrió
+    // así, mostramos únicamente lo que el vendedor eligió, ya elegido.
+    var ocultarParam = params.get('ocultar') || '';
+    _variantesOcultas = ocultarParam ? ocultarParam.split(',') : [];
+
+    // El fotoMap (Apps Script) es mucho más lento que precios.json (RTDB
+    // directa) — arranca en paralelo pero SIN esperarlo, para no atrasar
+    // el resto de la ficha. La foto se resuelve y aparece sola apenas
+    // esté lista (ver _resolverFotoDiferida más abajo).
+    var promesaFotoMap = _cargarFotoMap();
+
     try {
-        var resultados = await Promise.all([
-            fetch(PRECIOS_URL + '?t=' + Date.now(), { cache:'no-store' }).then(function(r){ return r.json(); }),
-            _cargarFotoMap(), // se espera acá, así fotoUrl() ya tiene el mapa listo cuando se usa más abajo
-        ]);
-        var lista = resultados[0];
+        var res = await fetch(PRECIOS_URL + '?t=' + Date.now(), { cache:'no-store' });
+        var lista = await res.json();
         var d = (Array.isArray(lista) ? lista : []).find(function(x) { return x['Nombre de Dispositivo'] === nombre; });
         if (!d) { _mostrarError('No se encontró el equipo "' + nombre + '" en el catálogo.'); return; }
 
@@ -230,10 +294,10 @@ async function _cargarFicha() {
         document.getElementById('fi-nombre').textContent = d['Nombre de Dispositivo'] || '';
         document.getElementById('fi-descripcion').textContent = d.Descripcion || '';
 
-        var foto = document.getElementById('fi-foto');
-        var fotoResuelta = fotoUrl(d.Foto);
-        if (fotoResuelta) { foto.src = fotoResuelta; foto.style.display = 'block'; }
-        else { document.querySelector('.foto-wrap').style.display = 'none'; }
+        // La foto recién se resuelve cuando el fotoMap termine de cargar
+        // (puede que ya haya terminado, puede que tarde un instante más)
+        // — el resto de la ficha no espera por esto.
+        promesaFotoMap.then(function() { _resolverFotoDiferida(d.Foto); });
 
         var btnRow = document.getElementById('fi-btn-row');
         var botones = '';
@@ -249,7 +313,9 @@ async function _cargarFicha() {
         var tarjetas = '';
         var contado = parseFloat(d['Precio CONTADO CNO']);
         if (!isNaN(contado) && contado > 0) {
-            tarjetas += '<div class="fin-card">' +
+            var ocultoContado = _variantesOcultas.indexOf('contado') !== -1;
+            tarjetas += '<div class="fin-card' + (ocultoContado ? ' fin-card-oculta' : '') + '" data-key="contado">' +
+                _checkboxVariante('contado', !ocultoContado) +
                 '<div class="fin-titulo">💵 Contado</div>' +
                 '<div class="fin-row"><span>Precio</span><span class="val contado-val">' + _fmtMoneda(contado, 'USD') + '</span></div>' +
                 (d.Descripcion_USD_CONTADO ? '<div class="fin-desc">' + _esc(d.Descripcion_USD_CONTADO) + '</div>' : '') +
@@ -259,7 +325,10 @@ async function _cargarFicha() {
             var adelanto = d[v.adelanto];
             var cuota = d[v.cuota];
             if (!_tieneValor(adelanto) && !_tieneValor(cuota)) return; // sin datos para esta variante en este equipo
-            tarjetas += '<div class="fin-card">' +
+            var key = v.adelanto; // estable y único por variante
+            var oculta = _variantesOcultas.indexOf(key) !== -1;
+            tarjetas += '<div class="fin-card' + (oculta ? ' fin-card-oculta' : '') + '" data-key="' + key + '">' +
+                _checkboxVariante(key, !oculta) +
                 '<div class="fin-titulo">' + v.titulo + '</div>' +
                 (_tieneValor(adelanto) ? '<div class="fin-row"><span>Adelanto</span><span class="val">' + _fmtMoneda(adelanto, v.moneda) + '</span></div>' : '') +
                 (_tieneValor(cuota) ? '<div class="fin-row"><span>Cuota</span><span class="val">' + _fmtMoneda(cuota, v.moneda) + '</span></div>' : '') +
@@ -299,6 +368,7 @@ function _formatearTelefonoWsp(raw) {
 function _compartirFichaWsp(e) {
     e.preventDefault();
     var link = 'https://ir.tlcsrl.com.ar/ficha-equipo.html?nombre=' + encodeURIComponent(_fichaNombreActual);
+    if (_variantesOcultas.length) link += '&ocultar=' + encodeURIComponent(_variantesOcultas.join(','));
     var msg = encodeURIComponent('Te comparto la ficha técnica de ' + _fichaNombreActual + ' — TLC SRL: ' + link);
     var telRaw = (document.getElementById('fi-telefono-destino') || {}).value || '';
     var telWsp = _formatearTelefonoWsp(telRaw);
