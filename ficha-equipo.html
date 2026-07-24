@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.22.3 -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.22.4 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -127,6 +127,37 @@
 
 <script>
 var PRECIOS_URL = './precios.json';
+var FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+var fotoMap = {};
+
+async function _cargarFotoMap() {
+    try {
+        var res = await fetch(FOTO_MAP_URL, { redirect: 'follow' });
+        var text = await res.text();
+        var data = JSON.parse(text);
+        if (data.error) { console.warn('FotoMap Apps Script error:', data.error); return; }
+        fotoMap = data;
+    } catch(e) { console.warn('No se pudo cargar fotoMap:', e.message); }
+}
+
+// Misma lógica que selector-dispositivos.html — el campo "Foto" de la
+// planilla no siempre es una URL directa: puede ser un link de Drive
+// (se convierte a lh3), o una ruta relativa tipo "Fotos/xxx.png" que
+// hay que resolver contra el fotoMap cargado del Apps Script.
+function fotoUrl(foto) {
+    if (!foto) return '';
+    var s = foto.toString().trim();
+    if (s.indexOf('lh3.googleusercontent.com') !== -1) return s;
+    var mDrive = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (mDrive) return 'https://lh3.googleusercontent.com/d/' + mDrive[1];
+    var mFotos = s.match(/^Fotos\/(.+)$/i);
+    if (mFotos) {
+        var nombre = mFotos[1].toLowerCase();
+        var nombreWebP = nombre.replace(/\.(png|jpg|jpeg)$/i, '.webp');
+        return fotoMap[nombreWebP] || fotoMap[nombre] || '';
+    }
+    return '';
+}
 var _fichaNombreActual = '';
 
 function _esc(s) { var d=document.createElement('div'); d.textContent=String(s==null?'':s); return d.innerHTML; }
@@ -162,8 +193,11 @@ async function _cargarFicha() {
     _fichaNombreActual = nombre;
 
     try {
-        var res = await fetch(PRECIOS_URL + '?t=' + Date.now(), { cache:'no-store' });
-        var lista = await res.json();
+        var resultados = await Promise.all([
+            fetch(PRECIOS_URL + '?t=' + Date.now(), { cache:'no-store' }).then(function(r){ return r.json(); }),
+            _cargarFotoMap(), // se espera acá, así fotoUrl() ya tiene el mapa listo cuando se usa más abajo
+        ]);
+        var lista = resultados[0];
         var d = (Array.isArray(lista) ? lista : []).find(function(x) { return x['Nombre de Dispositivo'] === nombre; });
         if (!d) { _mostrarError('No se encontró el equipo "' + nombre + '" en el catálogo.'); return; }
 
@@ -173,7 +207,8 @@ async function _cargarFicha() {
         document.getElementById('fi-descripcion').textContent = d.Descripcion || '';
 
         var foto = document.getElementById('fi-foto');
-        if (d.Foto) { foto.src = d.Foto; foto.style.display = 'block'; }
+        var fotoResuelta = fotoUrl(d.Foto);
+        if (fotoResuelta) { foto.src = fotoResuelta; foto.style.display = 'block'; }
         else { document.querySelector('.foto-wrap').style.display = 'none'; }
 
         var btnRow = document.getElementById('fi-btn-row');
