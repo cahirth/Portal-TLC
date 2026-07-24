@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.23.4 (mensaje de error más claro en la consulta a ARCA) -->
+<!-- Portal TLC | empresas.html | v2026.07.24.1 (+ importar desde Excel, chequeo de duplicados antes de crear) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Empresas — Portal TLC</title>
@@ -160,14 +161,27 @@
       <div class="buscador-row">
         <input type="text" class="buscador-input" id="buscador-empresas" placeholder="Buscar por razón social o CUIT..." oninput="_filtrarEmpresas(this.value)">
         <button class="btn-nueva" onclick="_toggleFormNuevaEmpresa()">+ Nueva empresa</button>
+        <button class="btn-nueva" style="background:transparent;border:1px solid var(--border-glow);color:var(--text-muted);" onclick="document.getElementById('input-excel-empresas').click()">📥 Importar Excel</button>
+        <input type="file" id="input-excel-empresas" accept=".xlsx,.xls" style="display:none;" onchange="_onSeleccionarExcel(this.files[0])">
+      </div>
+
+      <div class="section" id="import-preview-panel" style="display:none;">
+        <div class="section-title">📥 Importar desde Excel</div>
+        <div id="import-resumen" style="font-size:12px;color:var(--text-muted);margin-bottom:12px;"></div>
+        <div id="import-lista" style="max-height:260px;overflow-y:auto;margin-bottom:12px;"></div>
+        <div class="acciones-empresa">
+          <button class="btn-guardar-empresa" id="btn-confirmar-import" onclick="_confirmarImportacion()">✓ Importar</button>
+          <button class="btn-borrar-empresa" onclick="_cancelarImportacion()" style="color:var(--text-muted);background:transparent;border-color:var(--border-glow);">Cancelar</button>
+        </div>
+        <div id="import-progreso" style="display:none;margin-top:12px;font-size:12px;color:var(--text-muted);"></div>
       </div>
 
       <div class="section" id="form-nueva-empresa-panel" style="display:none;">
-        <div class="section-title">🏢 Nueva empresa <span class="hint" id="ne-estado-cuit"></span></div>
+        <div class="section-title">🏢 Nueva empresa</div>
         <div class="det-grid">
           <div class="det-campo">
-            <label>CUIT <span style="font-weight:400;">(autocompleta con ARCA)</span></label>
-            <input type="text" id="ne-cuit" placeholder="30-XXXXXXXX-X" oninput="_onEscribirCuitNuevaEmpresa(this.value)">
+            <label>CUIT</label>
+            <input type="text" id="ne-cuit" placeholder="30-XXXXXXXX-X">
           </div>
           <div class="det-campo">
             <label>Teléfono</label>
@@ -175,7 +189,7 @@
           </div>
           <div class="det-campo full">
             <label>Razón Social *</label>
-            <input type="text" id="ne-razon" placeholder="Se completa sola al poner el CUIT, o cargala a mano">
+            <input type="text" id="ne-razon" placeholder="Nombre de la empresa">
           </div>
           <div class="det-campo full">
             <label>Domicilio</label>
@@ -336,43 +350,23 @@ window._toggleFormNuevaEmpresa = function() {
   panel.style.display = abrir ? 'block' : 'none';
   if (abrir) {
     ['ne-cuit','ne-telefono','ne-razon','ne-domicilio'].forEach(function(id){ document.getElementById(id).value = ''; });
-    document.getElementById('ne-estado-cuit').textContent = '';
-    document.getElementById('ne-cuit').focus();
+    document.getElementById('ne-razon').focus();
   }
 };
 
-// Consulta ARCA (con respaldo en HubSpot) apenas se completa un CUIT
-// válido — mismo mecanismo que ya usa selector-dispositivos.html al
-// cargar un cliente nuevo. Con debounce para no disparar la consulta
-// en cada tecla mientras todavía se está escribiendo.
-var _timeoutCuitNuevaEmpresa = null;
-window._onEscribirCuitNuevaEmpresa = function(valor) {
-  clearTimeout(_timeoutCuitNuevaEmpresa);
-  var soloDigitos = valor.replace(/\D/g, '');
-  if (soloDigitos.length < 10) { document.getElementById('ne-estado-cuit').textContent = ''; return; }
-  _timeoutCuitNuevaEmpresa = setTimeout(function() { _consultarCuitNuevaEmpresa(soloDigitos); }, 600);
-};
+// ── Normalización y búsqueda de duplicados (compartida entre alta
+// manual e importación desde Excel) ──
+function _normCuit(s) { return String(s||'').replace(/\D/g, ''); }
+function _normRazon(s) { return String(s||'').toUpperCase().trim().replace(/\s+/g, ' '); }
 
-function _consultarCuitNuevaEmpresa(cuit) {
-  var estado = document.getElementById('ne-estado-cuit');
-  estado.textContent = 'Buscando en ARCA...';
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'consultarCuitArca', cuit:cuit }) })
-    .then(function(r){ return r.json(); })
-    .then(function(r) {
-      console.log('Respuesta consulta ARCA:', r);
-      if (!r.ok) { estado.textContent = 'No se pudo consultar.'; return; }
-      if (r.razonSocial) {
-        document.getElementById('ne-razon').value = r.razonSocial;
-        document.getElementById('ne-domicilio').value = r.domicilio || '';
-        estado.textContent = '✓ Encontrado en ' + r.origen;
-      } else if (r.arcaOk === false) {
-        estado.textContent = 'El servicio de ARCA no respondió — cargalo a mano.';
-      } else {
-        estado.textContent = 'No se encontró — cargalo a mano.';
-      }
-    })
-    .catch(function(){ estado.textContent = 'Error al consultar.'; });
+function _buscarEmpresaExistente(razonSocial, cuit) {
+  var cuitN = _normCuit(cuit);
+  var razonN = _normRazon(razonSocial);
+  return EMPRESAS.find(function(e) {
+    if (cuitN && _normCuit(e.cuit) === cuitN) return true;
+    if (razonN && _normRazon(e.razonSocial) === razonN) return true;
+    return false;
+  });
 }
 
 window._crearNuevaEmpresa = function() {
@@ -381,6 +375,15 @@ window._crearNuevaEmpresa = function() {
   var cuit = document.getElementById('ne-cuit').value.trim();
   var telefono = document.getElementById('ne-telefono').value.trim();
   var domicilio = document.getElementById('ne-domicilio').value.trim();
+
+  var existente = _buscarEmpresaExistente(razon, cuit);
+  if (existente) {
+    if (!confirm('Ya existe "' + existente.razonSocial + '" (' + (existente.cuit ? 'CUIT ' + existente.cuit : 'mismo nombre') + ').\n\n¿Querés abrir esa empresa en vez de crear una nueva?')) return;
+    document.getElementById('form-nueva-empresa-panel').style.display = 'none';
+    _abrirDetalleEmpresa(existente.id);
+    return;
+  }
+
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:razon, cuit:cuit, telefono:telefono, domicilio:domicilio }) })
     .then(function(r){ return r.json(); })
@@ -543,6 +546,179 @@ window._nuevoNegocio = function(tipo) {
   // vinculada; tipo==='servicio' abriría el formulario de Nuevo Ticket
   // en servicio.html con los datos del cliente precargados.
   alert('(pendiente) Esto va a crear un negocio nuevo de tipo "' + tipo + '" para ' + e.razonSocial + ', y te va a llevar directo a cargarlo — todavía no está conectado.');
+};
+
+// ══════════════════════════════════════════════════════════════════
+// IMPORTAR DESDE EXCEL — lee el archivo en el navegador (sin subirlo a
+// ningún lado), lo agrupa por CUIT/Razón Social (mismo criterio que el
+// resto de la app), lo cruza contra las empresas que YA existen en
+// Firebase, y arma un resumen para confirmar antes de escribir nada.
+// Formato esperado: mismo de la plantilla — encabezados en la fila 2,
+// datos desde la fila 3, columnas: Razón Social, CUIT, Domicilio,
+// Teléfono Empresa, Nombre del Contacto, Cargo, Email del Contacto,
+// Teléfono del Contacto, Notas (una fila por contacto).
+// ══════════════════════════════════════════════════════════════════
+var _importPendiente = null; // { nuevas:[...], existentes:[...] }
+
+window._onSeleccionarExcel = function(file) {
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var wb = XLSX.read(ev.target.result, { type:'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var filas = XLSX.utils.sheet_to_json(ws, { header:1, range:1 }); // fila 2 = encabezados (índice 1)
+      _procesarFilasExcel(filas);
+    } catch(e) {
+      alert('No se pudo leer el archivo — ¿es un .xlsx válido? (' + e.message + ')');
+    }
+    document.getElementById('input-excel-empresas').value = '';
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+function _procesarFilasExcel(filas) {
+  if (!filas.length) { alert('El archivo no tiene filas de datos.'); return; }
+  var encabezados = filas[0].map(function(h){ return String(h||'').trim(); });
+  var idxRazon = encabezados.findIndex(function(h){ return h.indexOf('Razón Social') !== -1; });
+  var idxCuit = encabezados.indexOf('CUIT');
+  var idxDom = encabezados.indexOf('Domicilio');
+  var idxTelEmp = encabezados.indexOf('Teléfono Empresa');
+  var idxNomC = encabezados.findIndex(function(h){ return h.indexOf('Nombre del Contacto') !== -1; });
+  var idxCargo = encabezados.indexOf('Cargo');
+  var idxEmail = encabezados.indexOf('Email del Contacto');
+  var idxTelC = encabezados.indexOf('Teléfono del Contacto');
+
+  if (idxRazon === -1) { alert('No encuentro la columna "Razón Social" — ¿es el archivo con el formato correcto?'); return; }
+
+  // Agrupar filas por empresa (mismo criterio: CUIT si hay, si no razón social normalizada)
+  var grupos = {};
+  var ordenGrupos = [];
+  for (var i = 1; i < filas.length; i++) {
+    var f = filas[i];
+    if (!f || !f[idxRazon]) continue;
+    var razon = String(f[idxRazon]).trim();
+    var cuit = idxCuit !== -1 ? String(f[idxCuit]||'').trim() : '';
+    var clave = _normCuit(cuit) || ('N:' + _normRazon(razon));
+    if (!grupos[clave]) {
+      grupos[clave] = { razonSocial:razon, cuit:cuit, domicilio: idxDom!==-1?String(f[idxDom]||'').trim():'',
+        telefono: idxTelEmp!==-1?String(f[idxTelEmp]||'').trim():'', contactos:[] };
+      ordenGrupos.push(clave);
+    }
+    var nomC = idxNomC !== -1 ? String(f[idxNomC]||'').trim() : '';
+    if (nomC) {
+      grupos[clave].contactos.push({
+        nombre: nomC, cargo: idxCargo!==-1?String(f[idxCargo]||'').trim():'',
+        email: idxEmail!==-1?String(f[idxEmail]||'').trim():'', telefono: idxTelC!==-1?String(f[idxTelC]||'').trim():'',
+      });
+    }
+  }
+
+  var nuevas = [], existentes = [];
+  ordenGrupos.forEach(function(clave) {
+    var g = grupos[clave];
+    var match = _buscarEmpresaExistente(g.razonSocial, g.cuit);
+    if (match) {
+      // Solo los contactos que todavía no tiene esa empresa (por nombre, sin importar mayúsculas)
+      var nombresYaTiene = (match.contactos||[]).map(function(c){ return c.nombre.toUpperCase(); });
+      g.contactosNuevos = g.contactos.filter(function(c){ return nombresYaTiene.indexOf(c.nombre.toUpperCase()) === -1; });
+      g.empresaExistenteId = match.id;
+      existentes.push(g);
+    } else {
+      nuevas.push(g);
+    }
+  });
+
+  _importPendiente = { nuevas: nuevas, existentes: existentes };
+  _renderPreviewImportacion();
+}
+
+function _renderPreviewImportacion() {
+  var p = _importPendiente;
+  var totalContactosNuevos = p.nuevas.reduce(function(a,e){ return a + e.contactos.length; }, 0)
+    + p.existentes.reduce(function(a,e){ return a + e.contactosNuevos.length; }, 0);
+
+  document.getElementById('import-resumen').innerHTML =
+    '<b style="color:var(--accent-green);">' + p.nuevas.length + '</b> empresas nuevas para crear · ' +
+    '<b style="color:var(--accent-orange);">' + p.existentes.length + '</b> ya existen (se les agregan contactos nuevos si tienen) · ' +
+    '<b>' + totalContactosNuevos + '</b> contactos nuevos en total';
+
+  var items = p.nuevas.map(function(g) {
+    return '<div style="padding:8px 10px;border-bottom:1px solid var(--border-glow);font-size:12px;">' +
+      '<span style="color:var(--accent-green);font-weight:700;">NUEVA</span> ' + g.razonSocial +
+      (g.cuit ? ' <span style="color:var(--text-dim);">(CUIT ' + g.cuit + ')</span>' : '') +
+      (g.contactos.length ? ' — ' + g.contactos.length + ' contacto' + (g.contactos.length!==1?'s':'') : '') +
+    '</div>';
+  }).concat(p.existentes.filter(function(g){ return g.contactosNuevos.length > 0; }).map(function(g) {
+    return '<div style="padding:8px 10px;border-bottom:1px solid var(--border-glow);font-size:12px;">' +
+      '<span style="color:var(--accent-orange);font-weight:700;">YA EXISTE</span> ' + g.razonSocial +
+      ' — se agregan ' + g.contactosNuevos.length + ' contacto' + (g.contactosNuevos.length!==1?'s':'') + ' nuevo' + (g.contactosNuevos.length!==1?'s':'') +
+    '</div>';
+  }));
+
+  document.getElementById('import-lista').innerHTML = items.length ? items.join('') : '<div class="empty-lista">Nada para importar — todo lo del archivo ya está cargado.</div>';
+  document.getElementById('import-preview-panel').style.display = 'block';
+  document.getElementById('form-nueva-empresa-panel').style.display = 'none';
+  document.getElementById('btn-confirmar-import').style.display = (p.nuevas.length || totalContactosNuevos) ? 'block' : 'none';
+  window.scrollTo(0,0);
+}
+
+window._cancelarImportacion = function() {
+  _importPendiente = null;
+  document.getElementById('import-preview-panel').style.display = 'none';
+};
+
+window._confirmarImportacion = async function() {
+  var p = _importPendiente;
+  if (!p) return;
+  var btn = document.getElementById('btn-confirmar-import');
+  var prog = document.getElementById('import-progreso');
+  btn.disabled = true;
+  prog.style.display = 'block';
+
+  var total = p.nuevas.length + p.existentes.filter(function(g){return g.contactosNuevos.length>0;}).length;
+  var hechos = 0;
+  function actualizarProgreso(msg) {
+    hechos++;
+    prog.textContent = 'Importando... (' + hechos + '/' + total + ') ' + msg;
+  }
+
+  // Empresas nuevas — se crean de a una, en tandas chicas para no saturar el Apps Script
+  for (var i = 0; i < p.nuevas.length; i++) {
+    var g = p.nuevas[i];
+    try {
+      var r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:g.razonSocial, cuit:g.cuit, telefono:g.telefono, domicilio:g.domicilio }) }).then(function(x){return x.json();});
+      if (r.ok) {
+        for (var j = 0; j < g.contactos.length; j++) {
+          var c = g.contactos[j];
+          await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'guardarContacto', empresaId:r.id, nombre:c.nombre, cargo:c.cargo, email:c.email, telefono:c.telefono }) });
+        }
+      }
+    } catch(e) { console.warn('Error importando', g.razonSocial, e); }
+    actualizarProgreso(g.razonSocial);
+  }
+
+  // Empresas existentes — solo se agregan los contactos nuevos
+  for (var k = 0; k < p.existentes.length; k++) {
+    var ge = p.existentes[k];
+    if (!ge.contactosNuevos.length) continue;
+    for (var m = 0; m < ge.contactosNuevos.length; m++) {
+      var cn = ge.contactosNuevos[m];
+      try {
+        await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+          body: JSON.stringify({ accion:'guardarContacto', empresaId:ge.empresaExistenteId, nombre:cn.nombre, cargo:cn.cargo, email:cn.email, telefono:cn.telefono }) });
+      } catch(e) { console.warn('Error agregando contacto a', ge.razonSocial, e); }
+    }
+    actualizarProgreso(ge.razonSocial);
+  }
+
+  prog.textContent = '✓ Importación terminada.';
+  btn.disabled = false;
+  _importPendiente = null;
+  await _cargarEmpresas();
+  setTimeout(function() { document.getElementById('import-preview-panel').style.display = 'none'; }, 1500);
 };
 
 // ── Origen: ?empresa=ID para entrar directo a una ficha (ej. desde una tarjeta) ──
