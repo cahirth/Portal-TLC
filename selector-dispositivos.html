@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.19.7 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.22.1 -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1192,6 +1192,7 @@
             <a class="btn-folleto" id="btn-folleto" target="_blank" style="display:none; flex:1; margin-bottom:0;">📄 Folleto</a>
             <a class="btn-folleto" id="btn-video" target="_blank" style="display:none; flex:1; margin-bottom:0; border-color:#f87171; color:#f87171;">▶️ Video</a>
             <button class="btn-folleto" id="btn-ver-stock" onclick="_toggleStockDetalle()" style="display:none; flex:1; margin-bottom:0; border-color:#3a86ff; color:#3a86ff; cursor:pointer;">📦 Ver stock</button>
+            <button class="btn-folleto" id="btn-compartir-ficha" onclick="_compartirFichaEquipo()" style="flex:1; margin-bottom:0; border-color:#06d6a0; color:#06d6a0; cursor:pointer;">🔗 Compartir</button>
         </div>
         <div id="stock-detalle-wrap" style="display:none; margin-top:8px; padding:10px 14px; border-radius:10px; font-size:13px; font-weight:700; text-align:center;"></div>
     </div>
@@ -3435,6 +3436,26 @@ function actualizarBadge() {
 // ─── Agregar al carrito con chequeo de compatibilidad ────────────
 function _esSoloVista() {
     return currentUserRol === 'Visor' || currentUserRol === 'Solo_Precios' || currentUserRol === 'Solo Vista';
+}
+
+// Comparte la ficha técnica pública de este equipo (sin llegar a ser un
+// presupuesto — solo características, precio y financiación). Usa el
+// Web Share API nativo cuando está disponible (deja elegir WhatsApp,
+// Mail, etc.), y si el navegador no lo soporta (típico en desktop),
+// abre WhatsApp directo como respaldo.
+function _compartirFichaEquipo() {
+  var d = dispositivoActual;
+  if (!d) return;
+  var nombre = d['Nombre de Dispositivo'] || '';
+  var link = 'https://cahirth.github.io/Portal-TLC/ficha-equipo.html?nombre=' + encodeURIComponent(nombre);
+  var texto = 'Ficha técnica — ' + nombre + ' (TLC SRL): ' + link;
+
+  if (navigator.share) {
+    navigator.share({ title: 'Ficha técnica — ' + nombre, text: 'Mirá la ficha técnica de ' + nombre, url: link })
+      .catch(function(){}); // el usuario cancela el share nativo → no hacer nada
+  } else {
+    window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+  }
 }
 
 function agregarAlCarrito() {
