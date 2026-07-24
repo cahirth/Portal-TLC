@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v0.1 (ESQUELETO — en revisión de diseño) -->
+<!-- Portal TLC | empresas.html | v2026.07.23.1 (Empresas y Contactos ya conectados a Firebase — "Negocios asociados" todavía pendiente) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -238,24 +238,25 @@
 // esté armada, esto se reemplaza por fetch()/GAS reales a /empresas,
 // /contactos y los índices de cotizaciones + tickets.
 // ══════════════════════════════════════════════════════════════════
-var EMPRESAS_MOCK = [
-  { id:'e1', razonSocial:'FUNDACIÓN ZAMBRANO', cuit:'30640069895', domicilio:'Av. Siempre Viva 123, CABA', telefono:'+541135710410',
-    contactos:[
-      {id:'c1', nombre:'Jerónimo Zambrano', cargo:'Director Médico', email:'jeronimo@zambrano.org', telefono:'+541135710410'},
-      {id:'c1b', nombre:'María Zambrano', cargo:'Administración', email:'maria@zambrano.org', telefono:'+541135710411'},
-    ],
-    negocios:[
-      { id:'TLC-20260717-TKPY', tipo:'ventas', estado:'Cotización', monto:13138, moneda:'USD', fecha:'17/07/2026' },
-      { id:'TLC-20260608-O8YE', tipo:'ventas', estado:'Perdida', monto:4254, moneda:'USD', fecha:'08/06/2026' },
-    ] },
-  { id:'e2', razonSocial:'HOSPITAL PABLO SORIA', cuit:'30500001234', domicilio:'San Salvador de Jujuy', telefono:'',
-    contactos:[{id:'c2', nombre:'Dr. Pablo Soria', cargo:'Jefe de Oftalmología', email:'', telefono:''}],
-    negocios:[
-      { id:'ST-20260701-A1B2', tipo:'servicio', estado:'Reparación', monto:0, moneda:'', fecha:'01/07/2026' },
-    ] },
-];
-
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+var EMPRESAS = []; // se llena con _cargarEmpresas() — ya no hay datos de prueba
 var _empresaActualId = null;
+var _cargando = false;
+
+async function _cargarEmpresas() {
+  _cargando = true;
+  var cont = document.getElementById('lista-empresas');
+  if (cont && !EMPRESAS.length) cont.innerHTML = '<div class="empty-lista">Cargando...</div>';
+  try {
+    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'listarEmpresas' }) });
+    var r = await resp.json();
+    if (r.ok) EMPRESAS = r.empresas || [];
+    else console.warn('Error listando empresas:', r.error);
+  } catch(e) { console.warn('Error de conexión al listar empresas:', e); }
+  _cargando = false;
+  _renderListaEmpresas();
+}
 
 // ── Tema ──
 window._toggleAvatarMenu = function(ev) { ev.stopPropagation(); document.getElementById('avatar-menu').classList.toggle('open'); };
@@ -281,10 +282,10 @@ window._volverDesdeHeader = function() {
 function _renderListaEmpresas(filtro) {
   var cont = document.getElementById('lista-empresas');
   var q = (filtro || '').toLowerCase();
-  var lista = EMPRESAS_MOCK.filter(function(e) {
+  var lista = EMPRESAS.filter(function(e) {
     return !q || e.razonSocial.toLowerCase().includes(q) || (e.cuit||'').includes(q);
   });
-  if (!lista.length) { cont.innerHTML = '<div class="empty-lista">Sin resultados.</div>'; return; }
+  if (!lista.length) { cont.innerHTML = '<div class="empty-lista">' + (EMPRESAS.length ? 'Sin resultados.' : 'Todavía no cargaste ninguna empresa.') + '</div>'; return; }
   cont.innerHTML = lista.map(function(e) {
     return '<div class="empresa-card" onclick="_abrirDetalleEmpresa(\'' + e.id + '\')">' +
       '<div class="empresa-card-top">' +
@@ -302,15 +303,20 @@ window._filtrarEmpresas = function(q) { _renderListaEmpresas(q); };
 window._abrirFormNuevaEmpresa = function() {
   var razon = prompt('Razón Social de la nueva empresa:');
   if (!razon) return;
-  var nueva = { id:'e_' + Date.now(), razonSocial:razon, cuit:'', domicilio:'', telefono:'', contactos:[], negocios:[] };
-  EMPRESAS_MOCK.push(nueva);
-  _renderListaEmpresas();
-  _abrirDetalleEmpresa(nueva.id);
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:razon }) })
+    .then(function(r){ return r.json(); })
+    .then(async function(r) {
+      if (!r.ok) { alert('Error al crear la empresa: ' + (r.error||'desconocido')); return; }
+      await _cargarEmpresas();
+      _abrirDetalleEmpresa(r.id);
+    })
+    .catch(function(){ alert('Error de conexión al crear la empresa.'); });
 };
 
 // ── DETALLE ──
 window._abrirDetalleEmpresa = function(id) {
-  var e = EMPRESAS_MOCK.find(function(x){ return x.id === id; });
+  var e = EMPRESAS.find(function(x){ return x.id === id; });
   if (!e) return;
   _empresaActualId = id;
   document.getElementById('vista-lista').style.display = 'none';
@@ -336,22 +342,36 @@ function _cerrarDetalle() {
 }
 
 window._guardarCambiosEmpresa = function() {
-  var e = EMPRESAS_MOCK.find(function(x){ return x.id === _empresaActualId; });
+  var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
   if (!e) return;
-  e.razonSocial = document.getElementById('det-razon').value.trim() || e.razonSocial;
-  e.cuit = document.getElementById('det-cuit').value.trim();
-  e.telefono = document.getElementById('det-telefono').value.trim();
-  e.domicilio = document.getElementById('det-domicilio').value.trim();
-  document.getElementById('hdr-titulo').textContent = e.razonSocial;
-  alert('(demo) Guardado en memoria — falta conectar a Firebase.');
+  var razon = document.getElementById('det-razon').value.trim() || e.razonSocial;
+  var cuit = document.getElementById('det-cuit').value.trim();
+  var telefono = document.getElementById('det-telefono').value.trim();
+  var domicilio = document.getElementById('det-domicilio').value.trim();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'guardarEmpresa', id:e.id, razonSocial:razon, cuit:cuit, telefono:telefono, domicilio:domicilio }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error al guardar: ' + (r.error||'desconocido')); return; }
+      e.razonSocial = razon; e.cuit = cuit; e.telefono = telefono; e.domicilio = domicilio;
+      document.getElementById('hdr-titulo').textContent = razon;
+    })
+    .catch(function(){ alert('Error de conexión al guardar.'); });
 };
 
 window._borrarEmpresaActual = function() {
-  var e = EMPRESAS_MOCK.find(function(x){ return x.id === _empresaActualId; });
+  var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
   if (!e) return;
   if (!confirm('¿Borrar "' + e.razonSocial + '" y todos sus contactos? Esta acción no se puede deshacer.')) return;
-  EMPRESAS_MOCK = EMPRESAS_MOCK.filter(function(x){ return x.id !== _empresaActualId; });
-  _cerrarDetalle();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'borrarEmpresa', id:e.id }) })
+    .then(function(r){ return r.json(); })
+    .then(async function(r) {
+      if (!r.ok) { alert('Error al borrar: ' + (r.error||'desconocido')); return; }
+      EMPRESAS = EMPRESAS.filter(function(x){ return x.id !== _empresaActualId; });
+      _cerrarDetalle();
+    })
+    .catch(function(){ alert('Error de conexión al borrar.'); });
 };
 
 // ── CONTACTOS ──
@@ -359,7 +379,7 @@ function _renderContactos(e) {
   document.getElementById('contactos-contador').textContent = e.contactos.length + ' contacto' + (e.contactos.length!==1?'s':'');
   var cont = document.getElementById('lista-contactos');
   if (!e.contactos.length) { cont.innerHTML = '<div class="empty-lista">Sin contactos cargados todavía.</div>'; return; }
-  cont.innerHTML = e.contactos.map(function(c, idx) {
+  cont.innerHTML = e.contactos.map(function(c) {
     return '<div class="contacto-card">' +
       '<div class="contacto-info">' +
         '<div class="nombre">' + c.nombre + '</div>' +
@@ -367,7 +387,7 @@ function _renderContactos(e) {
         '<div class="datos">' + [c.email, c.telefono].filter(Boolean).join(' · ') + '</div>' +
       '</div>' +
       '<div class="contacto-acciones">' +
-        '<button class="btn-icon-mini danger" onclick="_borrarContacto(' + idx + ')" title="Borrar">✕</button>' +
+        '<button class="btn-icon-mini danger" onclick="_borrarContacto(\'' + c.id + '\')" title="Borrar">✕</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -377,30 +397,42 @@ window._toggleFormContacto = function() { document.getElementById('form-contacto
   document.getElementById('form-contacto').style.display === 'block' ? 'none' : 'block'; };
 
 window._guardarContacto = function() {
-  var e = EMPRESAS_MOCK.find(function(x){ return x.id === _empresaActualId; });
+  var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
   if (!e) return;
   var nombre = document.getElementById('fc-nombre').value.trim();
   if (!nombre) { alert('El nombre es obligatorio.'); return; }
-  e.contactos.push({
-    id:'c_' + Date.now(), nombre:nombre,
-    cargo: document.getElementById('fc-cargo').value.trim(),
-    email: document.getElementById('fc-email').value.trim(),
-    telefono: document.getElementById('fc-telefono').value.trim(),
-  });
-  ['fc-nombre','fc-cargo','fc-email','fc-telefono'].forEach(function(id){ document.getElementById(id).value = ''; });
-  document.getElementById('form-contacto').style.display = 'none';
-  _renderContactos(e);
+  var cargo = document.getElementById('fc-cargo').value.trim();
+  var email = document.getElementById('fc-email').value.trim();
+  var telefono = document.getElementById('fc-telefono').value.trim();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'guardarContacto', empresaId:e.id, nombre:nombre, cargo:cargo, email:email, telefono:telefono }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error al guardar el contacto: ' + (r.error||'desconocido')); return; }
+      e.contactos.push({ id:r.id, nombre:nombre, cargo:cargo, email:email, telefono:telefono });
+      ['fc-nombre','fc-cargo','fc-email','fc-telefono'].forEach(function(id){ document.getElementById(id).value = ''; });
+      document.getElementById('form-contacto').style.display = 'none';
+      _renderContactos(e);
+    })
+    .catch(function(){ alert('Error de conexión al guardar el contacto.'); });
 };
 
-window._borrarContacto = function(idx) {
-  var e = EMPRESAS_MOCK.find(function(x){ return x.id === _empresaActualId; });
+window._borrarContacto = function(contactoId) {
+  var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
   if (!e) return;
   if (!confirm('¿Borrar este contacto?')) return;
-  e.contactos.splice(idx, 1);
-  _renderContactos(e);
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'borrarContacto', id:contactoId }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error al borrar el contacto: ' + (r.error||'desconocido')); return; }
+      e.contactos = e.contactos.filter(function(c){ return c.id !== contactoId; });
+      _renderContactos(e);
+    })
+    .catch(function(){ alert('Error de conexión al borrar el contacto.'); });
 };
 
-// ── NEGOCIOS ASOCIADOS ──
+// ── NEGOCIOS ASOCIADOS ── (todavía sin cruzar con cotizaciones/tickets reales — próxima etapa)
 var ESTADO_COLOR = {
   'Cotización':{bg:'rgba(58,134,255,.12)',c:'#60a5fa'}, 'Negociación':{bg:'rgba(168,85,247,.12)',c:'#c084fc'},
   'Ganada':{bg:'rgba(16,185,129,.12)',c:'#34d399'}, 'Perdida':{bg:'rgba(239,68,68,.12)',c:'#f87171'},
@@ -425,20 +457,20 @@ function _renderNegocios(e) {
 }
 
 window._nuevoNegocio = function(tipo) {
-  var e = EMPRESAS_MOCK.find(function(x){ return x.id === _empresaActualId; });
+  var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
   if (!e) return;
-  // (demo) En la versión conectada: tipo==='ventas' crea una tarjeta
-  // nueva en el Kanban de Ventas (cotizaciones.html) con esta empresa
-  // ya vinculada; tipo==='servicio' abre el formulario de Nuevo Ticket
+  // (pendiente próxima etapa) tipo==='ventas' crearía una tarjeta nueva
+  // en el Kanban de Ventas (cotizaciones.html) con esta empresa ya
+  // vinculada; tipo==='servicio' abriría el formulario de Nuevo Ticket
   // en servicio.html con los datos del cliente precargados.
-  alert('(demo) Esto crearía un negocio nuevo de tipo "' + tipo + '" para ' + e.razonSocial + ', y te llevaría directo a cargarlo.');
+  alert('(pendiente) Esto va a crear un negocio nuevo de tipo "' + tipo + '" para ' + e.razonSocial + ', y te va a llevar directo a cargarlo — todavía no está conectado.');
 };
 
 // ── Origen: ?empresa=ID para entrar directo a una ficha (ej. desde una tarjeta) ──
-(function() {
+(async function() {
   var params = new URLSearchParams(window.location.search);
   var empresaId = params.get('empresa');
-  _renderListaEmpresas();
+  await _cargarEmpresas();
   if (empresaId) _abrirDetalleEmpresa(empresaId);
 })();
 </script>
