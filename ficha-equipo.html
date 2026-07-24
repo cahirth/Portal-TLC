@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.23.3 -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.23.4 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -55,7 +55,8 @@
 
         .financiacion-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; padding:18px 24px; }
         .fin-card { border:1px solid var(--border-color); border-radius:10px; padding:14px; background:#fff; position:relative; }
-        .fin-card-oculta { display:none; }
+        .fin-card-oculta { opacity:.35; }
+        @media print { .fin-card-oculta { display:none; } }
         .fin-check-wrap { position:absolute; top:8px; right:8px; }
         .fin-check { width:17px; height:17px; cursor:pointer; accent-color:var(--blue-tlc); }
         .fin-card .fin-titulo { font-size:13px; font-weight:800; color:var(--text-dark); margin-bottom:8px; }
@@ -95,8 +96,8 @@
             .fin-card { padding:9px; break-inside:avoid; page-break-inside:avoid; }
             .fin-card .fin-row .val.contado-val { font-size:17px; }
             .footer-tlc { padding:8px; }
-            .btn-link { text-decoration:underline; }
-            .btn-link::after { content:" → " attr(href); display:block; font-size:9px; font-weight:400; word-break:break-all; margin-top:2px; color:#475569; }
+            .btn-link { text-decoration:underline; flex-direction:column; align-items:flex-start; gap:2px; }
+            .btn-link::after { content:"→ " attr(href); display:block; font-size:9px; font-weight:400; text-decoration:none; word-break:break-all; color:#475569; }
             .fin-check-wrap { display:none; }
             .section-title span { display:none; }
         }
@@ -302,7 +303,7 @@ async function _cargarFicha() {
         var btnRow = document.getElementById('fi-btn-row');
         var botones = '';
         if (d.Link_Folleto) botones += '<a class="btn-link folleto" href="' + _esc(d.Link_Folleto) + '" target="_blank">📄 Folleto</a>';
-        if (d.Link_Web) botones += '<a class="btn-link video" href="' + _esc(d.Link_Web) + '" target="_blank">▶️ Video</a>';
+        if (d.Link_Web) botones += '<a class="btn-link video" href="' + _esc(d.Link_Web) + '" target="_blank">📖 Ficha Técnica Completa</a>';
         btnRow.innerHTML = botones;
 
         var precioLista = parseFloat(d['Precio LISTA']);
