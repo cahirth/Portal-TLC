@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.22.4 -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.22.5 -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -26,9 +26,9 @@
         .foto-wrap { background:var(--bg-muted); display:flex; align-items:center; justify-content:center; padding:24px; }
         .foto-wrap img { max-width:100%; max-height:340px; object-fit:contain; }
 
-        .marca-cat { font-size:11px; font-weight:700; color:var(--blue-tlc); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+        .marca-cat { font-size:12px; font-weight:700; color:var(--blue-tlc); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
         .nombre-equipo { font-size:24px; font-weight:800; color:var(--text-dark); margin-bottom:8px; line-height:1.2; }
-        .descripcion-equipo { font-size:14px; color:var(--text-muted); line-height:1.6; white-space:pre-wrap; margin-bottom:18px; }
+        .descripcion-equipo { font-size:15px; color:var(--text-muted); line-height:1.6; white-space:pre-wrap; margin-bottom:18px; }
 
         .btn-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
         .btn-link { display:inline-flex; align-items:center; gap:7px; padding:10px 16px; border-radius:9px; font-size:13px; font-weight:700;
@@ -45,10 +45,11 @@
 
         .financiacion-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:20px 24px; }
         .fin-card { border:1px solid var(--border-color); border-radius:10px; padding:14px; background:#fff; }
-        .fin-card .fin-titulo { font-size:12px; font-weight:800; color:var(--text-dark); margin-bottom:8px; }
-        .fin-card .fin-row { display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted); padding:2px 0; }
+        .fin-card .fin-titulo { font-size:13px; font-weight:800; color:var(--text-dark); margin-bottom:8px; }
+        .fin-card .fin-row { display:flex; justify-content:space-between; font-size:13px; color:var(--text-muted); padding:3px 0; }
         .fin-card .fin-row .val { font-weight:700; color:var(--green-tlc); }
-        .fin-card .fin-desc { font-size:10px; color:#94a3b8; margin-top:6px; line-height:1.4; }
+        .fin-card .fin-row .val.contado-val { font-size:22px; font-weight:900; }
+        .fin-card .fin-desc { font-size:11px; color:#94a3b8; margin-top:6px; line-height:1.4; }
         .sin-financiacion { padding:24px; text-align:center; color:var(--text-muted); font-size:13px; font-style:italic; }
 
         @media (max-width:640px) { .financiacion-grid { grid-template-columns:1fr; } }
@@ -227,7 +228,7 @@ async function _cargarFicha() {
         if (!isNaN(contado) && contado > 0) {
             tarjetas += '<div class="fin-card">' +
                 '<div class="fin-titulo">💵 Contado</div>' +
-                '<div class="fin-row"><span>Precio</span><span class="val">' + _fmtMoneda(contado, 'USD') + '</span></div>' +
+                '<div class="fin-row"><span>Precio</span><span class="val contado-val">' + _fmtMoneda(contado, 'USD') + '</span></div>' +
                 (d.Descripcion_USD_CONTADO ? '<div class="fin-desc">' + _esc(d.Descripcion_USD_CONTADO) + '</div>' : '') +
             '</div>';
         }
