@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.24.4 (+ cruce real de Negocios asociados, boton Nuevo Negocio conectado) -->
+<!-- Portal TLC | empresas.html | v2026.07.24.5 (Negocios asociados limitado a los últimos 5) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -654,10 +654,12 @@ function _fmtFechaNegocio(f) {
 }
 
 function _renderNegocios(e) {
-  document.getElementById('negocios-contador').textContent = e.negocios.length + ' negocio' + (e.negocios.length!==1?'s':'');
+  var total = e.negocios.length;
+  document.getElementById('negocios-contador').textContent = total + ' negocio' + (total!==1?'s':'') + (total > 5 ? ' (últimos 5)' : '');
   var cont = document.getElementById('lista-negocios');
-  if (!e.negocios.length) { cont.innerHTML = '<div class="empty-lista">Todavía no tiene negocios asociados.</div>'; return; }
-  cont.innerHTML = e.negocios.map(function(n) {
+  if (!total) { cont.innerHTML = '<div class="empty-lista">Todavía no tiene negocios asociados.</div>'; return; }
+  var negociosAMostrar = e.negocios.slice(0, 5); // ya vienen ordenados por fecha desc — los más recientes primero
+  cont.innerHTML = negociosAMostrar.map(function(n) {
     var info = ESTADO_INFO[n.estado] || { label:n.estado, c:'#94a3b8', bg:'rgba(148,163,184,.12)' };
     var link = n.tipo === 'ventas'
       ? 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(n.id)
@@ -671,7 +673,7 @@ function _renderNegocios(e) {
       '</div>' +
       (n.monto ? '<div class="negocio-monto">' + n.moneda + ' ' + Math.round(n.monto).toLocaleString('es-AR') + '</div>' : '') +
     '</a>';
-  }).join('');
+  }).join('') + (total > 5 ? '<div class="empty-lista" style="padding:10px;font-style:normal;font-size:11px;">Mostrando los 5 más recientes de ' + total + ' en total.</div>' : '');
 }
 
 window._nuevoNegocio = function(tipo) {
