@@ -122,18 +122,34 @@
     else if (p.tiempoEntrega === 'personalizado') tiempoTexto = p.tiempoEntregaCustom || 'A confirmar';
     else if (p.tiempoEntrega) tiempoTexto = p.tiempoEntrega + ' días';
 
+    var validezTexto2 = '';
+    if (p.validez === 'personalizado') validezTexto2 = p.validezFecha ? ('Hasta ' + p.validezFecha) : 'A confirmar';
+    else if (p.validez) validezTexto2 = p.validez + ' días';
+
     var lugarTexto = p.lugarEntrega === 'oficina'
       ? 'Se entrega en nuestra oficina en Del Carmen 716 PB CABA. El envío y el seguro están a cargo del comprador.'
       : 'Clínica del Cliente.';
 
+    // Tipo de cambio — solo si los totales están en AR$ y se guardó un
+    // TC real al momento de generar el presupuesto (p.tcOficial).
+    var tcTexto = (p.monedaTotales === 'ARS' && p.tcOficial)
+      ? '<strong>Tipo de Cambio:</strong> $' + Number(p.tcOficial).toLocaleString('es-AR') + ' (oficial, al momento de generar este presupuesto)<br>'
+      : '';
+
     return (p.formaPago ? '<strong>Forma de Pago:</strong> ' + esc(p.formaPago) + '<br>' : '') +
+      (validezTexto2 ? '<strong>Validez de la Propuesta:</strong> ' + esc(validezTexto2) + '<br>' : '') +
       (tiempoTexto ? '<strong>Tiempo de Entrega:</strong> ' + esc(tiempoTexto) + '<br>' : '') +
-      '<strong>Lugar de Entrega:</strong> ' + esc(lugarTexto);
+      '<strong>Lugar de Entrega:</strong> ' + esc(lugarTexto) + '<br>' +
+      tcTexto +
+      (p.notas ? '<strong>Notas:</strong> ' + esc(p.notas) : '');
   }
 
-  function buildFilasProductos(carrito, etiquetaMoneda) {
+  function buildFilasProductos(carrito, etiquetaMonedaIgnorada) {
     if (!Array.isArray(carrito) || !carrito.length) return '';
-    etiquetaMoneda = etiquetaMoneda || 'USD';
+    // Los ítems SIEMPRE se muestran en USD (precio de lista) — el
+    // toggle de moneda ARS/USD solo afecta el bloque de Totales más
+    // abajo, nunca el detalle por ítem.
+    var etiquetaMoneda = 'USD';
     return carrito.map(function(i) {
       var qty = i.cantidad || 1;
       var base = i.precioLista || i.precioNeto || 0;
@@ -192,10 +208,22 @@
   function renderPresupuesto(idCot, p) {
     var c = p.carrito || [];
     var totales = p.totales || {};
-    var netoTotal = totales.subtotal_neto != null ? totales.subtotal_neto : 0;
-    var ivaTotal  = totales.iva_total     != null ? totales.iva_total     : 0;
-    var totalCIva = totales.total_con_iva != null ? totales.total_con_iva : (netoTotal + ivaTotal);
+    var netoTotalUSD = totales.subtotal_neto != null ? totales.subtotal_neto : 0;
+    var ivaTotalUSD  = totales.iva_total     != null ? totales.iva_total     : 0;
+    var totalCIvaUSD = totales.total_con_iva != null ? totales.total_con_iva : (netoTotalUSD + ivaTotalUSD);
     var etiquetaMoneda = (p.monedaTotales === 'ARS') ? 'AR$' : 'USD'; // ← FIX: antes "USD" estaba escrito fijo en 6 lugares de este archivo, sin leer la moneda real guardada
+
+    // Los totales quedan guardados SIEMPRE en USD (misma base que los
+    // ítems) — si el vendedor eligió AR$ para los totales, se convierten
+    // acá con el TC oficial real que se usó al momento de guardar
+    // (p.tcOficial, ver guardarPresupuestoEditor en FotoMap.gs v112).
+    // Los ÍTEMS nunca se convierten — siempre quedan en USD arriba.
+    var netoTotal = netoTotalUSD, ivaTotal = ivaTotalUSD, totalCIva = totalCIvaUSD;
+    if (p.monedaTotales === 'ARS' && p.tcOficial) {
+      netoTotal = netoTotalUSD * p.tcOficial;
+      ivaTotal  = ivaTotalUSD  * p.tcOficial;
+      totalCIva = totalCIvaUSD * p.tcOficial;
+    }
 
     // Validez de la oferta — dinámica si viene del editor nuevo
     // (presupuesto-editor.html, campos p.validez/p.validezFecha), texto

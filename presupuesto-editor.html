@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.10 (Sacado el botón 🔍 de catálogo inline por ítem y todo su código muerto asociado (modal, CATALOGO_CACHE, etc.) — la forma de elegir equipos es ir al selector de dispositivos con "+ Agregar ítem") -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.11 (Lugar de entrega a ancho completo para que no se corte; envía el TC oficial usado al guardar, y bloquea el guardado en AR$ si el TC todavía no cargó) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -271,7 +271,7 @@
           <label>Especificar tiempo de entrega</label>
           <input type="text" id="cc-tiempo-entrega-custom" placeholder="Ej: 60 días hábiles">
         </div>
-        <div class="det-campo">
+        <div class="det-campo full">
           <label>Lugar de entrega</label>
           <select id="cc-lugar-entrega">
             <option value="cliente">Clínica del Cliente</option>
@@ -780,6 +780,8 @@ async function _generarPresupuesto() {
   if (!CLIENTE_SEL) { alert('Elegí un cliente antes de generar el presupuesto.'); return; }
   if ((CLIENTE_SEL.contactos || []).length > 1 && !CONTACTO_SEL) { alert('Esta empresa tiene varios contactos — elegí uno.'); return; }
   if (!ITEMS.length || ITEMS.every(function(it){ return !it.descripcion && !it.precio; })) { alert('Agregá al menos un ítem con descripción y precio.'); return; }
+  var monedaElegida = document.getElementById('moneda-presupuesto').value;
+  if (monedaElegida === 'ARS' && !TC_OFICIAL) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
 
   var btn = document.getElementById('btn-generar-presupuesto');
   var textoOriginal = btn ? btn.textContent : '';
@@ -812,7 +814,8 @@ async function _generarPresupuesto() {
     tiempoEntregaCustom: document.getElementById('cc-tiempo-entrega-custom').value,
     lugarEntrega: document.getElementById('cc-lugar-entrega').value,
     notas: document.getElementById('cc-notas').value,
-    moneda: document.getElementById('moneda-presupuesto').value
+    moneda: document.getElementById('moneda-presupuesto').value,
+    tcOficial: TC_OFICIAL || null
   };
 
   try {

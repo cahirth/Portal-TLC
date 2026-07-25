@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.25.6 (Editar cotización ahora trae el negocio COMPLETO al editor — ítems y condiciones comerciales reales, no vacío. Lápiz de edición ✏️ solo en la última versión; las anteriores quedan solo para ver.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.25.7 (Flecha del select de Etapa reemplazada por triángulo CSS puro (la versión SVG seguía sin verse pese a fixes anteriores); foto del equipo más grande en el header del detalle) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -136,16 +136,24 @@
         .det-hero-monto { font-size:36px; font-weight:900; color:#06d6a0; line-height:1; letter-spacing:-1px; }
         .det-hero-sub { font-size:12px; color:#475569; margin-top:4px; }
         .det-hero-badge { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; margin-top:8px; }
+        .det-hero-badge-wrap { position:relative; display:inline-block; }
         .det-hero-badge-select {
-            appearance:none; -webkit-appearance:none; border:1.5px solid currentColor; border-radius:20px;
-            padding:6px 32px 6px 14px; font-size:12px; font-weight:700; font-family:inherit; cursor:pointer;
-            background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="%23475569" d="M2 4l4 4 4-4z"/></svg>');
-            background-repeat:no-repeat; background-position:right 11px center; background-size:13px;
+            appearance:none; -webkit-appearance:none; -moz-appearance:none; border:1.5px solid currentColor; border-radius:20px;
+            padding:6px 34px 6px 14px; font-size:12px; font-weight:700; font-family:inherit; cursor:pointer;
             width:auto; max-width:100%; min-width:0; flex-shrink:1; transition:box-shadow .15s ease;
-            white-space:normal; text-align:left;
+            white-space:normal; text-align:left; background-color:transparent;
         }
         .det-hero-badge-select:hover { box-shadow:0 0 0 2px rgba(58,134,255,0.25); }
         body.tema-claro .det-hero-badge-select { background-color:white; }
+        /* Flecha con borders CSS puros — no depende de que cargue ninguna
+           imagen/SVG (versiones anteriores con background-image de SVG
+           no se veían de forma consistente), así que no puede fallar. */
+        .det-hero-badge-wrap::after {
+            content:''; position:absolute; right:14px; top:50%; margin-top:-3px;
+            width:0; height:0; pointer-events:none;
+            border-left:5px solid transparent; border-right:5px solid transparent;
+            border-top:6px solid currentColor; opacity:.75;
+        }
 
         /* GRID 2 COLS */
         .det-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px 16px; }
@@ -1932,11 +1940,14 @@ function _pcProcesarItemPendiente() {
 // re-pintando solo el contenedor de fotos sin tocar el resto del detalle.
 function _renderFotosEquipos(carrito) {
     if (!carrito.length) return '';
+    // Foto más grande cuando hay pocos ítems (1-2), más chica si hay
+    // varios para que no ocupen toda la pantalla.
+    const tam = carrito.length <= 2 ? 92 : 64;
     const fotos = carrito.slice(0, 6).map(i => {
         const fotoSrc = i.foto || _buscarPrecio(i.nombre)?.['Foto'] || _buscarPrecio(i.nombre)?.['foto'] || '';
         return fotoSrc
             ? `<img src="${fotoSrc}" title="${_fixEncoding(i.nombre)}"
-                 style="width:56px;height:56px;object-fit:contain;border-radius:8px;background:#f8fafc;
+                 style="width:${tam}px;height:${tam}px;object-fit:contain;border-radius:10px;background:#f8fafc;
                         border:1px solid #e2e8f0;" onerror="this.style.display='none'">`
             : '';
     }).join('');
@@ -1991,10 +2002,12 @@ function _renderDetalle(c) {
                 ${neto !== monto ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">Neto USD ${Math.round(neto).toLocaleString('es-AR')} · IVA USD ${Math.round(iva).toLocaleString('es-AR')}</div>` : ''}
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:100%;">
-                <select class="det-hero-badge-select" style="${badgeStyle}"
-                    onchange="_cambiarEstadoDesdeDetalle('${id}', this.value)">
-                    ${etapasOptsHero}
-                </select>
+                <div class="det-hero-badge-wrap" style="color:${colData.color||'#3a86ff'};max-width:100%;">
+                    <select class="det-hero-badge-select" style="${badgeStyle}"
+                        onchange="_cambiarEstadoDesdeDetalle('${id}', this.value)">
+                        ${etapasOptsHero}
+                    </select>
+                </div>
                 ${puedeGestionar ? `<button id="btn-borrar-deal" onclick="_confirmarBorrarDeal('${id}')"
                     style="width:100%;max-width:170px;padding:5px 12px;border-radius:20px;background:transparent;
                            border:1px solid #dc2626;color:#dc2626;font-size:11px;font-weight:700;
