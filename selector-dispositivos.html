@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.25.1 (Nuevo puente ?volverAPresupuesto=1 con presupuesto-editor.html, mismo patrón que ?agregarA con cotizaciones.html) -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.25.2 ("Agregar al Carrito" oculto por defecto (ya sin uso standalone) — solo aparece, chico y en línea con Folleto/Ver stock/Ver ficha, en modo puente con cotizaciones.html o presupuesto-editor.html) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -140,7 +140,7 @@
         #btn-video { background: linear-gradient(135deg, #1c1520, #2d1a2e); border: 1.5px solid #f87171; color: #fca5a5; box-shadow: 0 0 12px rgba(248,113,113,0.15); }
         #btn-video:hover { background: #3d1f1f; box-shadow: 0 0 20px rgba(248,113,113,0.3); }
         .btn-cotizar { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; border-radius: 10px; background: #3a86ff; border: none; color: white; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 10px; }
-        .btn-cotizar.solo-vista { background: #1e293b !important; color: #475569 !important; cursor: not-allowed !important; border: 1px solid #334155 !important; }
+        #btn-cotizar.solo-vista { background: #1e293b !important; color: #475569 !important; cursor: not-allowed !important; border: 1px solid #334155 !important; }
         .btn-carrito-solo-vista { opacity: .4 !important; pointer-events: none !important; }
 
         /* FORMULARIO COTIZACIÓN */
@@ -1191,8 +1191,8 @@
 
     <!-- BOTONES DE ACCIÓN — arriba, junto a la foto, visibles sin scroll -->
     <div style="padding:0 20px; margin-top:14px;">
-        <button class="btn-cotizar" id="btn-cotizar" style="background:linear-gradient(135deg,#ff007f,#c0006b); margin-bottom:10px;">🛒 Agregar al Carrito</button>
         <div style="display:flex; gap:8px;">
+            <button class="btn-folleto" id="btn-cotizar" style="display:none; flex:1; margin-bottom:0; border-color:#c0006b; color:#ff007f; cursor:pointer;">🛒 Agregar al Carrito</button>
             <a class="btn-folleto" id="btn-folleto" target="_blank" style="display:none; flex:1; margin-bottom:0;">📄 Folleto</a>
             <a class="btn-folleto" id="btn-video" target="_blank" style="display:none; flex:1; margin-bottom:0; border-color:#f87171; color:#f87171;">▶️ Video</a>
             <button class="btn-folleto" id="btn-ver-stock" onclick="_toggleStockDetalle()" style="display:none; flex:1; margin-bottom:0; border-color:#3a86ff; color:#3a86ff; cursor:pointer;">📦 Ver stock</button>
@@ -3087,8 +3087,10 @@ function abrirDetalle(idx) {
     if (video) { btnVideo.href = video; btnVideo.style.display = 'flex'; }
     else { btnVideo.style.display = 'none'; }
 
-    // Mostrar la fila de botones solo si alguno está visible
-    btnFolleto.parentElement.style.display = (folleto || video || stockCargado) ? 'flex' : 'none';
+    // Mostrar la fila de botones solo si alguno está visible (incluye el
+    // modo puente con cotizaciones.html/presupuesto-editor.html, que no
+    // depende de datos del producto sino de cómo se llegó a este selector)
+    btnFolleto.parentElement.style.display = (folleto || video || stockCargado || _agregarACotizacionId || _volverAPresupuesto) ? 'flex' : 'none';
 
     // Modalidades disponibles — usar triggerKey (Descripcion) como gatillo
     const modalDisp = MODALIDADES.filter(m => tieneValor(d[m.triggerKey]));
@@ -3284,7 +3286,7 @@ document.getElementById('btn-back').addEventListener('click', () => {
 document.getElementById('btn-cotizar').addEventListener('click', agregarAlCarrito);
 if (_agregarACotizacionId || _volverAPresupuesto) {
     const btnCot = document.getElementById('btn-cotizar');
-    if (btnCot) btnCot.textContent = '➕ Agregar a la cotización';
+    if (btnCot) { btnCot.textContent = '➕ Agregar a la cotización'; btnCot.style.display = 'flex'; }
 }
 
 // Aplicar estilo según rol al abrir cualquier detalle
