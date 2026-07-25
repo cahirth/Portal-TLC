@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.22.3 -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.24.1 (+ precarga de cliente al crear negocio desde Empresas) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -974,6 +974,10 @@
 
 <div id="banner-agregar-cotizacion" style="display:none; background:#1a4b8c; color:#fff; text-align:center; padding:8px 16px; font-size:12px; font-weight:600;">
     📋 Elegí un equipo para agregar a la cotización — al confirmarlo, volvés directo ahí
+</div>
+
+<div id="banner-nuevo-negocio" style="display:none; background:#06d6a0; color:#04231a; text-align:center; padding:8px 16px; font-size:12px; font-weight:700;">
+    💼 Armando cotización nueva — elegí los equipos y tocá "Generar Cotización" cuando termines
 </div>
 
 <!-- HEADER -->
@@ -2266,6 +2270,7 @@ async function cargarTodo() {
         // en servicio.html. Abre directo el modal de resumen con los
         // datos del cliente/equipo ya precargados.
         _leerParametrosTicketDesdeURL();
+        _leerParametrosNegocioDesdeURL();
 
         // FotoMap en background — actualiza imágenes sin re-renderizar
         // Prueba la key WebP primero, luego la original como fallback
@@ -3897,6 +3902,28 @@ let _blobUrlActual  = null;
 let _linkWspActual  = null;
 let _idCotActual    = null;
 let _ticketVinculado = null; // ID del ticket de servicio, si venimos de "Generar Presupuesto" en servicio.html
+
+// Lee ?nuevoNegocio=1&razon=X&cuit=Y&contacto=Z&telefonoContacto=W desde
+// la URL (llegan al tocar "Nuevo negocio (Ventas)" en empresas.html) y
+// precarga los datos del cliente en el modal de resumen — reusa
+// exactamente el mismo mecanismo que la precarga desde un ticket de
+// Servicio Técnico (window._datosTicketPrecarga), así no hace falta
+// tocar _aplicarPrecargaTicketSiCorresponde().
+function _leerParametrosNegocioDesdeURL() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('nuevoNegocio') !== '1') return;
+
+    const razonSocial = params.get('razon') || '';
+    const contacto = params.get('contacto') || '';
+    const telefono = params.get('telefonoContacto') || '';
+
+    window._datosTicketPrecarga = { razonSocial, nombreMedico: contacto, telefono, domicilio:'', falla:'', equipoTexto:'' };
+    console.log('[Empresas] Datos de cliente listos para precargar en la próxima cotización:', window._datosTicketPrecarga);
+    document.addEventListener('DOMContentLoaded', function() {
+        const banner = document.getElementById('banner-nuevo-negocio');
+        if (banner) banner.style.display = 'block';
+    });
+}
 
 // Lee ?ticket=X&cliente=Y&marca=...&modelo=...&serie=...&telefono=...&domicilio=...
 // desde la URL (llegan al hacer click en "Generar Presupuesto" desde un ticket

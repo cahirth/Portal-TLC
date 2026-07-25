@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.24.3 (+ editar contactos existentes) -->
+<!-- Portal TLC | empresas.html | v2026.07.24.4 (+ cruce real de Negocios asociados, boton Nuevo Negocio conectado) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -304,6 +304,78 @@ async function _cargarEmpresas() {
   } catch(e) { console.warn('Error de conexión al listar empresas:', e); }
   _cargando = false;
   _renderListaEmpresas();
+  _cargarNegociosCruzados(); // en segundo plano — no bloquea el primer pintado de la lista
+}
+
+// ══════════════════════════════════════════════════════════════════
+// NEGOCIOS ASOCIADOS — cruce real contra Ventas (historico.json) y
+// Servicio Técnico (Firebase). Se hace client-side, sin tocar el GAS:
+// - Ventas: cruza por CUIT si ambos lo tienen, si no por razón social
+//   normalizada (mismo criterio que el resto del módulo Empresas).
+// - Servicio: los tickets no tienen CUIT propio, se cruza solo por
+//   nombre de cliente normalizado.
+// ══════════════════════════════════════════════════════════════════
+var HISTORICO_URL = 'https://raw.githubusercontent.com/cahirth/Portal-TLC/main/historico.json';
+var RTDB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+
+function _montoCot(c) {
+  return parseFloat((c.totales||{}).total_con_iva || c.totalConIva || c.montoUSD || 0) || 0;
+}
+
+async function _cargarNegociosCruzados() {
+  try {
+    var resultados = await Promise.all([
+      fetch(HISTORICO_URL + '?t=' + Date.now(), { cache:'no-store' }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
+      fetch(RTDB_URL + '/servicio_tecnico.json', { cache:'no-store' }).then(function(r){ return r.ok ? r.json() : {}; }).catch(function(){ return {}; }),
+    ]);
+    var cotizaciones = Array.isArray(resultados[0]) ? resultados[0] : [];
+    var tickets = resultados[1] || {};
+
+    EMPRESAS.forEach(function(e) {
+      var cuitN = _normCuit(e.cuit);
+      var razonN = _normRazon(e.razonSocial);
+      var negocios = [];
+
+      cotizaciones.forEach(function(c) {
+        var cCuit = _normCuit(c.cuit || (c.empresa||{}).cuit);
+        var cRazon = _normRazon(c.razonSocial || (c.empresa||{}).razonSocial || (c.cliente||{}).nombre || c.nombreMedico);
+        var match = (cuitN && cCuit && cCuit === cuitN) || (razonN && cRazon && cRazon === razonN);
+        if (!match) return;
+        negocios.push({
+          id: c.idCot || c.id_cotizacion || c.id || '—',
+          tipo: 'ventas',
+          estado: c.estado || 'Cotización',
+          monto: _montoCot(c),
+          moneda: 'USD',
+          fecha: c.fecha || c.fechaCreacion || '',
+        });
+      });
+
+      Object.keys(tickets).forEach(function(tid) {
+        var t = tickets[tid];
+        var tRazon = _normRazon(t.cliente);
+        if (!razonN || !tRazon || tRazon !== razonN) return; // tickets no tienen CUIT propio
+        negocios.push({
+          id: t.id_ticket || tid,
+          tipo: 'servicio',
+          estado: t.deposito || 'recepcion',
+          monto: 0,
+          moneda: '',
+          fecha: t.creado_en || '',
+        });
+      });
+
+      negocios.sort(function(a, b) { return new Date(b.fecha||0) - new Date(a.fecha||0); });
+      e.negocios = negocios;
+    });
+
+    // Repintar lo que ya esté en pantalla con los conteos reales
+    _renderListaEmpresas(document.getElementById('buscador-empresas').value);
+    if (_empresaActualId) {
+      var eActual = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
+      if (eActual) _renderNegocios(eActual);
+    }
+  } catch(e) { console.warn('Error cruzando negocios:', e); }
 }
 
 // ── Tema ──
@@ -555,26 +627,49 @@ window._borrarContacto = function(contactoId) {
     .catch(function(){ alert('Error de conexión al borrar el contacto.'); });
 };
 
-// ── NEGOCIOS ASOCIADOS ── (todavía sin cruzar con cotizaciones/tickets reales — próxima etapa)
-var ESTADO_COLOR = {
-  'Cotización':{bg:'rgba(58,134,255,.12)',c:'#60a5fa'}, 'Negociación':{bg:'rgba(168,85,247,.12)',c:'#c084fc'},
-  'Ganada':{bg:'rgba(16,185,129,.12)',c:'#34d399'}, 'Perdida':{bg:'rgba(239,68,68,.12)',c:'#f87171'},
-  'Reparación':{bg:'rgba(6,214,160,.12)',c:'#06d6a0'}, 'Recepción':{bg:'rgba(96,165,250,.1)',c:'#60a5fa'},
+// ── NEGOCIOS ASOCIADOS — cruce real (ver _cargarNegociosCruzados) ──
+var ESTADO_INFO = {
+  // Ventas (KANBAN_COLS de cotizaciones.html)
+  '10%':    { label:'Oportunidad reciente',         c:'#94a3b8', bg:'rgba(148,163,184,.12)' },
+  '25%':    { label:'Calificación y asesoramiento', c:'#fbbf24', bg:'rgba(251,191,36,.12)'  },
+  '50%':    { label:'Cotización',                   c:'#60a5fa', bg:'rgba(58,134,255,.12)'  },
+  '75%':    { label:'Negociación',                  c:'#c084fc', bg:'rgba(168,85,247,.12)'  },
+  '90%':    { label:'Cierre',                       c:'#fb923c', bg:'rgba(249,115,22,.12)'  },
+  'Ganada': { label:'Ganada',                       c:'#34d399', bg:'rgba(16,185,129,.12)'  },
+  'Perdida':{ label:'Perdida',                      c:'#f87171', bg:'rgba(239,68,68,.12)'   },
+  // Servicio Técnico (COLUMNAS_DEF de servicio.html)
+  'recepcion':    { label:'Recepción',      c:'#60a5fa', bg:'rgba(96,165,250,.12)' },
+  'diagnostico':  { label:'Diagnóstico',    c:'#a78bfa', bg:'rgba(167,139,250,.12)' },
+  'presupuesto':  { label:'Presupuesto',    c:'#fbbf24', bg:'rgba(251,191,36,.12)' },
+  'reparacion':   { label:'Reparación',     c:'#f87171', bg:'rgba(248,113,113,.12)' },
+  'para_facturar':{ label:'Para Facturar',  c:'#fb923c', bg:'rgba(251,146,60,.12)' },
+  'para_instalar':{ label:'Para Instalar',  c:'#38bdf8', bg:'rgba(56,189,248,.12)' },
+  'finalizado':   { label:'Finalizado',     c:'#34d399', bg:'rgba(52,211,153,.12)' },
 };
+
+function _fmtFechaNegocio(f) {
+  if (!f) return '';
+  try { return new Date(f).toLocaleDateString('es-AR', { day:'numeric', month:'short', year:'numeric' }); }
+  catch(e) { return f; }
+}
+
 function _renderNegocios(e) {
   document.getElementById('negocios-contador').textContent = e.negocios.length + ' negocio' + (e.negocios.length!==1?'s':'');
   var cont = document.getElementById('lista-negocios');
   if (!e.negocios.length) { cont.innerHTML = '<div class="empty-lista">Todavía no tiene negocios asociados.</div>'; return; }
   cont.innerHTML = e.negocios.map(function(n) {
-    var ec = ESTADO_COLOR[n.estado] || {bg:'rgba(148,163,184,.15)',c:'#94a3b8'};
-    return '<a class="negocio-card" href="#" onclick="alert(\'(demo) Esto abriría \' + ' + JSON.stringify(n.id) + '); return false;">' +
+    var info = ESTADO_INFO[n.estado] || { label:n.estado, c:'#94a3b8', bg:'rgba(148,163,184,.12)' };
+    var link = n.tipo === 'ventas'
+      ? 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(n.id)
+      : 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(n.id);
+    return '<a class="negocio-card" href="' + link + '" target="_blank">' +
       '<span class="negocio-tipo-tag ' + n.tipo + '">' + (n.tipo === 'ventas' ? 'VENTAS' : 'SERVICIO') + '</span>' +
       '<div class="negocio-info">' +
         '<div class="negocio-id">' + n.id + '</div>' +
-        '<div class="negocio-meta">' + n.fecha + '</div>' +
-        '<span class="negocio-estado" style="background:' + ec.bg + ';color:' + ec.c + ';">' + n.estado + '</span>' +
+        '<div class="negocio-meta">' + _fmtFechaNegocio(n.fecha) + '</div>' +
+        '<span class="negocio-estado" style="background:' + info.bg + ';color:' + info.c + ';">' + info.label + '</span>' +
       '</div>' +
-      (n.monto ? '<div class="negocio-monto">' + n.moneda + ' ' + n.monto.toLocaleString('es-AR') + '</div>' : '') +
+      (n.monto ? '<div class="negocio-monto">' + n.moneda + ' ' + Math.round(n.monto).toLocaleString('es-AR') + '</div>' : '') +
     '</a>';
   }).join('');
 }
@@ -582,11 +677,26 @@ function _renderNegocios(e) {
 window._nuevoNegocio = function(tipo) {
   var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
   if (!e) return;
-  // (pendiente próxima etapa) tipo==='ventas' crearía una tarjeta nueva
-  // en el Kanban de Ventas (cotizaciones.html) con esta empresa ya
-  // vinculada; tipo==='servicio' abriría el formulario de Nuevo Ticket
-  // en servicio.html con los datos del cliente precargados.
-  alert('(pendiente) Esto va a crear un negocio nuevo de tipo "' + tipo + '" para ' + e.razonSocial + ', y te va a llevar directo a cargarlo — todavía no está conectado.');
+
+  if (tipo === 'ventas') {
+    // Toma el primer contacto seleccionable de la empresa, si tiene, para
+    // precargar también el nombre de la persona (no solo la razón social).
+    var contacto = (e.contactos && e.contactos[0]) || {};
+    var url = 'https://cahirth.github.io/Portal-TLC/selector-dispositivos.html?nuevoNegocio=1' +
+      '&razon=' + encodeURIComponent(e.razonSocial || '') +
+      '&cuit=' + encodeURIComponent(e.cuit || '') +
+      '&contacto=' + encodeURIComponent(contacto.nombre || '') +
+      '&telefonoContacto=' + encodeURIComponent(contacto.telefono || e.telefono || '');
+    window.location.href = url;
+    return;
+  }
+
+  // Servicio Técnico: el formulario de "Nuevo Ticket" todavía no lee
+  // parámetros de precarga por URL (a diferencia del de Ventas) — queda
+  // pendiente de conectar. Por ahora, al menos lleva directo al módulo.
+  if (confirm('El alta de ticket con precarga automática todavía no está conectada — ¿igual querés ir a Servicio Técnico para cargarlo a mano?')) {
+    window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html';
+  }
 };
 
 // ══════════════════════════════════════════════════════════════════
