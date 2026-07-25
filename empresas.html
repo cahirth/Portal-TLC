@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.24.10 (Fix: texto invisible en el input "Nombre del negocio" en modo claro — mismo bug de color que los selects) -->
+<!-- Portal TLC | empresas.html | v2026.07.24.12 (Guarda la entrada del negocio recién creado en sessionStorage para que cotizaciones.html la muestre al instante, sin esperar a la propagación de historico.json en GitHub) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -742,10 +742,11 @@ function _abrirModalNuevoNegocio(e) {
   _mnnContactoIdx = (e.contactos && e.contactos.length === 1) ? 0 : null;
   document.getElementById('mnn-empresa-nombre').textContent =
     (e.razonSocial || 'Sin nombre') + (e.cuit ? ' · CUIT ' + e.cuit : '');
-  // Default editable: razón social + fecha corta — Cristian puede
-  // reescribirlo completamente antes de confirmar.
-  var fechaCorta = new Date().toLocaleDateString('es-AR', { day:'numeric', month:'long' });
-  document.getElementById('mnn-nombre-negocio').value = (e.razonSocial || '') + ' — ' + fechaCorta;
+  // Nombre del negocio: vacío a propósito, con placeholder que invita a
+  // algo descriptivo — antes prefillábamos razonSocial + fecha, pero
+  // cuando la razón social ya suena a fecha (ej. "20 de Junio") el
+  // resultado combinado confundía ("20 de Junio — 24 de julio").
+  document.getElementById('mnn-nombre-negocio').value = '';
   document.getElementById('mnn-etapa').value = '10%';
   _renderModalNuevoNegocio();
   document.getElementById('modal-nuevo-negocio').classList.add('open');
@@ -812,31 +813,60 @@ async function _confirmarNuevoNegocio() {
   btn.textContent = 'Creando...';
 
   try {
+    var payload = {
+      accion: 'crearNegocioVacio',
+      nombreNegocio: nombreNegocio,
+      razonSocial: e.razonSocial || '',
+      cuit: e.cuit || '',
+      telefono: e.telefono || '',
+      vendedor: vendedor,
+      estado: etapa,
+      empresaId: e.id || '',
+      contactoId: c ? (c.id || '') : '',
+      contactoNombre: c ? (c.nombre || '') : '',
+      contactoEmail: c ? (c.email || '') : '',
+      contactoTelefono: c ? (c.telefono || '') : '',
+    };
+    console.log('[Nuevo Negocio] Payload enviado:', payload);
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({
-        accion: 'crearNegocioVacio',
-        nombreNegocio: nombreNegocio,
-        razonSocial: e.razonSocial || '',
-        cuit: e.cuit || '',
-        telefono: e.telefono || '',
-        vendedor: vendedor,
-        estado: etapa,
-        empresaId: e.id || '',
-        contactoId: c ? (c.id || '') : '',
-        contactoNombre: c ? (c.nombre || '') : '',
-        contactoEmail: c ? (c.email || '') : '',
-        contactoTelefono: c ? (c.telefono || '') : '',
-      })
+      body: JSON.stringify(payload)
     });
-    var r = await resp.json();
-    if (!r.ok) {
-      alert('No se pudo crear el negocio: ' + (r.error || 'error desconocido'));
+    var textoCrudo = await resp.text();
+    console.log('[Nuevo Negocio] Respuesta cruda del GAS:', textoCrudo);
+    var r;
+    try { r = JSON.parse(textoCrudo); }
+    catch(eParse) {
+      alert('El servidor no devolvió JSON válido — revisá la consola (F12) para ver la respuesta completa.');
       btn.disabled = false; btn.textContent = textoOriginal;
       return;
     }
-    window.location.href = 'cotizaciones.html?id=' + encodeURIComponent(r.idCot);
+    // Algunas rutas viejas del GAS devuelven {status:'ERROR', message:...}
+    // en vez de {ok:false, error:...} (ej. "Acción desconocida" si el
+    // deployment todavía no tiene el código nuevo) — cubrimos ambas formas.
+    var fueOk = r.ok === true || r.status === 'SUCCESS';
+    if (!fueOk) {
+      alert('No se pudo crear el negocio: ' + (r.error || r.message || 'error desconocido'));
+      btn.disabled = false; btn.textContent = textoOriginal;
+      return;
+    }
+    var idCreado = r.idCot || r.id;
+    if (!idCreado) {
+      alert('El servidor respondió OK pero sin idCot — revisá la consola (F12).');
+      btn.disabled = false; btn.textContent = textoOriginal;
+      return;
+    }
+    // Guarda la entrada completa para que cotizaciones.html la muestre
+    // al toque, sin esperar a que historico.json se propague en GitHub
+    // Pages (eso puede tardar unos segundos, a veces más).
+    if (r.entrada) {
+      try {
+        sessionStorage.setItem('tlc_negocio_pendiente', JSON.stringify({ id: idCreado, entrada: r.entrada, ts: Date.now() }));
+      } catch(eStorage) {}
+    }
+    window.location.href = 'cotizaciones.html?id=' + encodeURIComponent(idCreado) + '&nuevo=1';
   } catch(err) {
-    alert('Error de conexión al crear el negocio.');
+    console.error('[Nuevo Negocio] Error de red/fetch:', err);
+    alert('Error de conexión al crear el negocio: ' + err.message);
     btn.disabled = false; btn.textContent = textoOriginal;
   }
 }
@@ -1030,7 +1060,7 @@ window._confirmarImportacion = async function() {
 
       <div class="modal-campo">
         <label>Nombre del negocio</label>
-        <input type="text" id="mnn-nombre-negocio" placeholder="Ej: Consultorio Dr. Pérez — OCT">
+        <input type="text" id="mnn-nombre-negocio" placeholder="Ej: Compra HRK-9000A · consulta OCT">
       </div>
 
       <div class="modal-campo">

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.24.2 (Botón "Crear/Editar cotización" siempre visible + reintentos de deep-link para negocios recién creados) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.24.3 (Toast de confirmación + inyección optimista del negocio recién creado, para no depender de la propagación de historico.json en GitHub) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -9,6 +9,15 @@
     <style>
         * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',sans-serif; -webkit-tap-highlight-color:transparent; }
         body { background:#030712; color:#f8fafc; min-height:100vh; }
+
+        /* TOAST simple de confirmación — usado por _toast() */
+        #tlc-toast-wrap { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:9999;
+            display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none; }
+        .tlc-toast { background:#0f1a30; border:1px solid #1e3050; border-left:4px solid #06d6a0; color:#f1f5f9;
+            padding:11px 18px; border-radius:10px; font-size:13px; font-weight:600; box-shadow:0 12px 32px rgba(0,0,0,.5);
+            opacity:0; transform:translateY(-10px); transition:opacity .25s, transform .25s; max-width:90vw; }
+        .tlc-toast.show { opacity:1; transform:translateY(0); }
+        .tlc-toast.tlc-toast-info { border-left-color:#3a86ff; }
 
         /* HEADER */
         .header { background:linear-gradient(135deg,#05111f,#0c1e3a); backdrop-filter:blur(12px); padding:0 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid rgba(58,134,255,0.15); position:sticky; top:0; z-index:100; height:58px; }
@@ -399,6 +408,7 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 </head>
 <body>
+<div id="tlc-toast-wrap"></div>
 
 <!-- Instrucciones de instalación en iPhone (PWA) -->
 <div id="modal-instalar-ios" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:flex-end;justify-content:center;">
@@ -1540,6 +1550,7 @@ async function cargar(forzar = false) {
         });
 
         historicoCompleto = data;
+        _inyectarNegocioPendienteSiCorresponde(); // ← ver definición más abajo
 
         // Extraer vendedores únicos del JSON y mergear con listaVendedores del Sheet.
         // Comparación normalizada (trim + lowercase) para evitar duplicados como
@@ -1782,6 +1793,49 @@ function abrirDetalle(idx) {
 // linkea a cotizaciones.html?id=TLC-XXX). Busca el idCot en todasLasCot ya
 // cargado y abre su detalle directo, sin que el vendedor tenga que buscarlo
 // a mano en el Kanban/Lista.
+// Toast simple de confirmación (no bloqueante, se auto-oculta).
+function _toast(texto, tipo) {
+    try {
+        var wrap = document.getElementById('tlc-toast-wrap');
+        if (!wrap) return;
+        var el = document.createElement('div');
+        el.className = 'tlc-toast' + (tipo === 'info' ? ' tlc-toast-info' : '');
+        el.textContent = texto;
+        wrap.appendChild(el);
+        requestAnimationFrame(function() { el.classList.add('show'); });
+        setTimeout(function() {
+            el.classList.remove('show');
+            setTimeout(function() { el.remove(); }, 300);
+        }, 3500);
+    } catch(e) {}
+}
+window._toast = _toast;
+
+// Cuando un negocio se crea desde empresas.html, llega acá vía
+// sessionStorage con la entrada completa que YA se guardó en
+// historico.json del lado del servidor. El archivo real en GitHub
+// puede tardar unos segundos (a veces más) en propagarse por
+// raw.githubusercontent.com, así que en vez de esperar, lo insertamos
+// localmente apenas llegamos a esta pantalla — apenas el fetch real lo
+// traiga también, dejamos de necesitar la copia optimista.
+function _inyectarNegocioPendienteSiCorresponde() {
+    try {
+        var raw = sessionStorage.getItem('tlc_negocio_pendiente');
+        if (!raw) return;
+        var pend = JSON.parse(raw);
+        if (!pend || !pend.id || !pend.entrada) { sessionStorage.removeItem('tlc_negocio_pendiente'); return; }
+        if (Date.now() - (pend.ts || 0) > 10 * 60 * 1000) { sessionStorage.removeItem('tlc_negocio_pendiente'); return; }
+        var yaEsta = historicoCompleto.some(function(x) {
+            return String(x.idCot || x.id_cotizacion || x.id || '') === String(pend.id);
+        });
+        if (!yaEsta) {
+            historicoCompleto.unshift(pend.entrada);
+        } else {
+            sessionStorage.removeItem('tlc_negocio_pendiente');
+        }
+    } catch(e) {}
+}
+
 // Deep-link a un negocio por ?id=. Reintenta unas veces re-descargando
 // historico.json si no lo encuentra: si el negocio se acaba de crear
 // desde empresas.html, GitHub Pages / raw.githubusercontent.com puede
@@ -1795,17 +1849,27 @@ async function _abrirDetallePorIdEnUrl(intentosRestantes) {
         const idx = todasLasCot.findIndex(x =>
             String(x.idCot || x.id_cotizacion || x.id || '') === idBuscado
         );
-        if (idx !== -1) { abrirDetalle(idx); return; }
-        if (intentosRestantes <= 0) {
-            console.warn('Deep-link: negocio no encontrado en la vista actual:', idBuscado);
+        if (idx !== -1) {
+            abrirDetalle(idx);
+            if (params.get('nuevo') === '1') _toast('✅ Negocio creado');
             return;
         }
+        if (intentosRestantes <= 0) {
+            console.warn('Deep-link: negocio no encontrado en la vista actual:', idBuscado);
+            if (params.get('nuevo') === '1') _toast('El negocio se creó, pero todavía no aparece acá — actualizá en unos segundos.', 'info');
+            return;
+        }
+        if (params.get('nuevo') === '1' && intentosRestantes === 3) _toast('Abriendo el negocio recién creado...', 'info');
         setTimeout(async () => {
             try {
                 const res = await fetch(HISTORICO_URL + '?_=' + Date.now(), { cache: 'no-store' });
                 if (res.ok) {
                     let data = await res.json();
-                    if (Array.isArray(data)) { historicoCompleto = data; _aplicarFiltroVendedor(); aplicarFiltros(); }
+                    if (Array.isArray(data)) {
+                        historicoCompleto = data;
+                        _inyectarNegocioPendienteSiCorresponde();
+                        _aplicarFiltroVendedor(); aplicarFiltros();
+                    }
                 }
             } catch(e) {}
             _abrirDetallePorIdEnUrl(intentosRestantes - 1);
