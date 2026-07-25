@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.25.5 (Botón grande "Editar cotización" sacado — ahora solo aparece "Crear cotización" si el negocio está vacío. Historial de versiones: cada versión tiene 👁 Ver (documento real en presupuesto.html, en vivo desde Firebase) y ✏️ Editar; se acabó el "Sin PDF". "Ver presupuesto" de arriba ya no depende de c.link.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.25.6 (Editar cotización ahora trae el negocio COMPLETO al editor — ítems y condiciones comerciales reales, no vacío. Lápiz de edición ✏️ solo en la última versión; las anteriores quedan solo para ver.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2183,8 +2183,13 @@ function _renderDetalle(c) {
             </div>
             <div style="display:flex;flex-direction:column;gap:6px;">`;
 
-        // Versiones /v1, /v2, ... — más reciente primero
-        versiones.slice().reverse().forEach(v => {
+        // Versiones /v1, /v2, ... — más reciente primero. Solo la más
+        // reciente (idx===0 acá porque ya está reversed) tiene lápiz de
+        // edición — las anteriores quedan de solo lectura, ya que
+        // editar siempre continúa desde el estado actual del negocio,
+        // no desde una versión vieja puntual.
+        versiones.slice().reverse().forEach((v, idx) => {
+            const esUltima = idx === 0;
             const vFecha  = _fmtFecha(v.fecha);
             const vMonto  = v.total_iva ? 'USD ' + Math.round(v.total_iva).toLocaleString('es-AR') : '—';
             const tag     = `<span style="font-size:10px;font-weight:800;font-family:monospace;
@@ -2201,8 +2206,8 @@ function _renderDetalle(c) {
                 </div>
                 <a href="${linkDocActual}" target="_blank" title="Ver presupuesto"
                     style="font-size:16px;text-decoration:none;padding:4px;">👁️</a>
-                <button onclick="_irAPresupuestoEditor('${idBase2}')" title="Editar cotización"
-                    style="background:transparent;border:none;font-size:16px;cursor:pointer;padding:4px;">✏️</button>
+                ${esUltima ? `<button onclick="_irAPresupuestoEditor('${idBase2}')" title="Editar cotización"
+                    style="background:transparent;border:none;font-size:16px;cursor:pointer;padding:4px;">✏️</button>` : ''}
             </div>`;
         });
 
@@ -2748,27 +2753,62 @@ let _pcIdCot    = null;  // idCot de la cotización en edición
 let _pcItems    = [];    // array de ítems editables
 
 // Abre la Pantalla Comercial precargada con los ítems de la cotización
-// Lleva a presupuesto-editor.html con la empresa y el contacto de este
-// negocio ya resueltos por URL — mismo formato de parámetros que usa
-// el modal "Nuevo Negocio" de empresas.html, más idNegocio para que,
-// cuando el guardado real esté conectado, quede vinculado a ESTE
-// negocio en vez de crear uno nuevo.
+// Lleva a presupuesto-editor.html con TODO el negocio ya cargado —
+// cliente, contacto, ítems y condiciones comerciales — para poder
+// seguir editando la última versión en vez de arrancar de cero.
+// Reutiliza el mismo mecanismo de sessionStorage que presupuesto-editor.html
+// ya usa para el viaje ida-vuelta con selector-dispositivos.html
+// (restaurarDraft=1), así no hizo falta escribir un camino nuevo ahí.
 function _irAPresupuestoEditor(idCot) {
     const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(idCot));
     if (!c) return;
-    const params = new URLSearchParams();
-    params.set('idNegocio', idCot);
-    params.set('razon', c.razonSocial || c.empresa?.razonSocial || '');
-    params.set('cuit', c.cuit || c.empresa?.cuit || '');
-    if (c.empresaId) params.set('empresa', c.empresaId);
-    if (c.telefono) params.set('telefonoEmpresa', c.telefono);
-    if (c.contacto?.nombre || c.nombreMedico) {
-        params.set('contactoId', c.contactoId || '');
-        params.set('contactoNombre', c.contacto?.nombre || c.nombreMedico || '');
-        params.set('contactoEmail', c.contacto?.email || '');
-        params.set('contactoTelefono', c.contacto?.telefono || c.telefono || '');
-    }
-    window.location.href = 'presupuesto-editor.html?' + params.toString();
+
+    const carritoActual = Array.isArray(c.carrito) ? c.carrito : [];
+    const items = carritoActual.map((it, i) => ({
+        id: i + 1,
+        foto: it.foto || null,
+        descripcion: it.nombre || '',
+        precio: parseFloat(it.precioLista != null ? it.precioLista : it.precioNeto) || 0,
+        cantidad: parseInt(it.cantidad) || 1,
+        descuento: parseFloat(it.descuentoValor) || 0,
+        iva: (it.ivaPct !== undefined && it.ivaPct !== null) ? parseFloat(it.ivaPct) : 10.5,
+    }));
+
+    const cond = c.condicionesComerciales || {};
+    const tieneContacto = !!(c.contacto && c.contacto.nombre);
+
+    const clienteSel = {
+        id: c.empresaId || null,
+        razonSocial: c.razonSocial || (c.empresa && c.empresa.razonSocial) || '',
+        cuit: c.cuit || (c.empresa && c.empresa.cuit) || '',
+        domicilio: c.domicilio || '',
+        telefono: c.telefono || '',
+        contactos: tieneContacto ? [c.contacto] : [],
+    };
+    const contactoSel = tieneContacto ? c.contacto : null;
+
+    try {
+        sessionStorage.setItem('tlc_presupuesto_draft', JSON.stringify({
+            clienteSel: clienteSel,
+            contactoSel: contactoSel,
+            items: items,
+            itemSeq: items.length,
+            negocioId: idCot,
+            presupuestoId: idCot,
+            condiciones: {
+                formaPago: cond.formaPago || '',
+                validez: cond.validez || '15',
+                validezFecha: cond.validezFecha || '',
+                tiempoEntrega: cond.tiempoEntrega || 'inmediato',
+                tiempoEntregaCustom: cond.tiempoEntregaCustom || '',
+                lugarEntrega: cond.lugarEntrega || 'cliente',
+                notas: cond.notas || '',
+            },
+            moneda: c.monedaTotales || 'USD',
+        }));
+    } catch(e) { console.warn('Error guardando borrador para editar:', e); }
+
+    window.location.href = 'presupuesto-editor.html?restaurarDraft=1';
 }
 
 function _pcAbrir(idCot) {
