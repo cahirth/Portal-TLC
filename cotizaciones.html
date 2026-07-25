@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.25.3 ("Crear/Editar cotización" ahora navega a presupuesto-editor.html con empresa+contacto precargados, en vez de abrir el modal Pantalla Comercial) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.25.4 (Fix: header del detalle ya no se centra a max-width:780px en desktop — antes dejaba el botón Volver lejos del borde real; ahora va a lo ancho completo como el resto de los módulos) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -115,11 +115,12 @@
         .detalle-overlay { position:fixed; inset:0; background:#080d14; z-index:200; display:none; overflow-y:auto; }
         .detalle-overlay.open { display:block; }
         .detalle-header { padding:12px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid #0f1a30; position:sticky; top:0; background:rgba(8,13,20,0.95); backdrop-filter:blur(12px); z-index:10; }
-        /* En desktop: header centrado también */
-        @media (min-width:700px) {
-            .detalle-header { max-width:780px; margin:0 auto; width:100%; border-bottom:none; }
-            .detalle-overlay.open { display:flex; flex-direction:column; align-items:center; }
-        }
+        /* El header va SIEMPRE a lo ancho completo (igual que el resto de
+           los módulos: index/empresas/servicio/presupuesto-editor) — antes
+           se centraba a max-width:780px en desktop, lo que dejaba el botón
+           de volver lejos del borde real de la pantalla. Solo el CONTENIDO
+           de abajo (.det-body-wrap) se centra, no el header. */
+        .detalle-overlay.open { display:flex; flex-direction:column; }
         .det-body-wrap { width:100%; }
         @media (min-width:700px) {
             .det-body-wrap { max-width:1120px; margin:0 auto; padding:0 16px 40px; display:flex; gap:16px; align-items:flex-start; }
