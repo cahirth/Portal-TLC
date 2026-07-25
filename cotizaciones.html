@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.24.3 (Toast de confirmación + inyección optimista del negocio recién creado, para no depender de la propagación de historico.json en GitHub) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.24.4 (Nombre del negocio arriba de todo con cliente como subtítulo; select de Etapa más ancho/responsivo con flecha notoria; Contacto convertido en dropdown editable; Historial del cliente limitado a 5 más recientes) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -127,7 +127,8 @@
             #det-mensajes-panel { width:320px; flex-shrink:0; position:sticky; top:14px; }
         }
         .btn-back { width:32px; height:32px; border-radius:50%; background:#1c2541; border:none; color:#f8fafc; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-        .det-titulo { font-size:15px; font-weight:700; flex:1; color:#f1f5f9; }
+        .det-titulo { font-size:14px; font-weight:700; flex:1; color:#f1f5f9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.3; }
+        .det-subtitulo { font-size:11px; font-weight:500; color:#64748b; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
         /* HERO CARD */
         .det-hero { padding:20px 16px 0; }
@@ -135,11 +136,12 @@
         .det-hero-sub { font-size:12px; color:#475569; margin-top:4px; }
         .det-hero-badge { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; margin-top:8px; }
         .det-hero-badge-select {
-            appearance:none; -webkit-appearance:none; border:1px solid currentColor; border-radius:20px;
-            padding:5px 28px 5px 12px; font-size:11px; font-weight:700; font-family:inherit; cursor:pointer;
-            background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="%23475569" d="M2.5 4.5l3.5 3.5 3.5-3.5z"/></svg>');
-            background-repeat:no-repeat; background-position:right 9px center; background-size:11px;
-            max-width:170px; flex-shrink:0; transition:box-shadow .15s ease;
+            appearance:none; -webkit-appearance:none; border:1.5px solid currentColor; border-radius:20px;
+            padding:6px 32px 6px 14px; font-size:12px; font-weight:700; font-family:inherit; cursor:pointer;
+            background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path fill="%23475569" d="M2 4l4 4 4-4z"/></svg>');
+            background-repeat:no-repeat; background-position:right 11px center; background-size:13px;
+            width:auto; max-width:100%; min-width:0; flex-shrink:1; transition:box-shadow .15s ease;
+            white-space:normal; text-align:left;
         }
         .det-hero-badge-select:hover { box-shadow:0 0 0 2px rgba(58,134,255,0.25); }
         body.tema-claro .det-hero-badge-select { background-color:white; }
@@ -337,6 +339,7 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
         body.tema-claro .detalle-overlay { background:#f8fafc !important; }
         body.tema-claro .detalle-header  { background:#ffffff !important; border-bottom-color:#e2e8f0 !important; }
         body.tema-claro .det-titulo      { color:#0f172a !important; }
+        body.tema-claro .det-subtitulo   { color:#64748b !important; }
         body.tema-claro .det-card        { background:#ffffff !important; border-color:#e2e8f0 !important; }
         body.tema-claro .det-card-full   { background:#ffffff !important; border-color:#e2e8f0 !important; }
         body.tema-claro .det-card-label  { color:#64748b !important; }
@@ -655,7 +658,10 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
 <div class="detalle-overlay" id="detalle-overlay">
     <div class="detalle-header">
         <button class="btn-back" onclick="cerrarDetalle()" style="background:#3a86ff;border:none;color:#fff;">←</button>
-        <div class="det-titulo" id="det-titulo">—</div>
+        <div style="flex:1;overflow:hidden;">
+            <div class="det-titulo" id="det-titulo">—</div>
+            <div class="det-subtitulo" id="det-subtitulo"></div>
+        </div>
     </div>
     <div class="det-body-wrap">
         <div class="det-body" id="det-body"></div>
@@ -1944,7 +1950,9 @@ function _renderDetalle(c) {
     const esDueño = primerNombreUsuario && String(c.vendedor || '').toLowerCase().includes(primerNombreUsuario);
     const puedeGestionar = permisos.verTodo || esDueño;
 
-    document.getElementById('det-titulo').textContent = cliente;
+    document.getElementById('det-titulo').textContent = c.nombreNegocio ? _fixEncoding(c.nombreNegocio) : cliente;
+    const subtituloEl = document.getElementById('det-subtitulo');
+    if (subtituloEl) subtituloEl.textContent = c.nombreNegocio ? cliente : '';
 
     // ── Estado badge color ────────────────────────────────────────
     const badgeStyle = `background:${colData.bg||'rgba(58,134,255,.1)'};border:1px solid ${colData.border||'rgba(58,134,255,.2)'};color:${colData.color||'#3a86ff'};`;
@@ -1961,13 +1969,13 @@ function _renderDetalle(c) {
     ).join('');
     html += `<div class="det-hero" style="padding:20px 16px 12px;">
         <div id="det-fotos-equipos">${_renderFotosEquipos(carrito)}</div>
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
             <div>
                 <div style="font-size:11px;color:#475569;margin-bottom:4px;">MONTO TOTAL c/IVA</div>
                 <div class="det-hero-monto">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
                 ${neto !== monto ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">Neto USD ${Math.round(neto).toLocaleString('es-AR')} · IVA USD ${Math.round(iva).toLocaleString('es-AR')}</div>` : ''}
             </div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:100%;">
                 <select class="det-hero-badge-select" style="${badgeStyle}"
                     onchange="_cambiarEstadoDesdeDetalle('${id}', this.value)">
                     ${etapasOptsHero}
@@ -2009,7 +2017,12 @@ function _renderDetalle(c) {
         </div>
         <div class="det-card">
             <div class="det-card-label">Contacto</div>
-            <div class="det-card-val">${contactoNombre || '—'}</div>
+            <select class="det-vendedor-select" id="det-contacto-select-${id}" data-id="${id}"
+                onchange="_mutarContactoCotizacion('${id}', this.value)"
+                style="width:100%;font-size:12px;font-weight:600;color:#0f172a;background:white;border:1px solid #cbd5e1;
+                       border-radius:6px;padding:5px 6px;font-family:inherit;">
+                <option value="0" selected>${contactoNombre || 'Sin contacto'}</option>
+            </select>
         </div>
         ${c.cuit || c.empresa?.cuit ? `<div class="det-card">
             <div class="det-card-label">CUIT</div>
@@ -2205,7 +2218,7 @@ function _renderDetalle(c) {
     const clienteRazon     = _fixEncoding(c.empresa?.razonSocial || c.razonSocial || '').toLowerCase().trim();
     const clienteContacto  = _fixEncoding(c.contacto?.nombre    || c.nombreMedico || '').toLowerCase().trim();
 
-    const anteriores = todasLasCot.filter(x => {
+    const anterioresTotal = todasLasCot.filter(x => {
         if (String(x.idCot || x.id_cotizacion || x.id || '') === String(id)) return false;
         if (clienteHsId.length >= 10) {
             const xCuit = String(x.empresa?.cuit || x.cuit || '').replace(/\D/g,'');
@@ -2221,6 +2234,7 @@ function _renderDetalle(c) {
         }
         return false;
     }).sort((a, b) => new Date(b.fechaCreacion || b.fecha || 0) - new Date(a.fechaCreacion || a.fecha || 0));
+    const anteriores = anterioresTotal.slice(0, 5);
 
     html += `<div class="historial-wrap">
         <div class="sec-titulo">🕓 Historial del cliente</div>`;
@@ -2250,6 +2264,9 @@ function _renderDetalle(c) {
                 </div>`;
             }).join('')}
         </div>`;
+        if (anterioresTotal.length > 5) {
+            html += `<div style="font-size:10px;color:#475569;text-align:center;padding:8px 0 0;">Mostrando los 5 más recientes de ${anterioresTotal.length} en total.</div>`;
+        }
     } else {
         html += `<div style="font-size:12px;color:#334155;padding:4px 0;">Sin otros negocios con este cliente.</div>`;
     }
@@ -2268,6 +2285,74 @@ function _renderDetalle(c) {
     }
 
     _renderPanelMensajesCot(id);
+    _cargarOtrosContactosParaNegocio(id, c);
+}
+
+// ── CONTACTO — dropdown para cambiar el contacto del negocio ───────
+// El select arranca con una única opción (el contacto actual, para no
+// dejar la pantalla vacía/rota) y se completa async con el resto de
+// los contactos de la misma empresa (vía listarEmpresas, el mismo
+// endpoint que usa empresas.html), matcheando por empresaId si está
+// guardado en el negocio, o por CUIT/razón social como respaldo para
+// negocios viejos que todavía no tienen empresaId.
+var _contactosPorNegocio = {};
+
+async function _cargarOtrosContactosParaNegocio(idCot, c) {
+    try {
+        const sel = document.getElementById('det-contacto-select-' + idCot);
+        if (!sel) return;
+
+        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'listarEmpresas' }) });
+        const r = await resp.json();
+        if (!r.ok || !Array.isArray(r.empresas)) return;
+
+        const empresaId  = c.empresaId || '';
+        const cuit       = String(c.empresa?.cuit || c.cuit || '').replace(/\D/g,'');
+        const razonNorm  = String(c.empresa?.razonSocial || c.razonSocial || '').toLowerCase().trim();
+
+        let empresa = null;
+        if (empresaId) empresa = r.empresas.find(e => e.id === empresaId);
+        if (!empresa && cuit.length >= 10) empresa = r.empresas.find(e => String(e.cuit||'').replace(/\D/g,'') === cuit);
+        if (!empresa && razonNorm.length >= 4) empresa = r.empresas.find(e => String(e.razonSocial||'').toLowerCase().trim() === razonNorm);
+        if (!empresa || !Array.isArray(empresa.contactos) || empresa.contactos.length < 2) return; // nada para elegir, dejamos el select con la única opción actual
+
+        _contactosPorNegocio[idCot] = empresa.contactos;
+        const contactoActualNombre = (c.contacto?.nombre || c.nombreMedico || '').trim();
+        sel.innerHTML = empresa.contactos.map((ct, i) => {
+            const sel_ = ct.nombre.trim() === contactoActualNombre ? ' selected' : '';
+            return `<option value="${i}"${sel_}>${ct.nombre}${ct.cargo ? ' — ' + ct.cargo : ''}</option>`;
+        }).join('');
+    } catch(e) { console.warn('_cargarOtrosContactosParaNegocio:', e); }
+}
+
+async function _mutarContactoCotizacion(idCot, indice) {
+    const contactos = _contactosPorNegocio[idCot];
+    if (!contactos || !contactos[indice]) return;
+    const ct = contactos[indice];
+    try {
+        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({
+                accion: 'actualizarContactoCotizacion',
+                idCot: idCot,
+                contactoId: ct.id || '',
+                contactoNombre: ct.nombre || '',
+                contactoEmail: ct.email || '',
+                contactoTelefono: ct.telefono || '',
+            })
+        });
+        const r = await resp.json();
+        if (!r.ok) { alert('No se pudo cambiar el contacto: ' + (r.error || r.message || 'error desconocido')); return; }
+        // Reflejar en memoria para que el resto de la pantalla (teléfono, etc.) quede consistente sin recargar todo.
+        const entrada = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(idCot));
+        if (entrada) {
+            entrada.contacto = { nombre: ct.nombre || '', email: ct.email || '', telefono: ct.telefono || '' };
+            entrada.contactoId = ct.id || '';
+        }
+        _toast('✅ Contacto actualizado');
+    } catch(e) {
+        alert('Error de conexión al cambiar el contacto.');
+    }
 }
 
 // ─── BORRAR NEGOCIO — confirmación + persistencia ──────────────────
