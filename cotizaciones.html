@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.24.1 (renombrado a Negocios) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.24.2 (Botón "Crear/Editar cotización" siempre visible + reintentos de deep-link para negocios recién creados) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1782,7 +1782,12 @@ function abrirDetalle(idx) {
 // linkea a cotizaciones.html?id=TLC-XXX). Busca el idCot en todasLasCot ya
 // cargado y abre su detalle directo, sin que el vendedor tenga que buscarlo
 // a mano en el Kanban/Lista.
-function _abrirDetallePorIdEnUrl() {
+// Deep-link a un negocio por ?id=. Reintenta unas veces re-descargando
+// historico.json si no lo encuentra: si el negocio se acaba de crear
+// desde empresas.html, GitHub Pages / raw.githubusercontent.com puede
+// tardar unos segundos en propagar el commit recién hecho.
+async function _abrirDetallePorIdEnUrl(intentosRestantes) {
+    if (intentosRestantes === undefined) intentosRestantes = 3;
     try {
         const params = new URLSearchParams(window.location.search);
         const idBuscado = (params.get('id') || '').trim();
@@ -1790,11 +1795,21 @@ function _abrirDetallePorIdEnUrl() {
         const idx = todasLasCot.findIndex(x =>
             String(x.idCot || x.id_cotizacion || x.id || '') === idBuscado
         );
-        if (idx !== -1) {
-            abrirDetalle(idx);
-        } else {
+        if (idx !== -1) { abrirDetalle(idx); return; }
+        if (intentosRestantes <= 0) {
             console.warn('Deep-link: negocio no encontrado en la vista actual:', idBuscado);
+            return;
         }
+        setTimeout(async () => {
+            try {
+                const res = await fetch(HISTORICO_URL + '?_=' + Date.now(), { cache: 'no-store' });
+                if (res.ok) {
+                    let data = await res.json();
+                    if (Array.isArray(data)) { historicoCompleto = data; _aplicarFiltroVendedor(); aplicarFiltros(); }
+                }
+            } catch(e) {}
+            _abrirDetallePorIdEnUrl(intentosRestantes - 1);
+        }, 1500);
     } catch(e) { console.warn('_abrirDetallePorIdEnUrl:', e); }
 }
 
@@ -1987,7 +2002,12 @@ function _renderDetalle(c) {
     }
 
     // ── BOTÓN PANTALLA COMERCIAL ──────────────────────────────────
-    if (carrito.length > 0) {
+    // Antes solo aparecía si carrito.length > 0, dejando sin forma de
+    // cargar el primer equipo a un negocio recién creado sin cotización
+    // todavía. _pcAbrir() ya soporta carrito vacío (ver esa función),
+    // así que ahora el botón siempre se muestra, con label distinto.
+    {
+        const labelBtnPc = carrito.length > 0 ? '✏️ Editar cotización' : '➕ Crear cotización';
         html += `<div style="padding:0 16px 4px;">
             <button onclick="_pcAbrir('${id}')"
                 style="width:100%;padding:11px;border-radius:10px;
@@ -1995,7 +2015,7 @@ function _renderDetalle(c) {
                        border:1px solid #3a86ff55;color:#60a5fa;
                        font-size:13px;font-weight:700;cursor:pointer;
                        display:flex;align-items:center;justify-content:center;gap:8px;">
-                ✏️ Editar cotización
+                ${labelBtnPc}
             </button>
         </div>`;
     }

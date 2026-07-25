@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.24.8 (Nuevo Negocio pasa domicilio/teléfono de la empresa a presupuesto-editor.html) -->
+<!-- Portal TLC | empresas.html | v2026.07.24.9 (Nuevo Negocio crea un negocio REAL en el Kanban de Ventas vía crearNegocioVacio — nombre editable, etapa elegible, redirige a cotizaciones.html en vez de presupuesto-editor.html) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -306,6 +306,21 @@ console.log("%c TLC Empresas v" + APP_VERSION + " ", "background:#3a86ff;color:w
 // con cotizaciones/tickets reales — próxima etapa.
 // ══════════════════════════════════════════════════════════════════
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+
+// Sesión compartida con el resto del Portal (login OTP), solo lectura —
+// empresas.html no tiene pantalla de login propia, se apoya en la sesión
+// que ya haya iniciado sesión desde otro módulo (index.html, servicio.html,
+// etc.), guardada en localStorage bajo la misma clave.
+const SESSION_KEY = 'tlc_session_v1';
+function _leerSesionCompartida() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    if (!payload.expira || Date.now() > payload.expira) { localStorage.removeItem(SESSION_KEY); return null; }
+    return payload.account;
+  } catch(e) { return null; }
+}
 var EMPRESAS = []; // se llena con _cargarEmpresas() — ya no hay datos de prueba
 var _empresaActualId = null;
 var _cargando = false;
@@ -726,6 +741,11 @@ function _abrirModalNuevoNegocio(e) {
   _mnnContactoIdx = (e.contactos && e.contactos.length === 1) ? 0 : null;
   document.getElementById('mnn-empresa-nombre').textContent =
     (e.razonSocial || 'Sin nombre') + (e.cuit ? ' · CUIT ' + e.cuit : '');
+  // Default editable: razón social + fecha corta — Cristian puede
+  // reescribirlo completamente antes de confirmar.
+  var fechaCorta = new Date().toLocaleDateString('es-AR', { day:'numeric', month:'long' });
+  document.getElementById('mnn-nombre-negocio').value = (e.razonSocial || '') + ' — ' + fechaCorta;
+  document.getElementById('mnn-etapa').value = '10%';
   _renderModalNuevoNegocio();
   document.getElementById('modal-nuevo-negocio').classList.add('open');
 }
@@ -767,7 +787,7 @@ function _renderModalNuevoNegocio() {
     placeholder + opciones + '</select></div>';
 }
 
-function _confirmarNuevoNegocio() {
+async function _confirmarNuevoNegocio() {
   var e = _mnnEmpresa;
   if (!e) return;
   var contactos = (e.contactos || []);
@@ -775,22 +795,49 @@ function _confirmarNuevoNegocio() {
     alert('Elegí un contacto antes de continuar.');
     return;
   }
-  var c = (_mnnContactoIdx !== null) ? contactos[_mnnContactoIdx] : null;
-
-  var url = 'presupuesto-editor.html' +
-    '?empresa=' + encodeURIComponent(e.id || '') +
-    '&razon=' + encodeURIComponent(e.razonSocial || '') +
-    '&cuit=' + encodeURIComponent(e.cuit || '') +
-    '&domicilio=' + encodeURIComponent(e.domicilio || '') +
-    '&telefonoEmpresa=' + encodeURIComponent(e.telefono || '');
-  if (c) {
-    url += '&contactoId=' + encodeURIComponent(c.id || '') +
-      '&contactoNombre=' + encodeURIComponent(c.nombre || '') +
-      '&contactoCargo=' + encodeURIComponent(c.cargo || '') +
-      '&contactoEmail=' + encodeURIComponent(c.email || '') +
-      '&contactoTelefono=' + encodeURIComponent(c.telefono || '');
+  var nombreNegocio = document.getElementById('mnn-nombre-negocio').value.trim();
+  if (!nombreNegocio) {
+    alert('Ponele un nombre al negocio antes de continuar.');
+    return;
   }
-  window.location.href = url;
+  var c = (_mnnContactoIdx !== null) ? contactos[_mnnContactoIdx] : null;
+  var etapa = document.getElementById('mnn-etapa').value;
+  var sesion = _leerSesionCompartida();
+  var vendedor = (sesion && sesion.name) || '';
+
+  var btn = document.getElementById('mnn-btn-crear');
+  btn.disabled = true;
+  var textoOriginal = btn.textContent;
+  btn.textContent = 'Creando...';
+
+  try {
+    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({
+        accion: 'crearNegocioVacio',
+        nombreNegocio: nombreNegocio,
+        razonSocial: e.razonSocial || '',
+        cuit: e.cuit || '',
+        telefono: e.telefono || '',
+        vendedor: vendedor,
+        estado: etapa,
+        empresaId: e.id || '',
+        contactoId: c ? (c.id || '') : '',
+        contactoNombre: c ? (c.nombre || '') : '',
+        contactoEmail: c ? (c.email || '') : '',
+        contactoTelefono: c ? (c.telefono || '') : '',
+      })
+    });
+    var r = await resp.json();
+    if (!r.ok) {
+      alert('No se pudo crear el negocio: ' + (r.error || 'error desconocido'));
+      btn.disabled = false; btn.textContent = textoOriginal;
+      return;
+    }
+    window.location.href = 'cotizaciones.html?id=' + encodeURIComponent(r.idCot);
+  } catch(err) {
+    alert('Error de conexión al crear el negocio.');
+    btn.disabled = false; btn.textContent = textoOriginal;
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -979,6 +1026,22 @@ window._confirmarImportacion = async function() {
     <div class="modal-panel">
       <div class="modal-titulo">💼 Nuevo Negocio (Ventas)</div>
       <div class="modal-sub" id="mnn-empresa-nombre"></div>
+
+      <div class="modal-campo">
+        <label>Nombre del negocio</label>
+        <input type="text" id="mnn-nombre-negocio" placeholder="Ej: Consultorio Dr. Pérez — OCT">
+      </div>
+
+      <div class="modal-campo">
+        <label>Etapa</label>
+        <select id="mnn-etapa">
+          <option value="10%">Oportunidad reciente</option>
+          <option value="25%">Calificación y asesoramiento</option>
+          <option value="50%">Cotización</option>
+          <option value="75%">Negociación</option>
+          <option value="90%">Cierre</option>
+        </select>
+      </div>
 
       <div id="mnn-contenido"></div>
 
