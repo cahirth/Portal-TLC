@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.22.1 -->
+<!-- Portal TLC | presupuesto.html | v2026.07.25.1 (Condiciones Comerciales y Validez de la oferta ahora dinámicas — lee los campos planos nuevos de presupuesto-editor.html (formaPago/validez/tiempoEntrega/lugarEntrega) con respaldo al formato viejo de selector-dispositivos.html) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -100,6 +100,37 @@
       '</div>';
   }
 
+  // Arma el texto de "Condiciones Comerciales". Dos formatos posibles:
+  // - NUEVO (presupuesto-editor.html, vía guardarPresupuestoEditor en
+  //   FotoMap.gs v111): campos planos p.formaPago / p.validez /
+  //   p.tiempoEntrega / p.lugarEntrega.
+  // - VIEJO (selector-dispositivos.html, vía _accionRegistrarCotizacion):
+  //   p.condicionesComerciales (texto libre) + p.detalleFinanciacion.
+  // Se detecta cuál usar mirando si hay campos del formato nuevo.
+  function construirCondicionesComerciales(p, etiquetaMoneda) {
+    var esFormatoNuevo = !!(p.formaPago || p.tiempoEntrega || p.lugarEntrega);
+
+    if (!esFormatoNuevo) {
+      return (p.condicionesComerciales ? '<strong>Condición de Pago:</strong> ' + esc(p.condicionesComerciales) + '<br>' : '') +
+        (p.detalleFinanciacion ? '<strong>Detalle de Financiación:</strong> ' + esc(p.detalleFinanciacion) + '<br>' : '') +
+        '<strong>Forma de Pago:</strong> Transferencia o depósito bancario. ' + (etiquetaMoneda === 'ARS' ? 'Valores expresados en pesos argentinos.' : 'Valores expresados en dólares oficiales Banco Nación con el tipo de cambio del día de acreditación de cada pago.') + '<br>' +
+        '<strong>Lugar de Entrega:</strong> Se entrega en nuestra oficina en Del Carmen 716 PB CABA.';
+    }
+
+    var tiempoTexto = '';
+    if (p.tiempoEntrega === 'inmediato') tiempoTexto = 'Inmediato hasta agotar stock';
+    else if (p.tiempoEntrega === 'personalizado') tiempoTexto = p.tiempoEntregaCustom || 'A confirmar';
+    else if (p.tiempoEntrega) tiempoTexto = p.tiempoEntrega + ' días';
+
+    var lugarTexto = p.lugarEntrega === 'oficina'
+      ? 'Se entrega en nuestra oficina en Del Carmen 716 PB CABA. El envío y el seguro están a cargo del comprador.'
+      : 'Clínica del Cliente.';
+
+    return (p.formaPago ? '<strong>Forma de Pago:</strong> ' + esc(p.formaPago) + '<br>' : '') +
+      (tiempoTexto ? '<strong>Tiempo de Entrega:</strong> ' + esc(tiempoTexto) + '<br>' : '') +
+      '<strong>Lugar de Entrega:</strong> ' + esc(lugarTexto);
+  }
+
   function buildFilasProductos(carrito, etiquetaMoneda) {
     if (!Array.isArray(carrito) || !carrito.length) return '';
     etiquetaMoneda = etiquetaMoneda || 'USD';
@@ -166,6 +197,17 @@
     var totalCIva = totales.total_con_iva != null ? totales.total_con_iva : (netoTotal + ivaTotal);
     var etiquetaMoneda = (p.monedaTotales === 'ARS') ? 'AR$' : 'USD'; // ← FIX: antes "USD" estaba escrito fijo en 6 lugares de este archivo, sin leer la moneda real guardada
 
+    // Validez de la oferta — dinámica si viene del editor nuevo
+    // (presupuesto-editor.html, campos p.validez/p.validezFecha), texto
+    // fijo "15 Días" como respaldo para presupuestos viejos que no
+    // tienen ese campo guardado.
+    var validezTexto = '15 Días';
+    if (p.validez === 'personalizado' && p.validezFecha) {
+      validezTexto = 'Hasta ' + p.validezFecha;
+    } else if (p.validez && p.validez !== 'personalizado') {
+      validezTexto = p.validez + ' Días';
+    }
+
     var fecha = '';
     try {
       var fechaObj = p.fecha ? new Date(p.fecha) : new Date();
@@ -215,7 +257,7 @@
           '<div style="margin-bottom:6px;"><span class="badge-novalido">Documento No Válido como Factura</span></div>' +
           '<div style="font-size:13px;font-weight:600;font-family:Arial,sans-serif;color:#0f172a;">Presupuesto Nº: ' + esc(idCot) + '</div>' +
           '<div style="font-size:12px;color:#374151;margin-top:4px;font-family:Arial,sans-serif;">Fecha: ' + esc(fecha) + '</div>' +
-          '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;">Validez de la oferta: &nbsp; 15 Días</div>' +
+          '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;">Validez de la oferta: &nbsp;' + esc(validezTexto) + '</div>' +
         '</div>' +
       '</div>' +
 
@@ -257,10 +299,7 @@
       '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:24px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">' +
         '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:10px;font-family:Arial,sans-serif;">Condiciones Comerciales</div>' +
         '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;line-height:1.9;">' +
-          (p.condicionesComerciales ? '<strong>Condición de Pago:</strong> ' + esc(p.condicionesComerciales) + '<br>' : '') +
-          (p.detalleFinanciacion ? '<strong>Detalle de Financiación:</strong> ' + esc(p.detalleFinanciacion) + '<br>' : '') +
-          '<strong>Forma de Pago:</strong> Transferencia o depósito bancario. ' + (etiquetaMoneda === 'ARS' ? 'Valores expresados en pesos argentinos.' : 'Valores expresados en dólares oficiales Banco Nación con el tipo de cambio del día de acreditación de cada pago.') + '<br>' +
-          '<strong>Lugar de Entrega:</strong> Se entrega en nuestra oficina en Del Carmen 716 PB CABA.' +
+          construirCondicionesComerciales(p, etiquetaMoneda) +
         '</div>' +
       '</div>' +
 
