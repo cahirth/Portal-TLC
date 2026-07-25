@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.11 (Lugar de entrega a ancho completo para que no se corte; envía el TC oficial usado al guardar, y bloquea el guardado en AR$ si el TC todavía no cargó) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.12 (Redirige con &guardado=1 en vez de &nuevo=1 al guardar una cotización, para que cotizaciones.html muestre el mensaje correcto) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -836,7 +836,7 @@ async function _generarPresupuesto() {
       return;
     }
     NEGOCIO_ID = r.idCot || NEGOCIO_ID;
-    window.location.href = 'cotizaciones.html?id=' + encodeURIComponent(NEGOCIO_ID) + '&nuevo=1';
+    window.location.href = 'cotizaciones.html?id=' + encodeURIComponent(NEGOCIO_ID) + '&guardado=1';
   } catch(err) {
     console.error('[Generar presupuesto] Error de red/fetch:', err);
     alert('Error de conexión al guardar el presupuesto: ' + err.message);

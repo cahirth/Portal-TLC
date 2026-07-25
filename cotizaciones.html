@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.25.7 (Flecha del select de Etapa reemplazada por triángulo CSS puro (la versión SVG seguía sin verse pese a fixes anteriores); foto del equipo más grande en el header del detalle) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.25.8 (Toast distingue "Negocio creado" vs "Cotización creada — Nº X" según de dónde vino) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1870,20 +1870,23 @@ async function _abrirDetallePorIdEnUrl(intentosRestantes) {
         const params = new URLSearchParams(window.location.search);
         const idBuscado = (params.get('id') || '').trim();
         if (!idBuscado) return;
+        const esNuevo    = params.get('nuevo') === '1';
+        const esGuardado = params.get('guardado') === '1';
         const idx = todasLasCot.findIndex(x =>
             String(x.idCot || x.id_cotizacion || x.id || '') === idBuscado
         );
         if (idx !== -1) {
             abrirDetalle(idx);
-            if (params.get('nuevo') === '1') _toast('✅ Negocio creado');
+            if (esNuevo) _toast('✅ Negocio creado');
+            if (esGuardado) _toast('✅ Cotización creada — Nº ' + idBuscado);
             return;
         }
         if (intentosRestantes <= 0) {
             console.warn('Deep-link: negocio no encontrado en la vista actual:', idBuscado);
-            if (params.get('nuevo') === '1') _toast('El negocio se creó, pero todavía no aparece acá — actualizá en unos segundos.', 'info');
+            if (esNuevo || esGuardado) _toast('Se guardó, pero todavía no aparece acá — actualizá en unos segundos.', 'info');
             return;
         }
-        if (params.get('nuevo') === '1' && intentosRestantes === 3) _toast('Abriendo el negocio recién creado...', 'info');
+        if ((esNuevo || esGuardado) && intentosRestantes === 3) _toast('Abriendo...', 'info');
         setTimeout(async () => {
             try {
                 const res = await fetch(HISTORICO_URL + '?_=' + Date.now(), { cache: 'no-store' });

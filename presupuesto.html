@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.25.1 (Condiciones Comerciales y Validez de la oferta ahora dinámicas — lee los campos planos nuevos de presupuesto-editor.html (formaPago/validez/tiempoEntrega/lugarEntrega) con respaldo al formato viejo de selector-dispositivos.html) -->
+<!-- Portal TLC | presupuesto.html | v2026.07.25.2 (Open Graph reforzado: dominio real ir.tlcsrl.com.ar, tamaño de imagen, twitter card completa; fecha de Validez en formato dd-mm-yyyy) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -8,10 +8,16 @@
 <title>Presupuesto — Tecnología Láser Corneal</title>
 <meta property="og:title" content="Presupuesto — Tecnología Láser Corneal">
 <meta property="og:description" content="Propuesta comercial de equipamiento oftalmológico. Tocá para ver el detalle completo.">
-<meta property="og:image" content="https://cahirth.github.io/Portal-TLC/icons/og-image.png">
+<meta property="og:image" content="https://ir.tlcsrl.com.ar/icons/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://cahirth.github.io/Portal-TLC/presupuesto.html">
-<meta name="twitter:card" content="summary">
+<meta property="og:site_name" content="Portal TLC">
+<meta property="og:url" content="https://ir.tlcsrl.com.ar/presupuesto.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Presupuesto — Tecnología Láser Corneal">
+<meta name="twitter:description" content="Propuesta comercial de equipamiento oftalmológico.">
+<meta name="twitter:image" content="https://ir.tlcsrl.com.ar/icons/og-image.png">
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
   body { font-family:"Times New Roman",Times,serif; background:#f1f5f9; color:#0f172a; font-size:13px; }
@@ -63,6 +69,14 @@
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
       return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
     });
+  }
+
+  // El input type="date" del editor guarda yyyy-mm-dd — para el
+  // documento lo mostramos como dd-mm-yyyy, más natural en español.
+  function fmtFechaDDMMYYYY(iso) {
+    if (!iso) return '';
+    var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? (m[3] + '-' + m[2] + '-' + m[1]) : iso;
   }
 
   function getIdFromUrl() {
@@ -123,7 +137,7 @@
     else if (p.tiempoEntrega) tiempoTexto = p.tiempoEntrega + ' días';
 
     var validezTexto2 = '';
-    if (p.validez === 'personalizado') validezTexto2 = p.validezFecha ? ('Hasta ' + p.validezFecha) : 'A confirmar';
+    if (p.validez === 'personalizado') validezTexto2 = p.validezFecha ? ('Hasta ' + fmtFechaDDMMYYYY(p.validezFecha)) : 'A confirmar';
     else if (p.validez) validezTexto2 = p.validez + ' días';
 
     var lugarTexto = p.lugarEntrega === 'oficina'
@@ -231,7 +245,7 @@
     // tienen ese campo guardado.
     var validezTexto = '15 Días';
     if (p.validez === 'personalizado' && p.validezFecha) {
-      validezTexto = 'Hasta ' + p.validezFecha;
+      validezTexto = 'Hasta ' + fmtFechaDDMMYYYY(p.validezFecha);
     } else if (p.validez && p.validez !== 'personalizado') {
       validezTexto = p.validez + ' Días';
     }
