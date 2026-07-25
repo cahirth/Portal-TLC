@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.24.3 (Cliente con todos los datos de empresa, tel/email del contacto, selector interactivo de catálogo por ítem, cuentas bancarias reales) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.1 (Recibe idNegocio desde cotizaciones.html; Volver prioriza volver al negocio de origen) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -332,10 +332,13 @@ var CONTACTO_SEL = null;     // { id, nombre, cargo, email, telefono } | null
 var ITEMS = [];
 var _itemSeq = 0;
 
-// ── URL params: si viene desde "Nuevo Negocio" en empresas.html, el
-// cliente (y opcionalmente el contacto) llegan ya resueltos ──
+// ── URL params: si viene desde "Nuevo Negocio" en empresas.html, o
+// desde "Crear/Editar cotización" en cotizaciones.html, el cliente (y
+// opcionalmente el contacto) llegan ya resueltos ──
+var NEGOCIO_ID = null; // idNegocio, si viene desde cotizaciones.html — todavía sin uso real hasta conectar el guardado
 function _leerParamsIniciales() {
   var p = new URLSearchParams(window.location.search);
+  NEGOCIO_ID = p.get('idNegocio') || null;
   if (!p.get('razon') && !p.get('empresa')) return;
   CLIENTE_SEL = {
     id: p.get('empresa') || null,
@@ -359,6 +362,7 @@ function _leerParamsIniciales() {
 
 function _volver() {
   var p = new URLSearchParams(window.location.search);
+  if (p.get('idNegocio')) { window.location.href = 'cotizaciones.html?id=' + encodeURIComponent(p.get('idNegocio')); return; }
   if (p.get('empresa')) { window.location.href = 'empresas.html?empresa=' + encodeURIComponent(p.get('empresa')); return; }
   if (document.referrer && document.referrer.indexOf(window.location.host) !== -1) { history.back(); return; }
   window.location.href = 'index.html';
@@ -650,6 +654,7 @@ function _generarPresupuesto() {
   if (!ITEMS.length || ITEMS.every(function(it){ return !it.descripcion && !it.precio; })) { alert('Agregá al menos un ítem con descripción y precio.'); return; }
 
   var payload = {
+    idNegocio: NEGOCIO_ID,
     cliente: CLIENTE_SEL,
     contacto: CONTACTO_SEL,
     items: ITEMS,

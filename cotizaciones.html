@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.24.4 (Nombre del negocio arriba de todo con cliente como subtítulo; select de Etapa más ancho/responsivo con flecha notoria; Contacto convertido en dropdown editable; Historial del cliente limitado a 5 más recientes) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.25.3 ("Crear/Editar cotización" ahora navega a presupuesto-editor.html con empresa+contacto precargados, en vez de abrir el modal Pantalla Comercial) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -199,6 +199,15 @@
         .pc-overlay { position:fixed; inset:0; background:rgba(3,7,18,0.88); z-index:400; display:none; overflow-y:auto; padding:16px; }
         .pc-overlay.open { display:block; }
         .pc-box { background:#0d1520; border:1px solid #1e3050; border-radius:20px; max-width:480px; margin:0 auto; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.6); }
+        @media (min-width:768px) {
+            .pc-overlay { padding:40px 24px; }
+            .pc-box { max-width:720px; }
+            .pc-body { padding:24px 32px; }
+            .pc-header { padding:20px 32px; }
+        }
+        @media (min-width:1200px) {
+            .pc-box { max-width:860px; }
+        }
         .pc-header { background:linear-gradient(135deg,#0f1a30,#1c2541); padding:16px 20px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #1e3050; }
         .pc-titulo { font-size:15px; font-weight:800; color:#f1f5f9; flex:1; }
         .pc-cliente { font-size:11px; color:#64748b; margin-top:2px; }
@@ -673,7 +682,7 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
 <div class="pc-overlay" id="pc-overlay">
     <div class="pc-box">
         <div class="pc-header">
-            <button onclick="_pcCerrar()" style="background:#3a86ff;border:none;border-radius:8px;padding:6px 12px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">← Volver</button>
+            <button class="btn-back" onclick="_pcCerrar()" style="background:#3a86ff;">←</button>
             <div style="flex:1;">
                 <div class="pc-titulo" id="pc-titulo">Pantalla Comercial</div>
                 <div class="pc-cliente" id="pc-cliente"></div>
@@ -1955,7 +1964,12 @@ function _renderDetalle(c) {
     if (subtituloEl) subtituloEl.textContent = c.nombreNegocio ? cliente : '';
 
     // ── Estado badge color ────────────────────────────────────────
-    const badgeStyle = `background:${colData.bg||'rgba(58,134,255,.1)'};border:1px solid ${colData.border||'rgba(58,134,255,.2)'};color:${colData.color||'#3a86ff'};`;
+    // OJO: background-color (no "background" shorthand) — el shorthand
+    // resetea background-image a "none", que es justo donde vive la
+    // flechita del <select> de etapa (viene de la clase CSS). Con el
+    // shorthand, el inline style la borraba siempre, sin importar qué
+    // tan visible la hiciéramos en la clase.
+    const badgeStyle = `background-color:${colData.bg||'rgba(58,134,255,.1)'};border:1px solid ${colData.border||'rgba(58,134,255,.2)'};color:${colData.color||'#3a86ff'};`;
 
     // ── Productos ─────────────────────────────────────────────────
     const prods = Array.isArray(c.productos) ? c.productos : [];
@@ -2078,15 +2092,16 @@ function _renderDetalle(c) {
         </div>`;
     }
 
-    // ── BOTÓN PANTALLA COMERCIAL ──────────────────────────────────
-    // Antes solo aparecía si carrito.length > 0, dejando sin forma de
-    // cargar el primer equipo a un negocio recién creado sin cotización
-    // todavía. _pcAbrir() ya soporta carrito vacío (ver esa función),
-    // así que ahora el botón siempre se muestra, con label distinto.
+    // ── BOTÓN CREAR/EDITAR COTIZACIÓN ───────────────────────────────
+    // Antes abría el modal "Pantalla Comercial" (_pcAbrir) en esta misma
+    // pantalla. Ahora lleva a presupuesto-editor.html con la empresa y
+    // el contacto del negocio ya precargados — ahí se agregan los ítems
+    // interactivamente desde el catálogo (mismo precios.json que usa
+    // selector-dispositivos.html).
     {
         const labelBtnPc = carrito.length > 0 ? '✏️ Editar cotización' : '➕ Crear cotización';
         html += `<div style="padding:0 16px 4px;">
-            <button onclick="_pcAbrir('${id}')"
+            <button onclick="_irAPresupuestoEditor('${id}')"
                 style="width:100%;padding:11px;border-radius:10px;
                        background:linear-gradient(135deg,#0f2a52,#1e3a6e);
                        border:1px solid #3a86ff55;color:#60a5fa;
@@ -2752,6 +2767,29 @@ let _pcIdCot    = null;  // idCot de la cotización en edición
 let _pcItems    = [];    // array de ítems editables
 
 // Abre la Pantalla Comercial precargada con los ítems de la cotización
+// Lleva a presupuesto-editor.html con la empresa y el contacto de este
+// negocio ya resueltos por URL — mismo formato de parámetros que usa
+// el modal "Nuevo Negocio" de empresas.html, más idNegocio para que,
+// cuando el guardado real esté conectado, quede vinculado a ESTE
+// negocio en vez de crear uno nuevo.
+function _irAPresupuestoEditor(idCot) {
+    const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(idCot));
+    if (!c) return;
+    const params = new URLSearchParams();
+    params.set('idNegocio', idCot);
+    params.set('razon', c.razonSocial || c.empresa?.razonSocial || '');
+    params.set('cuit', c.cuit || c.empresa?.cuit || '');
+    if (c.empresaId) params.set('empresa', c.empresaId);
+    if (c.telefono) params.set('telefonoEmpresa', c.telefono);
+    if (c.contacto?.nombre || c.nombreMedico) {
+        params.set('contactoId', c.contactoId || '');
+        params.set('contactoNombre', c.contacto?.nombre || c.nombreMedico || '');
+        params.set('contactoEmail', c.contacto?.email || '');
+        params.set('contactoTelefono', c.contacto?.telefono || c.telefono || '');
+    }
+    window.location.href = 'presupuesto-editor.html?' + params.toString();
+}
+
 function _pcAbrir(idCot) {
     const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(idCot));
     if (!c) return;
@@ -2776,7 +2814,6 @@ function _pcAbrir(idCot) {
     _pcRecalcular();
     document.getElementById('pc-search-panel').style.display = 'none';
     document.getElementById('pc-status').style.display = 'none';
-    document.getElementById('pc-btn-generar').disabled = false;
     document.getElementById('pc-btn-generar').textContent = '📄 Generar propuesta';
     const bvw = document.getElementById('pc-btn-ver-wrap');
     if (bvw) bvw.innerHTML = '';
@@ -2794,6 +2831,13 @@ function _pcCerrar() {
 // ── Render de items ────────────────────────────────────────────────
 function _pcRenderItems() {
     const wrap = document.getElementById('pc-items-wrap');
+    const btnGenerar = document.getElementById('pc-btn-generar');
+    if (btnGenerar) {
+        btnGenerar.disabled = _pcItems.length === 0;
+        btnGenerar.style.opacity = _pcItems.length === 0 ? '0.5' : '1';
+        btnGenerar.style.cursor = _pcItems.length === 0 ? 'not-allowed' : 'pointer';
+        btnGenerar.style.background = _pcItems.length === 0 ? '#334155' : '';
+    }
     if (!_pcItems.length) { wrap.innerHTML = ''; return; }
     wrap.innerHTML = _pcItems.map((item, idx) => {
         const base  = item.precioLista;
