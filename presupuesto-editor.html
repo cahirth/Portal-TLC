@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.6 (IVA por defecto de nuevos ítems: 10,5% en vez de 21% — pendiente futuro: columna IVA en Excel/Firebase por equipo, por ahora fijo. Precio LISTA confirmado como prioridad, ya estaba bien.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.7 (Condiciones Comerciales: agregado Tiempo de entrega (inmediato/30/45/personalizado) y Lugar de entrega (mismas opciones que Pantalla Comercial en selector-dispositivos.html) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -275,6 +275,26 @@
           <label>Fecha de vencimiento</label>
           <input type="date" id="cc-validez-fecha">
         </div>
+        <div class="det-campo">
+          <label>Tiempo de entrega</label>
+          <select id="cc-tiempo-entrega" onchange="_toggleTiempoEntregaPersonalizado()">
+            <option value="inmediato">Inmediato hasta agotar stock</option>
+            <option value="30">30 días</option>
+            <option value="45">45 días</option>
+            <option value="personalizado">Personalizado</option>
+          </select>
+        </div>
+        <div class="det-campo" id="campo-tiempo-entrega-personalizado" style="display:none;">
+          <label>Especificar tiempo de entrega</label>
+          <input type="text" id="cc-tiempo-entrega-custom" placeholder="Ej: 60 días hábiles">
+        </div>
+        <div class="det-campo">
+          <label>Lugar de entrega</label>
+          <select id="cc-lugar-entrega">
+            <option value="cliente">Clínica del Cliente</option>
+            <option value="oficina">Nuestra oficina — Del Carmen 716 PB CABA (envío y seguro a cargo del comprador)</option>
+          </select>
+        </div>
         <div class="det-campo full">
           <label>Notas</label>
           <textarea id="cc-notas" rows="3" placeholder="Observaciones para el cliente..."></textarea>
@@ -427,6 +447,9 @@ function _irASelectorDispositivos() {
         formaPago: document.getElementById('cc-forma-pago').value,
         validez: document.getElementById('cc-validez').value,
         validezFecha: document.getElementById('cc-validez-fecha').value,
+        tiempoEntrega: document.getElementById('cc-tiempo-entrega').value,
+        tiempoEntregaCustom: document.getElementById('cc-tiempo-entrega-custom').value,
+        lugarEntrega: document.getElementById('cc-lugar-entrega').value,
         notas: document.getElementById('cc-notas').value
       },
       moneda: document.getElementById('moneda-presupuesto').value
@@ -757,6 +780,11 @@ function _toggleValidezPersonalizada() {
   document.getElementById('campo-validez-personalizada').style.display = v === 'personalizado' ? 'block' : 'none';
 }
 
+function _toggleTiempoEntregaPersonalizado() {
+  var v = document.getElementById('cc-tiempo-entrega').value;
+  document.getElementById('campo-tiempo-entrega-personalizado').style.display = v === 'personalizado' ? 'block' : 'none';
+}
+
 function _renderTotales() {
   var subtotal = 0, descuento = 0, iva = 0, total = 0;
   ITEMS.forEach(function(it) {
@@ -792,6 +820,9 @@ function _generarPresupuesto() {
       formaPago: document.getElementById('cc-forma-pago').value,
       validez: document.getElementById('cc-validez').value,
       validezFecha: document.getElementById('cc-validez-fecha').value,
+      tiempoEntrega: document.getElementById('cc-tiempo-entrega').value,
+      tiempoEntregaCustom: document.getElementById('cc-tiempo-entrega-custom').value,
+      lugarEntrega: document.getElementById('cc-lugar-entrega').value,
       notas: document.getElementById('cc-notas').value
     },
     moneda: document.getElementById('moneda-presupuesto').value
@@ -825,8 +856,12 @@ if (_draftCondiciones) {
   document.getElementById('cc-forma-pago').value = _draftCondiciones.formaPago || 'Contado';
   document.getElementById('cc-validez').value = _draftCondiciones.validez || '15';
   document.getElementById('cc-validez-fecha').value = _draftCondiciones.validezFecha || '';
+  document.getElementById('cc-tiempo-entrega').value = _draftCondiciones.tiempoEntrega || 'inmediato';
+  document.getElementById('cc-tiempo-entrega-custom').value = _draftCondiciones.tiempoEntregaCustom || '';
+  document.getElementById('cc-lugar-entrega').value = _draftCondiciones.lugarEntrega || 'cliente';
   document.getElementById('cc-notas').value = _draftCondiciones.notas || '';
   _toggleValidezPersonalizada();
+  _toggleTiempoEntregaPersonalizado();
 }
 if (_draftMoneda) {
   document.getElementById('moneda-presupuesto').value = _draftMoneda;
