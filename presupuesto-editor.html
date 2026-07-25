@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.2 (Sin botón "Cambiar cliente"; Contacto al lado de la empresa con dropdown real conectado a listarEmpresas; "+ Agregar ítem" ahora va a selector-dispositivos.html como Pantalla Comercial, con puente que preserva todo el borrador ida y vuelta) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.4 (Auditoría de contraste en modo claro: tags ARS/USD de Cuentas Bancarias reforzados, tag verde pasado de inline style a clase para poder controlarlo por tema) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -55,7 +55,7 @@
   .buscador-cliente-input { width:100%; background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:10px;
     padding:11px 14px; color:var(--text-main); font-size:13px; outline:none; }
   .buscador-cliente-input:focus { border-color:var(--accent-blue); }
-  .resultados-cliente { position:absolute; top:calc(100% + 6px); left:0; right:0; background:#0d1520; border:1px solid var(--border-glow);
+  .resultados-cliente { position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--panel-dark); border:1px solid var(--border-glow);
     border-radius:10px; max-height:260px; overflow-y:auto; z-index:50; box-shadow:0 16px 48px rgba(0,0,0,.5); }
   .resultado-cliente-item { padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--border-glow); }
   .resultado-cliente-item:last-child { border-bottom:none; }
@@ -127,8 +127,9 @@
   /* ── CUENTAS BANCARIAS ── */
   .banco-card { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:10px; padding:12px 14px; margin-bottom:8px; }
   .banco-card .moneda-tag { font-size:9px; font-weight:800; padding:3px 8px; border-radius:8px; background:rgba(58,134,255,.12); color:#60a5fa; }
-  .banco-card .fila { font-size:11px; color:var(--text-muted); margin-top:6px; display:flex; justify-content:space-between; }
-  .banco-card .fila b { color:var(--text-main); font-weight:600; }
+  .banco-card .moneda-tag-green { background:rgba(6,214,160,.12); color:var(--accent-green); }
+  .banco-card .fila { font-size:10px; color:var(--text-muted); margin-top:8px; text-transform:uppercase; font-weight:700; letter-spacing:.3px; }
+  .banco-card .fila b { display:block; color:var(--text-main); font-weight:600; font-size:13px; text-transform:none; letter-spacing:0; margin-top:2px; }
   .aviso-mock { background:rgba(248,150,30,.08); border:1px solid rgba(248,150,30,.3); border-radius:10px; padding:10px 12px;
     font-size:11px; color:var(--accent-orange); margin-top:10px; }
 
@@ -145,22 +146,26 @@
     font-size:13px; font-weight:700; cursor:pointer; }
 
   /* ═══════ MODO CLARO ═══════ */
-  body.tema-claro { background:#f0f4f8; color:#1e293b; }
+  body.tema-claro {
+    --bg:#f0f4f8; --panel-dark:#ffffff; --panel-darker:#ffffff; --border-glow:#e2e8f0;
+    --text-main:#0f172a; --text-muted:#64748b; --text-dim:#94a3b8;
+    background:var(--bg); color:var(--text-main);
+  }
   body.tema-claro .header { background:linear-gradient(135deg,#ffffff,#f1f5f9); border-bottom-color:#cbd5e1; }
   body.tema-claro .header-text h1 { color:#0f172a; }
   body.tema-claro .avatar-btn { background:#ffffff; border-color:#cbd5e1; }
   body.tema-claro .avatar-menu { background:#ffffff; border-color:#e2e8f0; }
   body.tema-claro .tema-toggle { background:#f1f5f9; border-color:#cbd5e1; }
   body.tema-claro .tema-toggle button { color:#64748b; }
-  body.tema-claro .section, body.tema-claro .det-campo input, body.tema-claro .det-campo select, body.tema-claro .det-campo textarea,
-  body.tema-claro .cliente-card-contacto select,
-  body.tema-claro .buscador-cliente-input, body.tema-claro .cliente-card-sel, body.tema-claro .cliente-card-contacto, body.tema-claro .item-card, body.tema-claro .banco-card,
-  body.tema-claro .resultados-cliente, body.tema-claro .modal-panel, body.tema-claro .catalogo-buscador { background:#ffffff; border-color:#e2e8f0; }
+  /* Elementos con un tono apenas distinto al fondo blanco de su propia
+     tarjeta (inputs dentro de item-card, fotos placeholder) — no se
+     resuelven solos con las variables porque necesitan contrastar
+     contra --panel-darker, que en claro ya es blanco puro. */
   body.tema-claro .item-foto, body.tema-claro .item-grid input, body.tema-claro .item-grid select, body.tema-claro .catalogo-item .foto { background:#f8fafc; }
-  body.tema-claro .det-campo input, body.tema-claro .buscador-cliente-input, body.tema-claro .catalogo-buscador { color:#0f172a; }
   body.tema-claro select, body.tema-claro select option { color:#0f172a; }
-  body.tema-claro #bloque-contacto-selector select { background:#f8fafc; }
   body.tema-claro .section-title .hint { color:#94a3b8; }
+  body.tema-claro .banco-card .moneda-tag { color:#1d4ed8; }
+  body.tema-claro .banco-card .moneda-tag-green { color:#0d9268; }
 </style>
 </head>
 <body>
@@ -261,7 +266,7 @@
         <div class="fila"><span>Alias</span><b>jade.lado.persa</b></div>
       </div>
       <div class="banco-card">
-        <span class="moneda-tag" style="background:rgba(6,214,160,.12);color:var(--accent-green);">USD</span>
+        <span class="moneda-tag moneda-tag-green">USD</span>
         <div class="fila"><span>Cuenta</span><b>Credicoop CA USD 191-218-019730/3</b></div>
         <div class="fila"><span>CBU</span><b>191021825522180197303</b></div>
         <div class="fila"><span>Alias</span><b>TLC.CREDICOOP.USD</b></div>
@@ -783,12 +788,8 @@ document.addEventListener('click', function() { document.getElementById('avatar-
 _leerParamsIniciales();
 _aplicarTema();
 _renderCliente();
-if (!ITEMS.length) {
-  _agregarItem();
-} else {
-  _itemSeq = Math.max.apply(null, ITEMS.map(function(it){ return it.id; }).concat([_itemSeq]));
-  _render();
-}
+_itemSeq = Math.max.apply(null, ITEMS.map(function(it){ return it.id; }).concat([_itemSeq]));
+_render();
 if (_draftCondiciones) {
   document.getElementById('cc-forma-pago').value = _draftCondiciones.formaPago || 'Contado';
   document.getElementById('cc-validez').value = _draftCondiciones.validez || '15';
