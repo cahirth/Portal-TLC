@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.8 (Header muestra Nº de presupuesto real; Precio Unit. con prefijo de moneda + formato de miles; Descuento con sufijo %; Volver usa variables JS en vez de URL (se perdía tras ir al selector); Generar presupuesto YA GUARDA de verdad vía guardarPresupuestoEditor) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.10 (Sacado el botón 🔍 de catálogo inline por ítem y todo su código muerto asociado (modal, CATALOGO_CACHE, etc.) — la forma de elegir equipos es ir al selector de dispositivos con "+ Agregar ítem") -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -90,30 +90,6 @@
   .item-desc-input:focus { border-color:var(--accent-blue); }
   .item-borrar { width:30px; height:30px; border-radius:8px; background:transparent; border:1px solid var(--border-glow); color:var(--accent-red);
     cursor:pointer; flex-shrink:0; }
-  .item-catalogo-btn { width:30px; height:30px; border-radius:8px; background:transparent; border:1px solid rgba(58,134,255,.35); color:var(--accent-blue);
-    cursor:pointer; flex-shrink:0; font-size:13px; }
-  .item-catalogo-btn:hover { background:rgba(58,134,255,.1); }
-
-  /* ── MODAL SELECTOR DE CATÁLOGO ── */
-  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:300;
-    align-items:center; justify-content:center; padding:16px; }
-  .modal-overlay.open { display:flex; }
-  .modal-panel { background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:16px; padding:20px;
-    width:100%; max-width:480px; max-height:85vh; overflow-y:auto; display:flex; flex-direction:column; }
-  .modal-titulo { font-size:14px; font-weight:800; margin-bottom:12px; }
-  .catalogo-buscador { width:100%; background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:10px;
-    padding:11px 14px; color:var(--text-main); font-size:13px; outline:none; margin-bottom:12px; }
-  .catalogo-buscador:focus { border-color:var(--accent-blue); }
-  .catalogo-lista { overflow-y:auto; flex:1; }
-  .catalogo-item { display:flex; gap:10px; align-items:center; padding:10px; border-radius:10px; cursor:pointer; margin-bottom:6px; border:1px solid transparent; }
-  .catalogo-item:hover { background:rgba(58,134,255,.08); border-color:rgba(58,134,255,.25); }
-  .catalogo-item .foto { width:42px; height:42px; border-radius:8px; background:var(--panel-darker); flex-shrink:0; object-fit:cover; display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--text-dim); }
-  .catalogo-item .foto img { width:100%; height:100%; object-fit:cover; border-radius:8px; }
-  .catalogo-item .nombre { font-size:12px; font-weight:700; }
-  .catalogo-item .marca { font-size:10px; color:var(--text-muted); margin-top:1px; }
-  .catalogo-item .precio { font-size:11px; color:var(--accent-green); font-weight:800; margin-left:auto; white-space:nowrap; }
-  .btn-cerrar-modal { width:100%; padding:11px; border-radius:10px; background:transparent; border:1px solid var(--border-glow); color:var(--text-muted);
-    font-size:12px; font-weight:700; cursor:pointer; margin-top:10px; }
   .item-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px; }
   .item-grid .campo label { font-size:8px; color:var(--text-dim); text-transform:uppercase; font-weight:700; display:block; margin-bottom:3px; }
   .item-grid input, .item-grid select { width:100%; background:#0d1520; border:1px solid var(--border-glow); border-radius:7px;
@@ -176,7 +152,7 @@
      tarjeta (inputs dentro de item-card, fotos placeholder) — no se
      resuelven solos con las variables porque necesitan contrastar
      contra --panel-darker, que en claro ya es blanco puro. */
-  body.tema-claro .item-foto, body.tema-claro .item-grid input, body.tema-claro .item-grid select, body.tema-claro .catalogo-item .foto { background:#f8fafc; }
+  body.tema-claro .item-foto, body.tema-claro .item-grid input, body.tema-claro .item-grid select { background:#f8fafc; }
   body.tema-claro select, body.tema-claro select option { color:#0f172a; }
   body.tema-claro .section-title .hint { color:#94a3b8; }
   body.tema-claro .banco-card .moneda-tag { color:#1d4ed8; }
@@ -332,16 +308,6 @@
       <button class="btn-generar" id="btn-generar-presupuesto" onclick="_generarPresupuesto()">✓ Generar presupuesto</button>
     </div>
 
-  </div>
-
-  <!-- MODAL SELECTOR DE CATÁLOGO -->
-  <div class="modal-overlay" id="modal-catalogo">
-    <div class="modal-panel">
-      <div class="modal-titulo">📦 Elegir dispositivo del catálogo</div>
-      <input class="catalogo-buscador" id="input-buscar-catalogo" placeholder="Buscar por nombre o marca..." oninput="_filtrarCatalogo(this.value)" autocomplete="off">
-      <div class="catalogo-lista" id="catalogo-lista"></div>
-      <button class="btn-cerrar-modal" onclick="_cerrarCatalogo()">Cancelar</button>
-    </div>
   </div>
 
 <script>
@@ -701,78 +667,6 @@ window._fotoItem = function(id, input) {
   reader.readAsDataURL(file);
 };
 
-// ── CATÁLOGO DE DISPOSITIVOS — mismo precios.json que usa
-// selector-dispositivos.html. Ruta relativa (no absoluta a github.io)
-// para evitar el bug de CORS ya cazado en otros módulos. ──
-var CATALOGO_CACHE = null;
-var _itemCatalogoTarget = null;
-
-async function _cargarCatalogo() {
-  if (CATALOGO_CACHE) return CATALOGO_CACHE;
-  try {
-    var resp = await fetch('./precios.json', { cache:'no-store' });
-    CATALOGO_CACHE = resp.ok ? await resp.json() : [];
-  } catch(e) { console.warn('Error cargando precios.json:', e); CATALOGO_CACHE = []; }
-  return CATALOGO_CACHE;
-}
-
-function _precioCatalogo(d) {
-  // Precio LISTA siempre tiene prioridad (default pedido por Cristian);
-  // Precio CONTADO CNO solo como respaldo si el equipo no tiene LISTA cargado.
-  return parseFloat(d['Precio LISTA']) || parseFloat(d['Precio CONTADO CNO']) || 0;
-}
-
-async function _abrirCatalogo(itemId) {
-  _itemCatalogoTarget = itemId;
-  document.getElementById('modal-catalogo').classList.add('open');
-  document.getElementById('input-buscar-catalogo').value = '';
-  document.getElementById('catalogo-lista').innerHTML = '<div class="sin-resultados">Cargando catálogo...</div>';
-  await _cargarCatalogo();
-  _filtrarCatalogo('');
-}
-
-function _cerrarCatalogo() {
-  document.getElementById('modal-catalogo').classList.remove('open');
-  _itemCatalogoTarget = null;
-}
-
-function _filtrarCatalogo(q) {
-  var lista = CATALOGO_CACHE || [];
-  var qn = (q || '').toUpperCase().trim();
-  var resultados = qn
-    ? lista.filter(function(d) {
-        return (d['Nombre de Dispositivo'] || '').toUpperCase().indexOf(qn) !== -1 ||
-          (d['Marca'] || '').toUpperCase().indexOf(qn) !== -1 ||
-          (d['Sub Categoria'] || '').toUpperCase().indexOf(qn) !== -1;
-      })
-    : lista;
-  resultados = resultados.slice(0, 40);
-  var cont = document.getElementById('catalogo-lista');
-  window._catalogoResultados = resultados;
-  cont.innerHTML = resultados.length
-    ? resultados.map(function(d, i) {
-        var precio = _precioCatalogo(d);
-        return '<div class="catalogo-item" onclick="_seleccionarCatalogo(' + i + ')">' +
-          '<div class="foto">' + (d.Foto ? '<img src="' + d.Foto + '">' : '📷') + '</div>' +
-          '<div><div class="nombre">' + (d['Nombre de Dispositivo'] || 'Sin nombre') + '</div>' +
-          '<div class="marca">' + (d['Marca'] || d['Sub Categoria'] || '') + '</div></div>' +
-          (precio ? '<div class="precio">USD ' + Math.round(precio).toLocaleString('es-AR') + '</div>' : '') +
-        '</div>';
-      }).join('')
-    : '<div class="sin-resultados">Sin resultados en el catálogo.</div>';
-}
-
-window._seleccionarCatalogo = function(i) {
-  var d = window._catalogoResultados[i];
-  var it = ITEMS.find(function(x){ return x.id === _itemCatalogoTarget; });
-  if (!d || !it) return;
-  it.descripcion = d['Nombre de Dispositivo'] || it.descripcion;
-  it.precio = _precioCatalogo(d) || it.precio;
-  if (d.Foto) it.foto = d.Foto;
-  _cerrarCatalogo();
-  _render();
-};
-
 // ── TC OFICIAL — mismo endpoint (dolarapi.com) que usa syncDolarBNA en
 // FotoMap.gs, para no depender de que el valor esté sincronizado en el
 // Sheet. Se pide una sola vez al cargar la página y se cachea. ──
@@ -802,6 +696,12 @@ function _fmtMoneda(n) {
   return 'USD ' + (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits:2, maximumFractionDigits:2 });
 }
 
+// Ítems: SIEMPRE en USD (precio de lista), sin importar el dropdown de
+// moneda — ese dropdown solo afecta a la sección Totales de abajo.
+function _fmtUSD(n) {
+  return 'USD ' + (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
 function _calcularItem(it) {
   var bruto = it.precio * it.cantidad;
   var conDescuento = bruto * (1 - (it.descuento || 0) / 100);
@@ -811,8 +711,10 @@ function _calcularItem(it) {
 
 function _renderItems() {
   document.getElementById('items-contador').textContent = ITEMS.length + ' ítem' + (ITEMS.length !== 1 ? 's' : '');
-  var monedaSel = document.getElementById('moneda-presupuesto');
-  var prefijoMoneda = (monedaSel && monedaSel.value === 'ARS') ? 'AR$' : 'USD';
+  // Precio Unit. siempre en USD (precio de lista) — la conversión a
+  // pesos con el TC oficial pasa SOLO en Totales, con el dropdown de
+  // moneda. Acá arriba no se toca nunca.
+  var prefijoMoneda = 'USD';
   document.getElementById('lista-items').innerHTML = ITEMS.map(function(it) {
     var calc = _calcularItem(it);
     return '<div class="item-card">' +
@@ -822,7 +724,6 @@ function _renderItems() {
           '<input type="file" id="file-' + it.id + '" accept="image/*" style="display:none;" onchange="_fotoItem(' + it.id + ', this)">' +
         '</div>' +
         '<input class="item-desc-input" placeholder="Descripción del equipo/ítem..." value="' + (it.descripcion || '').replace(/"/g,'&quot;') + '" onchange="_actualizarItem(' + it.id + ',\'descripcion\',this.value)">' +
-        '<button class="item-catalogo-btn" title="Elegir del catálogo" onclick="_abrirCatalogo(' + it.id + ')">🔍</button>' +
         '<button class="item-borrar" onclick="_borrarItem(' + it.id + ')">✕</button>' +
       '</div>' +
       '<div class="item-grid">' +
@@ -839,7 +740,7 @@ function _renderItems() {
           [0,10.5,21,27].map(function(v){ return '<option value="' + v + '"' + (it.iva===v?' selected':'') + '>' + v + '%</option>'; }).join('') +
         '</select></div>' +
       '</div>' +
-      '<div class="item-subtotal">' + _fmtMoneda(calc.total) + '</div>' +
+      '<div class="item-subtotal">' + _fmtUSD(calc.total) + '</div>' +
     '</div>';
   }).join('');
 }
