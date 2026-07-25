@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.24.2 (Fix: texto invisible en options de selects en modo claro — color-scheme + color explícito) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.24.3 (Cliente con todos los datos de empresa, tel/email del contacto, selector interactivo de catálogo por ítem, cuentas bancarias reales) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -74,6 +74,7 @@
   .contacto-warning { background:rgba(248,150,30,.08); border:1px solid rgba(248,150,30,.3); border-radius:10px; padding:12px 14px;
     font-size:12px; color:var(--accent-orange); margin-top:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
   .contacto-warning a { color:var(--accent-orange); font-weight:700; text-decoration:underline; }
+  .contacto-datos { font-size:11px; color:var(--text-muted); margin-top:8px; }
 
   /* ── ÍTEMS ── */
   .item-card { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:12px; padding:14px; margin-bottom:12px; }
@@ -86,6 +87,30 @@
   .item-desc-input:focus { border-color:var(--accent-blue); }
   .item-borrar { width:30px; height:30px; border-radius:8px; background:transparent; border:1px solid var(--border-glow); color:var(--accent-red);
     cursor:pointer; flex-shrink:0; }
+  .item-catalogo-btn { width:30px; height:30px; border-radius:8px; background:transparent; border:1px solid rgba(58,134,255,.35); color:var(--accent-blue);
+    cursor:pointer; flex-shrink:0; font-size:13px; }
+  .item-catalogo-btn:hover { background:rgba(58,134,255,.1); }
+
+  /* ── MODAL SELECTOR DE CATÁLOGO ── */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:300;
+    align-items:center; justify-content:center; padding:16px; }
+  .modal-overlay.open { display:flex; }
+  .modal-panel { background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:16px; padding:20px;
+    width:100%; max-width:480px; max-height:85vh; overflow-y:auto; display:flex; flex-direction:column; }
+  .modal-titulo { font-size:14px; font-weight:800; margin-bottom:12px; }
+  .catalogo-buscador { width:100%; background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:10px;
+    padding:11px 14px; color:var(--text-main); font-size:13px; outline:none; margin-bottom:12px; }
+  .catalogo-buscador:focus { border-color:var(--accent-blue); }
+  .catalogo-lista { overflow-y:auto; flex:1; }
+  .catalogo-item { display:flex; gap:10px; align-items:center; padding:10px; border-radius:10px; cursor:pointer; margin-bottom:6px; border:1px solid transparent; }
+  .catalogo-item:hover { background:rgba(58,134,255,.08); border-color:rgba(58,134,255,.25); }
+  .catalogo-item .foto { width:42px; height:42px; border-radius:8px; background:var(--panel-darker); flex-shrink:0; object-fit:cover; display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--text-dim); }
+  .catalogo-item .foto img { width:100%; height:100%; object-fit:cover; border-radius:8px; }
+  .catalogo-item .nombre { font-size:12px; font-weight:700; }
+  .catalogo-item .marca { font-size:10px; color:var(--text-muted); margin-top:1px; }
+  .catalogo-item .precio { font-size:11px; color:var(--accent-green); font-weight:800; margin-left:auto; white-space:nowrap; }
+  .btn-cerrar-modal { width:100%; padding:11px; border-radius:10px; background:transparent; border:1px solid var(--border-glow); color:var(--text-muted);
+    font-size:12px; font-weight:700; cursor:pointer; margin-top:10px; }
   .item-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px; }
   .item-grid .campo label { font-size:8px; color:var(--text-dim); text-transform:uppercase; font-weight:700; display:block; margin-bottom:3px; }
   .item-grid input, .item-grid select { width:100%; background:#0d1520; border:1px solid var(--border-glow); border-radius:7px;
@@ -126,9 +151,9 @@
   body.tema-claro .tema-toggle button { color:#64748b; }
   body.tema-claro .section, body.tema-claro .det-campo input, body.tema-claro .det-campo select, body.tema-claro .det-campo textarea,
   body.tema-claro .buscador-cliente-input, body.tema-claro .cliente-card-sel, body.tema-claro .item-card, body.tema-claro .banco-card,
-  body.tema-claro .resultados-cliente { background:#ffffff; border-color:#e2e8f0; }
-  body.tema-claro .item-foto, body.tema-claro .item-grid input, body.tema-claro .item-grid select { background:#f8fafc; }
-  body.tema-claro .det-campo input, body.tema-claro .buscador-cliente-input { color:#0f172a; }
+  body.tema-claro .resultados-cliente, body.tema-claro .modal-panel, body.tema-claro .catalogo-buscador { background:#ffffff; border-color:#e2e8f0; }
+  body.tema-claro .item-foto, body.tema-claro .item-grid input, body.tema-claro .item-grid select, body.tema-claro .catalogo-item .foto { background:#f8fafc; }
+  body.tema-claro .det-campo input, body.tema-claro .buscador-cliente-input, body.tema-claro .catalogo-buscador { color:#0f172a; }
   body.tema-claro select, body.tema-claro select option { color:#0f172a; }
   body.tema-claro #bloque-contacto-selector select { background:#f8fafc; }
   body.tema-claro .section-title .hint { color:#94a3b8; }
@@ -172,6 +197,8 @@
         <div class="cliente-card-sel">
           <div class="razon" id="cs-razon"></div>
           <div class="cuit" id="cs-cuit"></div>
+          <div class="cuit" id="cs-telefono"></div>
+          <div class="cuit" id="cs-domicilio"></div>
           <button class="btn-cambiar" onclick="_cambiarCliente()">Cambiar cliente</button>
         </div>
 
@@ -225,19 +252,22 @@
       <div class="section-title">🏦 Cuentas Bancarias</div>
       <div class="banco-card">
         <span class="moneda-tag">ARS</span>
-        <div class="fila"><span>Banco</span><b>Banco Ejemplo S.A.</b></div>
-        <div class="fila"><span>CBU</span><b>0000000000000000000000</b></div>
-        <div class="fila"><span>Alias</span><b>TLC.EJEMPLO.ARS</b></div>
-        <div class="fila"><span>Titular</span><b>Tecnología Láser Corneal S.R.L.</b></div>
+        <div class="fila"><span>Cuenta</span><b>Credicoop CC$ 191-218-015278/6</b></div>
+        <div class="fila"><span>CBU</span><b>19102182-55021801527864</b></div>
+        <div class="fila"><span>Alias</span><b>jade.lado.persa</b></div>
       </div>
       <div class="banco-card">
         <span class="moneda-tag" style="background:rgba(6,214,160,.12);color:var(--accent-green);">USD</span>
-        <div class="fila"><span>Banco</span><b>Banco Ejemplo S.A.</b></div>
-        <div class="fila"><span>CBU</span><b>0000000000000000000000</b></div>
-        <div class="fila"><span>Alias</span><b>TLC.EJEMPLO.USD</b></div>
-        <div class="fila"><span>Titular</span><b>Tecnología Láser Corneal S.R.L.</b></div>
+        <div class="fila"><span>Cuenta</span><b>Credicoop CA USD 191-218-019730/3</b></div>
+        <div class="fila"><span>CBU</span><b>191021825522180197303</b></div>
+        <div class="fila"><span>Alias</span><b>TLC.CREDICOOP.USD</b></div>
       </div>
-      <div class="aviso-mock">⚠️ Datos de ejemplo — falta cargar los datos bancarios reales de TLC.</div>
+      <div class="banco-card">
+        <span class="moneda-tag">ARS</span>
+        <div class="fila"><span>Cuenta</span><b>Galicia CC$ Nº 4739-5 306-1</b></div>
+        <div class="fila"><span>CBU</span><b>0070306020000004739511</b></div>
+        <div class="fila"><span>Alias</span><b>TLC.BUENOS.AIRES</b></div>
+      </div>
     </div>
 
     <!-- ═══ TOTALES ═══ -->
@@ -263,6 +293,16 @@
 
   </div>
 
+  <!-- MODAL SELECTOR DE CATÁLOGO -->
+  <div class="modal-overlay" id="modal-catalogo">
+    <div class="modal-panel">
+      <div class="modal-titulo">📦 Elegir dispositivo del catálogo</div>
+      <input class="catalogo-buscador" id="input-buscar-catalogo" placeholder="Buscar por nombre o marca..." oninput="_filtrarCatalogo(this.value)" autocomplete="off">
+      <div class="catalogo-lista" id="catalogo-lista"></div>
+      <button class="btn-cerrar-modal" onclick="_cerrarCatalogo()">Cancelar</button>
+    </div>
+  </div>
+
 <script>
 const APP_VERSION = (typeof PORTAL_TLC_VERSION !== 'undefined') ? PORTAL_TLC_VERSION : '?';
 console.log("%c TLC Presupuesto Editor v" + APP_VERSION + " ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
@@ -270,14 +310,19 @@ console.log("%c TLC Presupuesto Editor v" + APP_VERSION + " ", "background:#3a86
 // presupuesto-editor.html — reemplazo planeado del carrito viejo de
 // cotizaciones.html / selector-dispositivos.html. Estado actual:
 //   ✅ Cliente: conectado de verdad a Firebase (mismo listarEmpresas
-//      que usa empresas.html). Si llega con ?empresa=... por URL
-//      (desde el botón "Nuevo Negocio" de empresas.html) el cliente
-//      viene precargado y bloqueado.
-//   ✅ Contacto: dropdown obligatorio si la empresa tiene 2+ contactos.
+//      que usa empresas.html), con todos los datos de la empresa
+//      (razón social, CUIT, teléfono, domicilio). Si llega con
+//      ?empresa=... por URL (desde "Nuevo Negocio" en empresas.html)
+//      el cliente viene precargado y bloqueado.
+//   ✅ Contacto: dropdown obligatorio si la empresa tiene 2+ contactos,
+//      muestra teléfono y email del contacto elegido.
+//   ✅ Ítems: cada uno se puede cargar a mano o elegir del catálogo
+//      real (precios.json, mismo dataset que selector-dispositivos.html)
+//      con buscador — completa descripción, precio y foto automático.
+//   ✅ Cuentas Bancarias: datos reales de TLC (Credicoop AR$/USD,
+//      Galicia AR$) — los mismos que usa presupuesto.html.
 //   ⏳ PENDIENTE: "Generar presupuesto" todavía NO guarda en Firebase
 //      ni genera el documento final — es el próximo paso.
-//   ⏳ PENDIENTE: Cuentas Bancarias con datos de ejemplo — falta que
-//      Cristian pase los datos reales de TLC.
 // ══════════════════════════════════════════════════════════════════
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 
@@ -296,6 +341,8 @@ function _leerParamsIniciales() {
     id: p.get('empresa') || null,
     razonSocial: p.get('razon') || '',
     cuit: p.get('cuit') || '',
+    domicilio: p.get('domicilio') || '',
+    telefono: p.get('telefonoEmpresa') || '',
     contactos: []
   };
   if (p.get('contactoNombre')) {
@@ -383,6 +430,12 @@ function _renderCliente() {
   bSel.style.display = 'block';
   document.getElementById('cs-razon').textContent = CLIENTE_SEL.razonSocial || 'Sin nombre';
   document.getElementById('cs-cuit').textContent = CLIENTE_SEL.cuit ? 'CUIT ' + CLIENTE_SEL.cuit : 'Sin CUIT cargado';
+  var elTel = document.getElementById('cs-telefono');
+  elTel.textContent = CLIENTE_SEL.telefono ? '📞 ' + CLIENTE_SEL.telefono : '';
+  elTel.style.display = CLIENTE_SEL.telefono ? 'block' : 'none';
+  var elDom = document.getElementById('cs-domicilio');
+  elDom.textContent = CLIENTE_SEL.domicilio ? '📍 ' + CLIENTE_SEL.domicilio : '';
+  elDom.style.display = CLIENTE_SEL.domicilio ? 'block' : 'none';
 
   var contactos = CLIENTE_SEL.contactos || [];
   var cont = document.getElementById('bloque-contacto-selector');
@@ -399,11 +452,25 @@ function _renderCliente() {
   }).join('');
   var placeholder = contactos.length > 1 && !CONTACTO_SEL ? '<option value="" selected disabled>Seleccioná un contacto...</option>' : '';
   cont.innerHTML = '<div class="det-campo full"><label>Contacto</label>' +
-    '<select onchange="_seleccionarContacto(this.value)">' + placeholder + opciones + '</select></div>';
+    '<select onchange="_seleccionarContacto(this.value)">' + placeholder + opciones + '</select>' +
+    '<div class="contacto-datos" id="contacto-datos-linea"></div>' +
+  '</div>';
+  _renderContactoDatos();
+}
+
+function _renderContactoDatos() {
+  var el = document.getElementById('contacto-datos-linea');
+  if (!el) return;
+  if (!CONTACTO_SEL) { el.innerHTML = ''; return; }
+  var partes = [];
+  if (CONTACTO_SEL.telefono) partes.push('📞 ' + CONTACTO_SEL.telefono);
+  if (CONTACTO_SEL.email) partes.push('✉️ ' + CONTACTO_SEL.email);
+  el.innerHTML = partes.join(' &nbsp;·&nbsp; ');
 }
 
 window._seleccionarContacto = function(i) {
   CONTACTO_SEL = CLIENTE_SEL.contactos[i];
+  _renderContactoDatos();
 };
 
 // ── ÍTEMS ──
@@ -442,6 +509,76 @@ window._fotoItem = function(id, input) {
   reader.readAsDataURL(file);
 };
 
+// ── CATÁLOGO DE DISPOSITIVOS — mismo precios.json que usa
+// selector-dispositivos.html. Ruta relativa (no absoluta a github.io)
+// para evitar el bug de CORS ya cazado en otros módulos. ──
+var CATALOGO_CACHE = null;
+var _itemCatalogoTarget = null;
+
+async function _cargarCatalogo() {
+  if (CATALOGO_CACHE) return CATALOGO_CACHE;
+  try {
+    var resp = await fetch('./precios.json', { cache:'no-store' });
+    CATALOGO_CACHE = resp.ok ? await resp.json() : [];
+  } catch(e) { console.warn('Error cargando precios.json:', e); CATALOGO_CACHE = []; }
+  return CATALOGO_CACHE;
+}
+
+function _precioCatalogo(d) {
+  return parseFloat(d['Precio LISTA']) || parseFloat(d['Precio CONTADO CNO']) || 0;
+}
+
+async function _abrirCatalogo(itemId) {
+  _itemCatalogoTarget = itemId;
+  document.getElementById('modal-catalogo').classList.add('open');
+  document.getElementById('input-buscar-catalogo').value = '';
+  document.getElementById('catalogo-lista').innerHTML = '<div class="sin-resultados">Cargando catálogo...</div>';
+  await _cargarCatalogo();
+  _filtrarCatalogo('');
+}
+
+function _cerrarCatalogo() {
+  document.getElementById('modal-catalogo').classList.remove('open');
+  _itemCatalogoTarget = null;
+}
+
+function _filtrarCatalogo(q) {
+  var lista = CATALOGO_CACHE || [];
+  var qn = (q || '').toUpperCase().trim();
+  var resultados = qn
+    ? lista.filter(function(d) {
+        return (d['Nombre de Dispositivo'] || '').toUpperCase().indexOf(qn) !== -1 ||
+          (d['Marca'] || '').toUpperCase().indexOf(qn) !== -1 ||
+          (d['Sub Categoria'] || '').toUpperCase().indexOf(qn) !== -1;
+      })
+    : lista;
+  resultados = resultados.slice(0, 40);
+  var cont = document.getElementById('catalogo-lista');
+  window._catalogoResultados = resultados;
+  cont.innerHTML = resultados.length
+    ? resultados.map(function(d, i) {
+        var precio = _precioCatalogo(d);
+        return '<div class="catalogo-item" onclick="_seleccionarCatalogo(' + i + ')">' +
+          '<div class="foto">' + (d.Foto ? '<img src="' + d.Foto + '">' : '📷') + '</div>' +
+          '<div><div class="nombre">' + (d['Nombre de Dispositivo'] || 'Sin nombre') + '</div>' +
+          '<div class="marca">' + (d['Marca'] || d['Sub Categoria'] || '') + '</div></div>' +
+          (precio ? '<div class="precio">USD ' + Math.round(precio).toLocaleString('es-AR') + '</div>' : '') +
+        '</div>';
+      }).join('')
+    : '<div class="sin-resultados">Sin resultados en el catálogo.</div>';
+}
+
+window._seleccionarCatalogo = function(i) {
+  var d = window._catalogoResultados[i];
+  var it = ITEMS.find(function(x){ return x.id === _itemCatalogoTarget; });
+  if (!d || !it) return;
+  it.descripcion = d['Nombre de Dispositivo'] || it.descripcion;
+  it.precio = _precioCatalogo(d) || it.precio;
+  if (d.Foto) it.foto = d.Foto;
+  _cerrarCatalogo();
+  _render();
+};
+
 function _fmtMoneda(n) {
   var moneda = document.getElementById('moneda-presupuesto').value;
   return moneda + ' ' + (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits:2, maximumFractionDigits:2 });
@@ -465,6 +602,7 @@ function _renderItems() {
           '<input type="file" id="file-' + it.id + '" accept="image/*" style="display:none;" onchange="_fotoItem(' + it.id + ', this)">' +
         '</div>' +
         '<input class="item-desc-input" placeholder="Descripción del equipo/ítem..." value="' + (it.descripcion || '').replace(/"/g,'&quot;') + '" onchange="_actualizarItem(' + it.id + ',\'descripcion\',this.value)">' +
+        '<button class="item-catalogo-btn" title="Elegir del catálogo" onclick="_abrirCatalogo(' + it.id + ')">🔍</button>' +
         '<button class="item-borrar" onclick="_borrarItem(' + it.id + ')">✕</button>' +
       '</div>' +
       '<div class="item-grid">' +
