@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.5 (Layout reordenado como el PDF real: Ítems → Totales → Condiciones → Datos Bancarios (formato compacto en línea) → footer de empresa, todo al final. TC oficial real desde dolarapi.com — antes el toggle ARS/USD solo cambiaba la etiqueta sin convertir el valor, ahora convierte de verdad.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.6 (IVA por defecto de nuevos ítems: 10,5% en vez de 21% — pendiente futuro: columna IVA en Excel/Firebase por equipo, por ahora fijo. Precio LISTA confirmado como prioridad, ya estaba bien.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -404,7 +404,7 @@ function _restaurarDraftYItemPendiente() {
     var rawItem = sessionStorage.getItem('tlc_item_pendiente_presupuesto');
     if (rawItem) {
       var it = JSON.parse(rawItem);
-      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: it.nombre || '', precio: it.precio || 0, cantidad: 1, descuento: 0, iva: 21 });
+      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: it.nombre || '', precio: it.precio || 0, cantidad: 1, descuento: 0, iva: 10.5 });
     }
   } catch (e) { console.warn('Error aplicando ítem pendiente:', e); }
   sessionStorage.removeItem('tlc_item_pendiente_presupuesto');
@@ -583,7 +583,7 @@ window._seleccionarContacto = function(i) {
 
 // ── ÍTEMS ──
 function _agregarItem() {
-  ITEMS.push({ id: ++_itemSeq, foto:null, descripcion:'', precio:0, cantidad:1, descuento:0, iva:21 });
+  ITEMS.push({ id: ++_itemSeq, foto:null, descripcion:'', precio:0, cantidad:1, descuento:0, iva:10.5 });
   _render();
 }
 window._borrarItem = function(id) {
@@ -633,6 +633,8 @@ async function _cargarCatalogo() {
 }
 
 function _precioCatalogo(d) {
+  // Precio LISTA siempre tiene prioridad (default pedido por Cristian);
+  // Precio CONTADO CNO solo como respaldo si el equipo no tiene LISTA cargado.
   return parseFloat(d['Precio LISTA']) || parseFloat(d['Precio CONTADO CNO']) || 0;
 }
 
