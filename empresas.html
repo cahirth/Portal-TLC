@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.24.5 (Negocios asociados limitado a los últimos 5) -->
+<!-- Portal TLC | empresas.html | v2026.07.24.6 (Modal "Nuevo Negocio" con selector de contacto obligatorio → arma la URL para presupuesto-editor.html) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -114,6 +114,23 @@
 
   @media (max-width:640px) { .det-grid { grid-template-columns:1fr; } }
 
+  /* ── MODAL NUEVO NEGOCIO ── */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:300;
+    align-items:center; justify-content:center; padding:16px; }
+  .modal-overlay.open { display:flex; }
+  .modal-panel { background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:16px; padding:20px;
+    width:100%; max-width:420px; max-height:90vh; overflow-y:auto; }
+  .modal-titulo { font-size:14px; font-weight:800; margin-bottom:4px; }
+  .modal-sub { font-size:11px; color:var(--text-muted); margin-bottom:16px; }
+  .modal-campo { margin-bottom:14px; }
+  .modal-campo label { font-size:9px; color:var(--text-dim); text-transform:uppercase; font-weight:700; display:block; margin-bottom:5px; }
+  .modal-campo select, .modal-campo input { width:100%; background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:8px;
+    padding:10px 11px; color:var(--text-main); font-size:12px; outline:none; }
+  .modal-campo select:focus, .modal-campo input:focus { border-color:var(--accent-blue); }
+  .modal-acciones { display:flex; gap:10px; margin-top:6px; }
+  .modal-warning { background:rgba(248,150,30,.08); border:1px solid rgba(248,150,30,.3); border-radius:9px; padding:10px 12px;
+    font-size:11px; color:var(--accent-orange); margin-bottom:14px; }
+
   /* ═══════ MODO CLARO ═══════ */
   body.tema-claro { background:#f0f4f8; color:#1e293b; }
   body.tema-claro .header { background:linear-gradient(135deg,#ffffff,#f1f5f9); border-bottom-color:#cbd5e1; }
@@ -124,7 +141,8 @@
   body.tema-claro .tema-toggle button { color:#64748b; }
   body.tema-claro .buscador-input, body.tema-claro .empresa-card, body.tema-claro .section,
   body.tema-claro .det-campo input, body.tema-claro .contacto-card, body.tema-claro .form-contacto,
-  body.tema-claro .negocio-card { background:#ffffff; border-color:#e2e8f0; }
+  body.tema-claro .negocio-card, body.tema-claro .modal-panel, body.tema-claro .modal-campo select,
+  body.tema-claro .modal-campo input { background:#ffffff; border-color:#e2e8f0; }
   body.tema-claro .empresa-card:hover { border-color:#1a4b8c; }
   body.tema-claro .empresa-card-razon, body.tema-claro .det-campo input, body.tema-claro .contacto-info .nombre,
   body.tema-claro .negocio-id, body.tema-claro .section-title .hint, body.tema-claro .buscador-input { color:#0f172a; }
@@ -681,15 +699,7 @@ window._nuevoNegocio = function(tipo) {
   if (!e) return;
 
   if (tipo === 'ventas') {
-    // Toma el primer contacto seleccionable de la empresa, si tiene, para
-    // precargar también el nombre de la persona (no solo la razón social).
-    var contacto = (e.contactos && e.contactos[0]) || {};
-    var url = 'https://cahirth.github.io/Portal-TLC/selector-dispositivos.html?nuevoNegocio=1' +
-      '&razon=' + encodeURIComponent(e.razonSocial || '') +
-      '&cuit=' + encodeURIComponent(e.cuit || '') +
-      '&contacto=' + encodeURIComponent(contacto.nombre || '') +
-      '&telefonoContacto=' + encodeURIComponent(contacto.telefono || e.telefono || '');
-    window.location.href = url;
+    _abrirModalNuevoNegocio(e);
     return;
   }
 
@@ -700,6 +710,84 @@ window._nuevoNegocio = function(tipo) {
     window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html';
   }
 };
+
+// ══════════════════════════════════════════════════════════════════
+// MODAL "NUEVO NEGOCIO (VENTAS)" — pide contacto (obligatorio si la
+// empresa tiene 2+) y arma la URL de presupuesto-editor.html con todo
+// precargado. No toca el flujo viejo de selector-dispositivos.html.
+// ══════════════════════════════════════════════════════════════════
+var _mnnEmpresa = null;
+var _mnnContactoIdx = null;
+
+function _abrirModalNuevoNegocio(e) {
+  _mnnEmpresa = e;
+  _mnnContactoIdx = (e.contactos && e.contactos.length === 1) ? 0 : null;
+  document.getElementById('mnn-empresa-nombre').textContent =
+    (e.razonSocial || 'Sin nombre') + (e.cuit ? ' · CUIT ' + e.cuit : '');
+  _renderModalNuevoNegocio();
+  document.getElementById('modal-nuevo-negocio').classList.add('open');
+}
+
+function _cerrarModalNuevoNegocio() {
+  document.getElementById('modal-nuevo-negocio').classList.remove('open');
+  _mnnEmpresa = null;
+  _mnnContactoIdx = null;
+}
+
+function _renderModalNuevoNegocio() {
+  var e = _mnnEmpresa;
+  var cont = document.getElementById('mnn-contenido');
+  var contactos = (e.contactos || []);
+  var btnCrear = document.getElementById('mnn-btn-crear');
+
+  if (!contactos.length) {
+    cont.innerHTML = '<div class="modal-warning">Esta empresa todavía no tiene contactos cargados. ' +
+      'Agregá uno antes de crear el negocio.</div>';
+    btnCrear.disabled = true;
+    btnCrear.style.opacity = '.5';
+    btnCrear.style.cursor = 'not-allowed';
+    return;
+  }
+
+  btnCrear.disabled = false;
+  btnCrear.style.opacity = '1';
+  btnCrear.style.cursor = 'pointer';
+
+  var placeholder = contactos.length > 1 && _mnnContactoIdx === null
+    ? '<option value="" selected disabled>Seleccioná un contacto...</option>' : '';
+  var opciones = contactos.map(function(c, i) {
+    var sel = _mnnContactoIdx === i ? ' selected' : '';
+    return '<option value="' + i + '"' + sel + '>' + c.nombre + (c.cargo ? ' — ' + c.cargo : '') + '</option>';
+  }).join('');
+
+  cont.innerHTML = '<div class="modal-campo"><label>Contacto</label>' +
+    '<select onchange="_mnnContactoIdx = this.value === \'\' ? null : parseInt(this.value,10);">' +
+    placeholder + opciones + '</select></div>';
+}
+
+function _confirmarNuevoNegocio() {
+  var e = _mnnEmpresa;
+  if (!e) return;
+  var contactos = (e.contactos || []);
+  if (contactos.length && _mnnContactoIdx === null) {
+    alert('Elegí un contacto antes de continuar.');
+    return;
+  }
+  var c = (_mnnContactoIdx !== null) ? contactos[_mnnContactoIdx] : null;
+
+  var url = 'presupuesto-editor.html' +
+    '?empresa=' + encodeURIComponent(e.id || '') +
+    '&razon=' + encodeURIComponent(e.razonSocial || '') +
+    '&cuit=' + encodeURIComponent(e.cuit || '');
+  if (c) {
+    url += '&contactoId=' + encodeURIComponent(c.id || '') +
+      '&contactoNombre=' + encodeURIComponent(c.nombre || '') +
+      '&contactoCargo=' + encodeURIComponent(c.cargo || '') +
+      '&contactoEmail=' + encodeURIComponent(c.email || '') +
+      '&contactoTelefono=' + encodeURIComponent(c.telefono || '');
+  }
+  window.location.href = url;
+}
 
 // ══════════════════════════════════════════════════════════════════
 // IMPORTAR DESDE EXCEL — lee el archivo en el navegador (sin subirlo a
@@ -882,5 +970,20 @@ window._confirmarImportacion = async function() {
   if (empresaId) _abrirDetalleEmpresa(empresaId);
 })();
 </script>
+  <!-- MODAL NUEVO NEGOCIO (VENTAS) -->
+  <div class="modal-overlay" id="modal-nuevo-negocio">
+    <div class="modal-panel">
+      <div class="modal-titulo">💼 Nuevo Negocio (Ventas)</div>
+      <div class="modal-sub" id="mnn-empresa-nombre"></div>
+
+      <div id="mnn-contenido"></div>
+
+      <div class="modal-acciones">
+        <button class="btn-borrar-empresa" style="flex:1;color:var(--text-muted);background:transparent;border-color:var(--border-glow);" onclick="_cerrarModalNuevoNegocio()">Cancelar</button>
+        <button class="btn-guardar-empresa" style="flex:1;" id="mnn-btn-crear" onclick="_confirmarNuevoNegocio()">Crear cotización</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
