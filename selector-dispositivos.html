@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.24.1 (+ precarga de cliente al crear negocio desde Empresas) -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.25.1 (Nuevo puente ?volverAPresupuesto=1 con presupuesto-editor.html, mismo patrón que ?agregarA con cotizaciones.html) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1836,7 +1836,11 @@ window.addEventListener('DOMContentLoaded', function() {
 // "Agregar al carrito" vuelve directo a esa cotización en vez de armar
 // un carrito nuevo (ver agregarAlCarrito()).
 const _agregarACotizacionId = new URLSearchParams(window.location.search).get('agregarA') || '';
-if (_agregarACotizacionId) {
+// Puente con presupuesto-editor.html: si viene ?volverAPresupuesto=1,
+// el próximo "Agregar al carrito" guarda el equipo elegido y vuelve
+// directo ahí (ver agregarAlCarrito()) — mismo patrón que _agregarACotizacionId.
+const _volverAPresupuesto = new URLSearchParams(window.location.search).get('volverAPresupuesto') === '1';
+if (_agregarACotizacionId || _volverAPresupuesto) {
     document.addEventListener('DOMContentLoaded', function() {
         const banner = document.getElementById('banner-agregar-cotizacion');
         if (banner) banner.style.display = 'block';
@@ -3278,7 +3282,7 @@ document.getElementById('btn-back').addEventListener('click', () => {
 
 // ─── FORMULARIO ───────────────────────────────────────────────────────────────
 document.getElementById('btn-cotizar').addEventListener('click', agregarAlCarrito);
-if (_agregarACotizacionId) {
+if (_agregarACotizacionId || _volverAPresupuesto) {
     const btnCot = document.getElementById('btn-cotizar');
     if (btnCot) btnCot.textContent = '➕ Agregar a la cotización';
 }
@@ -3477,6 +3481,22 @@ function agregarAlCarrito() {
             }));
         } catch(e) {}
         window.location.href = 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(_agregarACotizacionId) + '&agregarItem=1';
+        return;
+    }
+
+    // Puente: si llegamos acá con ?volverAPresupuesto=1 (desde "+ Agregar
+    // ítem" en presupuesto-editor.html), mismo patrón que arriba pero
+    // volviendo al editor de presupuestos en vez de a cotizaciones.html.
+    if (_volverAPresupuesto) {
+        const precioListaPP = parseNum(d['Precio LISTA']);
+        try {
+            sessionStorage.setItem('tlc_item_pendiente_presupuesto', JSON.stringify({
+                nombre: d['Nombre de Dispositivo'] || '',
+                precio: isNaN(precioListaPP) ? 0 : precioListaPP,
+                foto: fotoUrl(d['Foto'] || ''),
+            }));
+        } catch(e) {}
+        window.location.href = 'https://cahirth.github.io/Portal-TLC/presupuesto-editor.html?restaurarDraft=1';
         return;
     }
 
