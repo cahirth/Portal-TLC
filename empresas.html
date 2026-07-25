@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.24.6 (Modal "Nuevo Negocio" con selector de contacto obligatorio → arma la URL para presupuesto-editor.html) -->
+<!-- Portal TLC | empresas.html | v2026.07.24.7 (Fix: texto invisible en options de selects en modo claro — color-scheme + color explícito) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -143,6 +143,7 @@
   body.tema-claro .det-campo input, body.tema-claro .contacto-card, body.tema-claro .form-contacto,
   body.tema-claro .negocio-card, body.tema-claro .modal-panel, body.tema-claro .modal-campo select,
   body.tema-claro .modal-campo input { background:#ffffff; border-color:#e2e8f0; }
+  body.tema-claro .modal-campo select, body.tema-claro .modal-campo select option { color:#0f172a; }
   body.tema-claro .empresa-card:hover { border-color:#1a4b8c; }
   body.tema-claro .empresa-card-razon, body.tema-claro .det-campo input, body.tema-claro .contacto-info .nombre,
   body.tema-claro .negocio-id, body.tema-claro .section-title .hint, body.tema-claro .buscador-input { color:#0f172a; }
@@ -404,6 +405,7 @@ function _aplicarTema() {
   var tema = 'dark';
   try { tema = localStorage.getItem('tlc_tema') || 'dark'; } catch(e) {}
   document.body.classList.toggle('tema-claro', tema === 'light');
+  document.documentElement.style.colorScheme = tema === 'light' ? 'light' : 'dark';
   var bo = document.getElementById('btn-tema-oscuro'), bc = document.getElementById('btn-tema-claro');
   if (bo) bo.classList.toggle('active', tema !== 'light');
   if (bc) bc.classList.toggle('active', tema === 'light');

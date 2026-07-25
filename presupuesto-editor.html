@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.24.1 (primera versión conectada a Firebase — Cliente real, Ítems, Condiciones, Cuentas Bancarias de ejemplo. Guardado real todavía PENDIENTE.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.24.2 (Fix: texto invisible en options de selects en modo claro — color-scheme + color explícito) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -129,6 +129,8 @@
   body.tema-claro .resultados-cliente { background:#ffffff; border-color:#e2e8f0; }
   body.tema-claro .item-foto, body.tema-claro .item-grid input, body.tema-claro .item-grid select { background:#f8fafc; }
   body.tema-claro .det-campo input, body.tema-claro .buscador-cliente-input { color:#0f172a; }
+  body.tema-claro select, body.tema-claro select option { color:#0f172a; }
+  body.tema-claro #bloque-contacto-selector select { background:#f8fafc; }
   body.tema-claro .section-title .hint { color:#94a3b8; }
 </style>
 </head>
@@ -529,6 +531,7 @@ function _generarPresupuesto() {
 function _aplicarTema() {
   var tema = localStorage.getItem('tlc_tema') || 'dark';
   document.body.classList.toggle('tema-claro', tema === 'light');
+  document.documentElement.style.colorScheme = tema === 'light' ? 'light' : 'dark';
   document.getElementById('btn-tema-oscuro').classList.toggle('active', tema === 'dark');
   document.getElementById('btn-tema-claro').classList.toggle('active', tema === 'light');
 }
