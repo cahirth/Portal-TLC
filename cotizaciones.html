@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.26.2-DEBUG (Solo para diagnosticar el bug de @menciones — logs temporales agregados, sacar antes de la versión final) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.26.3 (Sin cambios de UI — solo quitados los logs de diagnóstico temporales usados para encontrar el bug de listarInternos, ver FotoMap.gs v118) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -883,13 +883,8 @@ async function _cargarInternosMencionesCot() {
         var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'listarInternos' }) });
         var r = await resp.json();
-        console.log('%c[DEBUG @menciones] Respuesta de listarInternos:', 'background:#3a86ff;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;', r);
         _internosCacheCot = (r.ok && Array.isArray(r.internos)) ? r.internos : [];
-        console.log('%c[DEBUG @menciones] Internos cacheados (' + _internosCacheCot.length + '):', 'background:#06d6a0;color:#04231a;font-weight:bold;padding:2px 6px;border-radius:4px;', _internosCacheCot);
-    } catch(e) {
-        console.log('%c[DEBUG @menciones] ERROR al pedir listarInternos:', 'background:#f87171;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;', e);
-        _internosCacheCot = [];
-    }
+    } catch(e) { _internosCacheCot = []; }
     return _internosCacheCot;
 }
 
