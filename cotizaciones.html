@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.25.9 (Fix: inyección optimista ahora REEMPLAZA negocios ya existentes desactualizados, no solo inserta nuevos — antes guardar una cotización sobre un negocio existente no se reflejaba al instante. Botón 🗑️ Borrar por versión en Historial de versiones.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.25.10 (Guardar Nota: antes era optimista y silencioso — mostraba la nota al toque aunque el guardado real fallara sin avisar. Ahora espera la confirmación real del servidor, muestra "Guardando..." mientras tanto, y si falla avisa con alert y no pierde el texto escrito.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2193,7 +2193,7 @@ function _renderDetalle(c) {
             placeholder="Escribí un comentario de seguimiento..."
             onfocus="this.style.borderColor='#3a86ff'"
             onblur="this.style.borderColor='#1e3050'"></textarea>
-        <button onclick="_guardarNotaInline('${id}')" class="btn-guardar-nota">
+        <button id="btn-guardar-nota-${id}" onclick="_guardarNotaInline('${id}')" class="btn-guardar-nota">
             💾 Guardar Nota
         </button>
     </div>`;
@@ -2690,44 +2690,56 @@ async function _guardarEdicionNota(id, ni) {
 // ─── GUARDAR NOTA INLINE ─────────────────────────────────────────
 async function _guardarNotaInline(id) {
     const txtEl = document.getElementById(`nueva-nota-txt-${id}`);
+    const btnEl = document.getElementById(`btn-guardar-nota-${id}`);
     if (!txtEl) return;
     const texto = txtEl.value.trim();
     if (!texto) { txtEl.focus(); return; }
 
-    // Armar objeto nota
+    if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ Guardando...'; btnEl.style.opacity = '.7'; btnEl.style.cursor = 'not-allowed'; }
+
     const nuevaNota = {
         texto,
         fecha:    new Date().toISOString(),
         vendedor: currentUserNombre,
     };
 
-    // Paso A: inyectar en memoria a 0ms
-    const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id));
-    if (c) {
-        if (!Array.isArray(c.notas_papiro)) c.notas_papiro = [];
-        c.notas_papiro.unshift(nuevaNota);
-        // Re-renderizar detalle con la nueva nota visible
-        _renderDetalle(c);
-    }
+    try {
+        const resp = await fetch(APPS_SCRIPT_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    JSON.stringify({ accion: 'agregarNota', idCot: id, nota: nuevaNota }),
+        });
+        const texto2 = await resp.text();
+        let r;
+        try { r = JSON.parse(texto2); }
+        catch(eParse) {
+            alert('El servidor no devolvió una respuesta válida al guardar la nota — revisá la consola (F12).');
+            console.error('Respuesta cruda:', texto2);
+            if (btnEl) { btnEl.disabled = false; btnEl.textContent = '💾 Guardar Nota'; btnEl.style.opacity = '1'; btnEl.style.cursor = 'pointer'; }
+            return;
+        }
+        if (!r.ok) {
+            alert('No se pudo guardar la nota: ' + (r.error || r.message || 'error desconocido'));
+            if (btnEl) { btnEl.disabled = false; btnEl.textContent = '💾 Guardar Nota'; btnEl.style.opacity = '1'; btnEl.style.cursor = 'pointer'; }
+            return;
+        }
 
-    // Paso B: persistir en background → recargar JSON al confirmar
-    fetch(APPS_SCRIPT_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body:    JSON.stringify({ accion: 'agregarNota', idCot: id, nota: nuevaNota }),
-    })
-    .then(r => r.text()).then(t => {
-        try {
-            const r = JSON.parse(t);
-            if (r.ok) {
-                console.log('Nota persistida ✅ — recargando JSON...');
-                _recargarHistoricoSilencioso();
-            } else {
-                console.warn('Nota ⚠️', r.error);
-            }
-        } catch(e) {}
-    })
-    .catch(e => console.warn('Persistencia nota:', e));
+        // Recién ahora que se confirmó que se guardó de verdad, la
+        // reflejamos en memoria y re-renderizamos — evita mostrar una
+        // nota "fantasma" que en realidad no llegó a guardarse.
+        const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id));
+        if (c) {
+            if (!Array.isArray(c.notas_papiro)) c.notas_papiro = [];
+            c.notas_papiro.unshift(nuevaNota);
+            _renderDetalle(c);
+        }
+        _toast('✅ Nota guardada');
+        _recargarHistoricoSilencioso();
+    } catch(e) {
+        console.error('Error de red guardando nota:', e);
+        alert('Error de conexión al guardar la nota — el texto no se perdió, podés reintentar.');
+        if (btnEl) { btnEl.disabled = false; btnEl.textContent = '💾 Guardar Nota'; btnEl.style.opacity = '1'; btnEl.style.cursor = 'pointer'; }
+    }
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────
