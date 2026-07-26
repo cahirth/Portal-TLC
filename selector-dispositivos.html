@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.25.4 (El puente con presupuesto-editor.html ahora también manda linkFolleto/linkVideo del ítem elegido, para que lleguen hasta el PDF final) -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.25.6 (Ícono del carrito standalone sacado de la UI — quedaba siempre vacío, sin forma de llenarlo desde que "Agregar al Carrito" solo se muestra en modo puente. El resto del sistema de carrito/Pantalla Comercial queda INTACTO porque lo sigue usando el flujo de tickets de Servicio Técnico.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1210,7 +1210,7 @@
         <div style="display:flex; gap:8px;">
             <button class="btn-folleto" id="btn-cotizar" style="display:none; flex:1; margin-bottom:0; border-color:#c0006b; color:#ff007f; cursor:pointer;">🛒 Agregar al Carrito</button>
             <a class="btn-folleto" id="btn-folleto" target="_blank" style="display:none; flex:1; margin-bottom:0;">📄 Folleto</a>
-            <a class="btn-folleto" id="btn-video" target="_blank" style="display:none; flex:1; margin-bottom:0; border-color:#f87171; color:#f87171;">▶️ Video</a>
+            <a class="btn-folleto" id="btn-video" target="_blank" style="display:none; flex:1; margin-bottom:0; border-color:#f87171; color:#f87171;">🌐 Web</a>
             <button class="btn-folleto" id="btn-ver-stock" onclick="_toggleStockDetalle()" style="display:none; flex:1; margin-bottom:0; border-color:#3a86ff; color:#3a86ff; cursor:pointer;">📦 Ver stock</button>
             <button class="btn-folleto" id="btn-compartir-ficha" onclick="_verFichaEquipo()" style="flex:1; margin-bottom:0; border-color:#06d6a0; color:#06d6a0; cursor:pointer;">📋 Ver ficha</button>
         </div>
@@ -1505,8 +1505,8 @@
                     Ver Folleto
                 </a>
                 <a id="form-btn-video" href="#" target="_blank" class="btn-folleto" style="display:none; flex:1; margin-bottom:0; background:linear-gradient(135deg,#1c1520,#2d1a2e); border-color:#f87171; color:#fca5a5; box-shadow:0 0 12px rgba(248,113,113,0.15);">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    Ver Video
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    Ver Página Web
                 </a>
             </div>
         </div>
@@ -1877,7 +1877,13 @@ async function mostrarApp(account) {
     const nombre = account.name || account.username;
     console.log('Account info:', JSON.stringify({name: account.name, user: account.username, rol: account.rol}));
     document.getElementById('user-greeting').textContent = `Hola, ${nombre}`;
-    document.getElementById('btn-carrito').style.display = 'flex';
+    // btn-carrito ya NO se muestra — el ícono del carrito quedó huérfano:
+    // la única forma de llenarlo (botón "Agregar al Carrito" fuera del
+    // modo puente) está oculta por defecto, así que el carrito estándalone
+    // siempre estaría vacío. El HTML/CSS/JS del carrito se deja intacto
+    // por abajo (no se borra) porque comparte la variable "carrito" y la
+    // Pantalla Comercial con el flujo de tickets de Servicio Técnico
+    // (?ticket=X), que sigue activo y no se debe tocar.
 
     // Rol Solo Vista / Visor: puede ver precios pero no cotizar
     if (currentUserRol === 'Visor' || currentUserRol === 'Solo_Precios' || currentUserRol === 'Solo Vista') {
@@ -5335,7 +5341,7 @@ async function generarHTMLPresupuesto({ nombre, razon, cuit, telefono, email, no
         const mediaHtml   = (linkFolleto || linkVideo) ? [
             '<div style="margin-top:6px;font-size:11px;">',
             linkFolleto ? '<a href="' + linkFolleto + '" target="_blank" style="color:#2563eb;text-decoration:none;font-weight:600;margin-right:12px;">\ud83d\udcc4 Ver Folleto \u2192<\/a>' : '',
-            linkVideo   ? '<a href="' + linkVideo   + '" target="_blank" style="color:#ef4444;text-decoration:none;font-weight:600;">\ud83c\udfa6 Ver Video Demo \u2192<\/a>' : '',
+            linkVideo   ? '<a href="' + linkVideo   + '" target="_blank" style="color:#ef4444;text-decoration:none;font-weight:600;">\ud83c\udf10 Ver P\u00e1gina Web \u2192<\/a>' : '',
             '<\/div>'
         ].join('') : '';
 
