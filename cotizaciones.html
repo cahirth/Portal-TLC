@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.25.11 (CAMBIO DE ARQUITECTURA: el Kanban lee de Firebase RTDB en vez de historico.json/GitHub — soluciona la demora de propagación de varios minutos. Fallback automático a GitHub si Firebase falla.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.25.12 (Conserva linkFolleto/linkVideo al reabrir un negocio existente para editar) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2863,6 +2863,8 @@ function _irAPresupuestoEditor(idCot) {
         cantidad: parseInt(it.cantidad) || 1,
         descuento: parseFloat(it.descuentoValor) || 0,
         iva: (it.ivaPct !== undefined && it.ivaPct !== null) ? parseFloat(it.ivaPct) : 10.5,
+        linkFolleto: it.linkFolleto || '',
+        linkVideo: it.linkVideo || '',
     }));
 
     const cond = c.condicionesComerciales || {};
