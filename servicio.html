@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.26.5 (Precarga real del formulario "Nuevo Ticket" cuando se llega desde el botón de una empresa — cliente/domicilio/teléfono bloqueados, datalist de contactos de esa empresa para el campo médico) -->
+<!-- Portal TLC | servicio.html | v2026.07.26.7 (Si la empresa tiene varios contactos, precarga el primero por defecto en vez de dejarlo vacío — el operador lo puede cambiar del datalist) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2972,13 +2972,35 @@ function _precargarNuevoTicketDesdeURL() {
   if (elTelefono && telefono)   { elTelefono.value = telefono;   elTelefono.readOnly = true;    elTelefono.style.opacity = '.75'; }
 
   if (elDatalist && contactosRaw) {
-    elDatalist.innerHTML = contactosRaw.split('|').filter(Boolean).map(function(nombre) {
-      return '<option value="' + nombre.replace(/"/g, '&quot;') + '">';
+    // Formato: "Nombre~Teléfono|Nombre2~Teléfono2|..." — el teléfono
+    // puede venir vacío si ese contacto no tiene uno cargado.
+    var listaContactos = contactosRaw.split('|').filter(Boolean).map(function(par) {
+      var partes = par.split('~');
+      return { nombre: partes[0] || '', telefono: partes[1] || '' };
+    }).filter(function(c) { return c.nombre; });
+
+    elDatalist.innerHTML = listaContactos.map(function(c) {
+      return '<option value="' + c.nombre.replace(/"/g, '&quot;') + '">';
     }).join('');
-    // Si hay un solo contacto, lo precarga directo — si hay varios,
-    // deja el campo vacío para que el operador elija del datalist.
-    var listaContactos = contactosRaw.split('|').filter(Boolean);
-    if (elMedico && listaContactos.length === 1) elMedico.value = listaContactos[0];
+
+    // Autocompletar el teléfono del contacto elegido — se dispara cada
+    // vez que el valor del campo coincide EXACTO con un contacto
+    // conocido (así funciona tanto al elegir del datalist como si se
+    // escribe el nombre completo a mano).
+    if (elMedico) {
+      elMedico.addEventListener('input', function() {
+        var match = listaContactos.find(function(c) { return c.nombre === elMedico.value; });
+        if (match && match.telefono && elTelefono) elTelefono.value = match.telefono;
+      });
+    }
+
+    // Precarga por defecto el primer contacto de la lista (el
+    // operador puede cambiarlo eligiendo otro del datalist si
+    // corresponde a uno distinto).
+    if (elMedico && listaContactos.length >= 1) {
+      elMedico.value = listaContactos[0].nombre;
+      if (listaContactos[0].telefono && elTelefono) elTelefono.value = listaContactos[0].telefono;
+    }
   }
 
   // Limpiar la URL (sacar los parámetros) para que un refresh accidental
