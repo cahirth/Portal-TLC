@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.26.3 (Manda también empresaId al puente de Nuevo Ticket, para que servicio.html pueda pedir los contactos frescos al backend) -->
+<!-- Portal TLC | empresas.html | v2026.07.26.4 (Botones "Guardar cambios", "Crear empresa" y "Guardar contacto" ahora se deshabilitan y muestran "Guardando..." mientras esperan la respuesta del servidor — antes se podía clickear varias veces seguidas.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -218,7 +218,7 @@
           </div>
         </div>
         <div class="acciones-empresa">
-          <button class="btn-guardar-empresa" onclick="_crearNuevaEmpresa()">✓ Crear empresa</button>
+          <button class="btn-guardar-empresa" id="btn-crear-empresa" onclick="_crearNuevaEmpresa()">✓ Crear empresa</button>
           <button class="btn-borrar-empresa" onclick="_toggleFormNuevaEmpresa()" style="color:var(--text-muted);background:transparent;border-color:var(--border-glow);">Cancelar</button>
         </div>
       </div>
@@ -250,7 +250,7 @@
           </div>
         </div>
         <div class="acciones-empresa">
-          <button class="btn-guardar-empresa" onclick="_guardarCambiosEmpresa()">✓ Guardar cambios</button>
+          <button class="btn-guardar-empresa" id="btn-guardar-cambios-empresa" onclick="_guardarCambiosEmpresa()">✓ Guardar cambios</button>
           <button class="btn-borrar-empresa" onclick="_borrarEmpresaActual()">🗑 Borrar empresa</button>
         </div>
       </div>
@@ -287,7 +287,7 @@
             </div>
           </div>
           <div class="acciones-empresa">
-            <button class="btn-guardar-empresa" onclick="_guardarContacto()">✓ Guardar contacto</button>
+            <button class="btn-guardar-empresa" id="btn-guardar-contacto" onclick="_guardarContacto()">✓ Guardar contacto</button>
             <button class="btn-borrar-empresa" onclick="_toggleFormContacto()" style="color:var(--text-muted);background:transparent;border-color:var(--border-glow);">Cancelar</button>
           </div>
         </div>
@@ -500,6 +500,10 @@ window._crearNuevaEmpresa = function() {
     return;
   }
 
+  var btnCrearEmp = document.getElementById('btn-crear-empresa');
+  var textoOrigCrearEmp = btnCrearEmp ? btnCrearEmp.textContent : '';
+  if (btnCrearEmp) { btnCrearEmp.disabled = true; btnCrearEmp.textContent = 'Guardando...'; }
+
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:razon, cuit:cuit, telefono:telefono, domicilio:domicilio }) })
     .then(function(r){ return r.json(); })
@@ -509,7 +513,8 @@ window._crearNuevaEmpresa = function() {
       await _cargarEmpresas();
       _abrirDetalleEmpresa(r.id);
     })
-    .catch(function(){ alert('Error de conexión al crear la empresa.'); });
+    .catch(function(){ alert('Error de conexión al crear la empresa.'); })
+    .finally(function() { if (btnCrearEmp) { btnCrearEmp.disabled = false; btnCrearEmp.textContent = textoOrigCrearEmp; } });
 };
 
 // ── DETALLE ──
@@ -546,6 +551,9 @@ window._guardarCambiosEmpresa = function() {
   var cuit = document.getElementById('det-cuit').value.trim();
   var telefono = document.getElementById('det-telefono').value.trim();
   var domicilio = document.getElementById('det-domicilio').value.trim();
+  var btn = document.getElementById('btn-guardar-cambios-empresa');
+  var textoOriginal = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'guardarEmpresa', id:e.id, razonSocial:razon, cuit:cuit, telefono:telefono, domicilio:domicilio }) })
     .then(function(r){ return r.json(); })
@@ -554,7 +562,8 @@ window._guardarCambiosEmpresa = function() {
       e.razonSocial = razon; e.cuit = cuit; e.telefono = telefono; e.domicilio = domicilio;
       document.getElementById('hdr-titulo').textContent = razon;
     })
-    .catch(function(){ alert('Error de conexión al guardar.'); });
+    .catch(function(){ alert('Error de conexión al guardar.'); })
+    .finally(function() { if (btn) { btn.disabled = false; btn.textContent = textoOriginal; } });
 };
 
 window._borrarEmpresaActual = function() {
@@ -633,6 +642,10 @@ window._guardarContacto = function() {
   var payload = { accion:'guardarContacto', empresaId:e.id, nombre:nombre, cargo:cargo, email:email, telefono:telefono };
   if (_contactoEditandoId) payload.id = _contactoEditandoId;
 
+  var btnContacto = document.getElementById('btn-guardar-contacto');
+  var textoOrigContacto = btnContacto ? btnContacto.textContent : '';
+  if (btnContacto) { btnContacto.disabled = true; btnContacto.textContent = 'Guardando...'; }
+
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify(payload) })
     .then(function(r){ return r.json(); })
@@ -649,7 +662,8 @@ window._guardarContacto = function() {
       document.getElementById('form-contacto').style.display = 'none';
       _renderContactos(e);
     })
-    .catch(function(){ alert('Error de conexión al guardar el contacto.'); });
+    .catch(function(){ alert('Error de conexión al guardar el contacto.'); })
+    .finally(function() { if (btnContacto) { btnContacto.disabled = false; btnContacto.textContent = textoOrigContacto; } });
 };
 
 window._borrarContacto = function(contactoId) {

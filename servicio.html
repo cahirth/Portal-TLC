@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.26.9 (Contactos de la empresa ahora se refrescan con listarEmpresas al abrir Nuevo Ticket — antes dependía 100% de la copia en memoria que traía empresas.html, que podía estar vieja si se editó un teléfono después de cargar esa página) -->
+<!-- Portal TLC | servicio.html | v2026.07.26.10 (Teléfono del ticket ahora es siempre el del contacto elegido, nunca el de la empresa; obligatorio para crear el ticket. Modal limpia el estado de chips/bloqueos al cerrarse.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -528,6 +528,7 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
       <div>
         <label class="form-label">Teléfono</label>
         <input type="text" class="form-input" id="nuevo-telefono" placeholder="Ej: +541112345678">
+        <div id="error-telefono" style="display:none;font-size:11px;color:#ef4444;margin-bottom:8px;">⚠ Campo obligatorio</div>
       </div>
     </div>
     <div class="form-row">
@@ -2942,6 +2943,21 @@ window._cerrarModalNuevo = function() {
   document.getElementById('modal-nuevo').classList.remove('open');
   _nuevoTicketFotos = [];
   _renderFotosPreviewNuevo();
+
+  // Limpiar el estado que puede haber quedado de una precarga desde
+  // empresas.html (chips de contactos, campos bloqueados, error de
+  // teléfono) — si no, queda pegado para el próximo ticket manual.
+  var elSug = document.getElementById('contactos-empresa-sugerencias');
+  if (elSug) { elSug.style.display = 'none'; elSug.innerHTML = ''; }
+  ['nuevo-cliente','nuevo-domicilio'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.readOnly = false; el.style.opacity = ''; }
+  });
+  var errTel = document.getElementById('error-telefono');
+  if (errTel) errTel.style.display = 'none';
+  var elTel = document.getElementById('nuevo-telefono');
+  if (elTel) elTel.style.borderColor = '';
+  window._contactosNuevoTicket = [];
 };
 
 // Precarga del formulario "Nuevo Ticket" desde un link de empresas.html
@@ -2965,12 +2981,13 @@ function _precargarNuevoTicketDesdeURL() {
   var empresaId = params.get('empresaId') || '';
   var cliente   = params.get('cliente')   || '';
   var domicilio = params.get('domicilio') || '';
-  var telefono  = params.get('telefono')  || '';
   var contactosRaw = params.get('contactos') || '';
 
   if (elCliente && cliente)     { elCliente.value = cliente;     elCliente.readOnly = true;     elCliente.style.opacity = '.75'; }
   if (elDomicilio && domicilio) { elDomicilio.value = domicilio; elDomicilio.readOnly = true;   elDomicilio.style.opacity = '.75'; }
-  if (elTelefono && telefono)   { elTelefono.value = telefono;   elTelefono.readOnly = true;    elTelefono.style.opacity = '.75'; }
+  // El teléfono NO se precarga con el de la empresa — tiene que ser
+  // siempre el del contacto elegido (más abajo, al pintar los chips).
+  // Se deja editable por si el operador necesita corregirlo a mano.
 
   function _pintarContactosNuevoTicket(listaContactos) {
     if (!listaContactos.length) return;
@@ -2994,7 +3011,7 @@ function _precargarNuevoTicketDesdeURL() {
       var c = window._contactosNuevoTicket[i];
       if (!c) return;
       if (elMedico) elMedico.value = c.nombre;
-      if (elTelefono && !elTelefono.readOnly) elTelefono.value = c.telefono || '';
+      if (elTelefono) elTelefono.value = c.telefono || '';
     };
 
     // Precarga por defecto el primer contacto de la lista — el
@@ -3274,6 +3291,19 @@ window._crearTicket = function() {
   } else {
     elAcc.style.borderColor = '';
     if (errAcc) errAcc.style.display = 'none';
+  }
+
+  var elTelefonoCrear = document.getElementById('nuevo-telefono');
+  var errTelefono = document.getElementById('error-telefono');
+  var telefonoCrear = elTelefonoCrear ? elTelefonoCrear.value.trim() : '';
+  if (!telefonoCrear) {
+    if (elTelefonoCrear) elTelefonoCrear.style.borderColor = '#ef4444';
+    if (errTelefono) errTelefono.style.display = 'block';
+    _stMostrarError('⚠ El teléfono de contacto es obligatorio');
+    ok = false;
+  } else {
+    if (elTelefonoCrear) elTelefonoCrear.style.borderColor = '';
+    if (errTelefono) errTelefono.style.display = 'none';
   }
 
   if (!ok) return;
