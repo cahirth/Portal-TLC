@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.12 (Redirige con &guardado=1 en vez de &nuevo=1 al guardar una cotización, para que cotizaciones.html muestre el mensaje correcto) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.13 (Al guardar, ahora también deja la entrada actualizada en sessionStorage para que cotizaciones.html la muestre al instante — antes esto solo pasaba al crear un negocio nuevo, no al guardar una cotización sobre uno existente) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -836,6 +836,15 @@ async function _generarPresupuesto() {
       return;
     }
     NEGOCIO_ID = r.idCot || NEGOCIO_ID;
+    // Mismo mecanismo de inyección optimista que usa el modal "Nuevo
+    // Negocio" de empresas.html — cotizaciones.html ya sabe leer esta
+    // clave (tlc_negocio_pendiente) y mostrar la entrada al instante,
+    // sin esperar a que historico.json se propague en GitHub Pages.
+    if (r.entrada) {
+      try {
+        sessionStorage.setItem('tlc_negocio_pendiente', JSON.stringify({ id: NEGOCIO_ID, entrada: r.entrada, ts: Date.now() }));
+      } catch(eStorage) {}
+    }
     window.location.href = 'cotizaciones.html?id=' + encodeURIComponent(NEGOCIO_ID) + '&guardado=1';
   } catch(err) {
     console.error('[Generar presupuesto] Error de red/fetch:', err);

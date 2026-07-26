@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.25.8 (Toast distingue "Negocio creado" vs "Cotización creada — Nº X" según de dónde vino) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.25.9 (Fix: inyección optimista ahora REEMPLAZA negocios ya existentes desactualizados, no solo inserta nuevos — antes guardar una cotización sobre un negocio existente no se reflejaba al instante. Botón 🗑️ Borrar por versión en Historial de versiones.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1849,13 +1849,30 @@ function _inyectarNegocioPendienteSiCorresponde() {
         var pend = JSON.parse(raw);
         if (!pend || !pend.id || !pend.entrada) { sessionStorage.removeItem('tlc_negocio_pendiente'); return; }
         if (Date.now() - (pend.ts || 0) > 10 * 60 * 1000) { sessionStorage.removeItem('tlc_negocio_pendiente'); return; }
-        var yaEsta = historicoCompleto.some(function(x) {
+
+        var idx = historicoCompleto.findIndex(function(x) {
             return String(x.idCot || x.id_cotizacion || x.id || '') === String(pend.id);
         });
-        if (!yaEsta) {
+        var pendVersiones = Array.isArray(pend.entrada.versiones_presupuesto) ? pend.entrada.versiones_presupuesto.length : 0;
+
+        if (idx === -1) {
+            // Caso "negocio nuevo" (crearNegocioVacio): todavía no existe en
+            // absoluto en historico.json — lo insertamos.
             historicoCompleto.unshift(pend.entrada);
         } else {
-            sessionStorage.removeItem('tlc_negocio_pendiente');
+            // Caso "cotización guardada sobre un negocio ya existente"
+            // (guardarPresupuestoEditor): el negocio YA está en la lista,
+            // pero puede tener los datos VIEJOS (historico.json todavía no
+            // propagó el guardado recién hecho). Comparamos por cantidad de
+            // versiones para saber si lo que hay es lo mismo que guardamos
+            // o algo desactualizado que hay que pisar.
+            var existenteVersiones = Array.isArray(historicoCompleto[idx].versiones_presupuesto) ? historicoCompleto[idx].versiones_presupuesto.length : 0;
+            if (existenteVersiones >= pendVersiones) {
+                // historico.json ya está al día (o más adelante) — no hace falta seguir pisando.
+                sessionStorage.removeItem('tlc_negocio_pendiente');
+            } else {
+                historicoCompleto[idx] = pend.entrada;
+            }
         }
     } catch(e) {}
 }
@@ -2224,6 +2241,8 @@ function _renderDetalle(c) {
                     style="font-size:16px;text-decoration:none;padding:4px;">👁️</a>
                 ${esUltima ? `<button onclick="_irAPresupuestoEditor('${idBase2}')" title="Editar cotización"
                     style="background:transparent;border:none;font-size:16px;cursor:pointer;padding:4px;">✏️</button>` : ''}
+                <button onclick="_borrarVersionPresupuesto('${idBase2}', ${v.version})" title="Borrar esta versión"
+                    style="background:transparent;border:none;font-size:16px;cursor:pointer;padding:4px;">🗑️</button>
             </div>`;
         });
 
@@ -2775,6 +2794,28 @@ let _pcItems    = [];    // array de ítems editables
 // Reutiliza el mismo mecanismo de sessionStorage que presupuesto-editor.html
 // ya usa para el viaje ida-vuelta con selector-dispositivos.html
 // (restaurarDraft=1), así no hizo falta escribir un camino nuevo ahí.
+// Borra una versión puntual del historial (no toca el carrito/totales
+// actuales del negocio, que siguen siendo los de la última versión
+// guardada). Pide confirmación porque no se puede deshacer.
+async function _borrarVersionPresupuesto(idCot, nroVersion) {
+    if (!confirm('¿Borrar la versión v' + nroVersion + ' del historial? No se puede deshacer.')) return;
+    try {
+        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'eliminarVersionPresupuesto', idCot: idCot, version: nroVersion })
+        });
+        const r = await resp.json();
+        if (!r.ok) { alert('No se pudo borrar la versión: ' + (r.error || r.message || 'error desconocido')); return; }
+        // Reflejar en memoria al toque, sin esperar a que historico.json propague.
+        const idx = historicoCompleto.findIndex(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(idCot));
+        if (idx !== -1 && r.entrada) historicoCompleto[idx] = r.entrada;
+        _toast('🗑️ Versión borrada');
+        const detIdx = todasLasCot.findIndex(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(idCot));
+        if (detIdx !== -1) abrirDetalle(detIdx);
+    } catch(e) {
+        alert('Error de conexión al borrar la versión.');
+    }
+}
+
 function _irAPresupuestoEditor(idCot) {
     const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(idCot));
     if (!c) return;
