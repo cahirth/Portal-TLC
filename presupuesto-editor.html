@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.14 (Conserva y envía linkFolleto/linkVideo por ítem, para que el PDF final muestre los botones de Folleto/Video) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.25.15 (Agregada la franja de info del documento — badge "No Válido como Factura", Fecha y Validez de la oferta en vivo — mismo estilo que el header real de presupuesto.html, para que el editor sea una vista previa más fiel) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -182,6 +182,18 @@
 
   <div class="wrap">
 
+    <!-- ═══ INFO DEL DOCUMENTO — mismo estilo que el header real de
+         presupuesto.html, para que el editor se vea/sienta como una
+         vista previa fiel de lo que se va a generar ═══ -->
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+      <span style="font-size:10px;font-weight:700;color:var(--text-dim);border:1px solid var(--border-glow);
+                   border-radius:6px;padding:3px 9px;white-space:nowrap;">Documento No Válido como Factura</span>
+    </div>
+    <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-bottom:16px;">
+      <div>Fecha: <b style="color:var(--text-main);" id="doc-info-fecha"></b></div>
+      <div>Validez de la oferta: <b style="color:var(--text-main);" id="doc-info-validez"></b></div>
+    </div>
+
     <!-- ═══ CLIENTE ═══ -->
     <div class="section">
       <div class="section-title">👤 Cliente</div>
@@ -256,7 +268,7 @@
         </div>
         <div class="det-campo" id="campo-validez-personalizada" style="display:none;">
           <label>Fecha de vencimiento</label>
-          <input type="date" id="cc-validez-fecha">
+          <input type="date" id="cc-validez-fecha" onchange="_actualizarInfoDocumento()">
         </div>
         <div class="det-campo">
           <label>Tiempo de entrega</label>
@@ -748,6 +760,27 @@ function _renderItems() {
 function _toggleValidezPersonalizada() {
   var v = document.getElementById('cc-validez').value;
   document.getElementById('campo-validez-personalizada').style.display = v === 'personalizado' ? 'block' : 'none';
+  _actualizarInfoDocumento();
+}
+
+// Fecha y Validez de la franja de info del documento — mismo texto que
+// va a mostrar presupuesto.html en el header real, para que el editor
+// se sienta como una vista previa fiel.
+function _actualizarInfoDocumento() {
+  var elFecha = document.getElementById('doc-info-fecha');
+  if (elFecha) {
+    elFecha.textContent = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'long', year:'numeric' });
+  }
+  var elValidez = document.getElementById('doc-info-validez');
+  if (elValidez) {
+    var v = document.getElementById('cc-validez').value;
+    if (v === 'personalizado') {
+      var f = document.getElementById('cc-validez-fecha').value;
+      elValidez.textContent = f ? ('Hasta ' + f.split('-').reverse().join('-')) : 'A confirmar';
+    } else {
+      elValidez.textContent = (v || '15') + ' Días';
+    }
+  }
 }
 
 function _toggleTiempoEntregaPersonalizado() {
@@ -890,6 +923,7 @@ if (_draftMoneda) {
   document.getElementById('moneda-presupuesto').value = _draftMoneda;
   _render();
 }
+_actualizarInfoDocumento();
 _cargarTC();
 </script>
 </body>
