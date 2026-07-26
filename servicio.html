@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.26.8 (Cambiado el <datalist> nativo de contactos por botones propios — el datalist no abría de forma confiable (por eso no cargaba el teléfono al elegir otro contacto). Ahora los contactos se ven como chips clickeables, siempre visibles si hay más de uno.) -->
+<!-- Portal TLC | servicio.html | v2026.07.26.9 (Contactos de la empresa ahora se refrescan con listarEmpresas al abrir Nuevo Ticket — antes dependía 100% de la copia en memoria que traía empresas.html, que podía estar vieja si se editó un teléfono después de cargar esa página) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2962,6 +2962,7 @@ function _precargarNuevoTicketDesdeURL() {
   var elMedico      = document.getElementById('nuevo-medico');
   var elSugerencias = document.getElementById('contactos-empresa-sugerencias');
 
+  var empresaId = params.get('empresaId') || '';
   var cliente   = params.get('cliente')   || '';
   var domicilio = params.get('domicilio') || '';
   var telefono  = params.get('telefono')  || '';
@@ -2971,21 +2972,14 @@ function _precargarNuevoTicketDesdeURL() {
   if (elDomicilio && domicilio) { elDomicilio.value = domicilio; elDomicilio.readOnly = true;   elDomicilio.style.opacity = '.75'; }
   if (elTelefono && telefono)   { elTelefono.value = telefono;   elTelefono.readOnly = true;    elTelefono.style.opacity = '.75'; }
 
-  if (elSugerencias && contactosRaw) {
-    // Formato: "Nombre~Teléfono|Nombre2~Teléfono2|..." — el teléfono
-    // puede venir vacío si ese contacto no tiene uno cargado.
-    var listaContactos = contactosRaw.split('|').filter(Boolean).map(function(par) {
-      var partes = par.split('~');
-      return { nombre: partes[0] || '', telefono: partes[1] || '' };
-    }).filter(function(c) { return c.nombre; });
-
+  function _pintarContactosNuevoTicket(listaContactos) {
     if (!listaContactos.length) return;
 
     // Botones propios en vez de <datalist> nativo — el datalist del
     // navegador es poco confiable (no siempre abre si el campo ya
     // tiene texto, y en algunos navegadores/celulares directamente no
     // muestra nada). Con botones, siempre visibles y siempre clickeables.
-    if (listaContactos.length > 1) {
+    if (listaContactos.length > 1 && elSugerencias) {
       elSugerencias.style.display = 'flex';
       elSugerencias.innerHTML = listaContactos.map(function(c, i) {
         return '<button type="button" onclick="_elegirContactoNuevoTicket(' + i + ')" ' +
@@ -3006,6 +3000,35 @@ function _precargarNuevoTicketDesdeURL() {
     // Precarga por defecto el primer contacto de la lista — el
     // operador puede tocar otro botón si corresponde a uno distinto.
     window._elegirContactoNuevoTicket(0);
+  }
+
+  // Paso 1 — precarga RÁPIDA con lo que vino por URL (instantáneo, sin
+  // esperar red). Formato: "Nombre~Teléfono|Nombre2~Teléfono2|...".
+  if (contactosRaw) {
+    var listaRapida = contactosRaw.split('|').filter(Boolean).map(function(par) {
+      var partes = par.split('~');
+      return { nombre: partes[0] || '', telefono: partes[1] || '' };
+    }).filter(function(c) { return c.nombre; });
+    _pintarContactosNuevoTicket(listaRapida);
+  }
+
+  // Paso 2 — actualización con datos FRESCOS del backend, por si el
+  // teléfono de algún contacto se cargó/cambió después de que se armó
+  // el link en empresas.html (la copia en memoria de ahí puede quedar
+  // vieja). Pisa lo pintado en el paso 1 en cuanto llega la respuesta.
+  if (empresaId) {
+    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'listarEmpresas' }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r){
+        if (!r.ok || !Array.isArray(r.empresas)) return;
+        var empresaFresca = r.empresas.find(function(e){ return e.id === empresaId; });
+        if (!empresaFresca || !Array.isArray(empresaFresca.contactos) || !empresaFresca.contactos.length) return;
+        _pintarContactosNuevoTicket(empresaFresca.contactos.map(function(c) {
+          return { nombre: c.nombre || '', telefono: c.telefono || '' };
+        }).filter(function(c) { return c.nombre; }));
+      })
+      .catch(function(e) { console.warn('No se pudieron refrescar los contactos de la empresa:', e); });
   }
 
   // Limpiar la URL (sacar los parámetros) para que un refresh accidental

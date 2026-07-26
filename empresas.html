@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.26.1 (Botón "Nuevo ticket (Servicio)" ahora precarga de verdad — antes solo confirmaba y mandaba sin datos. Manda cliente/domicilio/teléfono/contactos por URL a servicio.html.) -->
+<!-- Portal TLC | empresas.html | v2026.07.26.3 (Manda también empresaId al puente de Nuevo Ticket, para que servicio.html pueda pedir los contactos frescos al backend) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -728,16 +728,21 @@ window._nuevoNegocio = function(tipo) {
   // Servicio Técnico: precarga real por URL. El formulario de "Nuevo
   // Ticket" no tiene campos de CUIT ni email (no existen en el modelo
   // de datos de un ticket) — solo cliente, domicilio, teléfono y
-  // médico/contacto (texto libre) — así que se precargan esos 4, más
-  // la lista de contactos de la empresa para autocompletar el campo
-  // de médico/contacto (datalist, sin forzar un dropdown rígido).
+  // médico/contacto (texto libre) — así que se precargan esos 4. Se
+  // manda también el empresaId para que servicio.html pida los
+  // contactos FRESCOS al backend (evita depender de la copia en
+  // memoria de EMPRESAS acá, que puede haber quedado vieja si se
+  // editó un teléfono de contacto después de cargar esta página).
   var params = new URLSearchParams();
   params.set('nuevoTicket', '1');
+  params.set('empresaId', e.id || '');
   params.set('cliente', e.razonSocial || '');
   params.set('domicilio', e.domicilio || '');
   params.set('telefono', e.telefono || '');
   if (e.contactos && e.contactos.length) {
-    params.set('contactos', e.contactos.map(function(c){ return c.nombre; }).filter(Boolean).join('|'));
+    params.set('contactos', e.contactos.map(function(c){
+      return (c.nombre || '') + '~' + (c.telefono || '');
+    }).filter(function(s){ return s !== '~'; }).join('|'));
   }
   window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?' + params.toString();
 };
