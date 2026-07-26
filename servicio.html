@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.26.4 (Sin cambios de UI — logs de diagnóstico temporales sacados, mismo fix que cotizaciones.html) -->
+<!-- Portal TLC | servicio.html | v2026.07.26.5 (Precarga real del formulario "Nuevo Ticket" cuando se llega desde el botón de una empresa — cliente/domicilio/teléfono bloqueados, datalist de contactos de esa empresa para el campo médico) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -518,7 +518,8 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
     <label class="form-label">Cliente / Clínica</label>
     <input type="text" class="form-input" id="nuevo-cliente" placeholder="Ej: Clínica de Ojos Norte">
     <label class="form-label">Nombre del médico <span style="color:#64748b;font-size:10px;">(opcional)</span></label>
-    <input type="text" class="form-input" id="nuevo-medico" placeholder="Ej: Dr. Juan Pérez" style="margin-bottom:8px;">
+    <input type="text" class="form-input" id="nuevo-medico" placeholder="Ej: Dr. Juan Pérez" style="margin-bottom:8px;" list="lista-contactos-empresa">
+    <datalist id="lista-contactos-empresa"></datalist>
     <div class="form-row" style="margin-top:8px;">
       <div>
         <label class="form-label">Domicilio</label>
@@ -900,6 +901,7 @@ async function _cargarSesion() {
     if (_panelCampanaInicial) _panelCampanaInicial.style.display = 'none'; // arranca siempre cerrada
     _cargarNotificaciones();
     _iniciarPollingCampana();
+    _precargarNuevoTicketDesdeURL();
   } catch(e) {
     console.error('Error cargando sesión:', e);
     _redirigirLogin();
@@ -2941,6 +2943,50 @@ window._cerrarModalNuevo = function() {
   _nuevoTicketFotos = [];
   _renderFotosPreviewNuevo();
 };
+
+// Precarga del formulario "Nuevo Ticket" desde un link de empresas.html
+// (botón "🔧 Nuevo ticket (Servicio)" en la ficha de una empresa).
+// Cliente/domicilio/teléfono llegan por URL y se bloquean (readonly)
+// para que no se puedan pisar sin querer — si el operador necesita
+// corregir algo, mejor que edite la ficha de la empresa en Empresas.
+// El campo de médico/contacto queda editable, con un datalist de los
+// contactos de esa empresa para autocompletar (no se fuerza dropdown
+// rígido porque el campo siempre fue texto libre).
+function _precargarNuevoTicketDesdeURL() {
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('nuevoTicket') !== '1') return;
+
+  var elCliente   = document.getElementById('nuevo-cliente');
+  var elDomicilio = document.getElementById('nuevo-domicilio');
+  var elTelefono  = document.getElementById('nuevo-telefono');
+  var elMedico     = document.getElementById('nuevo-medico');
+  var elDatalist    = document.getElementById('lista-contactos-empresa');
+
+  var cliente   = params.get('cliente')   || '';
+  var domicilio = params.get('domicilio') || '';
+  var telefono  = params.get('telefono')  || '';
+  var contactosRaw = params.get('contactos') || '';
+
+  if (elCliente && cliente)     { elCliente.value = cliente;     elCliente.readOnly = true;     elCliente.style.opacity = '.75'; }
+  if (elDomicilio && domicilio) { elDomicilio.value = domicilio; elDomicilio.readOnly = true;   elDomicilio.style.opacity = '.75'; }
+  if (elTelefono && telefono)   { elTelefono.value = telefono;   elTelefono.readOnly = true;    elTelefono.style.opacity = '.75'; }
+
+  if (elDatalist && contactosRaw) {
+    elDatalist.innerHTML = contactosRaw.split('|').filter(Boolean).map(function(nombre) {
+      return '<option value="' + nombre.replace(/"/g, '&quot;') + '">';
+    }).join('');
+    // Si hay un solo contacto, lo precarga directo — si hay varios,
+    // deja el campo vacío para que el operador elija del datalist.
+    var listaContactos = contactosRaw.split('|').filter(Boolean);
+    if (elMedico && listaContactos.length === 1) elMedico.value = listaContactos[0];
+  }
+
+  // Limpiar la URL (sacar los parámetros) para que un refresh accidental
+  // no vuelva a abrir el modal ni pise lo que el operador ya escribió.
+  try { window.history.replaceState({}, '', window.location.pathname); } catch(e) {}
+
+  _abrirModalNuevo();
+}
 
 // ══════════════════════════════════════════════════════════════════
 // FOTOS — compresión en el cliente + galería (formulario de ingreso

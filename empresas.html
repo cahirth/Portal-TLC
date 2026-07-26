@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.25.1 (Agregada validación de acceso real — validarAccesoModulo("Empresas") de permisos.js, corre antes de cargar cualquier dato. Antes este módulo no validaba nada.) -->
+<!-- Portal TLC | empresas.html | v2026.07.26.1 (Botón "Nuevo ticket (Servicio)" ahora precarga de verdad — antes solo confirmaba y mandaba sin datos. Manda cliente/domicilio/teléfono/contactos por URL a servicio.html.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -725,12 +725,21 @@ window._nuevoNegocio = function(tipo) {
     return;
   }
 
-  // Servicio Técnico: el formulario de "Nuevo Ticket" todavía no lee
-  // parámetros de precarga por URL (a diferencia del de Ventas) — queda
-  // pendiente de conectar. Por ahora, al menos lleva directo al módulo.
-  if (confirm('El alta de ticket con precarga automática todavía no está conectada — ¿igual querés ir a Servicio Técnico para cargarlo a mano?')) {
-    window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html';
+  // Servicio Técnico: precarga real por URL. El formulario de "Nuevo
+  // Ticket" no tiene campos de CUIT ni email (no existen en el modelo
+  // de datos de un ticket) — solo cliente, domicilio, teléfono y
+  // médico/contacto (texto libre) — así que se precargan esos 4, más
+  // la lista de contactos de la empresa para autocompletar el campo
+  // de médico/contacto (datalist, sin forzar un dropdown rígido).
+  var params = new URLSearchParams();
+  params.set('nuevoTicket', '1');
+  params.set('cliente', e.razonSocial || '');
+  params.set('domicilio', e.domicilio || '');
+  params.set('telefono', e.telefono || '');
+  if (e.contactos && e.contactos.length) {
+    params.set('contactos', e.contactos.map(function(c){ return c.nombre; }).filter(Boolean).join('|'));
   }
+  window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?' + params.toString();
 };
 
 // ══════════════════════════════════════════════════════════════════
