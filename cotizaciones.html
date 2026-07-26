@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.25.10 (Guardar Nota: antes era optimista y silencioso — mostraba la nota al toque aunque el guardado real fallara sin avisar. Ahora espera la confirmación real del servidor, muestra "Guardando..." mientras tanto, y si falla avisa con alert y no pierde el texto escrito.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.25.11 (CAMBIO DE ARQUITECTURA: el Kanban lee de Firebase RTDB en vez de historico.json/GitHub — soluciona la demora de propagación de varios minutos. Fallback automático a GitHub si Firebase falla.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -753,6 +753,11 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 const HISTORICO_URL = 'https://raw.githubusercontent.com/cahirth/Portal-TLC/main/historico.json';
+// Lectura RÁPIDA: Firebase RTDB (público, sin el delay de CDN que tiene
+// GitHub Pages/raw.githubusercontent — ese podía tardar hasta varios
+// minutos en propagar). GitHub sigue siendo la fuente de respaldo con
+// historial de commits, pero el Kanban lee de acá.
+const RTDB_COTIZACIONES_URL = 'https://portal-tlc-default-rtdb.firebaseio.com/cotizaciones.json';
 const PRECIOS_URL     = './precios.json';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 
@@ -1548,6 +1553,32 @@ function _aplicarFiltroVendedor() {
 }
 
 // ─── CARGAR historico.json ────────────────────────────────────────
+// Lee la lista de negocios desde Firebase RTDB (rápido, sin delay de
+// CDN) y la convierte de {id: entrada, ...} a un array plano — mismo
+// formato que antes devolvía historico.json. Si Firebase falla por
+// cualquier motivo, cae de respaldo a GitHub (más lento, pero
+// funciona igual).
+async function _leerCotizacionesRapido() {
+    try {
+        const res = await fetch(RTDB_COTIZACIONES_URL + '?_=' + Date.now());
+        if (!res.ok) throw new Error('RTDB HTTP ' + res.status);
+        const obj = await res.json();
+        if (!obj || typeof obj !== 'object') return [];
+        return Object.values(obj).filter(Boolean);
+    } catch(eRtdb) {
+        console.warn('Firebase RTDB falló, usando GitHub de respaldo:', eRtdb);
+        try {
+            const res2 = await fetch(HISTORICO_URL + '?_=' + Date.now(), { cache: 'no-store' });
+            if (!res2.ok) throw new Error('GitHub HTTP ' + res2.status);
+            const data2 = await res2.json();
+            return Array.isArray(data2) ? data2 : [];
+        } catch(eGh) {
+            console.error('También falló el respaldo de GitHub:', eGh);
+            return [];
+        }
+    }
+}
+
 async function cargar(forzar = false) {
     document.getElementById('loading-inicial').style.display = 'flex';
     document.getElementById('stats-bar').style.display       = 'none';
@@ -1557,11 +1588,7 @@ async function cargar(forzar = false) {
     document.getElementById('kanban-outer').classList.remove('visible');
 
     try {
-        // raw.githubusercontent: JSON directo, sin base64, sin rate limit de API
-        const res  = await fetch(HISTORICO_URL + '?_=' + Date.now(), { cache: 'no-store' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        let data = await res.json();
-        if (!Array.isArray(data)) data = [];
+        let data = await _leerCotizacionesRapido();
 
         // Normalizar estados
         data.forEach(c => {
@@ -1906,14 +1933,11 @@ async function _abrirDetallePorIdEnUrl(intentosRestantes) {
         if ((esNuevo || esGuardado) && intentosRestantes === 3) _toast('Abriendo...', 'info');
         setTimeout(async () => {
             try {
-                const res = await fetch(HISTORICO_URL + '?_=' + Date.now(), { cache: 'no-store' });
-                if (res.ok) {
-                    let data = await res.json();
-                    if (Array.isArray(data)) {
-                        historicoCompleto = data;
-                        _inyectarNegocioPendienteSiCorresponde();
-                        _aplicarFiltroVendedor(); aplicarFiltros();
-                    }
+                const data = await _leerCotizacionesRapido();
+                if (Array.isArray(data) && data.length) {
+                    historicoCompleto = data;
+                    _inyectarNegocioPendienteSiCorresponde();
+                    _aplicarFiltroVendedor(); aplicarFiltros();
                 }
             } catch(e) {}
             _abrirDetallePorIdEnUrl(intentosRestantes - 1);
@@ -2602,10 +2626,8 @@ function _onDrop(e, nuevoEstado) {
 // Se dispara después de confirmar ok:true del GS — sin spinner, sin reset de UI
 async function _recargarHistoricoSilencioso() {
     try {
-        const res = await fetch(HISTORICO_URL + '?_=' + Date.now(), { cache: 'no-store' });
-        if (!res.ok) return;
-        let data = await res.json();
-        if (!Array.isArray(data)) return;
+        let data = await _leerCotizacionesRapido();
+        if (!Array.isArray(data) || !data.length) return;
 
         // Normalizar estados igual que en cargar()
         data.forEach(c => {
