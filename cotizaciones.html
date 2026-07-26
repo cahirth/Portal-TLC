@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.26.4-DEBUG (Diagnóstico @menciones round 2 — sacar antes de versión final) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.26.5 (Sin cambios de UI — logs de diagnóstico temporales sacados, ver FotoMap.gs v119 para el fix real: no era bug de código, era la hoja Vendedores convertida en "Tabla" de Sheets, que rompía la lectura de encabezados) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -883,12 +883,8 @@ async function _cargarInternosMencionesCot() {
         var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'listarInternos' }) });
         var r = await resp.json();
-        console.log('%c[DEBUG @menciones VENTAS]', 'background:#3a86ff;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;', r);
         _internosCacheCot = (r.ok && Array.isArray(r.internos)) ? r.internos : [];
-    } catch(e) {
-        console.log('%c[DEBUG @menciones VENTAS] ERROR:', 'background:#f87171;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;', e);
-        _internosCacheCot = [];
-    }
+    } catch(e) { _internosCacheCot = []; }
     return _internosCacheCot;
 }
 

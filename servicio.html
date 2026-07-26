@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.26.2-DEBUG (Diagnóstico @menciones round 2 — sacar antes de versión final) -->
+<!-- Portal TLC | servicio.html | v2026.07.26.4 (Sin cambios de UI — logs de diagnóstico temporales sacados, mismo fix que cotizaciones.html) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1795,10 +1795,8 @@ async function _cargarInternosMenciones() {
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarInternos' }) });
     var r = await resp.json();
-    console.log('%c[DEBUG @menciones SERVICIO]', 'background:#06d6a0;color:#04231a;font-weight:bold;padding:2px 6px;border-radius:4px;', r);
     _internosCache = (r.ok && Array.isArray(r.internos)) ? r.internos : [];
   } catch(e) {
-    console.log('%c[DEBUG @menciones SERVICIO] ERROR:', 'background:#f87171;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;', e);
     _internosCache = [];
   }
   return _internosCache;
