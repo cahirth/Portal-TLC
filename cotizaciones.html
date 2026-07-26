@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.25.15 (Validación real de acceso vía permisos.js — columna "Ventas" — corre en init(), antes de cargar el Kanban. Antes este módulo no validaba nada por su cuenta, solo el candado visual de index.html.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.26.1 (Kanban y Lista ordenan por última modificación (actualizado_en) en vez de fecha de creación — editar un negocio ahora lo sube arriba de todo en su columna. Cada versión del historial ahora abre su propio snapshot congelado, no siempre el documento actual.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1708,7 +1708,7 @@ function renderLista() {
     const wrap = document.getElementById('lista-wrap');
     if (!cotFiltradas.length) { wrap.innerHTML = '<div class="empty">Sin resultados</div>'; return; }
     const ordenadas = cotFiltradas.slice()
-        .sort((a, b) => new Date(b.fechaCreacion || b.fecha || 0) - new Date(a.fechaCreacion || a.fecha || 0));
+        .sort((a, b) => new Date(b.actualizado_en || b.fechaCreacion || b.fecha || 0) - new Date(a.actualizado_en || a.fechaCreacion || a.fecha || 0));
     wrap.innerHTML = ordenadas.map((c, i) => {
         const idxReal  = todasLasCot.indexOf(c);
         const id       = c.idCot || c.id_cotizacion || String(c.id || '') || '—';
@@ -1741,7 +1741,7 @@ function renderKanban() {
     const grid = document.getElementById('kanban-grid');
     grid.innerHTML = KANBAN_COLS.map(col => {
         const tarjetas = cotFiltradas.filter(c => c.estado === col.key)
-            .sort((a, b) => new Date(b.fechaCreacion || b.fecha || 0) - new Date(a.fechaCreacion || a.fecha || 0));
+            .sort((a, b) => new Date(b.actualizado_en || b.fechaCreacion || b.fecha || 0) - new Date(a.actualizado_en || a.fechaCreacion || a.fecha || 0));
         const total    = tarjetas.reduce((s, c) => s + _monto(c), 0);
         const totalFmt = 'USD ' + Math.round(total).toLocaleString('es-AR');
 
@@ -2262,6 +2262,7 @@ function _renderDetalle(c) {
                                           color:#f8961e;background:rgba(248,150,30,.12);
                                           border:1px solid rgba(248,150,30,.25);
                                           padding:1px 7px;border-radius:8px;">v${v.version}</span>`;
+            const linkVerVersion = esUltima ? linkDocActual : ('presupuesto.html?id=' + encodeURIComponent(idBase2) + '&version=' + v.version);
             html += `<div class="cot-historial-item" style="display:flex;align-items:center;gap:8px;border-radius:10px;padding:10px 14px;">
                 <span style="font-size:18px;">📋</span>
                 <div style="flex:1;min-width:0;">
@@ -2270,7 +2271,7 @@ function _renderDetalle(c) {
                     </div>
                     <div style="font-size:10px;color:#475569;">${vFecha} · ${vMonto}</div>
                 </div>
-                <a href="${linkDocActual}" target="_blank" title="Ver presupuesto"
+                <a href="${linkVerVersion}" target="_blank" title="${esUltima ? 'Ver presupuesto' : 'Ver esta versión (v' + v.version + ')'}"
                     style="font-size:16px;text-decoration:none;padding:4px;">👁️</a>
                 ${esUltima ? `<button onclick="_irAPresupuestoEditor('${idBase2}')" title="Editar cotización"
                     style="background:transparent;border:none;font-size:16px;cursor:pointer;padding:4px;">✏️</button>` : ''}
