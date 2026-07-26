@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.25.1 (Validación real de acceso vía permisos.js — columna "Servicio Tecnico" — corre al confirmar sesión, antes de cargar tickets. Antes este módulo no validaba nada por su cuenta, solo el candado visual de index.html.) -->
+<!-- Portal TLC | servicio.html | v2026.07.26.1 (Nueva sección de Adjuntos por ticket — módulo compartido adjuntos.js, Firebase Storage) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
 <script src="permisos.js"></script>
+<script src="adjuntos.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#080d14">
@@ -1724,6 +1725,10 @@ function _renderDetalle(t) {
         '<button class="btn-guardar-nota" onclick="_guardarNota(\'' + t.id_ticket + '\')">💾 Guardar nota</button>' : '') +
     '</div>' +
 
+    // ADJUNTOS — módulo reutilizable (adjuntos.js), mismo patrón en Ventas
+    '<div class="det-section">📎 Adjuntos</div>' +
+    '<div class="det-card" id="det-adjuntos-card"></div>' +
+
     // J: GASTOS DEL SERVICIO
     '<div class="det-section">Gastos del servicio</div>' +
     '<div class="det-card" id="det-gastos-card">' +
@@ -1735,6 +1740,20 @@ function _renderDetalle(t) {
 
   _actualizarEstadoChecklistCard(t.id_ticket);
   _renderPanelMensajes(t);
+  adjuntosRenderSeccion('det-adjuntos-card', GAS_URL, 'servicio', t.id_ticket, t.adjuntos, (_session && _session.name) || '');
+}
+
+// Recarga solo la sección de Adjuntos de un ticket, sin re-renderizar
+// todo el detalle — se llama después de subir/borrar un archivo.
+async function adjuntosRecargar(modulo, id, containerId) {
+  try {
+    const t = _tickets.find(x => x.id_ticket === id);
+    if (!t) return;
+    const res = await fetch(RTDB_URL + '/servicio_tecnico/' + encodeURIComponent(id) + '/adjuntos.json?_=' + Date.now());
+    const adjuntosFrescos = res.ok ? await res.json() : null;
+    t.adjuntos = adjuntosFrescos;
+    adjuntosRenderSeccion(containerId, GAS_URL, 'servicio', id, adjuntosFrescos, (_session && _session.name) || '');
+  } catch(e) { console.warn('adjuntosRecargar (servicio):', e); }
 }
 
 // Consulta en Firebase si el checklist técnico del ticket ya fue completado
