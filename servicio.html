@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.26.7 (Si la empresa tiene varios contactos, precarga el primero por defecto en vez de dejarlo vacío — el operador lo puede cambiar del datalist) -->
+<!-- Portal TLC | servicio.html | v2026.07.26.8 (Cambiado el <datalist> nativo de contactos por botones propios — el datalist no abría de forma confiable (por eso no cargaba el teléfono al elegir otro contacto). Ahora los contactos se ven como chips clickeables, siempre visibles si hay más de uno.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -518,8 +518,8 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
     <label class="form-label">Cliente / Clínica</label>
     <input type="text" class="form-input" id="nuevo-cliente" placeholder="Ej: Clínica de Ojos Norte">
     <label class="form-label">Nombre del médico <span style="color:#64748b;font-size:10px;">(opcional)</span></label>
-    <input type="text" class="form-input" id="nuevo-medico" placeholder="Ej: Dr. Juan Pérez" style="margin-bottom:8px;" list="lista-contactos-empresa">
-    <datalist id="lista-contactos-empresa"></datalist>
+    <input type="text" class="form-input" id="nuevo-medico" placeholder="Ej: Dr. Juan Pérez" style="margin-bottom:6px;">
+    <div id="contactos-empresa-sugerencias" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:12px;margin-top:-2px;"></div>
     <div class="form-row" style="margin-top:8px;">
       <div>
         <label class="form-label">Domicilio</label>
@@ -2956,11 +2956,11 @@ function _precargarNuevoTicketDesdeURL() {
   var params = new URLSearchParams(window.location.search);
   if (params.get('nuevoTicket') !== '1') return;
 
-  var elCliente   = document.getElementById('nuevo-cliente');
-  var elDomicilio = document.getElementById('nuevo-domicilio');
-  var elTelefono  = document.getElementById('nuevo-telefono');
-  var elMedico     = document.getElementById('nuevo-medico');
-  var elDatalist    = document.getElementById('lista-contactos-empresa');
+  var elCliente     = document.getElementById('nuevo-cliente');
+  var elDomicilio   = document.getElementById('nuevo-domicilio');
+  var elTelefono    = document.getElementById('nuevo-telefono');
+  var elMedico      = document.getElementById('nuevo-medico');
+  var elSugerencias = document.getElementById('contactos-empresa-sugerencias');
 
   var cliente   = params.get('cliente')   || '';
   var domicilio = params.get('domicilio') || '';
@@ -2971,7 +2971,7 @@ function _precargarNuevoTicketDesdeURL() {
   if (elDomicilio && domicilio) { elDomicilio.value = domicilio; elDomicilio.readOnly = true;   elDomicilio.style.opacity = '.75'; }
   if (elTelefono && telefono)   { elTelefono.value = telefono;   elTelefono.readOnly = true;    elTelefono.style.opacity = '.75'; }
 
-  if (elDatalist && contactosRaw) {
+  if (elSugerencias && contactosRaw) {
     // Formato: "Nombre~Teléfono|Nombre2~Teléfono2|..." — el teléfono
     // puede venir vacío si ese contacto no tiene uno cargado.
     var listaContactos = contactosRaw.split('|').filter(Boolean).map(function(par) {
@@ -2979,28 +2979,33 @@ function _precargarNuevoTicketDesdeURL() {
       return { nombre: partes[0] || '', telefono: partes[1] || '' };
     }).filter(function(c) { return c.nombre; });
 
-    elDatalist.innerHTML = listaContactos.map(function(c) {
-      return '<option value="' + c.nombre.replace(/"/g, '&quot;') + '">';
-    }).join('');
+    if (!listaContactos.length) return;
 
-    // Autocompletar el teléfono del contacto elegido — se dispara cada
-    // vez que el valor del campo coincide EXACTO con un contacto
-    // conocido (así funciona tanto al elegir del datalist como si se
-    // escribe el nombre completo a mano).
-    if (elMedico) {
-      elMedico.addEventListener('input', function() {
-        var match = listaContactos.find(function(c) { return c.nombre === elMedico.value; });
-        if (match && match.telefono && elTelefono) elTelefono.value = match.telefono;
-      });
+    // Botones propios en vez de <datalist> nativo — el datalist del
+    // navegador es poco confiable (no siempre abre si el campo ya
+    // tiene texto, y en algunos navegadores/celulares directamente no
+    // muestra nada). Con botones, siempre visibles y siempre clickeables.
+    if (listaContactos.length > 1) {
+      elSugerencias.style.display = 'flex';
+      elSugerencias.innerHTML = listaContactos.map(function(c, i) {
+        return '<button type="button" onclick="_elegirContactoNuevoTicket(' + i + ')" ' +
+          'style="font-size:11px;font-weight:600;padding:5px 10px;border-radius:20px;cursor:pointer;' +
+          'background:rgba(58,134,255,.1);border:1px solid rgba(58,134,255,.3);color:#3a86ff;">' +
+          c.nombre.replace(/</g,'&lt;') + '</button>';
+      }).join('');
     }
 
-    // Precarga por defecto el primer contacto de la lista (el
-    // operador puede cambiarlo eligiendo otro del datalist si
-    // corresponde a uno distinto).
-    if (elMedico && listaContactos.length >= 1) {
-      elMedico.value = listaContactos[0].nombre;
-      if (listaContactos[0].telefono && elTelefono) elTelefono.value = listaContactos[0].telefono;
-    }
+    window._contactosNuevoTicket = listaContactos;
+    window._elegirContactoNuevoTicket = function(i) {
+      var c = window._contactosNuevoTicket[i];
+      if (!c) return;
+      if (elMedico) elMedico.value = c.nombre;
+      if (elTelefono && !elTelefono.readOnly) elTelefono.value = c.telefono || '';
+    };
+
+    // Precarga por defecto el primer contacto de la lista — el
+    // operador puede tocar otro botón si corresponde a uno distinto.
+    window._elegirContactoNuevoTicket(0);
   }
 
   // Limpiar la URL (sacar los parámetros) para que un refresh accidental
