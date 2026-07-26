@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.25.2 (Open Graph reforzado: dominio real ir.tlcsrl.com.ar, tamaño de imagen, twitter card completa; fecha de Validez en formato dd-mm-yyyy) -->
+<!-- Portal TLC | presupuesto.html | v2026.07.25.4 (Volver ahora regresa al negocio en cotizaciones.html cuando se abrió con ?id=X — antes siempre iba a index.html sin importar de dónde vinieras) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -85,18 +85,24 @@
   }
 
   // ── Botón "Volver" del header ──────────────────────────────────
-  // Siempre va a index.html. Se simplificó (antes intentaba usar
-  // history.back() cuando el referrer era interno) porque en el
-  // navegador embebido de WhatsApp (el más común para este flujo,
-  // ya que el link llega compartido por WhatsApp) history.back() se
-  // comporta de forma inconsistente. Si en el futuro se conecta el
-  // flujo de ?ticket= real, ahí sí vale la pena la lógica condicional.
+  // Si viene de un ticket (?ticket=X), vuelve a ese ticket en
+  // servicio.html. Si viene de un negocio (?id=X, el caso normal desde
+  // que existe el flujo nuevo de presupuesto-editor.html), vuelve a
+  // ese negocio en cotizaciones.html. Si no hay ninguno de los dos
+  // (ej. alguien entra directo desde un link de WhatsApp sin más
+  // contexto), va a index.html — no se usa history.back() porque en el
+  // navegador embebido de WhatsApp se comporta de forma inconsistente.
   window._volverPresupuesto = function() {
     try {
       var params = new URLSearchParams(window.location.search);
       var ticketId = (params.get('ticket') || '').trim();
       if (ticketId) {
         window.location.href = 'servicio.html?ticket=' + encodeURIComponent(ticketId);
+        return;
+      }
+      var idNegocio = (params.get('id') || '').trim();
+      if (idNegocio) {
+        window.location.href = 'cotizaciones.html?id=' + encodeURIComponent(idNegocio);
         return;
       }
     } catch(e) {}
@@ -188,7 +194,7 @@
               '<div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:3px;">' + esc(i.nombre) + '</div>' +
               (i.linkFolleto || i.linkVideo ? '<div style="display:flex;gap:8px;margin-top:5px;flex-wrap:wrap;">' +
                 (i.linkFolleto ? '<a href="' + esc(i.linkFolleto) + '" target="_blank" style="font-size:11px;padding:3px 9px;border-radius:6px;background:#eff6ff;border:1px solid #93c5fd;color:#1a4b8c;text-decoration:none;">📄 Folleto</a>' : '') +
-                (i.linkVideo   ? '<a href="' + esc(i.linkVideo)   + '" target="_blank" style="font-size:11px;padding:3px 9px;border-radius:6px;background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;text-decoration:none;">▶️ Video</a>' : '') +
+                (i.linkVideo   ? '<a href="' + esc(i.linkVideo)   + '" target="_blank" style="font-size:11px;padding:3px 9px;border-radius:6px;background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;text-decoration:none;">🌐 Página Web</a>' : '') +
               '</div>' : '') +
             '</div>' +
           '</div>' +
