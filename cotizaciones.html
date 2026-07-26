@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.25.12 (Conserva linkFolleto/linkVideo al reabrir un negocio existente para editar) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.25.14 (Fix: la vista Lista no ordenaba nada — el Kanban sí ordenaba por fecha pero Lista mostraba el orden crudo de la base. Ahora ambas ordenan por más reciente arriba. También alineado el fallback de fecha (fechaCreacion || fecha) en Lista.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1700,12 +1700,14 @@ function mostrarStats() {
 function renderLista() {
     const wrap = document.getElementById('lista-wrap');
     if (!cotFiltradas.length) { wrap.innerHTML = '<div class="empty">Sin resultados</div>'; return; }
-    wrap.innerHTML = cotFiltradas.map((c, i) => {
+    const ordenadas = cotFiltradas.slice()
+        .sort((a, b) => new Date(b.fechaCreacion || b.fecha || 0) - new Date(a.fechaCreacion || a.fecha || 0));
+    wrap.innerHTML = ordenadas.map((c, i) => {
         const idxReal  = todasLasCot.indexOf(c);
         const id       = c.idCot || c.id_cotizacion || String(c.id || '') || '—';
         const cliente  = c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
         const equipos  = (c.carrito||[]).map(i => i.nombre).join(' · ') || '—';
-        const fecha    = _fmtFechaHora(c.fecha);
+        const fecha    = _fmtFechaHora(c.fechaCreacion || c.fecha);
         const monto    = _monto(c);
         const estadoCss = ESTADO_CSS[c.estado] || 'e-cotizacion';
         const estadoLabel = _estadoLabel(c.estado);
@@ -2134,7 +2136,7 @@ function _renderDetalle(c) {
                             style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;
                                    color:#f87171;text-decoration:none;padding:3px 8px;
                                    background:#2d0a0a;border:1px solid #7f1d1d;border-radius:8px;">
-                            🎬 Video</a>` : ''}
+                            🌐 Página Web</a>` : ''}
                     </div>` : ''}
                 </div>
                 <div class="equipo-precio">USD ${Math.round((i.precioNeto||i.precio||0)*(i.cantidad||1)).toLocaleString('es-AR')}</div>
