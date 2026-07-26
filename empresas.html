@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.24.13 (Botones Nuevo Negocio/Nuevo Ticket movidos arriba de todo en la ficha de empresa; modal dice "Crear negocio" en vez de "Crear cotización") -->
+<!-- Portal TLC | empresas.html | v2026.07.25.1 (Agregada validación de acceso real — validarAccesoModulo("Empresas") de permisos.js, corre antes de cargar cualquier dato. Antes este módulo no validaba nada.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="permisos.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1049,6 +1050,8 @@ window._confirmarImportacion = async function() {
 
 // ── Origen: ?empresa=ID para entrar directo a una ficha (ej. desde una tarjeta) ──
 (async function() {
+  var acceso = await validarAccesoModulo('Empresas');
+  if (!acceso) return; // ya mostró el alert y redirigió a index.html
   var params = new URLSearchParams(window.location.search);
   var empresaId = params.get('empresa');
   await _cargarEmpresas();

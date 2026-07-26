@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.21.4 -->
+<!-- Portal TLC | servicio.html | v2026.07.25.1 (Validación real de acceso vía permisos.js — columna "Servicio Tecnico" — corre al confirmar sesión, antes de cargar tickets. Antes este módulo no validaba nada por su cuenta, solo el candado visual de index.html.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="permisos.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#080d14">
@@ -837,7 +838,7 @@ document.addEventListener('DOMContentLoaded', function() {
   _chequearInstalacionIOS();
 });
 
-function _cargarSesion() {
+async function _cargarSesion() {
   try {
     var raw = localStorage.getItem(SESSION_KEY);
     if (!raw) { _redirigirLogin(); return; }
@@ -849,6 +850,12 @@ function _cargarSesion() {
       _session = payload;
     }
     if (!_session || !_session.username) { _redirigirLogin(); return; }
+
+    // Validación real de acceso al módulo — columna "Servicio Tecnico"
+    // en la solapa Vendedores. Si da FALSE, ya muestra el alert y
+    // redirige a index.html sola; no seguimos con nada más.
+    var acceso = await validarAccesoModulo('Servicio Tecnico');
+    if (!acceso) return;
 
     // Label header
     var nombre = _session.name || _session.username;

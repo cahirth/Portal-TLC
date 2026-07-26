@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.25.14 (Fix: la vista Lista no ordenaba nada — el Kanban sí ordenaba por fecha pero Lista mostraba el orden crudo de la base. Ahora ambas ordenan por más reciente arriba. También alineado el fallback de fecha (fechaCreacion || fecha) en Lista.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.25.15 (Validación real de acceso vía permisos.js — columna "Ventas" — corre en init(), antes de cargar el Kanban. Antes este módulo no validaba nada por su cuenta, solo el candado visual de index.html.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="permisos.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>TLC — Cotizaciones</title>
@@ -1438,6 +1439,12 @@ async function init() {
     currentUserRol      = account.rol || 'Vend_Externo';
     permisos            = _getPermisos(currentUserRol);
     document.getElementById('user-label').textContent = currentUserNombre.split(' ')[0];
+
+    // Validación real de acceso al módulo — columna "Ventas" en la
+    // solapa Vendedores. Si da FALSE, ya muestra el alert y redirige a
+    // index.html sola; no seguimos con nada más.
+    const acceso = await validarAccesoModulo('Ventas');
+    if (!acceso) return;
 
     // Cargar roles y vendedores desde Sheet (por si hay cambios desde el login)
     await _cargarVendedores(account.username?.toLowerCase() || '');

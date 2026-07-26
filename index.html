@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.07.24.3 (botones Catálogo/Negocios movidos arriba de las métricas) -->
+<!-- Portal TLC | index.html | v2026.07.25.1 (Nueva columna "Empresas" en Vendedores — el tile ahora gatea acceso igual que los demás módulos. Texto de toast estandarizado a "🔒 No tienes permiso para acceder a este módulo". Scroll horizontal agregado al contenedor del menú.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -81,7 +81,7 @@
         @keyframes slideUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
         /* FILAS DE MENÚ CON ICONOS RESALTADOS (Estilo AppSheet) */
-        .menu-list-stack { display: flex; flex-direction: column; gap: 12px; }
+        .menu-list-stack { display: flex; flex-direction: column; gap: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
         .menu-item-row {
             background-color: var(--panel-dark);
@@ -562,7 +562,7 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
 
             <!-- Banner de ofertas — scroll horizontal, solo productos con Oferta=TRUE -->
             <div class="menu-list-stack">
-                <div class="menu-item-row" id="menu-empresas" onclick="window.location.href='empresas.html'">
+                <div class="menu-item-row" id="menu-empresas" onclick="abrirUrlConPermiso('empresas.html', 'Empresas', 'empresas')">
                     <div class="item-logo-container" style="background:rgba(58,134,255,0.15); border:1px solid rgba(58,134,255,0.35);">
                         <i class="fa-solid fa-building" style="color:#3a86ff; font-size:20px;"></i>
                     </div>
@@ -1360,7 +1360,7 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
     // Placeholder de arranque (mientras carga el Sheet) — el valor real y
     // definitivo de verComisiones viene SIEMPRE de la columna "Ver Comisiones"
     // en cargarPermisosUsuario(), independiente del rol.
-    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, tareas: true, verComisiones: false, rol: 'Administrador' };
+    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, tareas: true, empresas: true, verComisiones: false, rol: 'Administrador' };
 
     async function cargarPermisosUsuario(email) {
         try {
@@ -1378,6 +1378,7 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
             const comexIdx   = cols.indexOf('Comercio Exterior');
             const adminIdx   = cols.indexOf('Administracion');
             const tareasIdx  = cols.indexOf('Tareas');
+            const empresasIdx= cols.indexOf('Empresas');
             const comisionesIdx = cols.indexOf('Ver Comisiones');
 
             const fila = rows.find(r => {
@@ -1398,11 +1399,12 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
                     comex:         bool(comexIdx),
                     admin:         bool(adminIdx),
                     tareas:        bool(tareasIdx),
+                    empresas:      bool(empresasIdx),
                     verComisiones: bool(comisionesIdx),
                 };
             } else {
                 // Email no encontrado → acceso mínimo
-                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, verComisiones: false };
+                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, empresas: false, verComisiones: false };
             }
         } catch(e) {
             console.warn('Error cargando permisos:', e);
@@ -1413,6 +1415,7 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
 
     function aplicarPermisosMenu() {
         const secciones = [
+            { id: 'menu-empresas', permiso: userPermisos.empresas },
             { id: 'menu-ventas',   permiso: userPermisos.ventas },
             { id: 'menu-servicio', permiso: userPermisos.servicio },
             { id: 'menu-comex',    permiso: userPermisos.comex },
@@ -1735,7 +1738,7 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
     function abrirModuloConPermiso(viewId, title, subtitle, seccion) {
         const el = document.getElementById('menu-' + seccion);
         if (el && el.dataset.bloqueado === 'true') {
-            mostrarToast('🔒 Sin acceso a ' + title);
+            mostrarToast('🔒 No tienes permiso para acceder a este módulo');
             return;
         }
         openModule(viewId, title, subtitle);
@@ -1748,7 +1751,7 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
     function abrirUrlConPermiso(url, title, seccion) {
         const el = document.getElementById('menu-' + seccion);
         if (el && el.dataset.bloqueado === 'true') {
-            mostrarToast('🔒 Sin acceso a ' + title);
+            mostrarToast('🔒 No tienes permiso para acceder a este módulo');
             return;
         }
         window.location.href = url;
