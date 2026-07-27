@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.3 (Fix: el toggle de moneda por ítem quedaba pisando el número (posicionado absoluto, pensado para un texto más corto). Reemplazado por un switch tipo pill USD/AR$, en flex, sin overlap.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.5 (Sacado el fallback confuso donde el teléfono de empresa caía al del contacto si la empresa no tenía uno propio — ahora quedan separados, cada uno con su dato real) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -665,7 +665,15 @@ window._actualizarItem = function(id, campo, valor) {
   var it = ITEMS.find(function(x){ return x.id === id; });
   if (!it) return;
   if (campo === 'descripcion') { it[campo] = valor; }
-  else if (campo === 'precio') { it[campo] = _parseMilesInput(valor); }
+  else if (campo === 'precio') {
+    var num = _parseMilesInput(valor);
+    // Si el toggle de este ítem está en AR$, lo que tipeó el operador
+    // es un monto en pesos — hay que convertirlo a USD antes de
+    // guardarlo, porque it.precio SIEMPRE se guarda en USD
+    // internamente (el toggle es solo de display/tipeo, no cambia la
+    // moneda real guardada).
+    it.precio = (it.moneda === 'ARS' && TC_OFICIAL) ? (num / TC_OFICIAL) : num;
+  }
   else if (campo === 'moneda') { it[campo] = valor; }
   else { it[campo] = parseFloat(valor) || 0; }
   _render();
@@ -673,6 +681,7 @@ window._actualizarItem = function(id, campo, valor) {
 window._toggleMonedaItem = function(id) {
   var it = ITEMS.find(function(x){ return x.id === id; });
   if (!it) return;
+  if (it.moneda !== 'ARS' && !TC_OFICIAL) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
   it.moneda = (it.moneda === 'ARS') ? 'USD' : 'ARS';
   _render();
 };
@@ -740,23 +749,24 @@ function _fmtEn(n, moneda) {
   return pref + ' ' + (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits:2, maximumFractionDigits:2 });
 }
 
+// it.precio SIEMPRE está en USD internamente (single source of truth,
+// igual que el resto del sistema) — it.moneda es solo la preferencia
+// de EN QUÉ MONEDA se tipea/muestra ese mismo valor, no cambia lo que
+// se guarda. La conversión a AR$ para mostrar es responsabilidad de
+// quien pinta el número (_precioParaInput / _renderItems), no de este
+// cálculo.
 function _calcularItem(it) {
   var bruto = it.precio * it.cantidad;
   var conDescuento = bruto * (1 - (it.descuento || 0) / 100);
   var iva = conDescuento * (it.iva || 0) / 100;
-  return { bruto:bruto, descontado:conDescuento, iva:iva, total:conDescuento + iva, moneda: it.moneda || 'USD' };
+  return { bruto:bruto, descontado:conDescuento, iva:iva, total:conDescuento + iva };
 }
 
-// Convierte el resultado de _calcularItem a USD (moneda interna base
-// para sumar Totales) — sin esto, un presupuesto con equipos en USD y
-// mano de obra en AR$ mezclados sumaría números de distinta moneda
-// como si fueran lo mismo.
-function _calcularItemEnUSD(it) {
-  var calc = _calcularItem(it);
-  if (calc.moneda === 'ARS' && TC_OFICIAL) {
-    return { bruto: calc.bruto / TC_OFICIAL, descontado: calc.descontado / TC_OFICIAL, iva: calc.iva / TC_OFICIAL, total: calc.total / TC_OFICIAL };
-  }
-  return calc;
+// Convierte un monto en USD a la moneda de display de un ítem (AR$ si
+// it.moneda === 'ARS' y ya cargó el TC, si no lo deja en USD).
+function _aMonedaItem(montoUSD, it) {
+  if ((it.moneda || 'USD') === 'ARS' && TC_OFICIAL) return montoUSD * TC_OFICIAL;
+  return montoUSD;
 }
 
 function _renderItems() {
@@ -764,6 +774,7 @@ function _renderItems() {
   document.getElementById('lista-items').innerHTML = ITEMS.map(function(it) {
     var calc = _calcularItem(it);
     var moneda = it.moneda || 'USD';
+    var precioMostrado = moneda === 'ARS' ? _aMonedaItem(it.precio, it) : it.precio;
     return '<div class="item-card">' +
       '<div class="item-top">' +
         '<div class="item-foto" onclick="document.getElementById(\'file-' + it.id + '\').click()">' +
@@ -774,12 +785,12 @@ function _renderItems() {
         '<button class="item-borrar" onclick="_borrarItem(' + it.id + ')">✕</button>' +
       '</div>' +
       '<div class="item-grid">' +
-        '<div class="campo"><label>Precio unit.</label><div class="precio-input-wrap">' +
+        '<div class="campo"><label>Precio unit.' + (moneda === 'ARS' && !TC_OFICIAL ? ' <span style="color:#f8961e;">(cargando TC...)</span>' : '') + '</label><div class="precio-input-wrap">' +
           '<div class="moneda-switch" onclick="_toggleMonedaItem(' + it.id + ')" title="Cambiar moneda">' +
             '<span class="' + (moneda !== 'ARS' ? 'activo' : '') + '">USD</span>' +
             '<span class="' + (moneda === 'ARS' ? 'activo' : '') + '">AR$</span>' +
           '</div>' +
-          '<input type="text" inputmode="decimal" value="' + _formatMilesInput(it.precio) + '" onchange="_actualizarItem(' + it.id + ',\'precio\',this.value)">' +
+          '<input type="text" inputmode="decimal" value="' + _formatMilesInput(precioMostrado) + '" onchange="_actualizarItem(' + it.id + ',\'precio\',this.value)">' +
         '</div></div>' +
         '<div class="campo"><label>Cantidad</label><input type="number" min="1" value="' + it.cantidad + '" onchange="_actualizarItem(' + it.id + ',\'cantidad\',this.value)"></div>' +
         '<div class="campo"><label>Descuento</label><div class="descuento-input-wrap">' +
@@ -790,14 +801,14 @@ function _renderItems() {
           [0,10.5,21,27].map(function(v){ return '<option value="' + v + '"' + (it.iva===v?' selected':'') + '>' + v + '%</option>'; }).join('') +
         '</select></div>' +
       '</div>' +
-      // Desglose SIEMPRE visible (subtotal sin IVA + total con IVA) —
-      // antes solo se veía el total final, y para chequear cuánto
-      // quedaba después del descuento había que poner el IVA en 0%
-      // "para ver" y a veces se olvidaba volver a subirlo, rompiendo
-      // el cálculo real del presupuesto.
+      // Desglose SIEMPRE visible (subtotal sin IVA + total con IVA),
+      // convertido a la moneda de display del ítem — antes solo se
+      // veía el total final, y para chequear cuánto quedaba después
+      // del descuento había que poner el IVA en 0% "para ver" y a
+      // veces se olvidaba volver a subirlo, rompiendo el cálculo real.
       '<div class="item-desglose" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;">' +
-        '<span style="opacity:.65;">Subtotal (sin IVA): <b style="opacity:1;">' + _fmtEn(calc.descontado, moneda) + '</b></span>' +
-        '<span style="color:var(--accent-green);font-weight:800;font-size:12px;">Total c/IVA: ' + _fmtEn(calc.total, moneda) + '</span>' +
+        '<span style="opacity:.65;">Subtotal (sin IVA): <b style="opacity:1;">' + _fmtEn(_aMonedaItem(calc.descontado, it), moneda) + '</b></span>' +
+        '<span style="color:var(--accent-green);font-weight:800;font-size:12px;">Total c/IVA: ' + _fmtEn(_aMonedaItem(calc.total, it), moneda) + '</span>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -837,11 +848,7 @@ function _toggleTiempoEntregaPersonalizado() {
 function _renderTotales() {
   var subtotal = 0, descuento = 0, iva = 0, total = 0;
   ITEMS.forEach(function(it) {
-    // Sumar siempre en base USD (convierte los ítems en AR$ con el TC
-    // oficial) — así, si el presupuesto mezcla equipos en USD con mano
-    // de obra en AR$, los Totales no suman números de distinta moneda
-    // como si fueran lo mismo.
-    var calc = _calcularItemEnUSD(it);
+    var calc = _calcularItem(it);
     subtotal += calc.bruto;
     descuento += (calc.bruto - calc.descontado);
     iva += calc.iva;
@@ -880,7 +887,7 @@ async function _generarPresupuesto() {
     presupuestoIdPreview: PRESUPUESTO_ID,
     razonSocial: CLIENTE_SEL.razonSocial || '',
     cuit: CLIENTE_SEL.cuit || '',
-    telefono: CLIENTE_SEL.telefono || (CONTACTO_SEL && CONTACTO_SEL.telefono) || '',
+    telefono: CLIENTE_SEL.telefono || '',
     domicilio: CLIENTE_SEL.domicilio || '',
     empresaId: CLIENTE_SEL.id || '',
     contactoId: (CONTACTO_SEL && CONTACTO_SEL.id) || '',

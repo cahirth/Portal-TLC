@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.26.2 (Cada ítem ahora se muestra en SU PROPIA moneda (USD o AR$) en vez de forzar USD siempre — necesario ahora que el editor permite cargar mano de obra en pesos mezclada con equipos en dólares) -->
+<!-- Portal TLC | presupuesto.html | v2026.07.26.4 (Agregada línea "Teléfono de contacto" (distinta de "Teléfono de la empresa") — el dato ya se mandaba desde el editor pero nunca llegaba hasta acá. CUIT, Teléfono de empresa y Domicilio ya existían, solo se muestran si tienen dato cargado.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -164,20 +164,23 @@
       (p.notas ? '<strong>Notas:</strong> ' + esc(p.notas) : '');
   }
 
-  function buildFilasProductos(carrito, etiquetaMonedaIgnorada) {
+  function buildFilasProductos(carrito, etiquetaMonedaIgnorada, tcOficial) {
     if (!Array.isArray(carrito) || !carrito.length) return '';
     return carrito.map(function(i) {
-      // Cada ítem se muestra en SU PROPIA moneda (nueva, 26/07/2026 —
-      // antes se forzaba USD siempre para todos). El toggle de moneda
-      // de Totales sigue siendo independiente, solo afecta el bloque
-      // de Subtotal/IVA/Total de más abajo.
-      var etiquetaMoneda = i.moneda === 'ARS' ? 'AR$' : 'USD';
+      // Cada ítem se muestra en SU PROPIA moneda (26/07/2026). El
+      // precio SIEMPRE se guarda en USD internamente — si el ítem
+      // está marcado en AR$, se multiplica acá por el TC oficial que
+      // se usó al momento de guardar (mismo criterio que Totales), no
+      // solo se le cambia la etiqueta.
+      var esArs = i.moneda === 'ARS';
+      var etiquetaMoneda = esArs ? 'AR$' : 'USD';
+      var factorConversion = (esArs && tcOficial) ? tcOficial : 1;
       var qty = i.cantidad || 1;
-      var base = i.precioLista || i.precioNeto || 0;
+      var base = (i.precioLista || i.precioNeto || 0) * factorConversion;
       var bruto = base * qty;
       var dVal = parseFloat(i.descuentoValor) || 0;
       var dTipo = i.descuentoTipo || '%';
-      var neto = (i.precioNeto != null) ? (i.precioNeto * qty) : (dTipo === '%' ? Math.max(0, bruto - bruto*(dVal/100)) : Math.max(0, bruto - dVal));
+      var neto = (i.precioNeto != null) ? (i.precioNeto * factorConversion * qty) : (dTipo === '%' ? Math.max(0, bruto - bruto*(dVal/100)) : Math.max(0, bruto - dVal));
       var descMonto = bruto - neto;
       var hayDesc = dVal > 0 && descMonto > 0.01;
       var fotoSrc = i.foto || '';
@@ -320,9 +323,10 @@
 
       '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:20px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);">' +
         '<div style="font-size:13px;font-family:Arial,sans-serif;"><strong>Señores:</strong> ' + esc(p.nombreMedico) + '</div>' +
+        (p.contactoTelefono ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Teléfono de contacto:</strong> ' + esc(p.contactoTelefono) + '</div>' : '') +
         (p.razonSocial ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Institución:</strong> ' + esc(p.razonSocial) + '</div>' : '') +
         (p.cuit ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>CUIT:</strong> ' + esc(p.cuit) + '</div>' : '') +
-        (p.telefono ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Teléfono:</strong> ' + esc(p.telefono) + '</div>' : '') +
+        (p.telefono ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Teléfono de la empresa:</strong> ' + esc(p.telefono) + '</div>' : '') +
         (p.domicilio ? '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;margin-top:4px;"><strong>Domicilio:</strong> ' + esc(p.domicilio) + '</div>' : '') +
       '</div>' +
 
@@ -337,7 +341,7 @@
             '<th style="padding:8px 10px;text-align:right;font-size:12px;font-family:Arial,sans-serif;width:130px;">Precio Total</th>' +
           '</tr>' +
         '</thead>' +
-        '<tbody>' + buildFilasProductos(c, etiquetaMoneda) + '</tbody>' +
+        '<tbody>' + buildFilasProductos(c, etiquetaMoneda, p.tcOficial) + '</tbody>' +
       '</table>' +
 
       (p.notas ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:10px 14px;margin-bottom:12px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#92400e;margin-bottom:4px;font-family:Arial,sans-serif;">Notas</div><div style="font-size:12px;color:#78350f;line-height:1.5;">' + esc(p.notas) + '</div></div>' : '') +
