@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.2 (Cada ítem ahora muestra "Subtotal (sin IVA)" SIEMPRE visible, sin tener que tocar el IVA para verlo — evita el bug real que pasó hoy (IVA en 0% para chequear el descuento, y se quedó así, rompiendo el total). Toggle de moneda USD/AR$ por ítem — para mano de obra en pesos mezclada con equipos en dólares.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.3 (Fix: el toggle de moneda por ítem quedaba pisando el número (posicionado absoluto, pensado para un texto más corto). Reemplazado por un switch tipo pill USD/AR$, en flex, sin overlap.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -95,9 +95,13 @@
   .item-grid input, .item-grid select { width:100%; background:#0d1520; border:1px solid var(--border-glow); border-radius:7px;
     padding:7px 8px; color:var(--text-main); font-size:12px; outline:none; }
   .precio-input-wrap, .descuento-input-wrap { position:relative; }
-  .precio-prefijo { position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:10px; font-weight:800;
-    color:var(--accent-blue); pointer-events:none; }
-  .precio-input-wrap input { padding-left:38px !important; }
+  .precio-input-wrap { display:flex; align-items:center; gap:6px; }
+  .precio-input-wrap input { flex:1; min-width:0; }
+  .moneda-switch { flex-shrink:0; display:flex; border-radius:20px; overflow:hidden; border:1px solid var(--border-glow);
+    font-size:9px; font-weight:800; cursor:pointer; user-select:none; }
+  .moneda-switch span { padding:6px 8px; transition:background .15s ease, color .15s ease; white-space:nowrap; }
+  .moneda-switch span.activo { background:var(--accent-blue); color:#fff; }
+  .moneda-switch span:not(.activo) { color:var(--text-dim); background:var(--panel-darker); }
   .descuento-sufijo { position:absolute; right:9px; top:50%; transform:translateY(-50%); font-size:11px; font-weight:700;
     color:var(--text-dim); pointer-events:none; }
   .descuento-input-wrap input { padding-right:22px !important; }
@@ -771,9 +775,10 @@ function _renderItems() {
       '</div>' +
       '<div class="item-grid">' +
         '<div class="campo"><label>Precio unit.</label><div class="precio-input-wrap">' +
-          '<button type="button" class="precio-prefijo" title="Cambiar a ' + (moneda === 'ARS' ? 'USD' : 'AR$') + '" ' +
-            'style="cursor:pointer;border:none;background:transparent;font:inherit;color:inherit;padding:0;" ' +
-            'onclick="_toggleMonedaItem(' + it.id + ')">' + (moneda === 'ARS' ? 'AR$' : 'USD') + ' ⇄</button>' +
+          '<div class="moneda-switch" onclick="_toggleMonedaItem(' + it.id + ')" title="Cambiar moneda">' +
+            '<span class="' + (moneda !== 'ARS' ? 'activo' : '') + '">USD</span>' +
+            '<span class="' + (moneda === 'ARS' ? 'activo' : '') + '">AR$</span>' +
+          '</div>' +
           '<input type="text" inputmode="decimal" value="' + _formatMilesInput(it.precio) + '" onchange="_actualizarItem(' + it.id + ',\'precio\',this.value)">' +
         '</div></div>' +
         '<div class="campo"><label>Cantidad</label><input type="number" min="1" value="' + it.cantidad + '" onchange="_actualizarItem(' + it.id + ',\'cantidad\',this.value)"></div>' +
