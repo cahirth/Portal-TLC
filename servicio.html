@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.26.11 (Generar/Modificar Presupuesto ahora lleva a presupuesto-editor.html, mismo editor unificado que usa Ventas — antes iba al flujo viejo de carrito en selector-dispositivos.html. Si ya hay un presupuesto generado, trae los ítems/condiciones reales para editarlos.) -->
+<!-- Portal TLC | servicio.html | v2026.07.26.13 (Conserva la moneda por ítem al traer una cotización existente para Modificar Presupuesto) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2010,6 +2010,14 @@ window._elegirMencion = function(nombre) {
   document.getElementById('mencion-sugerencias').style.display = 'none';
   _mencionCandidatos = [];
   _mencionIndiceResaltado = -1;
+  // Al cerrarse el cartel de sugerencias, el layout se corre hacia
+  // arriba en el mismo instante del toque — en mobile esto puede hacer
+  // que el botón "Enviar" (que estaba más abajo) termine debajo del
+  // dedo justo cuando el navegador procesa el click, disparando un
+  // envío que el usuario no pidió. _ultimaMencionElegidaEn (más abajo)
+  // bloquea el envío por una fracción de segundo después de elegir una
+  // mención, sin importar de dónde venga el click de más.
+  _ultimaMencionElegidaEn = Date.now();
   ta.focus();
 };
 
@@ -2028,6 +2036,7 @@ var _enviandoMensajeTicket = false;
 
 window._enviarMensajeTicket = function(idTicket) {
   if (_enviandoMensajeTicket) return; // ya hay un envío en curso, ignora clicks de más
+  if (Date.now() - _ultimaMencionElegidaEn < 400) return; // click fantasma justo después de elegir una mención (ver nota en _elegirMencion)
   var ta = document.getElementById('mensaje-nuevo-txt');
   var texto = (ta.value || '').trim();
   if (!texto) return;
@@ -2576,6 +2585,7 @@ window._generarPresupuestoTecnico = async function(id) {
             cantidad: parseInt(it.cantidad) || 1,
             descuento: parseFloat(it.descuentoValor) || 0,
             iva: (it.ivaPct !== undefined && it.ivaPct !== null) ? parseFloat(it.ivaPct) : 10.5,
+            moneda: it.moneda || 'USD',
             linkFolleto: it.linkFolleto || '',
             linkVideo: it.linkVideo || '',
           };

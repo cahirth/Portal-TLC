@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.1 (Soporta ?ticket=X — vincula el presupuesto de vuelta al ticket al guardar, y "Volver"/redirect post-guardado van al ticket en servicio.html en vez de a cotizaciones.html) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.2 (Cada ítem ahora muestra "Subtotal (sin IVA)" SIEMPRE visible, sin tener que tocar el IVA para verlo — evita el bug real que pasó hoy (IVA en 0% para chequear el descuento, y se quedó así, rompiendo el total). Toggle de moneda USD/AR$ por ítem — para mano de obra en pesos mezclada con equipos en dólares.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -454,7 +454,7 @@ function _restaurarDraftYItemPendiente() {
     var rawItem = sessionStorage.getItem('tlc_item_pendiente_presupuesto');
     if (rawItem) {
       var it = JSON.parse(rawItem);
-      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: it.nombre || '', precio: it.precio || 0, cantidad: 1, descuento: 0, iva: 10.5, linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
+      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: it.nombre || '', precio: it.precio || 0, cantidad: 1, descuento: 0, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
     }
   } catch (e) { console.warn('Error aplicando ítem pendiente:', e); }
   sessionStorage.removeItem('tlc_item_pendiente_presupuesto');
@@ -637,7 +637,7 @@ window._seleccionarContacto = function(i) {
 
 // ── ÍTEMS ──
 function _agregarItem() {
-  ITEMS.push({ id: ++_itemSeq, foto:null, descripcion:'', precio:0, cantidad:1, descuento:0, iva:10.5 });
+  ITEMS.push({ id: ++_itemSeq, foto:null, descripcion:'', precio:0, cantidad:1, descuento:0, iva:10.5, moneda:'USD' });
   _render();
 }
 window._borrarItem = function(id) {
@@ -662,7 +662,14 @@ window._actualizarItem = function(id, campo, valor) {
   if (!it) return;
   if (campo === 'descripcion') { it[campo] = valor; }
   else if (campo === 'precio') { it[campo] = _parseMilesInput(valor); }
+  else if (campo === 'moneda') { it[campo] = valor; }
   else { it[campo] = parseFloat(valor) || 0; }
+  _render();
+};
+window._toggleMonedaItem = function(id) {
+  var it = ITEMS.find(function(x){ return x.id === id; });
+  if (!it) return;
+  it.moneda = (it.moneda === 'ARS') ? 'USD' : 'ARS';
   _render();
 };
 window._fotoItem = function(id, input) {
@@ -721,21 +728,38 @@ function _fmtUSD(n) {
   return 'USD ' + (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits:2, maximumFractionDigits:2 });
 }
 
+// Formatea con la moneda EXPLÍCITA que se le pasa (no depende del
+// dropdown de Totales) — se usa para el desglose de cada ítem, que
+// puede tener su propia moneda distinta a la de los Totales.
+function _fmtEn(n, moneda) {
+  var pref = moneda === 'ARS' ? 'AR$' : 'USD';
+  return pref + ' ' + (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
 function _calcularItem(it) {
   var bruto = it.precio * it.cantidad;
   var conDescuento = bruto * (1 - (it.descuento || 0) / 100);
   var iva = conDescuento * (it.iva || 0) / 100;
-  return { bruto:bruto, descontado:conDescuento, iva:iva, total:conDescuento + iva };
+  return { bruto:bruto, descontado:conDescuento, iva:iva, total:conDescuento + iva, moneda: it.moneda || 'USD' };
+}
+
+// Convierte el resultado de _calcularItem a USD (moneda interna base
+// para sumar Totales) — sin esto, un presupuesto con equipos en USD y
+// mano de obra en AR$ mezclados sumaría números de distinta moneda
+// como si fueran lo mismo.
+function _calcularItemEnUSD(it) {
+  var calc = _calcularItem(it);
+  if (calc.moneda === 'ARS' && TC_OFICIAL) {
+    return { bruto: calc.bruto / TC_OFICIAL, descontado: calc.descontado / TC_OFICIAL, iva: calc.iva / TC_OFICIAL, total: calc.total / TC_OFICIAL };
+  }
+  return calc;
 }
 
 function _renderItems() {
   document.getElementById('items-contador').textContent = ITEMS.length + ' ítem' + (ITEMS.length !== 1 ? 's' : '');
-  // Precio Unit. siempre en USD (precio de lista) — la conversión a
-  // pesos con el TC oficial pasa SOLO en Totales, con el dropdown de
-  // moneda. Acá arriba no se toca nunca.
-  var prefijoMoneda = 'USD';
   document.getElementById('lista-items').innerHTML = ITEMS.map(function(it) {
     var calc = _calcularItem(it);
+    var moneda = it.moneda || 'USD';
     return '<div class="item-card">' +
       '<div class="item-top">' +
         '<div class="item-foto" onclick="document.getElementById(\'file-' + it.id + '\').click()">' +
@@ -747,7 +771,9 @@ function _renderItems() {
       '</div>' +
       '<div class="item-grid">' +
         '<div class="campo"><label>Precio unit.</label><div class="precio-input-wrap">' +
-          '<span class="precio-prefijo">' + prefijoMoneda + '</span>' +
+          '<button type="button" class="precio-prefijo" title="Cambiar a ' + (moneda === 'ARS' ? 'USD' : 'AR$') + '" ' +
+            'style="cursor:pointer;border:none;background:transparent;font:inherit;color:inherit;padding:0;" ' +
+            'onclick="_toggleMonedaItem(' + it.id + ')">' + (moneda === 'ARS' ? 'AR$' : 'USD') + ' ⇄</button>' +
           '<input type="text" inputmode="decimal" value="' + _formatMilesInput(it.precio) + '" onchange="_actualizarItem(' + it.id + ',\'precio\',this.value)">' +
         '</div></div>' +
         '<div class="campo"><label>Cantidad</label><input type="number" min="1" value="' + it.cantidad + '" onchange="_actualizarItem(' + it.id + ',\'cantidad\',this.value)"></div>' +
@@ -759,7 +785,15 @@ function _renderItems() {
           [0,10.5,21,27].map(function(v){ return '<option value="' + v + '"' + (it.iva===v?' selected':'') + '>' + v + '%</option>'; }).join('') +
         '</select></div>' +
       '</div>' +
-      '<div class="item-subtotal">' + _fmtUSD(calc.total) + '</div>' +
+      // Desglose SIEMPRE visible (subtotal sin IVA + total con IVA) —
+      // antes solo se veía el total final, y para chequear cuánto
+      // quedaba después del descuento había que poner el IVA en 0%
+      // "para ver" y a veces se olvidaba volver a subirlo, rompiendo
+      // el cálculo real del presupuesto.
+      '<div class="item-desglose" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;">' +
+        '<span style="opacity:.65;">Subtotal (sin IVA): <b style="opacity:1;">' + _fmtEn(calc.descontado, moneda) + '</b></span>' +
+        '<span style="color:var(--accent-green);font-weight:800;font-size:12px;">Total c/IVA: ' + _fmtEn(calc.total, moneda) + '</span>' +
+      '</div>' +
     '</div>';
   }).join('');
 }
@@ -798,7 +832,11 @@ function _toggleTiempoEntregaPersonalizado() {
 function _renderTotales() {
   var subtotal = 0, descuento = 0, iva = 0, total = 0;
   ITEMS.forEach(function(it) {
-    var calc = _calcularItem(it);
+    // Sumar siempre en base USD (convierte los ítems en AR$ con el TC
+    // oficial) — así, si el presupuesto mezcla equipos en USD con mano
+    // de obra en AR$, los Totales no suman números de distinta moneda
+    // como si fueran lo mismo.
+    var calc = _calcularItemEnUSD(it);
     subtotal += calc.bruto;
     descuento += (calc.bruto - calc.descontado);
     iva += calc.iva;
@@ -821,7 +859,8 @@ async function _generarPresupuesto() {
   if ((CLIENTE_SEL.contactos || []).length > 1 && !CONTACTO_SEL) { alert('Esta empresa tiene varios contactos — elegí uno.'); return; }
   if (!ITEMS.length || ITEMS.every(function(it){ return !it.descripcion && !it.precio; })) { alert('Agregá al menos un ítem con descripción y precio.'); return; }
   var monedaElegida = document.getElementById('moneda-presupuesto').value;
-  if (monedaElegida === 'ARS' && !TC_OFICIAL) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
+  var hayItemEnArs = ITEMS.some(function(it) { return it.moneda === 'ARS'; });
+  if ((monedaElegida === 'ARS' || hayItemEnArs) && !TC_OFICIAL) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
 
   var btn = document.getElementById('btn-generar-presupuesto');
   var textoOriginal = btn ? btn.textContent : '';
@@ -845,7 +884,7 @@ async function _generarPresupuesto() {
     contactoTelefono: (CONTACTO_SEL && CONTACTO_SEL.telefono) || '',
     vendedor: vendedor,
     items: ITEMS.map(function(it) {
-      return { nombre: it.descripcion, precio: it.precio, cantidad: it.cantidad, descuento: it.descuento, iva: it.iva, foto: it.foto || '', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' };
+      return { nombre: it.descripcion, precio: it.precio, cantidad: it.cantidad, descuento: it.descuento, iva: it.iva, moneda: it.moneda || 'USD', foto: it.foto || '', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' };
     }),
     formaPago: document.getElementById('cc-forma-pago').value,
     validez: document.getElementById('cc-validez').value,

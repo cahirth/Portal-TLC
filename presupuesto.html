@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.26.1 (Soporta ?version=N para abrir un snapshot histórico congelado en modo solo lectura — banner de aviso, sin botón de WhatsApp. Antes toda versión vieja mostraba el documento actual.) -->
+<!-- Portal TLC | presupuesto.html | v2026.07.26.2 (Cada ítem ahora se muestra en SU PROPIA moneda (USD o AR$) en vez de forzar USD siempre — necesario ahora que el editor permite cargar mano de obra en pesos mezclada con equipos en dólares) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -166,11 +166,12 @@
 
   function buildFilasProductos(carrito, etiquetaMonedaIgnorada) {
     if (!Array.isArray(carrito) || !carrito.length) return '';
-    // Los ítems SIEMPRE se muestran en USD (precio de lista) — el
-    // toggle de moneda ARS/USD solo afecta el bloque de Totales más
-    // abajo, nunca el detalle por ítem.
-    var etiquetaMoneda = 'USD';
     return carrito.map(function(i) {
+      // Cada ítem se muestra en SU PROPIA moneda (nueva, 26/07/2026 —
+      // antes se forzaba USD siempre para todos). El toggle de moneda
+      // de Totales sigue siendo independiente, solo afecta el bloque
+      // de Subtotal/IVA/Total de más abajo.
+      var etiquetaMoneda = i.moneda === 'ARS' ? 'AR$' : 'USD';
       var qty = i.cantidad || 1;
       var base = i.precioLista || i.precioNeto || 0;
       var bruto = base * qty;
