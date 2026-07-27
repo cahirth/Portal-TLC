@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.26.10 (Teléfono del ticket ahora es siempre el del contacto elegido, nunca el de la empresa; obligatorio para crear el ticket. Modal limpia el estado de chips/bloqueos al cerrarse.) -->
+<!-- Portal TLC | servicio.html | v2026.07.26.11 (Generar/Modificar Presupuesto ahora lleva a presupuesto-editor.html, mismo editor unificado que usa Ventas — antes iba al flujo viejo de carrito en selector-dispositivos.html. Si ya hay un presupuesto generado, trae los ítems/condiciones reales para editarlos.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2524,33 +2524,94 @@ function _renderCamposTecnicos(t, puedeEditar) {
 
 // ── Guardar campo técnico en RTDB ─────────────────────────────────
 // ── Generar/Modificar Presupuesto Técnico (solo Admin) ────────────
-// Abre el selector de dispositivos con datos pre-cargados del ticket.
-// El selector, al guardar la cotización, vuelve a escribir el link y
-// el registro en el historial de este ticket vía st_agregarPresupuesto.
-window._generarPresupuestoTecnico = function(id) {
+// Lleva a presupuesto-editor.html — mismo editor unificado que usa el
+// Kanban de Ventas (antes iba a selector-dispositivos.html / Pantalla
+// Comercial, el flujo viejo con carrito). Arma el mismo formato de
+// borrador en sessionStorage que ya usa cotizaciones.html
+// (_irAPresupuestoEditor) para que presupuesto-editor.html lo
+// restaure igual en los dos casos.
+window._generarPresupuestoTecnico = async function(id) {
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
   if (!t) return;
 
-  var params = new URLSearchParams();
-  params.set('ticket', t.id_ticket);
-  if (t.cliente)       params.set('cliente', t.cliente);
-  if (t.nombre_medico) params.set('medico', t.nombre_medico);
-  if (t.equipo_marca)  params.set('marca', t.equipo_marca);
-  if (t.equipo_modelo) params.set('modelo', t.equipo_modelo);
-  if (t.equipo_serie)  params.set('serie', t.equipo_serie);
-  if (t.telefono)      params.set('telefono', t.telefono);
-  if (t.domicilio)     params.set('domicilio', t.domicilio);
-  if (t.falla_reportada) params.set('falla', t.falla_reportada);
+  var tieneContacto = !!(t.nombre_medico && t.nombre_medico.trim());
+  var contactoBase = tieneContacto ? {
+    id: null, nombre: t.nombre_medico.trim(), cargo: '', email: '', telefono: t.telefono || '',
+  } : null;
+  var clienteSel = {
+    id: null,
+    razonSocial: t.cliente || '',
+    cuit: '',
+    domicilio: t.domicilio || '',
+    telefono: t.telefono || '',
+    contactos: tieneContacto ? [contactoBase] : [],
+  };
 
-  // Si el ticket ya tiene presupuestos generados antes ("Modificar
-  // Presupuesto"), mandamos el idCot de la ÚLTIMA versión para que
-  // Pantalla Comercial cargue ese carrito en vez de arrancar en blanco.
+  // ¿Ya tiene un presupuesto generado antes ("Modificar Presupuesto")?
+  // Si es así, se traen los ítems/condiciones REALES de esa cotización
+  // (pueden haber sido editados desde Ventas después de generarse acá)
+  // en vez de arrancar de cero.
+  var idCotExistente = null;
   if (Array.isArray(t.presupuestos) && t.presupuestos.length > 0) {
     var ultimo = t.presupuestos[t.presupuestos.length - 1];
-    if (ultimo && ultimo.idCot) params.set('modificar', ultimo.idCot);
+    if (ultimo && ultimo.idCot) idCotExistente = ultimo.idCot;
   }
 
-  window.location.href = SELECTOR_URL + '?' + params.toString();
+  var items = [];
+  var condiciones = { formaPago:'', validez:'15', validezFecha:'', tiempoEntrega:'inmediato', tiempoEntregaCustom:'', lugarEntrega:'cliente', notas:'' };
+  var moneda = 'USD';
+
+  if (idCotExistente) {
+    try {
+      var res = await fetch(RTDB_URL + '/cotizaciones/' + encodeURIComponent(idCotExistente) + '.json?_=' + Date.now());
+      var c = res.ok ? await res.json() : null;
+      if (c) {
+        var carritoActual = Array.isArray(c.carrito) ? c.carrito : [];
+        items = carritoActual.map(function(it, i) {
+          return {
+            id: i + 1,
+            foto: it.foto || null,
+            descripcion: it.nombre || '',
+            precio: parseFloat(it.precioLista != null ? it.precioLista : it.precioNeto) || 0,
+            cantidad: parseInt(it.cantidad) || 1,
+            descuento: parseFloat(it.descuentoValor) || 0,
+            iva: (it.ivaPct !== undefined && it.ivaPct !== null) ? parseFloat(it.ivaPct) : 10.5,
+            linkFolleto: it.linkFolleto || '',
+            linkVideo: it.linkVideo || '',
+          };
+        });
+        var cond = c.condicionesComerciales || {};
+        condiciones = {
+          formaPago: cond.formaPago || '', validez: cond.validez || '15', validezFecha: cond.validezFecha || '',
+          tiempoEntrega: cond.tiempoEntrega || 'inmediato', tiempoEntregaCustom: cond.tiempoEntregaCustom || '',
+          lugarEntrega: cond.lugarEntrega || 'cliente', notas: cond.notas || '',
+        };
+        moneda = c.monedaTotales || 'USD';
+        // Si la cotización ya tiene su propio cliente/contacto guardado
+        // (pudo haberse editado desde Ventas), usar eso en vez de los
+        // datos crudos del ticket.
+        if (c.razonSocial) clienteSel.razonSocial = c.razonSocial;
+        if (c.cuit) clienteSel.cuit = c.cuit;
+        if (c.domicilio) clienteSel.domicilio = c.domicilio;
+        if (c.telefono) clienteSel.telefono = c.telefono;
+      }
+    } catch(e) { console.warn('No se pudo traer la cotización existente, se arranca con lo del ticket:', e); }
+  }
+
+  try {
+    sessionStorage.setItem('tlc_presupuesto_draft', JSON.stringify({
+      clienteSel: clienteSel,
+      contactoSel: contactoBase,
+      items: items,
+      itemSeq: items.length,
+      negocioId: idCotExistente,
+      presupuestoId: idCotExistente,
+      condiciones: condiciones,
+      moneda: moneda,
+    }));
+  } catch(e) { console.warn('Error guardando borrador para presupuesto técnico:', e); }
+
+  window.location.href = 'https://cahirth.github.io/Portal-TLC/presupuesto-editor.html?restaurarDraft=1&ticket=' + encodeURIComponent(t.id_ticket);
 };
 
 window._guardarCampoTecnico = function(id, campo, valor) {
