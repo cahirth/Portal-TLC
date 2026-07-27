@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.26.4 (Botones "Guardar cambios", "Crear empresa" y "Guardar contacto" ahora se deshabilitan y muestran "Guardando..." mientras esperan la respuesta del servidor — antes se podía clickear varias veces seguidas.) -->
+<!-- Portal TLC | empresas.html | v2026.07.26.5 (Buscador en su propia fila de ancho completo; ahora también busca por nombre de contacto, mostrando cuál coincidió en la tarjeta) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -179,8 +179,10 @@
 
     <!-- VISTA LISTA -->
     <div id="vista-lista">
+      <div class="buscador-row" style="margin-bottom:10px;">
+        <input type="text" class="buscador-input" id="buscador-empresas" placeholder="Buscar por razón social, CUIT o contacto..." oninput="_filtrarEmpresas(this.value)">
+      </div>
       <div class="buscador-row">
-        <input type="text" class="buscador-input" id="buscador-empresas" placeholder="Buscar por razón social o CUIT..." oninput="_filtrarEmpresas(this.value)">
         <button class="btn-nueva" onclick="_toggleFormNuevaEmpresa()">+ Nueva empresa</button>
         <button class="btn-nueva" style="background:transparent;border:1px solid var(--border-glow);color:var(--text-muted);" onclick="document.getElementById('input-excel-empresas').click()">📥 Importar Excel</button>
         <input type="file" id="input-excel-empresas" accept=".xlsx,.xls" style="display:none;" onchange="_onSeleccionarExcel(this.files[0])">
@@ -443,14 +445,22 @@ function _renderListaEmpresas(filtro) {
   var cont = document.getElementById('lista-empresas');
   var q = (filtro || '').toLowerCase();
   var lista = EMPRESAS.filter(function(e) {
-    return !q || e.razonSocial.toLowerCase().includes(q) || (e.cuit||'').includes(q);
+    if (!q) return true;
+    if (e.razonSocial.toLowerCase().includes(q)) return true;
+    if ((e.cuit||'').includes(q)) return true;
+    return (e.contactos||[]).some(function(c) { return (c.nombre||'').toLowerCase().includes(q); });
   }).sort(function(a, b) { return a.razonSocial.localeCompare(b.razonSocial, 'es', { sensitivity:'base' }); });
   if (!lista.length) { cont.innerHTML = '<div class="empty-lista">' + (EMPRESAS.length ? 'Sin resultados.' : 'Todavía no cargaste ninguna empresa.') + '</div>'; return; }
   cont.innerHTML = lista.map(function(e) {
+    var contactoQueMatchea = null;
+    if (q && !e.razonSocial.toLowerCase().includes(q) && !(e.cuit||'').includes(q)) {
+      contactoQueMatchea = (e.contactos||[]).find(function(c) { return (c.nombre||'').toLowerCase().includes(q); });
+    }
     return '<div class="empresa-card" onclick="_abrirDetalleEmpresa(\'' + e.id + '\')">' +
       '<div class="empresa-card-top">' +
         '<div><div class="empresa-card-razon">' + e.razonSocial + '</div><div class="empresa-card-cuit">CUIT ' + (e.cuit||'sin CUIT') + '</div></div>' +
       '</div>' +
+      (contactoQueMatchea ? '<div style="font-size:11px;color:#3a86ff;margin-top:2px;">👤 Coincide por contacto: ' + contactoQueMatchea.nombre + '</div>' : '') +
       '<div class="empresa-card-meta">' +
         '<span>👤 <b>' + e.contactos.length + '</b> contacto' + (e.contactos.length!==1?'s':'') + '</span>' +
         '<span>💼 <b>' + e.negocios.length + '</b> negocio' + (e.negocios.length!==1?'s':'') + '</span>' +
