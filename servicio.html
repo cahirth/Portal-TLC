@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.26.13 (Conserva la moneda por ítem al traer una cotización existente para Modificar Presupuesto) -->
+<!-- Portal TLC | servicio.html | v2026.07.26.14 (Historial de versiones del presupuesto igual al de Ventas — 👁️ Ver (snapshot congelado por versión, actual solo la más reciente), ✏️ Editar (solo la última), 🗑️ Borrar. Los links ahora incluyen &ticket= para que "Volver" funcione bien.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2469,15 +2469,26 @@ function _renderCamposTecnicos(t, puedeEditar) {
         'Historial de versiones (' + historial.length + ')' +
       '</div>' +
       historial.slice().reverse().map(function(v, i) {
+        var esUltima = i === 0;
         var fechaLinda = '';
         try { fechaLinda = new Date(v.fecha).toLocaleDateString('es-AR', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
         catch(e) { fechaLinda = v.fecha || '—'; }
-        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:11px;">' +
-          '<span style="color:var(--text-muted);">v' + v.version + ' · ' + fechaLinda + '</span>' +
-          '<span style="display:flex;align-items:center;gap:8px;">' +
-            (v.monto ? '<span style="font-weight:700;color:var(--text-main);">' + (v.moneda || 'USD') + ' ' + Number(v.monto).toLocaleString('en-US') + '</span>' : '') +
-            (v.link ? '<a href="' + _esc(v.link) + '" target="_blank" style="color:#60a5fa;text-decoration:none;">Ver 🔗</a>' : '') +
+        // "Ver" apunta al snapshot congelado de ESA versión (excepto la
+        // más reciente, que va al documento en vivo) — mismo patrón que
+        // ya usa cotizaciones.html. Siempre con &ticket= para que
+        // "Volver" desde el documento vuelva a esta tarjeta.
+        var linkVer = 'https://cahirth.github.io/Portal-TLC/presupuesto.html?id=' + encodeURIComponent(v.idCot) +
+          (esUltima ? '' : '&version=' + v.version) + '&ticket=' + encodeURIComponent(t.id_ticket);
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:11px;">' +
+          '<span style="flex:1;color:var(--text-muted);">v' + v.version + ' · ' + fechaLinda +
+            (v.monto ? ' · <b style="color:var(--text-main);">' + (v.moneda || 'USD') + ' ' + Number(v.monto).toLocaleString('en-US') + '</b>' : '') +
           '</span>' +
+          '<a href="' + linkVer + '" target="_blank" title="' + (esUltima ? 'Ver presupuesto' : 'Ver esta versión (v' + v.version + ')') + '" ' +
+            'style="font-size:15px;text-decoration:none;padding:2px;">👁️</a>' +
+          (esUltima ? '<button onclick="_generarPresupuestoTecnico(\'' + t.id_ticket + '\')" title="Editar presupuesto" ' +
+            'style="background:transparent;border:none;font-size:15px;cursor:pointer;padding:2px;">✏️</button>' : '') +
+          '<button onclick="_borrarVersionPresupuestoTicket(\'' + t.id_ticket + '\', ' + v.version + ')" title="Borrar esta versión" ' +
+            'style="background:transparent;border:none;font-size:15px;cursor:pointer;padding:2px;">🗑️</button>' +
         '</div>';
       }).join('') +
     '</div>';
@@ -2539,6 +2550,24 @@ function _renderCamposTecnicos(t, puedeEditar) {
 // borrador en sessionStorage que ya usa cotizaciones.html
 // (_irAPresupuestoEditor) para que presupuesto-editor.html lo
 // restaure igual en los dos casos.
+// Borra una versión puntual del historial de presupuestos de ESTE
+// ticket (no toca la cotización de Ventas en sí, solo el registro
+// dentro del ticket) — mismo patrón que ya existe en cotizaciones.html.
+window._borrarVersionPresupuestoTicket = async function(ticketId, nroVersion) {
+  if (!confirm('¿Borrar la versión v' + nroVersion + ' del historial? No se puede deshacer.')) return;
+  try {
+    const resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'eliminarVersionPresupuestoTicket', ticketId: ticketId, version: nroVersion }) });
+    const r = await resp.json();
+    if (!r.ok) { alert('No se pudo borrar la versión: ' + (r.error || r.message || 'error desconocido')); return; }
+    var t = _tickets.find(function(x){ return x.id_ticket === ticketId; });
+    if (t) t.presupuestos = r.presupuestos;
+    _renderDetalle(t);
+  } catch(e) {
+    alert('Error de conexión al borrar la versión.');
+  }
+};
+
 window._generarPresupuestoTecnico = async function(id) {
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
   if (!t) return;
