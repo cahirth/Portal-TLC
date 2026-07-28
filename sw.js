@@ -57,7 +57,15 @@ self.addEventListener('notificationclick', function(event) {
 //      Cache-first solo para assets externos (Font Awesome, etc.).
 //      Limpia cachés viejas automáticamente al activar.
 
-const CACHE_NAME = 'portal-tlc-v16';
+// v17: CACHE_NAME bumpeado — 6 archivos que se venían editando toda la
+//      sesión (empresas.html, presupuesto-editor.html, permisos.js,
+//      adjuntos.js, remito-ingreso.html, ficha-equipo.html) nunca
+//      habían entrado a la lista HTML_LOCAL (red primero) — quedaban
+//      en la rama "cache-first" de abajo, cacheados para siempre desde
+//      la primera vez que se abrían, sin importar cuántas versiones
+//      nuevas se subieran después. Esto probablemente explica más de
+//      un "no se ve el cambio" de hoy, no solo el botón de instalar.
+const CACHE_NAME = 'portal-tlc-v17';
 
 const HTML_LOCAL = [
     './',
@@ -67,8 +75,14 @@ const HTML_LOCAL = [
     './presupuesto.html',
     './servicio.html',
     './orden-servicio.html',
+    './empresas.html',
+    './presupuesto-editor.html',
+    './remito-ingreso.html',
+    './ficha-equipo.html',
     './manifest.json',
     './version.js',
+    './permisos.js',
+    './adjuntos.js',
 ];
 
 const ASSETS_EXTERNOS = [
