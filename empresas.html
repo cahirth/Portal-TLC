@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.26.8-DEBUG (Ahora muestra la respuesta CRUDA sin procesar de ARCA, vía debugArcaRaw — sacar apenas se resuelva el parseo) -->
+<!-- Portal TLC | empresas.html | v2026.07.26.9 (Búsqueda automática por CUIT probada y descartada — las dos fuentes de ARCA están muertas (confirmado con la respuesta cruda real). Campo CUIT vuelve a carga 100% manual, sin el enganche.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -204,8 +204,7 @@
         <div class="det-grid">
           <div class="det-campo">
             <label>CUIT</label>
-            <input type="text" id="ne-cuit" placeholder="30-XXXXXXXX-X" onblur="_consultarCuitArcaNuevaEmpresa()">
-            <div id="ne-cuit-status" style="font-size:11px;margin-top:4px;"></div>
+            <input type="text" id="ne-cuit" placeholder="30-XXXXXXXX-X">
           </div>
           <div class="det-campo">
             <label>Teléfono</label>
@@ -477,8 +476,6 @@ window._toggleFormNuevaEmpresa = function() {
   panel.style.display = abrir ? 'block' : 'none';
   if (abrir) {
     ['ne-cuit','ne-telefono','ne-razon','ne-domicilio'].forEach(function(id){ document.getElementById(id).value = ''; });
-    var elStatus = document.getElementById('ne-cuit-status');
-    if (elStatus) elStatus.textContent = '';
     document.getElementById('ne-razon').focus();
   }
 };
@@ -498,54 +495,16 @@ function _buscarEmpresaExistente(razonSocial, cuit) {
   });
 }
 
-// Al salir del campo CUIT en "Nueva empresa", consulta ARCA (ex-AFIP)
-// y completa Razón Social/Domicilio con lo que encuentre — acepta el
-// CUIT con o sin guiones, los saca antes de mandarlo. Nunca pisa un
-// campo que el usuario ya haya escrito a mano (solo completa lo que
-// esté vacío), y nunca bloquea la carga manual si ARCA no responde o
-// no encuentra nada — es un asistente, no un requisito.
-window._consultarCuitArcaNuevaEmpresa = async function() {
-  var elCuit = document.getElementById('ne-cuit');
-  var elStatus = document.getElementById('ne-cuit-status');
-  var cuitLimpio = (elCuit.value || '').replace(/\D/g, '');
-  if (cuitLimpio.length !== 11) {
-    if (elStatus) elStatus.textContent = cuitLimpio ? '' : ''; // CUIT incompleto — no consulta, no molesta
-    return;
-  }
-  if (elStatus) { elStatus.textContent = '🔎 Buscando en ARCA...'; elStatus.style.color = '#3a86ff'; }
-  try {
-    // DEBUG TEMPORAL — llamando a debugArcaRaw en vez de consultarCuitArca
-    // para ver la respuesta CRUDA de la API y arreglar el parseo.
-    var respDebug = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({ accion:'debugArcaRaw', cuit: cuitLimpio }) });
-    var rDebug = await respDebug.json();
-    if (elStatus) {
-      var elDebugRaw = document.createElement('pre');
-      elDebugRaw.style.cssText = 'font-size:10px;background:#0f1b2e;color:#94a3b8;padding:8px;border-radius:6px;margin-top:6px;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto;';
-      elDebugRaw.textContent = '🐛 DEBUG CRUDO: ' + JSON.stringify(rDebug, null, 2);
-      elStatus.parentNode.insertBefore(elDebugRaw, elStatus.nextSibling);
-    }
-
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({ accion:'consultarCuitArca', cuit: cuitLimpio }) });
-    var r = await resp.json();
-    if (!r.ok || !r.arcaOk) {
-      if (elStatus) { elStatus.textContent = '⚠️ No se encontraron datos en ARCA para este CUIT — completá a mano.'; elStatus.style.color = '#f8961e'; }
-      return;
-    }
-    var elRazon = document.getElementById('ne-razon');
-    var elDomicilio = document.getElementById('ne-domicilio');
-    var completo = [];
-    if (r.razonSocial && elRazon && !elRazon.value.trim()) { elRazon.value = r.razonSocial; completo.push('razón social'); }
-    if (r.domicilio && elDomicilio && !elDomicilio.value.trim()) { elDomicilio.value = r.domicilio; completo.push('domicilio'); }
-    if (elStatus) {
-      elStatus.textContent = completo.length ? ('✅ Completado desde ARCA: ' + completo.join(' y ') + (r.condicionIva ? ' · ' + r.condicionIva : '')) : '✅ Encontrado en ARCA' + (r.condicionIva ? ' · ' + r.condicionIva : '');
-      elStatus.style.color = '#06d6a0';
-    }
-  } catch(e) {
-    if (elStatus) { elStatus.textContent = '⚠️ No se pudo consultar ARCA — completá a mano.'; elStatus.style.color = '#f8961e'; }
-  }
-};
+// Búsqueda automática por CUIT vía ARCA: PROBADA Y DESCARTADA
+// (26/07/2026) — se reconectó consultarCuitArca (backend ya existía)
+// pero se confirmó que las dos fuentes que usa están muertas:
+//   - api.afip.gob.ar (oficial): error de DNS, el dominio no resuelve.
+//   - afip.tangofactura.com (mirror de respaldo): responde ella misma
+//     "Sistema desactualizado o fuera de soporte".
+// No hay alternativa gratuita simple hoy — los servicios que sí
+// funcionan (TusFacturasAPP, etc.) piden vincular certificados
+// digitales de ARCA y tienen costo. Detalle completo en el documento
+// maestro, Parte 7. El campo CUIT queda de carga 100% manual.
 
 window._crearNuevaEmpresa = function() {
   var razon = document.getElementById('ne-razon').value.trim();
