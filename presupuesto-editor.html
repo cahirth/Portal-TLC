@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.8 (Al agregar un ítem desde el selector, la descripción combina Nombre de Dispositivo + Descripcion del catálogo con separador " — ", todo en el mismo campo editable) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.9 (Campo de descripción del ítem ahora es multilínea con auto-resize (crece con el contenido) — antes era un input de una sola línea que se cortaba con descripciones largas) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -81,12 +81,13 @@
 
   /* ── ÍTEMS ── */
   .item-card { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:12px; padding:14px; margin-bottom:12px; }
-  .item-top { display:flex; gap:12px; }
+  .item-top { display:flex; gap:12px; align-items:flex-start; }
   .item-foto { width:56px; height:56px; border-radius:8px; background:#0d1520; border:1px dashed var(--border-glow); flex-shrink:0;
     display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; font-size:18px; color:var(--text-dim); }
   .item-foto img { width:100%; height:100%; object-fit:cover; }
   .item-desc-input { flex:1; background:transparent; border:none; border-bottom:1px solid var(--border-glow); color:var(--text-main);
-    font-size:13px; font-weight:600; padding:6px 2px; outline:none; }
+    font-size:13px; font-weight:600; padding:6px 2px; outline:none; font-family:inherit; resize:none; overflow:hidden;
+    line-height:1.4; min-height:22px; }
   .item-desc-input:focus { border-color:var(--accent-blue); }
   .item-borrar { width:30px; height:30px; border-radius:8px; background:transparent; border:1px solid var(--border-glow); color:var(--accent-red);
     cursor:pointer; flex-shrink:0; }
@@ -818,7 +819,9 @@ function _renderItems() {
           (it.foto ? '<img src="' + it.foto + '">' : '📷') +
           '<input type="file" id="file-' + it.id + '" accept="image/*" style="display:none;" onchange="_fotoItem(' + it.id + ', this)">' +
         '</div>' +
-        '<input class="item-desc-input" placeholder="Descripción del equipo/ítem..." value="' + (it.descripcion || '').replace(/"/g,'&quot;') + '" onchange="_actualizarItem(' + it.id + ',\'descripcion\',this.value)">' +
+        '<textarea class="item-desc-input" rows="1" placeholder="Descripción del equipo/ítem..." ' +
+          'oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';" ' +
+          'onchange="_actualizarItem(' + it.id + ',\'descripcion\',this.value)">' + (it.descripcion || '').replace(/</g,'&lt;') + '</textarea>' +
         '<button class="item-borrar" onclick="_borrarItem(' + it.id + ')">✕</button>' +
       '</div>' +
       '<div class="item-grid">' +
@@ -849,6 +852,14 @@ function _renderItems() {
       '</div>' +
     '</div>';
   }).join('');
+  // Ajustar la altura de cada descripción a su contenido apenas se
+  // pinta — el evento oninput solo se dispara con interacción del
+  // usuario, así que sin esto quedaría en una sola línea hasta que
+  // alguien toque el campo.
+  document.querySelectorAll('.item-desc-input').forEach(function(ta) {
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 'px';
+  });
 }
 
 function _toggleValidezPersonalizada() {
