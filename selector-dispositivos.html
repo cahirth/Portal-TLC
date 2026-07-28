@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.25.7 (Texto de Solo Vista actualizado: decía "no permite agregar al carrito", ahora dice "no permite agregar ítems a una cotización" — la restricción en sí no cambió, solo el texto que ya no reflejaba el flujo actual) -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.26.1 (El puente con presupuesto-editor.html ahora también manda el campo Descripcion del catálogo, para pegarlo al lado del nombre del ítem) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -3516,6 +3516,7 @@ function agregarAlCarrito() {
         try {
             sessionStorage.setItem('tlc_item_pendiente_presupuesto', JSON.stringify({
                 nombre: d['Nombre de Dispositivo'] || '',
+                descripcionCatalogo: d['Descripcion'] || '',
                 precio: isNaN(precioListaPP) ? 0 : precioListaPP,
                 foto: fotoUrl(d['Foto'] || ''),
                 linkFolleto: d['Link_Folleto'] || '',

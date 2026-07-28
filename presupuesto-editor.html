@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.7 (Fix: el contacto ya elegido (CONTACTO_SEL) no se resincronizaba cuando se refrescaban los contactos de la empresa, así que el teléfono no aparecía aunque la lista ya estuviera actualizada — arreglado en _cargarContactosCompletosCliente. También simplificado _refrescarDatosEmpresa para no duplicar el refresco de contactos.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.8 (Al agregar un ítem desde el selector, la descripción combina Nombre de Dispositivo + Descripcion del catálogo con separador " — ", todo en el mismo campo editable) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -458,7 +458,9 @@ function _restaurarDraftYItemPendiente() {
     var rawItem = sessionStorage.getItem('tlc_item_pendiente_presupuesto');
     if (rawItem) {
       var it = JSON.parse(rawItem);
-      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: it.nombre || '', precio: it.precio || 0, cantidad: 1, descuento: 0, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
+      var descripcionCombinada = it.nombre || '';
+      if (it.descripcionCatalogo && it.descripcionCatalogo.trim()) descripcionCombinada += ' — ' + it.descripcionCatalogo.trim();
+      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: it.precio || 0, cantidad: 1, descuento: 0, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
     }
   } catch (e) { console.warn('Error aplicando ítem pendiente:', e); }
   sessionStorage.removeItem('tlc_item_pendiente_presupuesto');
