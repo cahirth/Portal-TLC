@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.07.26.14 (Historial de versiones del presupuesto igual al de Ventas — 👁️ Ver (snapshot congelado por versión, actual solo la más reciente), ✏️ Editar (solo la última), 🗑️ Borrar. Los links ahora incluyen &ticket= para que "Volver" funcione bien.) -->
+<!-- Portal TLC | servicio.html | v2026.07.26.15 (Sacado el input/botón "Ver" del link crudo de Presupuesto Vinculado — quedaba redundante con el 👁️ del Historial de versiones. El dato sigue funcionando por atrás (auto-completado al guardar, y sigue siendo el que exige el gate de etapa Reparación→Para Facturar), solo se sacó el widget visual.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2497,13 +2497,6 @@ function _renderCamposTecnicos(t, puedeEditar) {
   var presupHtml = '<div class="campo-tecnico-wrap">' +
     '<div class="campo-tecnico-label">Presupuesto vinculado ' + _campoBadge(dep,'presupuesto') + '</div>' +
     '<div class="presupuesto-wrap">' +
-      '<div class="presupuesto-link-row">' +
-        '<input class="presupuesto-link-input" id="det-presupuesto-link" ' +
-          'placeholder="Pegá el link del presupuesto generado..." ' +
-          'value="' + _esc(t.presupuesto_link||'') + '" ' +
-          (presupDisabled ? 'disabled' : 'onblur="_guardarCampoTecnico(\'' + t.id_ticket + '\',\'presupuesto_link\',this.value)"') + '>' +
-        (t.presupuesto_link ? '<a href="' + _esc(t.presupuesto_link) + '" target="_blank" class="presupuesto-link-btn">🔗 Ver</a>' : '') +
-      '</div>' +
       '<label class="checkbox-row">' +
         '<input type="checkbox" id="det-presupuesto-aprobado" ' +
           (t.presupuesto_aprobado ? 'checked' : '') + ' ' +
