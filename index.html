@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.07.25.1 (Nueva columna "Empresas" en Vendedores — el tile ahora gatea acceso igual que los demás módulos. Texto de toast estandarizado a "🔒 No tienes permiso para acceder a este módulo". Scroll horizontal agregado al contenedor del menú.) -->
+<!-- Portal TLC | index.html | v2026.07.26.1 (Fix: "Cómo instalar la app" no respondía al toque en iPhone — mismo patrón que ya resolvió el picker de menciones en servicio.html, doble binding onclick+ontouchend con debounce, para cuando el click de Safari en iOS no dispara de forma confiable.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -526,6 +526,7 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
 
                     <!-- Cómo instalar la app -->
                     <button id="btn-como-instalar" onclick="_manejarClickInstalarApp()"
+                        ontouchend="event.preventDefault(); _manejarClickInstalarAppUnaVez();"
                         style="width:100%; padding:11px; border-radius:10px; background:transparent;
                                border:1px solid #1e3050; color:#f1f5f9; font-size:13px; font-weight:600;
                                cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
@@ -2078,7 +2079,15 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
       if (btn) btn.style.display = 'flex';
       if (_esIOS() && !localStorage.getItem(IOS_INSTALL_DISMISSED_KEY)) _mostrarModalInstalarIOS();
     }
+    var _ultimoClickInstalarApp = 0;
+    window._manejarClickInstalarAppUnaVez = function() {
+      var ahora = Date.now();
+      if (ahora - _ultimoClickInstalarApp < 400) return; // ya se procesó este mismo toque
+      _ultimoClickInstalarApp = ahora;
+      _manejarClickInstalarApp();
+    };
     window._manejarClickInstalarApp = function() {
+      _ultimoClickInstalarApp = Date.now();
       if (_esIOS()) { _mostrarModalInstalarIOS(); return; }
       if (_deferredInstallPrompt) {
         _deferredInstallPrompt.prompt();
