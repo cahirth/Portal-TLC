@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.26.6 (Conserva la moneda por ítem (USD/ARS) al reabrir un negocio existente para editar) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.26.8 (Tarjetas del Kanban: "Ver Presupuesto" ahora funciona para negocios del flujo nuevo también (caía siempre a c.link, que nunca se llena ahí) — cae al documento dinámico si hace falta. Agregada línea de Empresa/Cliente debajo del título, siempre visible sin importar cómo se haya escrito el nombre del negocio. Monto de la tarjeta también respeta AR$ si corresponde.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1750,9 +1750,17 @@ function renderKanban() {
             const idxReal   = todasLasCot.indexOf(c);
             const id        = c.idCot || c.id_cotizacion || c.id || '—';
             const titulo    = _fixEncoding(c.nombreNegocio || c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—');
+            const empresaNombre = _fixEncoding(c.razonSocial || c.cliente?.nombre || '');
             const monto     = _monto(c);
             const fecha     = _fmtFechaHora(c.fechaCreacion || c.fecha);
-            const linkPdf   = c.link && !c.link.startsWith('blob:') ? c.link : null;
+            // "Ver Presupuesto" — antes dependía solo de c.link (campo
+            // del flujo viejo, que nunca se llena con el editor nuevo).
+            // Ahora, si no hay c.link, cae al documento dinámico en
+            // vivo (presupuesto.html?id=X) — funciona para cualquier
+            // negocio con carrito cargado, sin importar cómo se creó.
+            const linkPdf = (c.link && !c.link.startsWith('blob:'))
+                ? c.link
+                : ((c.carrito && c.carrito.length) ? ('presupuesto.html?id=' + encodeURIComponent(id)) : null);
 
             // Productos como badges con fix encoding
             const prods = Array.isArray(c.productos) ? c.productos : [];
@@ -1800,8 +1808,14 @@ function renderKanban() {
                     ${probHtml}
                 </div>
                 <div class="k-titulo">${titulo}</div>
+                ${empresaNombre && empresaNombre !== titulo ? `<div style="font-size:10px;color:#94a3b8;margin-top:-4px;margin-bottom:4px;">🏢 ${empresaNombre}</div>` : ''}
                 ${prodsHtml}
-                <div class="k-valor">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
+                <div class="k-valor">${(() => {
+                    const hayConv = c.monedaTotales === 'ARS' && c.tcOficial;
+                    const mon = hayConv ? 'AR$' : 'USD';
+                    const val = hayConv ? monto * c.tcOficial : monto;
+                    return mon + ' ' + Math.round(val).toLocaleString('es-AR');
+                })()}</div>
                 ${permisos.verVendedorEnCard && c.vendedor ? `<div class="k-prop">👤 ${c.vendedor}</div>` : ''}
                 <div class="k-fecha">📅 ${fecha}</div>
                 <select class="cambio-etapa-select"
@@ -2015,6 +2029,17 @@ function _renderDetalle(c) {
     const monto   = _monto(c);
     const iva     = _monto_iva(c);
     const neto    = monto - iva;
+    // El monto siempre se guarda en USD internamente — si el último
+    // guardado del presupuesto eligió AR$ para los Totales, se
+    // convierte acá SOLO para mostrar (con el TC real usado en ese
+    // momento), sin tocar los helpers compartidos _monto()/_monto_iva()
+    // que otras partes de la pantalla siguen usando en USD.
+    const hayConversion = c.monedaTotales === 'ARS' && c.tcOficial;
+    const monedaMostrar = hayConversion ? 'AR$' : 'USD';
+    const factorMostrar = hayConversion ? c.tcOficial : 1;
+    const montoMostrar = monto * factorMostrar;
+    const netoMostrar  = neto * factorMostrar;
+    const ivaMostrar   = iva * factorMostrar;
     const linkPdf = c.link && !c.link.startsWith('blob:') ? c.link : null;
     const colData = KANBAN_COLS.find(k => k.key === c.estado) || {};
 
@@ -2052,8 +2077,8 @@ function _renderDetalle(c) {
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
             <div>
                 <div style="font-size:11px;color:#475569;margin-bottom:4px;">MONTO TOTAL c/IVA</div>
-                <div class="det-hero-monto">USD ${Math.round(monto).toLocaleString('es-AR')}</div>
-                ${neto !== monto ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">Neto USD ${Math.round(neto).toLocaleString('es-AR')} · IVA USD ${Math.round(iva).toLocaleString('es-AR')}</div>` : ''}
+                <div class="det-hero-monto">${monedaMostrar} ${Math.round(montoMostrar).toLocaleString('es-AR')}</div>
+                ${neto !== monto ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">Neto ${monedaMostrar} ${Math.round(netoMostrar).toLocaleString('es-AR')} · IVA ${monedaMostrar} ${Math.round(ivaMostrar).toLocaleString('es-AR')}</div>` : ''}
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:100%;">
                 <div class="det-hero-badge-wrap" style="color:${colData.color||'#3a86ff'};max-width:100%;">
