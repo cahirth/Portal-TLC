@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.5 (Sacado el fallback confuso donde el teléfono de empresa caía al del contacto si la empresa no tenía uno propio — ahora quedan separados, cada uno con su dato real) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.6 (Fix: CUIT/teléfono/domicilio de la empresa podían quedar desactualizados (copia vieja guardada en el negocio o en el link de empresas.html) — ahora se refrescan contra listarEmpresas apenas abre el editor, mismo criterio que ya se usaba en servicio.html para los contactos.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -555,6 +555,32 @@ function _cambiarCliente() {
   _renderCliente();
 }
 
+// Los datos de la empresa (razón social, CUIT, teléfono, domicilio)
+// pueden llegar acá desde una copia vieja — la que quedó guardada en
+// el negocio al momento de crearlo (vía cotizaciones.html) o la que
+// tenía empresas.html al armar el link (vía "Nuevo negocio"). Si
+// después se cargó/corrigió el CUIT en el módulo Empresas, esa copia
+// vieja nunca se entera. Acá se pide la versión ACTUAL directo al
+// backend y se pisa lo que haya, igual que ya se hace en servicio.html
+// para los contactos del formulario de Nuevo Ticket.
+async function _refrescarDatosEmpresa() {
+  if (!CLIENTE_SEL || !CLIENTE_SEL.id) return;
+  try {
+    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'listarEmpresas' }) });
+    var r = await resp.json();
+    if (!r.ok || !Array.isArray(r.empresas)) return;
+    var fresca = r.empresas.find(function(e){ return e.id === CLIENTE_SEL.id; });
+    if (!fresca) return;
+    CLIENTE_SEL.razonSocial = fresca.razonSocial || CLIENTE_SEL.razonSocial;
+    CLIENTE_SEL.cuit        = fresca.cuit || '';
+    CLIENTE_SEL.telefono    = fresca.telefono || '';
+    CLIENTE_SEL.domicilio   = fresca.domicilio || '';
+    if (Array.isArray(fresca.contactos)) CLIENTE_SEL.contactos = fresca.contactos;
+    _renderCliente();
+  } catch(e) { console.warn('No se pudieron refrescar los datos de la empresa:', e); }
+}
+
 function _renderCliente() {
   var bBuscador = document.getElementById('bloque-buscador-cliente');
   var bSel = document.getElementById('bloque-cliente-sel');
@@ -969,6 +995,7 @@ _leerParamsIniciales();
 _actualizarTituloHeader();
 _aplicarTema();
 _renderCliente();
+_refrescarDatosEmpresa();
 _itemSeq = Math.max.apply(null, ITEMS.map(function(it){ return it.id; }).concat([_itemSeq]));
 _render();
 if (_draftCondiciones) {
