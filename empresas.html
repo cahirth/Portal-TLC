@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.07.26.6 (Nueva Empresa: al salir del campo CUIT (con o sin guiones), consulta ARCA/AFIP y completa Razón Social/Domicilio si están vacíos — reconecta la función consultarCuitArca del backend, que ya existía pero no estaba enganchada a ningún formulario) -->
+<!-- Portal TLC | empresas.html | v2026.07.26.7-DEBUG (Diagnóstico ARCA — muestra la respuesta cruda en pantalla debajo del CUIT, para ver por qué no completa razón social/domicilio. Sacar en cuanto se resuelva.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -529,6 +529,16 @@ window._consultarCuitArcaNuevaEmpresa = async function() {
     if (elStatus) {
       elStatus.textContent = completo.length ? ('✅ Completado desde ARCA: ' + completo.join(' y ') + (r.condicionIva ? ' · ' + r.condicionIva : '')) : '✅ Encontrado en ARCA' + (r.condicionIva ? ' · ' + r.condicionIva : '');
       elStatus.style.color = '#06d6a0';
+    }
+    // DEBUG TEMPORAL — mostrar la respuesta cruda en pantalla (no en
+    // consola, para que se pueda ver directo desde el celular) para
+    // diagnosticar por qué no trae razonSocial/domicilio aunque diga
+    // "Encontrado en ARCA". Sacar apenas se resuelva.
+    if (elStatus) {
+      var elDebug = document.createElement('pre');
+      elDebug.style.cssText = 'font-size:10px;background:#0f1b2e;color:#94a3b8;padding:8px;border-radius:6px;margin-top:6px;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow:auto;';
+      elDebug.textContent = '🐛 DEBUG: ' + JSON.stringify(r, null, 2);
+      elStatus.parentNode.insertBefore(elDebug, elStatus.nextSibling);
     }
   } catch(e) {
     if (elStatus) { elStatus.textContent = '⚠️ No se pudo consultar ARCA — completá a mano.'; elStatus.style.color = '#f8961e'; }
