@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.26.11 (Fix real: /config no tiene lectura pública en Firebase, daba 401 al leer pipelines directo — ahora pasa por listarPipelines en el backend, igual que toda escritura. Por eso el pipeline se creaba pero no aparecía en el desplegable.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.28.1 (Cuadro 1: bloque de datos del cliente (Empresa/CUIT/Contacto/Teléfono) al lado de las miniaturas de equipos, arriba de todo, sin scrollear. Cuadro 2: botón "📝 Crear Presupuesto" siempre visible debajo de Equipos (antes solo aparecía si el negocio no tenía ítems todavía) — reutiliza _irAPresupuestoEditor, que ya precargaba todo esto.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2250,7 +2250,16 @@ function _renderDetalle(c) {
         `<option value="${k.key}" ${k.key === c.estado ? 'selected' : ''}>${k.label} (${k.prob})</option>`
     ).join('');
     html += `<div class="det-hero" style="padding:20px 16px 12px;">
-        <div id="det-fotos-equipos">${_renderFotosEquipos(carrito)}</div>
+        <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px;">
+            <div style="flex:1;min-width:170px;background:#0f1a30;border:1px solid #3a86ff33;border-radius:10px;padding:10px 12px;">
+                <div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;">🏢 Cliente</div>
+                <div style="font-size:12.5px;font-weight:700;color:#f1f5f9;line-height:1.3;">${cliente}</div>
+                ${c.cuit ? `<div style="font-size:10.5px;color:#94a3b8;margin-top:3px;">CUIT ${c.cuit}</div>` : ''}
+                ${contactoNombre ? `<div style="font-size:10.5px;color:#94a3b8;margin-top:3px;">👤 ${contactoNombre}</div>` : ''}
+                ${(c.telefono || c.contacto?.telefono) ? `<div style="font-size:10.5px;color:#94a3b8;margin-top:3px;">📞 ${c.telefono || c.contacto?.telefono}</div>` : ''}
+            </div>
+            <div id="det-fotos-equipos" style="flex-shrink:0;">${_renderFotosEquipos(carrito)}</div>
+        </div>
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
             <div>
                 <div style="font-size:11px;color:#475569;margin-bottom:4px;">MONTO TOTAL c/IVA</div>
@@ -2368,24 +2377,21 @@ function _renderDetalle(c) {
         </div>`;
     }
 
-    // ── BOTÓN CREAR COTIZACIÓN — solo la primera vez ────────────────
-    // Si el negocio todavía no tiene ítems, este es el único punto de
-    // entrada (no hay "Historial de versiones" todavía donde poner un
-    // lápiz). Una vez que ya hay una cotización armada, este botón
-    // desaparece — la edición pasa a los lápices ✏️ de cada versión en
-    // "Historial de versiones", más abajo.
-    if (carrito.length === 0) {
-        html += `<div style="padding:0 16px 4px;">
-            <button onclick="_irAPresupuestoEditor('${id}')"
-                style="width:100%;padding:11px;border-radius:10px;
-                       background:linear-gradient(135deg,#0f2a52,#1e3a6e);
-                       border:1px solid #3a86ff55;color:#60a5fa;
-                       font-size:13px;font-weight:700;cursor:pointer;
-                       display:flex;align-items:center;justify-content:center;gap:8px;">
-                ➕ Crear cotización
-            </button>
-        </div>`;
-    }
+    // ── BOTÓN CREAR/EDITAR PRESUPUESTO — siempre visible ────────────
+    // _irAPresupuestoEditor ya sabe hacer las dos cosas: si el negocio
+    // no tiene ítems todavía, abre el editor en blanco; si ya tiene
+    // carrito armado, lo trae completo para seguir editando — mismo
+    // botón sirve para las dos situaciones.
+    html += `<div style="padding:0 16px 4px;">
+        <button onclick="_irAPresupuestoEditor('${id}')"
+            style="width:100%;padding:12px;border-radius:10px;
+                   background:linear-gradient(135deg,#0f2a52,#1e3a6e);
+                   border:1px solid #3a86ff55;color:#60a5fa;
+                   font-size:13px;font-weight:700;cursor:pointer;
+                   display:flex;align-items:center;justify-content:center;gap:8px;">
+            📝 Crear Presupuesto
+        </button>
+    </div>`;
 
     // (Cambio de etapa ahora vive en el dropdown compacto del HERO, arriba)
 
