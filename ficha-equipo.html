@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.26.3 (Selector de Pipeline arriba del buscador de empresa — recuerda la última elección en localStorage, para no tener que volver a elegirlo en cada envío durante un congreso) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.26.4 (FASE 3 — Antes de crear un negocio nuevo, busca si ya hay uno agrupable (mismo cliente + pipeline + etapa 50% + modificado hace 7 días o menos) — si lo hay, apila la ficha ahí en vez de duplicar la tarjeta.) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -574,6 +574,35 @@ async function _guardarSeguimientoVentas() {
       if (rEmp.ok && rEmp.id) empresaId = rEmp.id;
     }
 
+    var pipelineElegido = (document.getElementById('fi-pipeline-select') || {}).value || 'GENERAL';
+
+    // ── FASE 3: ¿ya hay un negocio abierto para agrupar esta ficha? ──
+    // 3 condiciones al mismo tiempo: mismo cliente (por empresaId, o
+    // razón social si es una empresa nueva sin id todavía), mismo
+    // pipeline, etapa inicial (50%) y modificado hace 7 días o menos.
+    // Si las cumple, se apila la ficha ahí en vez de duplicar tarjeta.
+    var respBuscar = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'buscarNegocioAgrupable', empresaId: empresaId, razonSocial: empresaTexto, pipeline_id: pipelineElegido }) });
+    var rBuscar = await respBuscar.json();
+
+    if (rBuscar.ok && rBuscar.idCot) {
+      var respApilar = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({
+          accion: 'apilarFichaTecnica',
+          idCot: rBuscar.idCot,
+          ficha: {
+            nombre: _fichaNombreActual,
+            precio: _fichaPrecioListaActual,
+            foto: fotoUrl(_fichaFotoRawActual) || '',
+            vendedor: (_sesionVendedor && _sesionVendedor.name) || '',
+          },
+        }) });
+      var rApilar = await respApilar.json();
+      if (!rApilar.ok) { if (elResultado) { elResultado.textContent = '⚠️ No se pudo apilar la ficha: ' + (rApilar.error||'error desconocido'); elResultado.style.color = '#f8961e'; } return; }
+      if (elResultado) { elResultado.textContent = '📎 Ficha sumada al negocio existente de ' + empresaTexto + ' (' + rApilar.total + ' fichas enviadas)'; elResultado.style.color = '#06d6a0'; }
+      return;
+    }
+
     var payload = {
       accion: 'guardarPresupuestoEditor',
       idNegocio: '',
@@ -598,7 +627,7 @@ async function _guardarSeguimientoVentas() {
       notas: 'Generado automáticamente al compartir la Ficha Técnica' + (_sesionVendedor && _sesionVendedor.name ? ' por ' + _sesionVendedor.name : '') + '.',
       moneda: 'USD',
       tcOficial: null,
-      pipeline_id: (document.getElementById('fi-pipeline-select') || {}).value || 'GENERAL',
+      pipeline_id: pipelineElegido,
     };
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
     var r = await resp.json();
