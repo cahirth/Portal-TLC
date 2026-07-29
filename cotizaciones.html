@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.26.8 (Tarjetas del Kanban: "Ver Presupuesto" ahora funciona para negocios del flujo nuevo también (caía siempre a c.link, que nunca se llena ahí) — cae al documento dinámico si hace falta. Agregada línea de Empresa/Cliente debajo del título, siempre visible sin importar cómo se haya escrito el nombre del negocio. Monto de la tarjeta también respeta AR$ si corresponde.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.26.9 (FASE 1 — Pipelines/Campañas: selector dinámico en el header (persiste en localStorage), alta/renombre/borrado vía botón ⚙️, filtrado + recalculo de totales, badge reasignable en la tarjeta del Kanban, select en el detalle del negocio.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -659,6 +659,17 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
     <button class="filtro-btn" data-estado="Perdida"        onclick="selFiltro(this)">❌ Perdida</button>
 </div>
 
+<!-- PIPELINE / CAMPAÑA -->
+<div class="filtros-wrap" id="pipeline-selector-wrap" style="display:none; padding-top:0; gap:6px;">
+    <select id="select-pipeline" onchange="_onCambiarPipeline(this.value)"
+        style="flex:1; padding:8px 10px; background:#0f1a30; border:1px solid #3a86ff33;
+               border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer;">
+    </select>
+    <button onclick="_abrirConfigPipeline()" title="Configurar pipeline"
+        style="flex-shrink:0; width:34px; height:34px; border-radius:8px; background:#0f1a30;
+               border:1px solid #3a86ff33; color:#94a3b8; font-size:14px; cursor:pointer;">⚙️</button>
+</div>
+
 <!-- BUSCADOR -->
 <div class="buscador-wrap" id="buscador-wrap" style="display:none;">
     <input type="text" id="buscador" placeholder="Buscar cliente, equipo o ID..." oninput="aplicarFiltros()">
@@ -760,6 +771,153 @@ const HISTORICO_URL = 'https://raw.githubusercontent.com/cahirth/Portal-TLC/main
 // minutos en propagar). GitHub sigue siendo la fuente de respaldo con
 // historial de commits, pero el Kanban lee de acá.
 const RTDB_COTIZACIONES_URL = 'https://portal-tlc-default-rtdb.firebaseio.com/cotizaciones.json';
+const RTDB_PIPELINES_URL = 'https://portal-tlc-default-rtdb.firebaseio.com/config/pipelines.json';
+
+// ── PIPELINES / CAMPAÑAS (Fase 1) ───────────────────────────────
+// Lectura directa de RTDB (público, sin pasar por el GAS — mismo
+// criterio que el resto de las lecturas de este archivo). La
+// ESCRITURA (crear/renombrar/eliminar pipeline, o reasignar una
+// tarjeta) sí pasa siempre por el backend.
+var PIPELINES = [];              // [{ id, nombre }, ...] — leídos de /config/pipelines
+var pipelineActual = localStorage.getItem('tlc_pipeline_actual') || 'TODOS';
+
+async function _cargarPipelines() {
+    try {
+        const res = await fetch(RTDB_PIPELINES_URL + '?_=' + Date.now());
+        const data = res.ok ? await res.json() : null;
+        PIPELINES = data ? Object.keys(data).map(function(id) { return { id: id, nombre: data[id].nombre || id }; }) : [];
+        PIPELINES.sort(function(a, b) { return a.nombre.localeCompare(b.nombre, 'es', { sensitivity:'base' }); });
+    } catch(e) { PIPELINES = []; }
+    _renderSelectPipeline();
+}
+
+function _renderSelectPipeline() {
+    const sel = document.getElementById('select-pipeline');
+    if (!sel) return;
+    let html = '<option value="TODOS">🌐 Ver Todos los Pipelines</option>';
+    html += '<option value="GENERAL">🏢 Pipeline General</option>';
+    PIPELINES.forEach(function(p) {
+        html += '<option value="' + p.id + '">🏷️ ' + _escCot(p.nombre) + '</option>';
+    });
+    html += '<option value="__crear__">➕ Crear Nuevo Pipeline...</option>';
+    sel.innerHTML = html;
+    // Si el pipeline que estaba guardado en localStorage ya no existe
+    // (se borró desde otro dispositivo, por ejemplo), cae a TODOS.
+    const existe = pipelineActual === 'TODOS' || pipelineActual === 'GENERAL' || PIPELINES.some(function(p){ return p.id === pipelineActual; });
+    if (!existe) pipelineActual = 'TODOS';
+    sel.value = pipelineActual;
+}
+
+window._onCambiarPipeline = async function(valor) {
+    if (valor === '__crear__') {
+        const nombre = prompt('Nombre de la nueva campaña/pipeline (ej: "Facoextrema 2026"):');
+        if (!nombre || !nombre.trim()) { document.getElementById('select-pipeline').value = pipelineActual; return; }
+        try {
+            const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+                body: JSON.stringify({ accion:'guardarPipeline', nombre: nombre.trim() }) });
+            const r = await resp.json();
+            if (!r.ok) { alert('No se pudo crear el pipeline: ' + (r.error||'error desconocido')); document.getElementById('select-pipeline').value = pipelineActual; return; }
+            await _cargarPipelines();
+            pipelineActual = r.id;
+            localStorage.setItem('tlc_pipeline_actual', pipelineActual);
+            document.getElementById('select-pipeline').value = pipelineActual;
+            _toast('✅ Pipeline "' + nombre.trim() + '" creado');
+            aplicarFiltros();
+        } catch(e) {
+            alert('Error de conexión al crear el pipeline.');
+            document.getElementById('select-pipeline').value = pipelineActual;
+        }
+        return;
+    }
+    pipelineActual = valor;
+    localStorage.setItem('tlc_pipeline_actual', pipelineActual);
+    aplicarFiltros();
+};
+
+window._abrirConfigPipeline = async function() {
+    if (pipelineActual === 'TODOS' || pipelineActual === 'GENERAL') {
+        alert('Elegí un pipeline específico del desplegable para poder renombrarlo o eliminarlo — "Todos" y "General" son fijos.');
+        return;
+    }
+    const p = PIPELINES.find(function(x){ return x.id === pipelineActual; });
+    if (!p) return;
+    const opcion = prompt('Pipeline "' + p.nombre + '":\n\nEscribí un nombre nuevo para RENOMBRARLO,\no escribí "borrar" para ELIMINARLO.\n(Cancelar para no hacer nada)');
+    if (opcion === null) return;
+    if (opcion.trim().toLowerCase() === 'borrar') {
+        if (!confirm('¿Eliminar el pipeline "' + p.nombre + '"? Las tarjetas asociadas vuelven automáticamente a "Pipeline General". No se puede deshacer.')) return;
+        try {
+            const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+                body: JSON.stringify({ accion:'eliminarPipeline', id: p.id }) });
+            const r = await resp.json();
+            if (!r.ok) { alert('No se pudo eliminar: ' + (r.error||'error desconocido')); return; }
+            pipelineActual = 'TODOS';
+            localStorage.setItem('tlc_pipeline_actual', pipelineActual);
+            await _cargarPipelines();
+            await _recargarHistoricoSilencioso();
+            _toast('🗑️ Pipeline eliminado — las tarjetas volvieron a Pipeline General');
+        } catch(e) { alert('Error de conexión al eliminar el pipeline.'); }
+        return;
+    }
+    if (!opcion.trim()) return;
+    try {
+        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'guardarPipeline', id: p.id, nombre: opcion.trim() }) });
+        const r = await resp.json();
+        if (!r.ok) { alert('No se pudo renombrar: ' + (r.error||'error desconocido')); return; }
+        await _cargarPipelines();
+        _toast('✅ Pipeline renombrado a "' + opcion.trim() + '"');
+    } catch(e) { alert('Error de conexión al renombrar el pipeline.'); }
+};
+
+// Reasignar el pipeline de UN negocio puntual (desde el badge de la
+// tarjeta, o desde el select del detalle) — sin abrir todo el editor.
+window._asignarPipelineNegocio = async function(idCot, nuevoPipelineId) {
+    try {
+        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'asignarPipelineNegocio', idCot: idCot, pipeline_id: nuevoPipelineId }) });
+        const r = await resp.json();
+        if (!r.ok) { alert('No se pudo cambiar el pipeline: ' + (r.error||'error desconocido')); return; }
+        const c = todasLasCot.find(function(x){ return String(x.idCot || x.id_cotizacion || x.id || '') === String(idCot); });
+        if (c) c.pipeline_id = nuevoPipelineId === 'GENERAL' ? '' : nuevoPipelineId;
+        aplicarFiltros();
+    } catch(e) { alert('Error de conexión al cambiar el pipeline.'); }
+};
+
+// Reasignación rápida de pipeline desde el badge de la tarjeta — sin
+// abrir el editor completo. Menú flotante simple, se cierra solo al
+// elegir una opción o al tocar afuera.
+window._reasignarPipelineDesdeTarjeta = function(idCot) {
+    var existente = document.getElementById('menu-reasignar-pipeline');
+    if (existente) existente.remove();
+
+    var menu = document.createElement('div');
+    menu.id = 'menu-reasignar-pipeline';
+    menu.style.cssText = 'position:fixed;z-index:9999;background:#0f1a30;border:1px solid #3a86ff33;' +
+        'border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);padding:6px;min-width:180px;max-height:260px;overflow-y:auto;';
+
+    var opciones = [{ id:'GENERAL', nombre:'🏢 Pipeline General' }].concat(
+        PIPELINES.map(function(p){ return { id:p.id, nombre:'🏷️ ' + p.nombre }; })
+    );
+    menu.innerHTML = opciones.map(function(o) {
+        return '<div onclick="_asignarPipelineNegocio(\'' + idCot + '\',\'' + o.id + '\');document.getElementById(\'menu-reasignar-pipeline\').remove();" ' +
+            'style="padding:8px 10px;font-size:12px;color:#f1f5f9;cursor:pointer;border-radius:6px;">' + o.nombre + '</div>';
+    }).join('');
+
+    document.body.appendChild(menu);
+    // Posicionar cerca de donde se hizo click
+    var ev = window.event;
+    var x = ev ? ev.clientX : 100, y = ev ? ev.clientY : 100;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    menu.style.left = Math.min(x, vw - 200) + 'px';
+    menu.style.top  = Math.min(y, vh - 200) + 'px';
+
+    setTimeout(function() {
+        document.addEventListener('click', function cerrar(e) {
+            if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', cerrar); }
+        });
+    }, 10);
+};
+
 const PRECIOS_URL     = './precios.json';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 
@@ -1454,6 +1612,7 @@ async function init() {
     _configurarDropdownVendedor();
 
     await cargar();
+    _cargarPipelines();
     _getPrecios(); // cargar precios.json en background para folletos/videos
     _inicializarAvatarCot(); // poblar avatar con datos del usuario logueado
 }
@@ -1638,6 +1797,7 @@ async function cargar(forzar = false) {
         document.getElementById('loading-inicial').style.display = 'none';
         document.getElementById('filtros-wrap').style.display    = 'flex';
         document.getElementById('buscador-wrap').style.display   = 'block';
+        document.getElementById('pipeline-selector-wrap').style.display = 'flex';
         setVista(window.innerWidth < 700 ? 'lista' : 'kanban'); // mobile→lista, desktop→kanban
         mostrarStats();
 
@@ -1672,7 +1832,12 @@ function aplicarFiltros() {
         ].join(' ')).toLowerCase();
         const id      = String(c.idCot || c.id_cotizacion || c.id || '').toLowerCase();
         const matchQ  = !q || razon.includes(q) || equipo.includes(q) || id.includes(q);
-        return matchEstado && matchQ;
+        // Pipeline: una tarjeta sin pipeline_id cargado se considera
+        // "GENERAL" — así, seleccionar "Pipeline General" muestra tanto
+        // las tarjetas viejas (sin este campo) como las reasignadas ahí a mano.
+        const pipelineTarjeta = c.pipeline_id || 'GENERAL';
+        const matchPipeline = pipelineActual === 'TODOS' || pipelineTarjeta === pipelineActual;
+        return matchEstado && matchQ && matchPipeline;
     });
     if (vistaActual === 'lista') renderLista();
     else renderKanban();
@@ -1761,6 +1926,11 @@ function renderKanban() {
             const linkPdf = (c.link && !c.link.startsWith('blob:'))
                 ? c.link
                 : ((c.carrito && c.carrito.length) ? ('presupuesto.html?id=' + encodeURIComponent(id)) : null);
+            // Badge de Pipeline — solo se muestra si la tarjeta tiene un
+            // pipeline distinto de "General" (que es el default cuando
+            // no tiene nada cargado, no hace falta remarcarlo siempre).
+            const pipelineDeLaTarjeta = PIPELINES.find(function(p){ return p.id === c.pipeline_id; });
+            const pipelineNombreTarjeta = pipelineDeLaTarjeta ? pipelineDeLaTarjeta.nombre : '';
 
             // Productos como badges con fix encoding
             const prods = Array.isArray(c.productos) ? c.productos : [];
@@ -1809,6 +1979,10 @@ function renderKanban() {
                 </div>
                 <div class="k-titulo">${titulo}</div>
                 ${empresaNombre && empresaNombre !== titulo ? `<div style="font-size:10px;color:#94a3b8;margin-top:-4px;margin-bottom:4px;">🏢 ${empresaNombre}</div>` : ''}
+                ${pipelineNombreTarjeta ? `<div onclick="event.stopPropagation();_reasignarPipelineDesdeTarjeta('${id}')"
+                    title="Tocar para cambiar de pipeline" style="display:inline-block;font-size:9px;font-weight:700;color:#a78bfa;
+                    background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);border-radius:20px;padding:2px 8px;
+                    margin-bottom:5px;cursor:pointer;">🏷️ ${_escCot(pipelineNombreTarjeta)}</div>` : ''}
                 ${prodsHtml}
                 <div class="k-valor">${(() => {
                     const hayConv = c.monedaTotales === 'ARS' && c.tcOficial;
@@ -2087,6 +2261,12 @@ function _renderDetalle(c) {
                         ${etapasOptsHero}
                     </select>
                 </div>
+                <select onchange="_asignarPipelineNegocio('${id}', this.value)"
+                    style="font-size:10px;padding:4px 22px 4px 10px;border-radius:20px;background:#0f1a30;
+                           border:1px solid #3a86ff33;color:#94a3b8;outline:none;cursor:pointer;max-width:170px;">
+                    <option value="GENERAL"${!c.pipeline_id ? ' selected' : ''}>🏢 Pipeline General</option>
+                    ${PIPELINES.map(p => `<option value="${p.id}"${c.pipeline_id === p.id ? ' selected' : ''}>🏷️ ${_escCot(p.nombre)}</option>`).join('')}
+                </select>
                 ${puedeGestionar ? `<button id="btn-borrar-deal" onclick="_confirmarBorrarDeal('${id}')"
                     style="width:100%;max-width:170px;padding:5px 12px;border-radius:20px;background:transparent;
                            border:1px solid #dc2626;color:#dc2626;font-size:11px;font-weight:700;
