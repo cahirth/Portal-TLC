@@ -784,6 +784,7 @@ var pipelineActual = localStorage.getItem('tlc_pipeline_actual') || 'TODOS';
 async function _cargarPipelines() {
     try {
         const res = await fetch(RTDB_PIPELINES_URL + '?_=' + Date.now());
+        console.log('%c[DEBUG pipelines] HTTP status:', 'background:#f8961e;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;', res.status, res.statusText);
         const data = res.ok ? await res.json() : null;
         console.log('%c[DEBUG pipelines] Respuesta cruda de RTDB:', 'background:#3a86ff;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;', data);
         PIPELINES = data ? Object.keys(data).map(function(id) { return { id: id, nombre: data[id].nombre || id }; }) : [];
