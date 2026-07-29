@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.26.10-DEBUG (Diagnóstico Pipelines — muestra en consola la respuesta cruda de /config/pipelines. Sacar apenas se resuelva.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.26.11 (Fix real: /config no tiene lectura pública en Firebase, daba 401 al leer pipelines directo — ahora pasa por listarPipelines en el backend, igual que toda escritura. Por eso el pipeline se creaba pero no aparecía en el desplegable.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -771,7 +771,9 @@ const HISTORICO_URL = 'https://raw.githubusercontent.com/cahirth/Portal-TLC/main
 // minutos en propagar). GitHub sigue siendo la fuente de respaldo con
 // historial de commits, pero el Kanban lee de acá.
 const RTDB_COTIZACIONES_URL = 'https://portal-tlc-default-rtdb.firebaseio.com/cotizaciones.json';
-const RTDB_PIPELINES_URL = 'https://portal-tlc-default-rtdb.firebaseio.com/config/pipelines.json';
+// RTDB_PIPELINES_URL sacada — /config no tiene lectura pública en
+// Firebase (a diferencia de /cotizaciones), así que listarPipelines
+// pasa por el backend (ver _cargarPipelines más abajo).
 
 // ── PIPELINES / CAMPAÑAS (Fase 1) ───────────────────────────────
 // Lectura directa de RTDB (público, sin pasar por el GAS — mismo
@@ -783,14 +785,12 @@ var pipelineActual = localStorage.getItem('tlc_pipeline_actual') || 'TODOS';
 
 async function _cargarPipelines() {
     try {
-        const res = await fetch(RTDB_PIPELINES_URL + '?_=' + Date.now());
-        console.log('%c[DEBUG pipelines] HTTP status:', 'background:#f8961e;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;', res.status, res.statusText);
-        const data = res.ok ? await res.json() : null;
-        console.log('%c[DEBUG pipelines] Respuesta cruda de RTDB:', 'background:#3a86ff;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;', data);
-        PIPELINES = data ? Object.keys(data).map(function(id) { return { id: id, nombre: data[id].nombre || id }; }) : [];
+        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'listarPipelines' }) });
+        const r = await resp.json();
+        PIPELINES = (r.ok && Array.isArray(r.pipelines)) ? r.pipelines : [];
         PIPELINES.sort(function(a, b) { return a.nombre.localeCompare(b.nombre, 'es', { sensitivity:'base' }); });
-        console.log('%c[DEBUG pipelines] PIPELINES procesado:', 'background:#06d6a0;color:#04231a;font-weight:bold;padding:2px 6px;border-radius:4px;', PIPELINES);
-    } catch(e) { PIPELINES = []; console.log('%c[DEBUG pipelines] ERROR:', 'background:#f87171;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;', e); }
+    } catch(e) { PIPELINES = []; }
     _renderSelectPipeline();
 }
 
