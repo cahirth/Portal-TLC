@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.26.1 (Nuevo: buscador de Empresa/Cliente arriba del teléfono, para guardar seguimiento en Ventas al compartir por WhatsApp. Si la empresa no existe, se crea de cero (para completar después). Se crea un negocio a Cotización (50%) con este equipo como único ítem — reutiliza guardarPresupuestoEditor, así que hasta genera un presupuesto real de arranque. Solo aparece si hay sesión de vendedor iniciada y no es el link ya compartido con un cliente.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.26.2 (Al elegir una empresa, muestra sus contactos como chips (igual que Nuevo Ticket en Servicio Técnico) — el WhatsApp termina yendo a la persona, no al teléfono general de la empresa. El contacto elegido viaja también al negocio creado en Ventas.) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -147,6 +147,7 @@
                 box-shadow:0 8px 24px rgba(0,0,0,.12);"></div>
         </div>
         <div id="fi-empresa-status" style="font-size:11px; color:var(--text-muted); margin-top:-2px;"></div>
+        <div id="fi-contactos-sugerencias" style="display:none; flex-wrap:wrap; gap:6px; margin-top:-4px;"></div>
         <div style="display:flex; gap:10px; width:100%;">
             <input type="tel" id="fi-telefono-destino" placeholder="Teléfono del cliente (opcional)"
                 style="flex:1; padding:11px 14px; border-radius:8px; border:1px solid var(--border-color); font-size:13px; outline:none;">
@@ -250,7 +251,8 @@ var _fichaNombreActual = '';
 var _fichaPrecioListaActual = 0;
 var _fichaFotoRawActual = '';
 var _empresasCacheFicha = null;
-var _empresaSeleccionadaFicha = null; // { id, razonSocial, telefono } | null (null = texto libre, empresa nueva)
+var _empresaSeleccionadaFicha = null; // { id, razonSocial, telefono, contactos } | null (null = texto libre, empresa nueva)
+var _contactoSeleccionadoFicha = null; // { nombre, telefono } | null
 
 function _esc(s) { var d=document.createElement('div'); d.textContent=String(s==null?'':s); return d.innerHTML; }
 function _fmtMoneda(n, moneda) {
@@ -444,7 +446,12 @@ window._filtrarEmpresasFicha = async function(q) {
   // Si el texto tipeado ya no coincide con la empresa que estaba
   // seleccionada, se pierde la selección — vuelve a tratarse como
   // texto libre (empresa nueva) hasta que se elija otra de la lista.
-  if (_empresaSeleccionadaFicha && _empresaSeleccionadaFicha.razonSocial !== q) _empresaSeleccionadaFicha = null;
+  if (_empresaSeleccionadaFicha && _empresaSeleccionadaFicha.razonSocial !== q) {
+    _empresaSeleccionadaFicha = null;
+    _contactoSeleccionadoFicha = null;
+    var contCont = document.getElementById('fi-contactos-sugerencias');
+    if (contCont) { contCont.style.display = 'none'; contCont.innerHTML = ''; }
+  }
 
   if (!qn) { cont.style.display = 'none'; cont.innerHTML = ''; return; }
   var resultados = lista.filter(function(e) { return (e.razonSocial||'').toLowerCase().indexOf(qn) !== -1; }).slice(0, 8);
@@ -467,9 +474,38 @@ window._elegirEmpresaFicha = function(i) {
   var e = window._empresasFiltradasFicha[i];
   if (!e) return;
   _empresaSeleccionadaFicha = e;
+  _contactoSeleccionadoFicha = null;
   document.getElementById('fi-empresa-buscar').value = e.razonSocial;
   if (e.telefono) document.getElementById('fi-telefono-destino').value = e.telefono;
   document.getElementById('fi-empresa-sugerencias').style.display = 'none';
+  _pintarContactosFicha(e.contactos);
+};
+
+// El WhatsApp termina yendo a una PERSONA, no al teléfono general de
+// la empresa — si la empresa tiene contactos cargados, se muestran
+// como chips para elegir cuál, y ESE teléfono es el que se usa
+// (pisa el de la empresa). Mismo patrón que ya se usa en el
+// formulario de "Nuevo Ticket" de servicio.html.
+function _pintarContactosFicha(contactos) {
+  var cont = document.getElementById('fi-contactos-sugerencias');
+  if (!cont) return;
+  if (!Array.isArray(contactos) || !contactos.length) { cont.style.display = 'none'; cont.innerHTML = ''; return; }
+  window._contactosFicha = contactos;
+  cont.style.display = 'flex';
+  cont.innerHTML = contactos.map(function(c, i) {
+    return '<button type="button" onclick="_elegirContactoFicha(' + i + ')" ' +
+      'style="font-size:11px;font-weight:600;padding:5px 10px;border-radius:20px;cursor:pointer;' +
+      'background:#eff6ff;border:1px solid #93c5fd;color:var(--blue-tlc);">👤 ' + _esc(c.nombre) + '</button>';
+  }).join('');
+  // Si hay un solo contacto, lo precarga directo.
+  if (contactos.length === 1) _elegirContactoFicha(0);
+}
+
+window._elegirContactoFicha = function(i) {
+  var c = (window._contactosFicha || [])[i];
+  if (!c) return;
+  _contactoSeleccionadoFicha = c;
+  if (c.telefono) document.getElementById('fi-telefono-destino').value = c.telefono;
 };
 
 document.addEventListener('click', function(ev) {
@@ -510,8 +546,8 @@ async function _guardarSeguimientoVentas() {
       telefono: (document.getElementById('fi-telefono-destino')||{}).value || '',
       domicilio: '',
       empresaId: empresaId,
-      contactoNombre: '',
-      contactoTelefono: '',
+      contactoNombre: (_contactoSeleccionadoFicha && _contactoSeleccionadoFicha.nombre) || '',
+      contactoTelefono: (_contactoSeleccionadoFicha && _contactoSeleccionadoFicha.telefono) || '',
       vendedor: (_sesionVendedor && _sesionVendedor.name) || '',
       items: [{
         nombre: _fichaNombreActual,
