@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.26.2 (Al elegir una empresa, muestra sus contactos como chips (igual que Nuevo Ticket en Servicio Técnico) — el WhatsApp termina yendo a la persona, no al teléfono general de la empresa. El contacto elegido viaja también al negocio creado en Ventas.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.26.3 (Selector de Pipeline arriba del buscador de empresa — recuerda la última elección en localStorage, para no tener que volver a elegirlo en cada envío durante un congreso) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -138,6 +138,12 @@
     </div>
 
     <div class="wsp-bar" style="flex-direction:column;" id="fi-lead-bar">
+        <div style="display:flex; gap:10px; width:100%;">
+            <select id="fi-pipeline-select" onchange="_onCambiarPipelineFicha(this.value)"
+                style="flex:1; padding:10px 14px; border-radius:8px; border:1px solid var(--border-color); font-size:12px; outline:none; cursor:pointer; color:var(--text-muted);">
+                <option value="GENERAL">🏢 Pipeline General</option>
+            </select>
+        </div>
         <div style="display:flex; gap:10px; width:100%; position:relative;">
             <input type="text" id="fi-empresa-buscar" placeholder="Empresa / Cliente (para guardar el seguimiento en Ventas)"
                 autocomplete="off" oninput="_filtrarEmpresasFicha(this.value)" onfocus="_filtrarEmpresasFicha(this.value)"
@@ -251,6 +257,32 @@ var _fichaNombreActual = '';
 var _fichaPrecioListaActual = 0;
 var _fichaFotoRawActual = '';
 var _empresasCacheFicha = null;
+var PIPELINES_FICHA_KEY = 'tlc_ficha_pipeline_actual';
+
+async function _cargarPipelinesFicha() {
+  var sel = document.getElementById('fi-pipeline-select');
+  if (!sel) return;
+  try {
+    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'listarPipelines' }) });
+    var r = await resp.json();
+    var lista = (r.ok && Array.isArray(r.pipelines)) ? r.pipelines : [];
+    lista.sort(function(a, b) { return a.nombre.localeCompare(b.nombre, 'es', { sensitivity:'base' }); });
+    var html = '<option value="GENERAL">🏢 Pipeline General</option>';
+    lista.forEach(function(p) { html += '<option value="' + p.id + '">🏷️ ' + _esc(p.nombre) + '</option>'; });
+    sel.innerHTML = html;
+    // Recuerda el último pipeline elegido (ideal para congresos: se
+    // elige una vez al llegar al stand y queda para todos los envíos
+    // siguientes, sin tener que volver a tocarlo cada vez).
+    var guardado = localStorage.getItem(PIPELINES_FICHA_KEY) || 'GENERAL';
+    var existe = guardado === 'GENERAL' || lista.some(function(p){ return p.id === guardado; });
+    sel.value = existe ? guardado : 'GENERAL';
+  } catch(e) { /* si falla, se queda en Pipeline General, no bloquea nada */ }
+}
+
+window._onCambiarPipelineFicha = function(valor) {
+  localStorage.setItem(PIPELINES_FICHA_KEY, valor);
+};
 var _empresaSeleccionadaFicha = null; // { id, razonSocial, telefono, contactos } | null (null = texto libre, empresa nueva)
 var _contactoSeleccionadoFicha = null; // { nombre, telefono } | null
 
@@ -332,6 +364,10 @@ async function _cargarFicha() {
         var elStatusWrap = document.getElementById('fi-empresa-status');
         if (elBuscarWrap) elBuscarWrap.closest('div').style.display = 'none';
         if (elStatusWrap) elStatusWrap.style.display = 'none';
+        var elPipelineWrap = document.getElementById('fi-pipeline-select');
+        if (elPipelineWrap) elPipelineWrap.closest('div').style.display = 'none';
+    } else {
+        _cargarPipelinesFicha();
     }
 
     // El fotoMap (Apps Script) es mucho más lento que precios.json (RTDB
@@ -562,6 +598,7 @@ async function _guardarSeguimientoVentas() {
       notas: 'Generado automáticamente al compartir la Ficha Técnica' + (_sesionVendedor && _sesionVendedor.name ? ' por ' + _sesionVendedor.name : '') + '.',
       moneda: 'USD',
       tcOficial: null,
+      pipeline_id: (document.getElementById('fi-pipeline-select') || {}).value || 'GENERAL',
     };
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
     var r = await resp.json();
