@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.10 (Mismo esquema de Totales discriminado que el PDF: Subtotal → Descuentos (etiqueta dinámica según la modalidad) → Subtotal con descuentos → IVA → Total.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.11 (Fix: TLC 6/12 y Leasing 36 ahora calculan sobre "Subtotal con descuentos" (respeta cualquier descuento manual agregado en ese modo) — antes usaban precio bruto ignorando por completo el campo Descuento, aunque el vendedor lo hubiera editado a mano.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1008,7 +1008,7 @@ function _renderModalidadesPago() {
   if (TC_OFICIAL) {
     // El neto USD del presupuesto se convierte a AR$ para leasing —
     // InverLease cotiza siempre en pesos, sobre el valor del bien SIN IVA.
-    var netoUSD = ITEMS.reduce(function(s, it) { return s + (it.precio * it.cantidad); }, 0); // precio de LISTA completo (sin el descuento de contado), TLC/Leasing financian sobre lista
+    var netoUSD = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).descontado; }, 0); // Subtotal CON descuentos (respeta cualquier descuento manual agregado en este modo) — es la misma Base que muestra Totales arriba
     var baseARS = netoUSD * TC_OFICIAL;
     var l = _calcularLeasing36(baseARS);
     cardLeasing =
@@ -1034,7 +1034,7 @@ function _renderModalidadesPago() {
         '<div style="font-size:11px;color:var(--text-dim);">Esperando el TC oficial para calcular...</div>' +
       '</div>';
     }
-    var netoUSD = ITEMS.reduce(function(s, it) { return s + (it.precio * it.cantidad); }, 0); // precio de LISTA completo (sin el descuento de contado), TLC/Leasing financian sobre lista
+    var netoUSD = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).descontado; }, 0); // Subtotal CON descuentos (respeta cualquier descuento manual agregado en este modo) — es la misma Base que muestra Totales arriba
     var baseARS = netoUSD * TC_OFICIAL;
     var p = PARAMS_PAGO[clave];
     var r = _calcularTLC(baseARS, p);
