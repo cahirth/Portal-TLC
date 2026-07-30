@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.3 (Dropdown Forma de Pago ahora tiene las 4 modalidades reales (Contado/TLC 6/TLC 12/Leasing 36) y muestra solo la tarjeta elegida. El Descuento de cada ítem se auto-completa al agregarlo desde el selector, calculado para llegar al precio de contado real del catálogo — visible y editable, ya no es una cuenta escondida. TLC/Leasing siguen financiando sobre precio de lista completo, sin ese descuento.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.4 (Contado preseleccionado por default; Contado vuelve a usar precioContado directo (revierte el auto-descuento de la ronda anterior, ya no aplica el campo Descuento del ítem). Modalidades de Pago movido debajo de Condiciones Comerciales. Letra de la descripción de Leasing 36 agrandada (9.5px→11px). Arreglado el restaurador de borrador para negocios viejos con formato de forma de pago en texto libre.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -252,12 +252,6 @@
       </div>
     </div>
 
-    <!-- ═══ MODALIDADES DE PAGO (referencia, calculado en vivo) ═══ -->
-    <div class="section">
-      <div class="section-title">💳 Modalidades de Pago <span style="font-size:10px;font-weight:400;color:var(--text-dim);">(calculado sobre el neto de este presupuesto)</span></div>
-      <div id="modalidades-pago-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;"></div>
-    </div>
-
     <!-- ═══ CONDICIONES COMERCIALES ═══ -->
     <div class="section">
       <div class="section-title">📋 Condiciones Comerciales</div>
@@ -309,6 +303,12 @@
           <textarea id="cc-notas" rows="3" placeholder="Observaciones para el cliente..."></textarea>
         </div>
       </div>
+    </div>
+
+    <!-- ═══ MODALIDADES DE PAGO (referencia, calculado en vivo) ═══ -->
+    <div class="section">
+      <div class="section-title">💳 Modalidades de Pago <span style="font-size:10px;font-weight:400;color:var(--text-dim);">(calculado sobre el neto de este presupuesto)</span></div>
+      <div id="modalidades-pago-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;"></div>
     </div>
 
     <!-- ═══ CUENTAS BANCARIAS — al final de todo, formato compacto en línea
@@ -468,14 +468,7 @@ function _restaurarDraftYItemPendiente() {
       if (it.descripcionCatalogo && it.descripcionCatalogo.trim()) descripcionCombinada += ' — ' + it.descripcionCatalogo.trim();
       var precioLista = it.precio || 0;
       var precioContado = it.precioContado || precioLista;
-      // El descuento se auto-calcula para que, aplicado sobre el
-      // precio de lista, dé exactamente el precio de contado real que
-      // tiene cargado el ítem en el catálogo — así el campo Descuento
-      // queda visible/editable en vez de una cuenta escondida aparte.
-      var descuentoAuto = (precioLista > 0 && precioContado < precioLista)
-        ? Math.round((1 - precioContado / precioLista) * 10000) / 100
-        : 0;
-      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: 1, descuento: descuentoAuto, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
+      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: 1, descuento: 0, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
     }
   } catch (e) { console.warn('Error aplicando ítem pendiente:', e); }
   sessionStorage.removeItem('tlc_item_pendiente_presupuesto');
@@ -935,17 +928,16 @@ var PARAMS_PAGO = {
 // contado ya cargado en el catálogo (columna "Precio CONTADO CNO" en
 // Lista_Precios). Se le sigue aplicando el descuento manual del ítem
 // (si hay) e IVA, igual que al precio de lista normal.
-// Contado ahora es el mismo cálculo que Totales de arriba — el campo
-// Descuento de cada ítem YA es el camino al precio de contado (se
-// auto-completa al agregar el ítem, ver ITEMS.push), así que no hace
-// falta un cálculo aparte con precioContado — evita aplicar el
-// descuento dos veces si el vendedor lo ajusta a mano después.
+// Contado usa el precio de contado real de cada ítem (columna "Precio
+// CONTADO CNO" del catálogo) DIRECTO — no pasa por el campo Descuento
+// del ítem (ese es independiente, para negociar aparte si hiciera
+// falta, pero no participa del cálculo de Contado).
 function _calcularContado() {
   var neto = 0, iva = 0;
   ITEMS.forEach(function(it) {
-    var calc = _calcularItem(it);
-    neto += calc.descontado;
-    iva += calc.iva;
+    var n = (it.precioContado || it.precio) * it.cantidad;
+    neto += n;
+    iva += n * (it.iva || 0) / 100;
   });
   return { neto: neto, iva: iva, total: neto + iva };
 }
@@ -1017,7 +1009,7 @@ function _renderModalidadesPago() {
         '<div style="font-size:13px;font-weight:700;">' + _fmtARS(l.maxicanon) + ' + IVA</div>' +
         '<div style="font-size:10px;color:var(--text-dim);margin-top:6px;">' + l.canones + ' cánones fijos</div>' +
         '<div style="font-size:13px;font-weight:700;">' + _fmtARS(l.canon) + ' + IVA c/u</div>' +
-        '<div style="font-size:9.5px;color:var(--text-dim);margin-top:6px;line-height:1.4;">+ 1 canon en garantía (se aplica a los últimos) · Opción de compra al finalizar: ' + _fmtARS(l.vr) + ' + IVA · TNA ' + PARAMS_PAGO.leasing36.tna + '%</div>' +
+        '<div style="font-size:11px;color:var(--text-dim);margin-top:6px;line-height:1.45;">+ 1 canon en garantía (se aplica a los últimos) · Opción de compra al finalizar: ' + _fmtARS(l.vr) + ' + IVA · TNA ' + PARAMS_PAGO.leasing36.tna + '%</div>' +
       '</div>';
   } else {
     cardLeasing = '<div style="border:1px solid var(--border-glow);border-radius:10px;padding:12px;opacity:.6;">' +
@@ -1183,7 +1175,15 @@ _refrescarDatosEmpresa();
 _itemSeq = Math.max.apply(null, ITEMS.map(function(it){ return it.id; }).concat([_itemSeq]));
 _render();
 if (_draftCondiciones) {
-  document.getElementById('cc-forma-pago').value = _draftCondiciones.formaPago || 'Contado';
+  var elFormaPago = document.getElementById('cc-forma-pago');
+  var fpGuardada = _draftCondiciones.formaPago || 'contado';
+  // Negocios guardados antes de este cambio pueden tener el formato
+  // viejo (texto libre: "Contado", "Transferencia bancaria", etc.) —
+  // si no coincide con ninguna de las 4 opciones actuales, cae a
+  // Contado por default en vez de dejar el select sin selección.
+  var coincide = Array.prototype.some.call(elFormaPago.options, function(o) { return o.value === fpGuardada; });
+  elFormaPago.value = coincide ? fpGuardada : 'contado';
+  _renderModalidadesPago();
   document.getElementById('cc-validez').value = _draftCondiciones.validez || '15';
   document.getElementById('cc-validez-fecha').value = _draftCondiciones.validezFecha || '';
   document.getElementById('cc-tiempo-entrega').value = _draftCondiciones.tiempoEntrega || 'inmediato';
