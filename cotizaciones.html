@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.28.1 (Cuadro 1: bloque de datos del cliente (Empresa/CUIT/Contacto/Teléfono) al lado de las miniaturas de equipos, arriba de todo, sin scrollear. Cuadro 2: botón "📝 Crear Presupuesto" siempre visible debajo de Equipos (antes solo aparecía si el negocio no tenía ítems todavía) — reutiliza _irAPresupuestoEditor, que ya precargaba todo esto.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.28.2 (Barra de filtros reorganizada en una sola fila en desktop: Vendedores (max-width 200px) → Pipeline → Buscador (flexible) → Pills de etapa — con flex-wrap para que en mobile caiga ordenado en varias líneas.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -37,13 +37,16 @@
         .vista-btn.active { background:#3a86ff; color:white; }
 
         /* FILTROS */
-        .filtros-wrap { padding:10px 16px 0; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
+        .filtros-superior-unificada { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 16px; }
+        .filtros-wrap { display:flex; gap:6px; flex-wrap:wrap; }
+        .buscador-wrap { flex:1 1 220px; min-width:180px; }
+        .buscador-wrap input { width:100%; }
         .filtros-wrap::-webkit-scrollbar { display:none; }
         .filtro-btn { flex-shrink:0; padding:5px 12px; border-radius:16px; border:1px solid #222e50; background:#1c2541; color:#94a3b8; font-size:11px; cursor:pointer; transition:all .15s; white-space:nowrap; }
         .filtro-btn.active { background:#3a86ff; border-color:#3a86ff; color:white; font-weight:600; }
 
         /* BUSCADOR */
-        .buscador-wrap { padding:8px 16px; }
+        /* .buscador-wrap padding sacado — ahora vive dentro de .filtros-superior-unificada, que ya tiene su propio padding */
         .buscador-wrap input { width:100%; background:#1c2541; border:1px solid #222e50; border-radius:8px; padding:8px 14px 8px 36px; color:#f8fafc; font-size:13px; outline:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:12px center; }
         .buscador-wrap input:focus { border-color:#3a86ff; }
         .buscador-wrap input::placeholder { color:#475569; }
@@ -641,38 +644,42 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
 <div class="stats-bar" id="stats-bar" style="display:none;"></div>
 
 <!-- FILTROS -->
-<div class="filtros-wrap" id="filtros-wrap" style="display:none;">
+<div class="filtros-superior-unificada" id="zona-filtros-unificada" style="display:none;">
     <!-- Dropdown vendedor (solo admin ve el selector; vendedor ve su nombre fijo) -->
-    <div id="vendedor-selector-wrap" style="display:none; padding:0 0 6px 0; width:100%;">
+    <div id="vendedor-selector-wrap" style="display:none; flex:0 1 180px; max-width:200px;">
         <select id="vendedor-selector" onchange="selVendedor(this.value)"
             style="width:100%; padding:7px 12px; background:#0f1a30; border:1px solid #3a86ff33;
                    border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer;">
         </select>
     </div>
-    <button class="filtro-btn active" data-estado="TODOS"   onclick="selFiltro(this)">Todos</button>
-    <button class="filtro-btn" data-estado="10%"            onclick="selFiltro(this)">🌱 (10%) Oportunidad</button>
-    <button class="filtro-btn" data-estado="25%"            onclick="selFiltro(this)">🔵 (25%) Calificación</button>
-    <button class="filtro-btn" data-estado="50%"            onclick="selFiltro(this)">📋 (50%) Cotización</button>
-    <button class="filtro-btn" data-estado="75%"            onclick="selFiltro(this)">🟣 (75%) Negociación</button>
-    <button class="filtro-btn" data-estado="90%"            onclick="selFiltro(this)">🔶 (90%) Cierre</button>
-    <button class="filtro-btn" data-estado="Ganada"         onclick="selFiltro(this)">✅ Ganada</button>
-    <button class="filtro-btn" data-estado="Perdida"        onclick="selFiltro(this)">❌ Perdida</button>
-</div>
 
-<!-- PIPELINE / CAMPAÑA -->
-<div class="filtros-wrap" id="pipeline-selector-wrap" style="display:none; padding-top:0; gap:6px;">
-    <select id="select-pipeline" onchange="_onCambiarPipeline(this.value)"
-        style="flex:1; padding:8px 10px; background:#0f1a30; border:1px solid #3a86ff33;
-               border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer;">
-    </select>
-    <button onclick="_abrirConfigPipeline()" title="Configurar pipeline"
-        style="flex-shrink:0; width:34px; height:34px; border-radius:8px; background:#0f1a30;
-               border:1px solid #3a86ff33; color:#94a3b8; font-size:14px; cursor:pointer;">⚙️</button>
-</div>
+    <!-- PIPELINE / CAMPAÑA -->
+    <div id="pipeline-selector-wrap" style="display:none; gap:6px; flex:0 1 210px; min-width:150px;">
+        <select id="select-pipeline" onchange="_onCambiarPipeline(this.value)"
+            style="flex:1; padding:8px 10px; background:#0f1a30; border:1px solid #3a86ff33;
+                   border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer;">
+        </select>
+        <button onclick="_abrirConfigPipeline()" title="Configurar pipeline"
+            style="flex-shrink:0; width:34px; height:34px; border-radius:8px; background:#0f1a30;
+                   border:1px solid #3a86ff33; color:#94a3b8; font-size:14px; cursor:pointer;">⚙️</button>
+    </div>
 
-<!-- BUSCADOR -->
-<div class="buscador-wrap" id="buscador-wrap" style="display:none;">
-    <input type="text" id="buscador" placeholder="Buscar cliente, equipo o ID..." oninput="aplicarFiltros()">
+    <!-- BUSCADOR -->
+    <div class="buscador-wrap" id="buscador-wrap" style="display:none;">
+        <input type="text" id="buscador" placeholder="Buscar cliente, equipo o ID..." oninput="aplicarFiltros()">
+    </div>
+
+    <!-- FILTROS DE ETAPA -->
+    <div class="filtros-wrap" id="filtros-wrap" style="display:none;">
+        <button class="filtro-btn active" data-estado="TODOS"   onclick="selFiltro(this)">Todos</button>
+        <button class="filtro-btn" data-estado="10%"            onclick="selFiltro(this)">🌱 (10%) Oportunidad</button>
+        <button class="filtro-btn" data-estado="25%"            onclick="selFiltro(this)">🔵 (25%) Calificación</button>
+        <button class="filtro-btn" data-estado="50%"            onclick="selFiltro(this)">📋 (50%) Cotización</button>
+        <button class="filtro-btn" data-estado="75%"            onclick="selFiltro(this)">🟣 (75%) Negociación</button>
+        <button class="filtro-btn" data-estado="90%"            onclick="selFiltro(this)">🔶 (90%) Cierre</button>
+        <button class="filtro-btn" data-estado="Ganada"         onclick="selFiltro(this)">✅ Ganada</button>
+        <button class="filtro-btn" data-estado="Perdida"        onclick="selFiltro(this)">❌ Perdida</button>
+    </div>
 </div>
 
 </div><!-- /zona-superior -->
@@ -1754,6 +1761,7 @@ async function cargar(forzar = false) {
     document.getElementById('stats-bar').style.display       = 'none';
     document.getElementById('filtros-wrap').style.display    = 'none';
     document.getElementById('buscador-wrap').style.display   = 'none';
+    document.getElementById('zona-filtros-unificada').style.display = 'none';
     document.getElementById('lista-wrap').style.display      = 'none';
     document.getElementById('kanban-outer').classList.remove('visible');
 
@@ -1800,6 +1808,7 @@ async function cargar(forzar = false) {
         document.getElementById('loading-inicial').style.display = 'none';
         document.getElementById('filtros-wrap').style.display    = 'flex';
         document.getElementById('buscador-wrap').style.display   = 'block';
+        document.getElementById('zona-filtros-unificada').style.display = 'flex';
         document.getElementById('pipeline-selector-wrap').style.display = 'flex';
         setVista(window.innerWidth < 700 ? 'lista' : 'kanban'); // mobile→lista, desktop→kanban
         mostrarStats();
