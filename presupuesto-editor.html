@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.11 (Fix: TLC 6/12 y Leasing 36 ahora calculan sobre "Subtotal con descuentos" (respeta cualquier descuento manual agregado en ese modo) — antes usaban precio bruto ignorando por completo el campo Descuento, aunque el vendedor lo hubiera editado a mano.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.13 (TLC 6/12 ahora sigue la moneda del selector general de Totales — USD tal cual, o AR$ multiplicando por el TC oficial. Sigue calculando en base USD internamente, solo cambia cómo se muestra.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -261,8 +261,8 @@
           <label>Forma de pago</label>
           <select id="cc-forma-pago" onchange="_onCambiarFormaPago()">
             <option value="contado">Contado</option>
-            <option value="tlc6">TLC 6 cuotas (AR$)</option>
-            <option value="tlc12">TLC 12 cuotas (AR$)</option>
+            <option value="tlc6">TLC 6 cuotas</option>
+            <option value="tlc12">TLC 12 cuotas</option>
             <option value="leasing36">Leasing 36 meses (AR$)</option>
           </select>
         </div>
@@ -1028,25 +1028,27 @@ function _renderModalidadesPago() {
   }
 
   var cardTLC = function(clave, titulo) {
-    if (!TC_OFICIAL) {
-      return '<div style="border:1px solid var(--border-glow);border-radius:10px;padding:12px;opacity:.6;">' +
-        '<div style="font-size:11px;font-weight:800;color:#f8961e;margin-bottom:6px;">' + titulo + '</div>' +
-        '<div style="font-size:11px;color:var(--text-dim);">Esperando el TC oficial para calcular...</div>' +
-      '</div>';
-    }
-    var netoUSD = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).descontado; }, 0); // Subtotal CON descuentos (respeta cualquier descuento manual agregado en este modo) — es la misma Base que muestra Totales arriba
-    var baseARS = netoUSD * TC_OFICIAL;
+    // TLC 6/12: se calcula siempre en USD sobre el Subtotal con
+    // descuentos (respeta cualquier descuento manual) — el resultado
+    // se muestra en la moneda que esté elegida en el selector general
+    // de Totales arriba (USD tal cual, o AR$ multiplicando por el TC).
+    var netoUSD = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).descontado; }, 0);
     var p = PARAMS_PAGO[clave];
-    var r = _calcularTLC(baseARS, p);
+    var r = _calcularTLC(netoUSD, p);
+    var monedaGeneral = (document.getElementById('moneda-presupuesto') || {}).value || 'USD';
+    var mostrarEnArs = monedaGeneral === 'ARS' && TC_OFICIAL;
+    var fmtTlc = mostrarEnArs ? _fmtARS : _fmtUSD;
+    var anticipoMostrado = mostrarEnArs ? r.anticipo * TC_OFICIAL : r.anticipo;
+    var cuotaMostrada = mostrarEnArs ? r.cuota * TC_OFICIAL : r.cuota;
     return '<div style="border:1px solid var(--border-glow);border-radius:10px;padding:12px;">' +
       '<div style="font-size:11px;font-weight:800;color:#f8961e;margin-bottom:6px;">📅 ' + titulo + '</div>' +
       '<label style="font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:5px;margin-bottom:6px;">Anticipo ' +
         '<input type="number" min="0" max="100" value="' + p.anticipoPct + '" onchange="_actualizarAnticipoTLC(\'' + clave + '\', this.value)" ' +
           'style="width:48px;padding:3px 4px;border-radius:5px;border:1px solid var(--border-glow);background:var(--panel-darker);color:var(--text-main);font-size:11px;text-align:center;">%' +
       '</label>' +
-      '<div style="font-size:13px;font-weight:700;">' + _fmtARS(r.anticipo) + ' + IVA</div>' +
+      '<div style="font-size:13px;font-weight:700;">' + fmtTlc(anticipoMostrado) + ' + IVA</div>' +
       '<div style="font-size:10px;color:var(--text-dim);margin-top:6px;">' + r.cuotas + ' cuotas fijas de</div>' +
-      '<div style="font-size:13px;font-weight:700;">' + _fmtARS(r.cuota) + ' + IVA c/u</div>' +
+      '<div style="font-size:13px;font-weight:700;">' + fmtTlc(cuotaMostrada) + ' + IVA c/u</div>' +
     '</div>';
   };
 
