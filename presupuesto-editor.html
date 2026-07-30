@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.4 (Contado preseleccionado por default; Contado vuelve a usar precioContado directo (revierte el auto-descuento de la ronda anterior, ya no aplica el campo Descuento del ítem). Modalidades de Pago movido debajo de Condiciones Comerciales. Letra de la descripción de Leasing 36 agrandada (9.5px→11px). Arreglado el restaurador de borrador para negocios viejos con formato de forma de pago en texto libre.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.5 (Descuento de cada ítem se auto-completa al agregarlo, con la fórmula (Precio LISTA − Precio CONTADO CNO) / Precio LISTA — visible y editable en el campo Descuento. Contado ahora usa el mismo cálculo que Totales (ya que el descuento refleja esto). TLC 6/12/Leasing siguen financiando sobre precio de lista completo, sin este descuento — confirmado que no se ven afectados.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -468,7 +468,14 @@ function _restaurarDraftYItemPendiente() {
       if (it.descripcionCatalogo && it.descripcionCatalogo.trim()) descripcionCombinada += ' — ' + it.descripcionCatalogo.trim();
       var precioLista = it.precio || 0;
       var precioContado = it.precioContado || precioLista;
-      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: 1, descuento: 0, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
+      // Descuento = (Precio LISTA − Precio CONTADO CNO) / Precio LISTA
+      // — se auto-completa al agregar el ítem, para que el campo
+      // Descuento refleje de entrada el precio de contado real del
+      // catálogo. Queda visible y editable ahí mismo.
+      var descuentoAuto = (precioLista > 0)
+        ? Math.round(((precioLista - precioContado) / precioLista) * 10000) / 100
+        : 0;
+      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: 1, descuento: descuentoAuto, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
     }
   } catch (e) { console.warn('Error aplicando ítem pendiente:', e); }
   sessionStorage.removeItem('tlc_item_pendiente_presupuesto');
@@ -928,16 +935,17 @@ var PARAMS_PAGO = {
 // contado ya cargado en el catálogo (columna "Precio CONTADO CNO" en
 // Lista_Precios). Se le sigue aplicando el descuento manual del ítem
 // (si hay) e IVA, igual que al precio de lista normal.
-// Contado usa el precio de contado real de cada ítem (columna "Precio
-// CONTADO CNO" del catálogo) DIRECTO — no pasa por el campo Descuento
-// del ítem (ese es independiente, para negociar aparte si hiciera
-// falta, pero no participa del cálculo de Contado).
+// Contado ahora usa el mismo cálculo que Totales de arriba — el
+// campo Descuento de cada ítem YA refleja el precio de contado real
+// (se auto-completa al agregar el ítem con la fórmula (Precio LISTA
+// − Precio CONTADO CNO) / Precio LISTA), así que no hace falta un
+// cálculo aparte con precioContado.
 function _calcularContado() {
   var neto = 0, iva = 0;
   ITEMS.forEach(function(it) {
-    var n = (it.precioContado || it.precio) * it.cantidad;
-    neto += n;
-    iva += n * (it.iva || 0) / 100;
+    var calc = _calcularItem(it);
+    neto += calc.descontado;
+    iva += calc.iva;
   });
   return { neto: neto, iva: iva, total: neto + iva };
 }
