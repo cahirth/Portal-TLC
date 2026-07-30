@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.26.9 (Campo de descripción del ítem ahora es multilínea con auto-resize (crece con el contenido) — antes era un input de una sola línea que se cortaba con descripciones largas) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.2 (TLC 6/12 cuotas: anticipo editable por presupuesto (default 35%/50%), saldo dividido en partes iguales sin recargo financiero — mismo criterio en pesos que Leasing. Se limpió un duplicado de funciones que había quedado de una edición anterior.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -252,6 +252,12 @@
       </div>
     </div>
 
+    <!-- ═══ MODALIDADES DE PAGO (referencia, calculado en vivo) ═══ -->
+    <div class="section">
+      <div class="section-title">💳 Modalidades de Pago <span style="font-size:10px;font-weight:400;color:var(--text-dim);">(calculado sobre el neto de este presupuesto)</span></div>
+      <div id="modalidades-pago-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;"></div>
+    </div>
+
     <!-- ═══ CONDICIONES COMERCIALES ═══ -->
     <div class="section">
       <div class="section-title">📋 Condiciones Comerciales</div>
@@ -461,7 +467,7 @@ function _restaurarDraftYItemPendiente() {
       var it = JSON.parse(rawItem);
       var descripcionCombinada = it.nombre || '';
       if (it.descripcionCatalogo && it.descripcionCatalogo.trim()) descripcionCombinada += ' — ' + it.descripcionCatalogo.trim();
-      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: it.precio || 0, cantidad: 1, descuento: 0, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
+      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: it.precio || 0, precioContado: it.precioContado || it.precio || 0, cantidad: 1, descuento: 0, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
     }
   } catch (e) { console.warn('Error aplicando ítem pendiente:', e); }
   sessionStorage.removeItem('tlc_item_pendiente_presupuesto');
@@ -679,7 +685,7 @@ window._seleccionarContacto = function(i) {
 
 // ── ÍTEMS ──
 function _agregarItem() {
-  ITEMS.push({ id: ++_itemSeq, foto:null, descripcion:'', precio:0, cantidad:1, descuento:0, iva:10.5, moneda:'USD' });
+  ITEMS.push({ id: ++_itemSeq, foto:null, descripcion:'', precio:0, precioContado:0, cantidad:1, descuento:0, iva:10.5, moneda:'USD' });
   _render();
 }
 window._borrarItem = function(id) {
@@ -893,6 +899,147 @@ function _toggleTiempoEntregaPersonalizado() {
   document.getElementById('campo-tiempo-entrega-personalizado').style.display = v === 'personalizado' ? 'block' : 'none';
 }
 
+// ══════════════════════════════════════════════════════════════════
+// MODALIDADES DE PAGO — parámetros de negocio (Cristian los actualiza
+// acá cuando cambien las tasas/condiciones; el resto del cálculo no
+// hay que tocarlo, solo estos números).
+// ══════════════════════════════════════════════════════════════════
+var PARAMS_PAGO = {
+  leasing36: {
+    // Estructura fija confirmada con InverLease (26/07/2026): Maxicanon
+    // 15% del valor del bien sin IVA + 35 cánones fijos (sistema
+    // francés) + 1 canon en garantía (se cobra al firmar, cancela los
+    // últimos) + Opción de compra (VR) = 1 canon más al finalizar.
+    maxicanonPct: 15,
+    tna: 39, // ← TNA de referencia (calculada de una cotización real de InverLease del 27/07/2026, con Maxicanon 15% + 35 cuotas daba $1.821.538 contra el canon real de $1.822.860 — diferencia <0,1%). ACTUALIZAR ACÁ cuando llegue una cotización nueva.
+    plazoMeses: 36,
+    canonesAPagar: 35,
+  },
+  // TLC 6C y TLC 12C: anticipo editable + saldo dividido en cuotas
+  // fijas iguales — SIN recargo financiero (a diferencia de Leasing).
+  // El % de anticipo lo puede ajustar el vendedor en el momento, según
+  // lo que negocie con el cliente — arranca en el valor default.
+  tlc6:  { anticipoPct: 35, cuotas: 6 },
+  tlc12: { anticipoPct: 50, cuotas: 12 },
+};
+
+// Contado: NO es un % genérico — cada ítem tiene su propio precio de
+// contado ya cargado en el catálogo (columna "Precio CONTADO CNO" en
+// Lista_Precios). Se le sigue aplicando el descuento manual del ítem
+// (si hay) e IVA, igual que al precio de lista normal.
+function _calcularContado() {
+  var neto = 0, iva = 0;
+  ITEMS.forEach(function(it) {
+    var base = (it.precioContado || it.precio) * it.cantidad;
+    var n = base * (1 - (it.descuento || 0) / 100);
+    neto += n;
+    iva += n * (it.iva || 0) / 100;
+  });
+  return { neto: neto, iva: iva, total: neto + iva };
+}
+
+// Leasing 36 — sistema francés (cuota fija) sobre el valor del bien
+// SIN IVA, en pesos (así cotiza InverLease). baseARS ya viene
+// convertida con el TC oficial.
+function _calcularLeasing36(baseARS) {
+  var p = PARAMS_PAGO.leasing36;
+  var i = (p.tna / 100) / 12;
+  var n = p.canonesAPagar;
+  var maxicanon = baseARS * p.maxicanonPct / 100;
+  var capitalFinanciar = baseARS - maxicanon;
+  var canon = capitalFinanciar * i / (1 - Math.pow(1 + i, -n));
+  return {
+    maxicanon: maxicanon,
+    canon: canon,
+    canones: n,
+    garantia: canon, // el canon en garantía es igual a un canon normal
+    vr: canon,        // la opción de compra también equivale a 1 canon
+    totalNominal: maxicanon + (canon * (n + 1)), // maxicanon + 35 cánones + VR (el canon en garantía no suma, ya está contemplado en los 35)
+  };
+}
+
+// TLC 6/12 — sin recargo financiero, solo divide el saldo en partes
+// iguales. baseARS ya viene convertida con el TC oficial.
+function _calcularTLC(baseARS, params) {
+  var anticipo = baseARS * params.anticipoPct / 100;
+  var saldo = baseARS - anticipo;
+  var cuota = saldo / params.cuotas;
+  return { anticipo: anticipo, saldo: saldo, cuota: cuota, cuotas: params.cuotas };
+}
+
+window._actualizarAnticipoTLC = function(clave, valor) {
+  var pct = parseFloat(valor);
+  if (isNaN(pct) || pct < 0 || pct > 100) return;
+  PARAMS_PAGO[clave].anticipoPct = pct;
+  _renderModalidadesPago();
+};
+
+function _fmtARS(n) {
+  return '$' + Math.round(n).toLocaleString('es-AR');
+}
+
+function _renderModalidadesPago() {
+  var cont = document.getElementById('modalidades-pago-grid');
+  if (!cont) return;
+
+  var contado = _calcularContado();
+
+  var cardContado =
+    '<div style="border:1px solid var(--border-glow);border-radius:10px;padding:12px;">' +
+      '<div style="font-size:11px;font-weight:800;color:var(--accent-green);margin-bottom:6px;">💵 CONTADO</div>' +
+      '<div style="font-size:16px;font-weight:800;">' + _fmtUSD(contado.total) + '</div>' +
+      '<div style="font-size:10px;color:var(--text-dim);margin-top:2px;">Neto ' + _fmtUSD(contado.neto) + ' + IVA ' + _fmtUSD(contado.iva) + '</div>' +
+    '</div>';
+
+  var cardLeasing = '';
+  if (TC_OFICIAL) {
+    // El neto USD del presupuesto se convierte a AR$ para leasing —
+    // InverLease cotiza siempre en pesos, sobre el valor del bien SIN IVA.
+    var netoUSD = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).descontado; }, 0);
+    var baseARS = netoUSD * TC_OFICIAL;
+    var l = _calcularLeasing36(baseARS);
+    cardLeasing =
+      '<div style="border:1px solid var(--border-glow);border-radius:10px;padding:12px;">' +
+        '<div style="font-size:11px;font-weight:800;color:#a78bfa;margin-bottom:6px;">🏦 LEASING 36 MESES</div>' +
+        '<div style="font-size:10px;color:var(--text-dim);">Maxicanon</div>' +
+        '<div style="font-size:13px;font-weight:700;">' + _fmtARS(l.maxicanon) + ' + IVA</div>' +
+        '<div style="font-size:10px;color:var(--text-dim);margin-top:6px;">' + l.canones + ' cánones fijos</div>' +
+        '<div style="font-size:13px;font-weight:700;">' + _fmtARS(l.canon) + ' + IVA c/u</div>' +
+        '<div style="font-size:9.5px;color:var(--text-dim);margin-top:6px;line-height:1.4;">+ 1 canon en garantía (se aplica a los últimos) · Opción de compra al finalizar: ' + _fmtARS(l.vr) + ' + IVA · TNA ' + PARAMS_PAGO.leasing36.tna + '%</div>' +
+      '</div>';
+  } else {
+    cardLeasing = '<div style="border:1px solid var(--border-glow);border-radius:10px;padding:12px;opacity:.6;">' +
+      '<div style="font-size:11px;font-weight:800;color:#a78bfa;margin-bottom:6px;">🏦 LEASING 36 MESES</div>' +
+      '<div style="font-size:11px;color:var(--text-dim);">Esperando el TC oficial para calcular...</div>' +
+    '</div>';
+  }
+
+  var cardTLC = function(clave, titulo) {
+    if (!TC_OFICIAL) {
+      return '<div style="border:1px solid var(--border-glow);border-radius:10px;padding:12px;opacity:.6;">' +
+        '<div style="font-size:11px;font-weight:800;color:#f8961e;margin-bottom:6px;">' + titulo + '</div>' +
+        '<div style="font-size:11px;color:var(--text-dim);">Esperando el TC oficial para calcular...</div>' +
+      '</div>';
+    }
+    var netoUSD = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).descontado; }, 0);
+    var baseARS = netoUSD * TC_OFICIAL;
+    var p = PARAMS_PAGO[clave];
+    var r = _calcularTLC(baseARS, p);
+    return '<div style="border:1px solid var(--border-glow);border-radius:10px;padding:12px;">' +
+      '<div style="font-size:11px;font-weight:800;color:#f8961e;margin-bottom:6px;">📅 ' + titulo + '</div>' +
+      '<label style="font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:5px;margin-bottom:6px;">Anticipo ' +
+        '<input type="number" min="0" max="100" value="' + p.anticipoPct + '" onchange="_actualizarAnticipoTLC(\'' + clave + '\', this.value)" ' +
+          'style="width:48px;padding:3px 4px;border-radius:5px;border:1px solid var(--border-glow);background:var(--panel-darker);color:var(--text-main);font-size:11px;text-align:center;">%' +
+      '</label>' +
+      '<div style="font-size:13px;font-weight:700;">' + _fmtARS(r.anticipo) + ' + IVA</div>' +
+      '<div style="font-size:10px;color:var(--text-dim);margin-top:6px;">' + r.cuotas + ' cuotas fijas de</div>' +
+      '<div style="font-size:13px;font-weight:700;">' + _fmtARS(r.cuota) + ' + IVA c/u</div>' +
+    '</div>';
+  };
+
+  cont.innerHTML = cardContado + cardLeasing + cardTLC('tlc6', 'TLC 6 CUOTAS') + cardTLC('tlc12', 'TLC 12 CUOTAS');
+}
+
 function _renderTotales() {
   var subtotal = 0, descuento = 0, iva = 0, total = 0;
   ITEMS.forEach(function(it) {
@@ -911,6 +1058,7 @@ function _renderTotales() {
 function _render() {
   _renderItems();
   _renderTotales();
+  _renderModalidadesPago();
 }
 
 // ── GENERAR (todavía mock — guardado real es el próximo paso) ──
@@ -944,7 +1092,7 @@ async function _generarPresupuesto() {
     contactoTelefono: (CONTACTO_SEL && CONTACTO_SEL.telefono) || '',
     vendedor: vendedor,
     items: ITEMS.map(function(it) {
-      return { nombre: it.descripcion, precio: it.precio, cantidad: it.cantidad, descuento: it.descuento, iva: it.iva, moneda: it.moneda || 'USD', foto: it.foto || '', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' };
+      return { nombre: it.descripcion, precio: it.precio, precioContado: it.precioContado || it.precio, cantidad: it.cantidad, descuento: it.descuento, iva: it.iva, moneda: it.moneda || 'USD', foto: it.foto || '', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' };
     }),
     formaPago: document.getElementById('cc-forma-pago').value,
     validez: document.getElementById('cc-validez').value,
