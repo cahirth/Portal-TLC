@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.9 (Simplificado: cada cambio de Forma de Pago resetea el Descuento sin condiciones — TLC 6/12/Leasing 36 → 0%, Contado → aplica la fórmula real. El vendedor puede editarlo después en cualquiera de los dos casos; el próximo cambio de modalidad lo vuelve a pisar según corresponda.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.10 (Mismo esquema de Totales discriminado que el PDF: Subtotal → Descuentos (etiqueta dinámica según la modalidad) → Subtotal con descuentos → IVA → Total.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -246,7 +246,8 @@
       </span></div>
       <div class="totales-grid">
         <div class="totales-fila"><span>Subtotal</span><b id="tot-subtotal">-</b></div>
-        <div class="totales-fila"><span>Descuentos</span><b id="tot-descuento">-</b></div>
+        <div class="totales-fila"><span id="tot-descuento-label">Descuentos</span><b id="tot-descuento">-</b></div>
+        <div class="totales-fila"><span>Subtotal con descuentos</span><b id="tot-subtotal-neto">-</b></div>
         <div class="totales-fila"><span>IVA</span><b id="tot-iva">-</b></div>
         <div class="totales-fila final"><span>Total</span><span id="tot-total">-</span></div>
       </div>
@@ -1078,8 +1079,12 @@ function _renderTotales() {
     iva += calc.iva;
     total += calc.total;
   });
+  var subtotalNeto = subtotal - descuento;
+  var formaPago = (document.getElementById('cc-forma-pago') || {}).value || 'contado';
+  document.getElementById('tot-descuento-label').textContent = formaPago === 'contado' ? 'Descuentos (Contado)' : 'Descuentos';
   document.getElementById('tot-subtotal').textContent = _fmtMoneda(subtotal);
   document.getElementById('tot-descuento').textContent = '- ' + _fmtMoneda(descuento);
+  document.getElementById('tot-subtotal-neto').textContent = _fmtMoneda(subtotalNeto);
   document.getElementById('tot-iva').textContent = _fmtMoneda(iva);
   document.getElementById('tot-total').textContent = _fmtMoneda(total);
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.28.1 (Título separado en 3 renglones: PRESUPUESTO (negrita) / FACTURA PROFORMA (itálica, secundario) / N°: completo con white-space:nowrap para que la numeración nunca se corte en dos líneas) -->
+<!-- Portal TLC | presupuesto.html | v2026.07.28.2 (Totales discriminados: Subtotal (precio de lista) → Descuentos (etiqueta "Descuentos (Contado)" si esa fue la modalidad, "Descuentos" si es manual del usuario, solo se muestra si hay descuento real) → Subtotal con descuentos → IVA → Total. Antes solo mostraba el subtotal ya neto, sin discriminar.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -249,6 +249,17 @@
       totalCIva = totalCIvaUSD * p.tcOficial;
     }
 
+    // Subtotal BRUTO (precio de lista, sin descuentos) — no viene
+    // guardado directo en p.totales (que ya es neto), se reconstruye
+    // sumando precioLista × cantidad de cada ítem del carrito.
+    var subtotalBrutoUSD = 0;
+    c.forEach(function(i) {
+      subtotalBrutoUSD += (i.precioLista || i.precioNeto || 0) * (i.cantidad || 1);
+    });
+    var subtotalBruto = (p.monedaTotales === 'ARS' && p.tcOficial) ? subtotalBrutoUSD * p.tcOficial : subtotalBrutoUSD;
+    var montoDescuento = Math.max(0, subtotalBruto - netoTotal);
+    var labelDescuento = (p.formaPago === 'contado') ? 'Descuentos (Contado)' : 'Descuentos';
+
     // Validez de la oferta — dinámica si viene del editor nuevo
     // (presupuesto-editor.html, campos p.validez/p.validezFecha), texto
     // fijo "15 Días" como respaldo para presupuestos viejos que no
@@ -353,7 +364,9 @@
 
       '<div style="display:flex;justify-content:flex-end;margin-bottom:16px;">' +
         '<table style="border-collapse:collapse;min-width:260px;">' +
-          '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">Subtotal</td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>' + etiquetaMoneda + '</strong> &nbsp;' + Math.round(netoTotal).toLocaleString('es-AR') + '</td></tr>' +
+          '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">Subtotal</td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>' + etiquetaMoneda + '</strong> &nbsp;' + Math.round(subtotalBruto).toLocaleString('es-AR') + '</td></tr>' +
+          (montoDescuento > 0.5 ? '<tr><td style="padding:5px 8px;font-size:13px;color:#dc2626;">' + labelDescuento + '</td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;color:#dc2626;">− <strong>' + etiquetaMoneda + '</strong> &nbsp;' + Math.round(montoDescuento).toLocaleString('es-AR') + '</td></tr>' : '') +
+          '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">Subtotal con descuentos</td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>' + etiquetaMoneda + '</strong> &nbsp;' + Math.round(netoTotal).toLocaleString('es-AR') + '</td></tr>' +
           '<tr><td style="padding:5px 8px;font-size:13px;color:#374151;">IVA</td><td style="padding:5px 8px;text-align:right;font-size:13px;font-weight:600;"><strong>' + etiquetaMoneda + '</strong> &nbsp;' + Math.round(ivaTotal).toLocaleString('es-AR') + '</td></tr>' +
           '<tr style="border-top:2px solid #0f172a;"><td style="padding:8px 8px;font-size:14px;font-weight:700;">Total</td><td style="padding:8px 8px;text-align:right;font-size:14px;font-weight:700;"><strong>' + etiquetaMoneda + '</strong> &nbsp;' + Math.round(totalCIva).toLocaleString('es-AR') + '</td></tr>' +
         '</table>' +
