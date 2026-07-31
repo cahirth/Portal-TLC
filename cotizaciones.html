@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.28.2 (Barra de filtros reorganizada en una sola fila en desktop: Vendedores (max-width 200px) → Pipeline → Buscador (flexible) → Pills de etapa — con flex-wrap para que en mobile caiga ordenado en varias líneas.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.30.1 (Fix buscador Kanban: aplicarFiltros() no matcheaba c.empresa?.razonSocial ni c.contacto?.nombre — negocios creados/vinculados vía flujo nuevo (empresas.html/ficha-equipo.html) no aparecían al buscar por empresa o contacto. Ahora sí. También se agregó búsqueda por CUIT (c.cuit / c.empresa?.cuit) y se actualizó el placeholder del input.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -666,7 +666,7 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
 
     <!-- BUSCADOR -->
     <div class="buscador-wrap" id="buscador-wrap" style="display:none;">
-        <input type="text" id="buscador" placeholder="Buscar cliente, equipo o ID..." oninput="aplicarFiltros()">
+        <input type="text" id="buscador" placeholder="Buscar cliente, contacto, equipo, ID o CUIT..." oninput="aplicarFiltros()">
     </div>
 
     <!-- FILTROS DE ETAPA -->
@@ -1837,13 +1837,15 @@ function aplicarFiltros() {
     const q = (document.getElementById('buscador')?.value || '').toLowerCase().trim();
     cotFiltradas = todasLasCot.filter(c => {
         const matchEstado = filtroEstado === 'TODOS' || c.estado === filtroEstado;
-        const razon   = String(c.nombreNegocio || c.razonSocial || c.cliente?.nombre || c.nombreMedico || '').toLowerCase();
+        const razon   = String(c.nombreNegocio || c.razonSocial || c.empresa?.razonSocial || c.cliente?.nombre || '').toLowerCase();
+        const contactoStr = String(c.contacto?.nombre || c.nombreMedico || '').toLowerCase();
         const equipo  = String([
             ...(c.carrito||[]).map(i => i.nombre),
             ...(Array.isArray(c.productos) ? c.productos : []),
         ].join(' ')).toLowerCase();
         const id      = String(c.idCot || c.id_cotizacion || c.id || '').toLowerCase();
-        const matchQ  = !q || razon.includes(q) || equipo.includes(q) || id.includes(q);
+        const cuit    = String(c.cuit || c.empresa?.cuit || '').toLowerCase();
+        const matchQ  = !q || razon.includes(q) || contactoStr.includes(q) || equipo.includes(q) || id.includes(q) || cuit.includes(q);
         // Pipeline: una tarjeta sin pipeline_id cargado se considera
         // "GENERAL" — así, seleccionar "Pipeline General" muestra tanto
         // las tarjetas viejas (sin este campo) como las reasignadas ahí a mano.
