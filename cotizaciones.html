@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.07.30.2 (Fix REAL del buscador Kanban: la v2026.07.30.1 agregó empresa.razonSocial y contacto.nombre a la búsqueda pero seguía usando || entre campos, así que si nombreNegocio estaba cargado (caso normal) nunca se llegaba a comparar contra razonSocial/empresa.razonSocial — por eso "Vision Norte" no encontraba el negocio "HOCtavius 1F" de esa empresa. Ahora se concatenan todos los campos de nombre y se busca contra el conjunto completo.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.07.30.3 (Fix: _irAPresupuestoEditor no llevaba precioContado ni recalculaba descuentoContadoOriginal al reabrir un negocio existente para "Crear/Modificar Presupuesto" — el toggle a modalidad Contado en presupuesto-editor.html caía siempre a descuento 0% en vez de la fórmula real del catálogo. Reportado por Cristian: "andaba a la mañana", dejó de andar al reabrir un negocio ya guardado.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -3118,18 +3118,34 @@ function _irAPresupuestoEditor(idCot) {
     if (!c) return;
 
     const carritoActual = Array.isArray(c.carrito) ? c.carrito : [];
-    const items = carritoActual.map((it, i) => ({
-        id: i + 1,
-        foto: it.foto || null,
-        descripcion: it.nombre || '',
-        precio: parseFloat(it.precioLista != null ? it.precioLista : it.precioNeto) || 0,
-        cantidad: parseInt(it.cantidad) || 1,
-        descuento: parseFloat(it.descuentoValor) || 0,
-        iva: (it.ivaPct !== undefined && it.ivaPct !== null) ? parseFloat(it.ivaPct) : 10.5,
-        moneda: it.moneda || 'USD',
-        linkFolleto: it.linkFolleto || '',
-        linkVideo: it.linkVideo || '',
-    }));
+    const items = carritoActual.map((it, i) => {
+        const precioLista = parseFloat(it.precioLista != null ? it.precioLista : it.precioNeto) || 0;
+        // precioContado no viajaba acá — sin él, presupuesto-editor.html
+        // no puede recalcular descuentoContadoOriginal y el toggle a
+        // modalidad "Contado" caía siempre a descuento 0% en vez de la
+        // fórmula real del catálogo. Reportado por Cristian: "andaba a
+        // la mañana" — dejaba de andar justo al REABRIR un negocio ya
+        // guardado (los ítems recién agregados desde el selector sí
+        // traían este dato fresco).
+        const precioContado = parseFloat(it.precioContado) || precioLista;
+        const descuentoContadoOriginal = precioLista > 0
+            ? Math.round(((precioLista - precioContado) / precioLista) * 10000) / 100
+            : 0;
+        return {
+            id: i + 1,
+            foto: it.foto || null,
+            descripcion: it.nombre || '',
+            precio: precioLista,
+            precioContado: precioContado,
+            cantidad: parseInt(it.cantidad) || 1,
+            descuento: parseFloat(it.descuentoValor) || 0,
+            descuentoContadoOriginal: descuentoContadoOriginal,
+            iva: (it.ivaPct !== undefined && it.ivaPct !== null) ? parseFloat(it.ivaPct) : 10.5,
+            moneda: it.moneda || 'USD',
+            linkFolleto: it.linkFolleto || '',
+            linkVideo: it.linkVideo || '',
+        };
+    });
 
     const cond = c.condicionesComerciales || {};
     const tieneContacto = !!(c.contacto && c.contacto.nombre);
