@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.30.4 (1) Botón "Crear Negocio" nuevo, entre "Enviar por WhatsApp" y "Guardar PDF" — llama a _guardarSeguimientoVentas() directo, sin pasar por WhatsApp; oculto en modo receptor/sin sesión. (2) Regla de negocio: la tarjeta "Leasing $ — 36 cuotas" solo se muestra si el total con IVA del equipo supera USD 15.000.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.30.5 (Fix: el cartel de sugerencias de empresa ("Sin coincidencias..." o resultados) era position:absolute y flotaba SIN reservar espacio — tapaba el campo Teléfono de abajo (en mobile, directamente lo bloqueaba, sin forma de tocarlo). Ahora es un bloque normal en el flujo, empuja el resto del formulario en vez de taparlo.) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -145,14 +145,19 @@
                 <option value="GENERAL">🏢 Pipeline General</option>
             </select>
         </div>
-        <div style="display:flex; gap:10px; width:100%; position:relative;">
+        <div style="display:flex; gap:10px; width:100%;">
             <input type="text" id="fi-empresa-buscar" placeholder="Empresa / Cliente (para guardar el seguimiento en Ventas)"
                 autocomplete="off" oninput="_filtrarEmpresasFicha(this.value)" onfocus="_filtrarEmpresasFicha(this.value)"
                 style="flex:1; padding:11px 14px; border-radius:8px; border:1px solid var(--border-color); font-size:13px; outline:none;">
-            <div id="fi-empresa-sugerencias" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:50;
-                background:#fff; border:1px solid var(--border-color); border-radius:8px; max-height:220px; overflow-y:auto;
-                box-shadow:0 8px 24px rgba(0,0,0,.12);"></div>
         </div>
+        <!-- Antes era position:absolute — flotaba SIN reservar espacio, así que
+             al aparecer tapaba el status y el campo Teléfono de abajo (en mobile
+             directamente los bloqueaba, sin forma de tocarlos). Ahora es un
+             bloque normal en el flujo del documento: cuando se muestra, empuja
+             el resto del formulario hacia abajo en vez de taparlo. -->
+        <div id="fi-empresa-sugerencias" style="display:none; width:100%;
+            background:#fff; border:1px solid var(--border-color); border-radius:8px; max-height:220px; overflow-y:auto;
+            box-shadow:0 8px 24px rgba(0,0,0,.12);"></div>
         <div id="fi-empresa-status" style="font-size:11px; color:var(--text-muted); margin-top:-2px;"></div>
         <div id="fi-contactos-sugerencias" style="display:none; flex-wrap:wrap; gap:6px; margin-top:-4px;"></div>
         <div style="display:flex; gap:10px; width:100%;">
