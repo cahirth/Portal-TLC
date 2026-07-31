@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.28.1 (Chip de contacto elegido ahora se marca visualmente (fondo azul sólido + ✓) — antes no se notaba cuál estaba seleccionado) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.30.1 (Fix: compartir la ficha por WhatsApp ya no genera un presupuesto/versión automático en el negocio — se agregó soloRegistrarNegocio:true al payload de guardarPresupuestoEditor, requiere FotoMap.gs v133. El negocio y el equipo en "Equipos" se siguen registrando igual, solo que sin la "Edición V1" no pedida.) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -622,6 +622,7 @@ async function _guardarSeguimientoVentas() {
 
     var payload = {
       accion: 'guardarPresupuestoEditor',
+      soloRegistrarNegocio: true, // ← v2026.07.30 — deja el negocio+equipo registrado en Ventas, pero el backend (FotoMap.gs v133) NO genera versión ni documento de presupuesto automático; eso queda para "Crear Presupuesto" en el detalle
       idNegocio: '',
       razonSocial: empresaTexto,
       cuit: '',
