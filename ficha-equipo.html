@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.30.2 (Botón "Ver negocio →" en el mensaje de confirmación al compartir por WhatsApp — abre directo el detalle del negocio recién creado/actualizado en cotizaciones.html vía deep-link ?id=. Además el v2026.07.30.1: soloRegistrarNegocio:true en el payload para no generar presupuesto automático, requiere FotoMap.gs v133.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.30.3 (Fix REAL del bug "Contado no aplica descuento" al crear/apilar negocio desde la ficha técnica: nunca se mandaba precioContado (el "Precio CONTADO CNO" del catálogo) al backend — quedaba local a la función de render. Ahora viaja en ambos payloads (apilarFichaTecnica y guardarPresupuestoEditor). Requiere FotoMap.gs v134.) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -255,6 +255,7 @@ function fotoUrl(foto) {
 }
 var _fichaNombreActual = '';
 var _fichaPrecioListaActual = 0;
+var _fichaPrecioContadoActual = 0; // ← Precio CONTADO CNO del catálogo — antes solo vivía local a la función de render, nunca viajaba al crear/apilar el negocio
 var _fichaFotoRawActual = '';
 var _empresasCacheFicha = null;
 var PIPELINES_FICHA_KEY = 'tlc_ficha_pipeline_actual';
@@ -407,6 +408,7 @@ async function _cargarFicha() {
         var finGrid = document.getElementById('fi-financiacion-grid');
         var tarjetas = '';
         var contado = parseFloat(d['Precio CONTADO CNO']);
+        _fichaPrecioContadoActual = (!isNaN(contado) && contado > 0) ? contado : 0;
         if (!isNaN(contado) && contado > 0) {
             var ocultoContado = _variantesOcultas.indexOf('contado') !== -1;
             if (!(_modoReceptor && ocultoContado)) {
@@ -625,6 +627,7 @@ async function _guardarSeguimientoVentas() {
           ficha: {
             nombre: _fichaNombreActual,
             precio: _fichaPrecioListaActual,
+            precioContado: _fichaPrecioContadoActual || _fichaPrecioListaActual, // ← v2026.07.30 — antes no viajaba, el Descuento en modalidad Contado quedaba siempre en 0%
             foto: fotoUrl(_fichaFotoRawActual) || '',
             vendedor: (_sesionVendedor && _sesionVendedor.name) || '',
           },
@@ -650,6 +653,7 @@ async function _guardarSeguimientoVentas() {
       items: [{
         nombre: _fichaNombreActual,
         precio: _fichaPrecioListaActual,
+        precioContado: _fichaPrecioContadoActual || _fichaPrecioListaActual, // ← v2026.07.30 — antes no viajaba, el Descuento en modalidad Contado quedaba siempre en 0%
         cantidad: 1,
         descuento: 0,
         iva: 10.5,
