@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.28.2 (El puente con presupuesto-editor.html ahora también manda precioContado (columna "Precio CONTADO CNO" del catálogo), para la calculadora de Modalidades de Pago) -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.07.30.1 (Buscador ampliado en las 3 pantallas del selector: antes, buscar dentro de una categoría/subcategoría activa (ej. AUTOREFRACTOR) restringía los resultados a esa misma categoría; ahora, apenas hay texto en el buscador, se busca siempre contra el catálogo COMPLETO sin importar en qué pantalla/categoría se esté parado. Pedido por Cristian: "que abarque todos los equipos siempre". Sin texto, la navegación por categoría sigue funcionando igual que antes.) -->
+
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2839,13 +2840,12 @@ function _ejecutarBusqueda(q) {
         return;
     }
 
-    // Buscar en TODOS los dispositivos — catActual ya es null en la
-    // pantalla principal (se resetea en volverCategorias()), así que
-    // esta misma condición ya cubre "buscar en todo" sin hacer nada
-    // especial: si no hay categoría activa, no filtra por categoría.
-    const base = dispositivos.filter(d =>
-        !catActual || d['Categoria'] === catActual
-    );
+    // Buscar en TODOS los dispositivos, siempre — pedido por Cristian:
+    // el buscador debe "abrazar todos los equipos siempre" en todas las
+    // pantallas del selector, sin importar en qué categoría/subcategoría
+    // esté parado. Antes se restringía a catActual cuando había una
+    // categoría activa (solo buscaba dentro de esa categoría).
+    const base = dispositivos;
 
     const resultados = base.filter(d => {
         const nombre = sinAcentos((d['Nombre de Dispositivo'] || '').toLowerCase());
@@ -2951,16 +2951,25 @@ function _abrirDetalleDesdeResultado(idxGlobal, subcat) {
 function filtrar() {
     const q = sinAcentos((document.getElementById('buscador')?.value || '').trim());
     const filtrados = dispositivos.filter(d => {
+        const nombre = sinAcentos(d['Nombre de Dispositivo']);
+        const desc   = sinAcentos(d['Descripcion']);
+        const marca  = sinAcentos(d['Sub Categoria'] || '');
+        if (q) {
+            // Con texto en el buscador: SIEMPRE contra el catálogo
+            // completo, sin importar en qué categoría/subcategoría
+            // estemos parados — pedido por Cristian (30/07/2026): el
+            // filtro debe abarcar todos los equipos siempre, en todas
+            // las pantallas del selector.
+            return nombre.includes(q) || desc.includes(q) || marca.includes(q);
+        }
+        // Sin texto: comportamiento normal, navegación por categoría/subcategoría.
         if (!catActual) return true;
         if (d['Categoria'] !== catActual) return false;
         if (subcatActual !== 'TODAS') {
             const dSub = (d['Sub Categoria'] || '').trim();
-            // Match exacto o match de grupo (primera palabra)
             if (dSub !== subcatActual) return false;
         }
-        const nombre = sinAcentos(d['Nombre de Dispositivo']);
-        const desc   = sinAcentos(d['Descripcion']);
-        return !q || nombre.includes(q) || desc.includes(q);
+        return true;
     });
     renderLista(filtrados);
 }
