@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.30.1 (Fix: compartir la ficha por WhatsApp ya no genera un presupuesto/versión automático en el negocio — se agregó soloRegistrarNegocio:true al payload de guardarPresupuestoEditor, requiere FotoMap.gs v133. El negocio y el equipo en "Equipos" se siguen registrando igual, solo que sin la "Edición V1" no pedida.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.07.30.2 (Botón "Ver negocio →" en el mensaje de confirmación al compartir por WhatsApp — abre directo el detalle del negocio recién creado/actualizado en cotizaciones.html vía deep-link ?id=. Además el v2026.07.30.1: soloRegistrarNegocio:true en el payload para no generar presupuesto automático, requiere FotoMap.gs v133.) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -571,6 +571,21 @@ document.addEventListener('click', function(ev) {
 // ("Cotización"), con este equipo como único ítem — para que quede
 // registro de seguimiento sin frenar el envío por WhatsApp (se dispara
 // en paralelo, después de abrir WhatsApp, nunca antes).
+//
+// Muestra el mensaje de resultado del guardado en Ventas, con un botón
+// "Ver negocio →" al lado que abre directo el detalle en cotizaciones.html
+// (deep-link vía ?id=, ya soportado ahí por _abrirDetallePorIdEnUrl) —
+// pedido por Cristian para poder chequear al toque lo que se acaba de
+// crear/apilar sin tener que ir a buscarlo a mano en el Kanban.
+function _mostrarResultadoConNegocio(elResultado, mensaje, color, idCot) {
+  if (!elResultado) return;
+  var linkNegocio = idCot ? ('https://ir.tlcsrl.com.ar/cotizaciones.html?id=' + encodeURIComponent(idCot)) : '';
+  elResultado.innerHTML = _esc(mensaje) + (linkNegocio
+    ? ' <a href="' + linkNegocio + '" target="_blank" rel="noopener" ' +
+      'style="margin-left:6px;color:#3a86ff;font-weight:700;text-decoration:none;white-space:nowrap;">Ver negocio →</a>'
+    : '');
+  elResultado.style.color = color;
+}
 async function _guardarSeguimientoVentas() {
   var elResultado = document.getElementById('fi-lead-resultado');
   var empresaTexto = (document.getElementById('fi-empresa-buscar') || {}).value || '';
@@ -616,7 +631,7 @@ async function _guardarSeguimientoVentas() {
         }) });
       var rApilar = await respApilar.json();
       if (!rApilar.ok) { if (elResultado) { elResultado.textContent = '⚠️ No se pudo apilar la ficha: ' + (rApilar.error||'error desconocido'); elResultado.style.color = '#f8961e'; } return; }
-      if (elResultado) { elResultado.textContent = '📎 Ficha sumada al negocio existente de ' + empresaTexto + ' (' + rApilar.total + ' fichas enviadas)'; elResultado.style.color = '#06d6a0'; }
+      _mostrarResultadoConNegocio(elResultado, '📎 Ficha sumada al negocio existente de ' + empresaTexto + ' (' + rApilar.total + ' fichas enviadas)', '#06d6a0', rBuscar.idCot);
       return;
     }
 
@@ -650,7 +665,7 @@ async function _guardarSeguimientoVentas() {
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
     var r = await resp.json();
     if (!r.ok) { if (elResultado) { elResultado.textContent = '⚠️ No se pudo guardar el seguimiento: ' + (r.error||'error desconocido'); elResultado.style.color = '#f8961e'; } return; }
-    if (elResultado) { elResultado.textContent = '✅ Guardado en Ventas — Cotización (50%) para ' + empresaTexto; elResultado.style.color = '#06d6a0'; }
+    _mostrarResultadoConNegocio(elResultado, '✅ Guardado en Ventas — Cotización (50%) para ' + empresaTexto, '#06d6a0', r.idCot);
   } catch(e) {
     if (elResultado) { elResultado.textContent = '⚠️ Error de conexión al guardar el seguimiento.'; elResultado.style.color = '#f8961e'; }
   }
