@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.30.1 (Fix REAL del bug "Contado no aplica descuento": al cargar la página con una modalidad ya guardada, se seteaba elFormaPago.value a mano — eso no dispara el evento onchange del select, así que _onCambiarFormaPago() (que recalcula el Descuento real de cada ítem) nunca corría al iniciar. Ahora se llama a mano al cargar, con el mismo efecto que un onchange real.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.30.2 (Regla de negocio: la opción "Leasing 36 meses (AR$)" del desplegable Forma de Pago se oculta/deshabilita si el total de lista con IVA no supera USD 15.000 — se recalcula en cada _render(). Si estaba seleccionada y deja de ser elegible (ej. al borrar un ítem), vuelve sola a Contado.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1091,9 +1091,36 @@ function _renderTotales() {
   document.getElementById('tot-total').textContent = _fmtMoneda(total);
 }
 
+// Regla de negocio (pedida por Cristian, 30/07/2026): "Leasing 36
+// meses (AR$)" solo se ofrece si el total CON IVA de la propuesta
+// supera los USD 15.000. Se calcula a precio de LISTA (bruto, sin
+// descuentos aplicados) para que no dependa de qué modalidad esté
+// elegida en ese momento — así el umbral es siempre el mismo,
+// modalidad tras modalidad. Si estaba seleccionada y el total baja de
+// 15.000 (por ejemplo al borrar un ítem), vuelve sola a Contado.
+function _actualizarDisponibilidadLeasing36() {
+  var totalListaConIva = 0;
+  ITEMS.forEach(function(it) {
+    var bruto = (it.precio || 0) * (it.cantidad || 1);
+    totalListaConIva += bruto * (1 + (it.iva || 0) / 100);
+  });
+  var elForma = document.getElementById('cc-forma-pago');
+  if (!elForma) return;
+  var elOpcion = elForma.querySelector('option[value="leasing36"]');
+  if (!elOpcion) return;
+  var habilitado = totalListaConIva > 15000;
+  elOpcion.hidden = !habilitado;
+  elOpcion.disabled = !habilitado;
+  if (!habilitado && elForma.value === 'leasing36') {
+    elForma.value = 'contado';
+    window._onCambiarFormaPago();
+  }
+}
+
 function _render() {
   _renderItems();
   _renderTotales();
+  _actualizarDisponibilidadLeasing36();
   _renderModalidadesPago();
 }
 
