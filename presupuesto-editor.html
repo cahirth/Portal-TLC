@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.28.13 (TLC 6/12 ahora sigue la moneda del selector general de Totales — USD tal cual, o AR$ multiplicando por el TC oficial. Sigue calculando en base USD internamente, solo cambia cómo se muestra.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.07.30.1 (Fix REAL del bug "Contado no aplica descuento": al cargar la página con una modalidad ya guardada, se seteaba elFormaPago.value a mano — eso no dispara el evento onchange del select, así que _onCambiarFormaPago() (que recalcula el Descuento real de cada ítem) nunca corría al iniciar. Ahora se llama a mano al cargar, con el mismo efecto que un onchange real.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1213,7 +1213,15 @@ if (_draftCondiciones) {
   // Contado por default en vez de dejar el select sin selección.
   var coincide = Array.prototype.some.call(elFormaPago.options, function(o) { return o.value === fpGuardada; });
   elFormaPago.value = coincide ? fpGuardada : 'contado';
-  _renderModalidadesPago();
+  // Fijar .value a mano NO dispara el evento onchange del select, así
+  // que _onCambiarFormaPago() (que recalcula el Descuento real de cada
+  // ítem según la modalidad) nunca se ejecutaba al cargar la página —
+  // se quedaba con el Descuento tal cual estaba guardado (0% si el
+  // negocio se había guardado antes bajo otra modalidad). Reportado
+  // por Cristian: "en Contado no aplica el descuento". Se llama acá a
+  // mano, mismo efecto que un onchange real (y ya incluye _render()
+  // completo, así que reemplaza al _renderModalidadesPago() suelto).
+  window._onCambiarFormaPago();
   document.getElementById('cc-validez').value = _draftCondiciones.validez || '15';
   document.getElementById('cc-validez-fecha').value = _draftCondiciones.validezFecha || '';
   document.getElementById('cc-tiempo-entrega').value = _draftCondiciones.tiempoEntrega || 'inmediato';
