@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.07.30.5 (Fix: el cartel de sugerencias de empresa ("Sin coincidencias..." o resultados) era position:absolute y flotaba SIN reservar espacio — tapaba el campo Teléfono de abajo (en mobile, directamente lo bloqueaba, sin forma de tocarlo). Ahora es un bloque normal en el flujo, empuja el resto del formulario en vez de taparlo.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.08.01.2 (Fix de velocidad: 1) si el negocio ya se resolvió una vez en esta misma carga de página (WhatsApp y después Crear Negocio, o al revés), el segundo click va DIRECTO a apilar — 1 llamada al backend en vez de 3. 2) En el primer click con cliente nuevo, guardarEmpresa y buscarNegocioAgrupable ahora corren en paralelo en vez de uno atrás del otro. Reportado por Cristian: "delante del cliente, se hace mucho tiempo".) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -297,6 +297,7 @@ window._onCambiarPipelineFicha = function(valor) {
   localStorage.setItem(PIPELINES_FICHA_KEY, valor);
 };
 var _empresaSeleccionadaFicha = null; // { id, razonSocial, telefono, contactos } | null (null = texto libre, empresa nueva)
+var _negocioActualFicha = null; // { idCot, razonSocial } | null — negocio ya resuelto en ESTA carga de página, para que un segundo click (WhatsApp + Crear Negocio) vaya directo a apilar sin repetir toda la búsqueda
 var _contactoSeleccionadoFicha = null; // { nombre, telefono } | null
 
 function _esc(s) { var d=document.createElement('div'); d.textContent=String(s==null?'':s); return d.innerHTML; }
@@ -619,28 +620,86 @@ async function _guardarSeguimientoVentas() {
   if (elResultado) { elResultado.textContent = '⏳ Guardando seguimiento en Ventas...'; elResultado.style.color = '#64748b'; }
 
   try {
+    // v2026.08.01 — FIX de velocidad: antes, CADA click (WhatsApp y
+    // Crear Negocio) repetía las 3 llamadas completas al backend
+    // (crear/buscar empresa → buscar negocio agrupable → crear/apilar),
+    // aunque ya supiéramos perfectamente a qué negocio iba esta ficha
+    // desde el click anterior en la misma pantalla — reportado por
+    // Cristian: "delante del cliente, se hace mucho tiempo". Si ya
+    // resolvimos el negocio una vez en esta carga de página, vamos
+    // DIRECTO a apilar — 1 sola llamada en vez de 3.
+    if (_negocioActualFicha && _negocioActualFicha.razonSocial === empresaTexto) {
+      var respApilarDirecto = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({
+          accion: 'apilarFichaTecnica',
+          idCot: _negocioActualFicha.idCot,
+          ficha: {
+            nombre: _fichaNombreActual,
+            precio: _fichaPrecioListaActual,
+            precioContado: _fichaPrecioContadoActual || _fichaPrecioListaActual,
+            foto: fotoUrl(_fichaFotoRawActual) || '',
+            vendedor: (_sesionVendedor && _sesionVendedor.name) || '',
+          },
+        }) });
+      var rApilarDirecto = await respApilarDirecto.json();
+      if (rApilarDirecto.ok) {
+        _mostrarResultadoConNegocio(elResultado, '📎 Ficha sumada al negocio de ' + empresaTexto + ' (' + rApilarDirecto.total + ' fichas enviadas)', '#06d6a0', _negocioActualFicha.idCot);
+        return;
+      }
+      // Si por lo que sea falló (ej. alguien borró el negocio mientras
+      // tanto), seguimos con el flujo normal de abajo en vez de cortar.
+    }
+
     var empresaId = '';
     if (_empresaSeleccionadaFicha && _empresaSeleccionadaFicha.razonSocial === empresaTexto) {
       empresaId = _empresaSeleccionadaFicha.id || '';
     } else {
-      // Empresa nueva — se crea de cero, para completar el resto de
-      // sus datos (CUIT, domicilio, contactos) más adelante.
-      var respEmp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({ accion:'guardarEmpresa', razonSocial: empresaTexto, telefono: (document.getElementById('fi-telefono-destino')||{}).value || '' }) });
-      var rEmp = await respEmp.json();
-      if (rEmp.ok && rEmp.id) empresaId = rEmp.id;
+      // Búsqueda LOCAL (sin red) contra el cache de empresas ya
+      // cargado — si la encontramos acá, nos ahorramos por completo la
+      // llamada a guardarEmpresa (ver rama de abajo, que corre en
+      // paralelo con la búsqueda de negocio cuando esto no alcanza).
+      var empresasExistentes = await _cargarEmpresasFicha();
+      var qNorm = empresaTexto.trim().toLowerCase();
+      var empresaExistente = empresasExistentes.find(function(e) {
+        return (e.razonSocial || '').trim().toLowerCase() === qNorm;
+      });
+      if (empresaExistente) {
+        empresaId = empresaExistente.id || '';
+        _empresaSeleccionadaFicha = empresaExistente;
+      }
     }
 
     var pipelineElegido = (document.getElementById('fi-pipeline-select') || {}).value || 'GENERAL';
 
-    // ── FASE 3: ¿ya hay un negocio abierto para agrupar esta ficha? ──
-    // 3 condiciones al mismo tiempo: mismo cliente (por empresaId, o
-    // razón social si es una empresa nueva sin id todavía), mismo
-    // pipeline, etapa inicial (50%) y modificado hace 7 días o menos.
-    // Si las cumple, se apila la ficha ahí en vez de duplicar tarjeta.
-    var respBuscar = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({ accion:'buscarNegocioAgrupable', empresaId: empresaId, razonSocial: empresaTexto, pipeline_id: pipelineElegido }) });
-    var rBuscar = await respBuscar.json();
+    // v2026.08.01 — guardarEmpresa (si hace falta crear una nueva) y
+    // buscarNegocioAgrupable ahora corren EN PARALELO en vez de uno
+    // atrás del otro: buscarNegocioAgrupable ya sabe encontrar el
+    // negocio por razón social aunque todavía no tengamos empresaId, así
+    // que no hace falta esperar a que la empresa termine de crearse
+    // para arrancar la búsqueda — se ahorra un viaje entero de ida y
+    // vuelta al backend en el caso de cliente realmente nuevo.
+    var crearEmpresaPromise = empresaId ? Promise.resolve(null) : fetch(GAS_URL, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'guardarEmpresa', razonSocial: empresaTexto, telefono: (document.getElementById('fi-telefono-destino')||{}).value || '' })
+    }).then(function(r){ return r.json(); });
+
+    var buscarPromise = fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'buscarNegocioAgrupable', empresaId: empresaId, razonSocial: empresaTexto, pipeline_id: pipelineElegido })
+    }).then(function(r){ return r.json(); });
+
+    var _resultadosParalelo = await Promise.all([crearEmpresaPromise, buscarPromise]);
+    var rEmp    = _resultadosParalelo[0];
+    var rBuscar = _resultadosParalelo[1];
+
+    if (rEmp && rEmp.ok && rEmp.id) {
+      empresaId = rEmp.id;
+      var nuevaEmpresa = { id: rEmp.id, razonSocial: empresaTexto, contactos: [] };
+      _empresaSeleccionadaFicha = nuevaEmpresa;
+      // La sumamos también al cache local — así, si se llama de nuevo
+      // esta función más adelante en la misma carga de página, la
+      // encuentra sin crear otra empresa duplicada.
+      if (Array.isArray(_empresasCacheFicha)) _empresasCacheFicha.push(nuevaEmpresa);
+    }
 
     if (rBuscar.ok && rBuscar.idCot) {
       var respApilar = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
@@ -657,6 +716,7 @@ async function _guardarSeguimientoVentas() {
         }) });
       var rApilar = await respApilar.json();
       if (!rApilar.ok) { if (elResultado) { elResultado.textContent = '⚠️ No se pudo apilar la ficha: ' + (rApilar.error||'error desconocido'); elResultado.style.color = '#f8961e'; } return; }
+      _negocioActualFicha = { idCot: rBuscar.idCot, razonSocial: empresaTexto };
       _mostrarResultadoConNegocio(elResultado, '📎 Ficha sumada al negocio existente de ' + empresaTexto + ' (' + rApilar.total + ' fichas enviadas)', '#06d6a0', rBuscar.idCot);
       return;
     }
@@ -692,6 +752,7 @@ async function _guardarSeguimientoVentas() {
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
     var r = await resp.json();
     if (!r.ok) { if (elResultado) { elResultado.textContent = '⚠️ No se pudo guardar el seguimiento: ' + (r.error||'error desconocido'); elResultado.style.color = '#f8961e'; } return; }
+    _negocioActualFicha = { idCot: r.idCot, razonSocial: empresaTexto };
     _mostrarResultadoConNegocio(elResultado, '✅ Guardado en Ventas — Cotización (50%) para ' + empresaTexto, '#06d6a0', r.idCot);
   } catch(e) {
     if (elResultado) { elResultado.textContent = '⚠️ Error de conexión al guardar el seguimiento.'; elResultado.style.color = '#f8961e'; }
