@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.07.30.2 (Regla de negocio: la opción "Leasing 36 meses (AR$)" del desplegable Forma de Pago se oculta/deshabilita si el total de lista con IVA no supera USD 15.000 — se recalcula en cada _render(). Si estaba seleccionada y deja de ser elegible (ej. al borrar un ítem), vuelve sola a Contado.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.01.2 (Fix bug reportado por Cristian: al reabrir un presupuesto en modalidad Contado, el sistema pisaba el % Descuento que el vendedor había editado a mano en un ítem puntual con el descuento automático de lista/contado — si ese automático daba negativo en algún ítem, encima INFLABA el precio en vez de bajarlo. Fix en dos capas: (1) _onCambiarFormaPago ahora respeta el descuento real de cada ítem si detecta que fue editado a mano (comparándolo contra el automático, funciona incluso después de guardar/reabrir); (2) _calcularItem nunca aplica un descuento negativo, clamp a 0 como red de seguridad. Mismo clamp aplicado en FotoMap.gs v137 y en cotizaciones.html al recalcular descuentoContadoOriginal.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -474,7 +474,7 @@ function _restaurarDraftYItemPendiente() {
       // Descuento refleje de entrada el precio de contado real del
       // catálogo. Queda visible y editable ahí mismo.
       var descuentoAuto = (precioLista > 0)
-        ? Math.round(((precioLista - precioContado) / precioLista) * 10000) / 100
+        ? Math.max(0, Math.round(((precioLista - precioContado) / precioLista) * 10000) / 100)
         : 0;
       ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: 1, descuento: descuentoAuto, descuentoContadoOriginal: descuentoAuto, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
     }
@@ -729,6 +729,13 @@ window._actualizarItem = function(id, campo, valor) {
   }
   else if (campo === 'moneda') { it[campo] = valor; }
   else { it[campo] = parseFloat(valor) || 0; }
+  // El campo Descuento es el único que, una vez tocado a mano por el
+  // vendedor, no debe volver a ser pisado por el recálculo automático
+  // de _onCambiarFormaPago() (ni al cambiar la modalidad ni al reabrir
+  // el presupuesto). Reportado por Cristian: editaba el Descuento real
+  // de un ítem y, al reabrir, el sistema se lo volvía a pisar con el
+  // descuento automático de lista/contado y las cuentas no cerraban.
+  if (campo === 'descuento') { it.descuentoEditadoManual = true; }
   _render();
 };
 window._toggleMonedaItem = function(id) {
@@ -810,7 +817,15 @@ function _fmtEn(n, moneda) {
 // cálculo.
 function _calcularItem(it) {
   var bruto = it.precio * it.cantidad;
-  var conDescuento = bruto * (1 - (it.descuento || 0) / 100);
+  // Clamp defensivo: un "Descuento" nunca puede ser negativo en el
+  // cálculo — si lo fuera (tipeado a mano por error, o porque el
+  // cálculo automático de lista/contado dio negativo en algún ítem
+  // con precios cargados al revés), en vez de SUMAR precio como
+  // pasaba antes, simplemente no se aplica ningún descuento. Reportado
+  // por Cristian: un descuento negativo terminaba inflando el total en
+  // vez de bajarlo.
+  var descuentoPct = Math.max(0, it.descuento || 0);
+  var conDescuento = bruto * (1 - descuentoPct / 100);
   var iva = conDescuento * (it.iva || 0) / 100;
   return { bruto:bruto, descontado:conDescuento, iva:iva, total:conDescuento + iva };
 }
@@ -1059,13 +1074,25 @@ function _renderModalidadesPago() {
 
 // Al cambiar la Forma de Pago: TLC 6/12/Leasing 36 → Descuento pasa a
 // 0% (precio de lista, sin descuentos) en todos los ítems. Contado →
-// vuelve a aplicar la fórmula real de contado. En los dos casos, el
-// vendedor puede después cambiar el % a mano si quiere — el próximo
-// cambio de modalidad lo vuelve a pisar con el valor que corresponda.
+// vuelve a aplicar la fórmula real de contado, PERO SOLO en los
+// ítems que nunca fueron tocados a mano — si el vendedor ya editó el
+// % Descuento de un ítem puntual, se respeta el valor real que está
+// cargado en esa celda, no se lo vuelve a pisar con el cálculo
+// automático de lista. Se detecta "editado a mano" de dos formas
+// (cualquiera de las dos alcanza): el flag descuentoEditadoManual
+// (vivo solo durante esta sesión de edición) y, más importante,
+// comparar el descuento actualmente cargado contra el que daría la
+// fórmula automática — si no coinciden, es porque en algún momento
+// alguien lo cambió a mano, incluso si eso pasó en una sesión previa
+// y se guardó así (ese dato SÍ viaja siempre, es el que persiste).
 window._onCambiarFormaPago = function() {
   var nueva = document.getElementById('cc-forma-pago').value;
   if (nueva === 'contado') {
-    ITEMS.forEach(function(it) { it.descuento = it.descuentoContadoOriginal || 0; });
+    ITEMS.forEach(function(it) {
+      var automatico = it.descuentoContadoOriginal || 0;
+      var yaEditadoAMano = it.descuentoEditadoManual || (Math.round((it.descuento || 0) * 100) !== Math.round(automatico * 100));
+      if (!yaEditadoAMano) it.descuento = automatico;
+    });
   } else {
     ITEMS.forEach(function(it) { it.descuento = 0; });
   }
