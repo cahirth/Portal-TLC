@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.08.01.2 (Fix de velocidad: 1) si el negocio ya se resolvió una vez en esta misma carga de página (WhatsApp y después Crear Negocio, o al revés), el segundo click va DIRECTO a apilar — 1 llamada al backend en vez de 3. 2) En el primer click con cliente nuevo, guardarEmpresa y buscarNegocioAgrupable ahora corren en paralelo en vez de uno atrás del otro. Reportado por Cristian: "delante del cliente, se hace mucho tiempo".) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.08.01.4 (Fix bug de ítems duplicados: el fix de velocidad anterior (ir directo a apilar en un 2do click sobre el mismo negocio) no distinguía "2do click = otro equipo" de "2do click = MISMA ficha de nuevo" — reportado por Cristian: "crea 2 items elegidos repetidos" al tocar Enviar WhatsApp y Crear Negocio para la misma ficha. Ahora un flag _fichaYaApiladaFicha corta el segundo apilado de la misma ficha antes de llamar al backend — apilarFichaTecnica en FotoMap.gs no deduplica, así que el corte tiene que hacerse del lado del front.) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -170,7 +170,7 @@
                 <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
                 Enviar por WhatsApp
             </a>
-            <button id="fi-btn-crear-negocio" class="btn-wsp btn-crear-negocio" onclick="_guardarSeguimientoVentas()">
+            <button id="fi-btn-crear-negocio" class="btn-wsp btn-crear-negocio" onclick="_guardarSeguimientoVentas('negocio')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
                     <path d="M12 5v14M5 12h14"/>
                 </svg>
@@ -298,6 +298,16 @@ window._onCambiarPipelineFicha = function(valor) {
 };
 var _empresaSeleccionadaFicha = null; // { id, razonSocial, telefono, contactos } | null (null = texto libre, empresa nueva)
 var _negocioActualFicha = null; // { idCot, razonSocial } | null — negocio ya resuelto en ESTA carga de página, para que un segundo click (WhatsApp + Crear Negocio) vaya directo a apilar sin repetir toda la búsqueda
+// v2026.08.02 — este equipo puntual ya se apiló una vez en ESTA carga
+// de página. apilarFichaTecnica en el backend agrega el ítem al
+// carrito sin chequear duplicados (es agnóstico, no sabe si ya está) —
+// antes eso no era un problema porque cada click repetía TODO el flujo
+// desde cero y no había forma clara de detectarlo del lado del front,
+// pero con el fix de velocidad (ir directo a apilar en el 2do click) un
+// segundo click sobre la MISMA ficha —vía WhatsApp y después Crear
+// Negocio, o al revés— apilaba el mismo equipo dos veces. Reportado
+// por Cristian: "crea 2 items elegidos repetidos".
+var _fichaYaApiladaFicha = false;
 var _contactoSeleccionadoFicha = null; // { nombre, telefono } | null
 
 function _esc(s) { var d=document.createElement('div'); d.textContent=String(s==null?'':s); return d.innerHTML; }
@@ -593,26 +603,75 @@ document.addEventListener('click', function(ev) {
   if (cont && input && ev.target !== input && !cont.contains(ev.target)) cont.style.display = 'none';
 });
 
+// Recuerda desde dónde se disparó el guardado en Ventas ('whatsapp' o
+// 'negocio') para poder diferenciar el texto del popup — pedido por
+// Cristian: "negocio creado" o "negocio creado + WhatsApp enviado".
+var _origenGuardadoActual = null;
+
+// Popup/toast fijo arriba de la pantalla — pedido por Cristian: el
+// mensajito chico al pie ("Guardado en Ventas...") no se notaba lo
+// suficiente estando delante de un cliente. Se auto-oculta solo, y
+// tiene una X para cerrarlo a mano antes si hace falta.
+function _mostrarPopupToast(titulo, subtitulo, idCot) {
+  var el = document.getElementById('fi-popup-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fi-popup-toast';
+    el.style.cssText = 'position:fixed; top:16px; left:50%; transform:translateX(-50%) translateY(-140%); ' +
+      'z-index:9999; background:#06d6a0; color:#fff; padding:14px 20px; border-radius:12px; ' +
+      'box-shadow:0 10px 30px rgba(0,0,0,.25); max-width:92vw; display:flex; align-items:center; gap:12px; ' +
+      'transition:transform .25s ease-out; font-family:inherit;';
+    document.body.appendChild(el);
+  }
+  var linkNegocio = idCot ? ('https://ir.tlcsrl.com.ar/cotizaciones.html?id=' + encodeURIComponent(idCot)) : '';
+  el.innerHTML =
+    '<div style="flex:1;min-width:0;">' +
+      '<div style="font-weight:800;font-size:14px;line-height:1.3;">' + _esc(titulo) + '</div>' +
+      (subtitulo ? '<div style="font-size:12px;opacity:.9;margin-top:2px;">' + _esc(subtitulo) + '</div>' : '') +
+    '</div>' +
+    (linkNegocio ? '<a href="' + linkNegocio + '" target="_blank" rel="noopener" style="flex-shrink:0;color:#fff;font-weight:700;font-size:13px;text-decoration:underline;white-space:nowrap;">Ver negocio →</a>' : '') +
+    '<button onclick="document.getElementById(\'fi-popup-toast\').style.transform=\'translateX(-50%) translateY(-140%)\'" ' +
+      'style="flex-shrink:0;background:transparent;border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;opacity:.85;">✕</button>';
+
+  // Forzar reflow para que la transición de entrada se vea siempre,
+  // incluso si el toast anterior todavía estaba visible.
+  el.style.transform = 'translateX(-50%) translateY(-140%)';
+  void el.offsetWidth;
+  el.style.transform = 'translateX(-50%) translateY(0)';
+
+  clearTimeout(_popupToastTimer);
+  _popupToastTimer = setTimeout(function() {
+    el.style.transform = 'translateX(-50%) translateY(-140%)';
+  }, 5000);
+}
+var _popupToastTimer = null;
+
 // Crea (si hace falta) la empresa y un negocio nuevo en Ventas — a 50%
 // ("Cotización"), con este equipo como único ítem — para que quede
 // registro de seguimiento sin frenar el envío por WhatsApp (se dispara
 // en paralelo, después de abrir WhatsApp, nunca antes).
 //
-// Muestra el mensaje de resultado del guardado en Ventas, con un botón
-// "Ver negocio →" al lado que abre directo el detalle en cotizaciones.html
-// (deep-link vía ?id=, ya soportado ahí por _abrirDetallePorIdEnUrl) —
-// pedido por Cristian para poder chequear al toque lo que se acaba de
+// Muestra el mensaje de resultado del guardado en Ventas (texto chico
+// al pie + popup arriba de la pantalla), con un botón "Ver negocio →"
+// que abre directo el detalle en cotizaciones.html (deep-link vía
+// ?id=, ya soportado ahí por _abrirDetallePorIdEnUrl) — pedido por
+// Cristian para poder chequear al toque lo que se acaba de
 // crear/apilar sin tener que ir a buscarlo a mano en el Kanban.
-function _mostrarResultadoConNegocio(elResultado, mensaje, color, idCot) {
-  if (!elResultado) return;
-  var linkNegocio = idCot ? ('https://ir.tlcsrl.com.ar/cotizaciones.html?id=' + encodeURIComponent(idCot)) : '';
-  elResultado.innerHTML = _esc(mensaje) + (linkNegocio
-    ? ' <a href="' + linkNegocio + '" target="_blank" rel="noopener" ' +
-      'style="margin-left:6px;color:#3a86ff;font-weight:700;text-decoration:none;white-space:nowrap;">Ver negocio →</a>'
-    : '');
-  elResultado.style.color = color;
+function _mostrarResultadoConNegocio(elResultado, mensaje, color, idCot, esNegocioNuevo) {
+  if (elResultado) {
+    var linkNegocio = idCot ? ('https://ir.tlcsrl.com.ar/cotizaciones.html?id=' + encodeURIComponent(idCot)) : '';
+    elResultado.innerHTML = _esc(mensaje) + (linkNegocio
+      ? ' <a href="' + linkNegocio + '" target="_blank" rel="noopener" ' +
+        'style="margin-left:6px;color:#3a86ff;font-weight:700;text-decoration:none;white-space:nowrap;">Ver negocio →</a>'
+      : '');
+    elResultado.style.color = color;
+  }
+  var titulo = esNegocioNuevo ? '✅ Negocio creado' : '📎 Ficha sumada al negocio';
+  if (_origenGuardadoActual === 'whatsapp') titulo += ' + WhatsApp enviado';
+  _mostrarPopupToast(titulo, mensaje.replace(/^[✅📎]\s*/, ''), idCot);
 }
-async function _guardarSeguimientoVentas() {
+async function _guardarSeguimientoVentas(origen) {
+  _origenGuardadoActual = origen || null;
   var elResultado = document.getElementById('fi-lead-resultado');
   var empresaTexto = (document.getElementById('fi-empresa-buscar') || {}).value || '';
   if (!empresaTexto.trim()) return; // sin empresa cargada, no se guarda nada — la ficha se compartió igual
@@ -629,6 +688,16 @@ async function _guardarSeguimientoVentas() {
     // resolvimos el negocio una vez en esta carga de página, vamos
     // DIRECTO a apilar — 1 sola llamada en vez de 3.
     if (_negocioActualFicha && _negocioActualFicha.razonSocial === empresaTexto) {
+      // Si esta misma ficha YA se apiló en esta carga de página (ej. se
+      // tocó "Enviar WhatsApp" y ahora se toca "Crear Negocio", o al
+      // revés), no volvemos a pegarle al backend — se duplicaría el
+      // equipo en el carrito. Solo mostramos de nuevo la confirmación.
+      if (_fichaYaApiladaFicha) {
+        var tituloRepetido = '📎 Ya estaba sumada al negocio de ' + empresaTexto;
+        if (origen === 'whatsapp') tituloRepetido += ' + WhatsApp enviado';
+        _mostrarResultadoConNegocio(elResultado, tituloRepetido, '#06d6a0', _negocioActualFicha.idCot, false);
+        return;
+      }
       var respApilarDirecto = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({
           accion: 'apilarFichaTecnica',
@@ -643,7 +712,8 @@ async function _guardarSeguimientoVentas() {
         }) });
       var rApilarDirecto = await respApilarDirecto.json();
       if (rApilarDirecto.ok) {
-        _mostrarResultadoConNegocio(elResultado, '📎 Ficha sumada al negocio de ' + empresaTexto + ' (' + rApilarDirecto.total + ' fichas enviadas)', '#06d6a0', _negocioActualFicha.idCot);
+        _fichaYaApiladaFicha = true;
+        _mostrarResultadoConNegocio(elResultado, '📎 Ficha sumada al negocio de ' + empresaTexto + ' (' + rApilarDirecto.total + ' fichas enviadas)', '#06d6a0', _negocioActualFicha.idCot, false);
         return;
       }
       // Si por lo que sea falló (ej. alguien borró el negocio mientras
@@ -717,7 +787,8 @@ async function _guardarSeguimientoVentas() {
       var rApilar = await respApilar.json();
       if (!rApilar.ok) { if (elResultado) { elResultado.textContent = '⚠️ No se pudo apilar la ficha: ' + (rApilar.error||'error desconocido'); elResultado.style.color = '#f8961e'; } return; }
       _negocioActualFicha = { idCot: rBuscar.idCot, razonSocial: empresaTexto };
-      _mostrarResultadoConNegocio(elResultado, '📎 Ficha sumada al negocio existente de ' + empresaTexto + ' (' + rApilar.total + ' fichas enviadas)', '#06d6a0', rBuscar.idCot);
+      _fichaYaApiladaFicha = true;
+      _mostrarResultadoConNegocio(elResultado, '📎 Ficha sumada al negocio existente de ' + empresaTexto + ' (' + rApilar.total + ' fichas enviadas)', '#06d6a0', rBuscar.idCot, false);
       return;
     }
 
@@ -753,7 +824,8 @@ async function _guardarSeguimientoVentas() {
     var r = await resp.json();
     if (!r.ok) { if (elResultado) { elResultado.textContent = '⚠️ No se pudo guardar el seguimiento: ' + (r.error||'error desconocido'); elResultado.style.color = '#f8961e'; } return; }
     _negocioActualFicha = { idCot: r.idCot, razonSocial: empresaTexto };
-    _mostrarResultadoConNegocio(elResultado, '✅ Guardado en Ventas — Cotización (50%) para ' + empresaTexto, '#06d6a0', r.idCot);
+    _fichaYaApiladaFicha = true;
+    _mostrarResultadoConNegocio(elResultado, '✅ Guardado en Ventas — Cotización (50%) para ' + empresaTexto, '#06d6a0', r.idCot, true);
   } catch(e) {
     if (elResultado) { elResultado.textContent = '⚠️ Error de conexión al guardar el seguimiento.'; elResultado.style.color = '#f8961e'; }
   }
@@ -771,7 +843,7 @@ function _compartirFichaWsp(e) {
     // El guardado en Ventas va DESPUÉS de abrir WhatsApp — si fuera
     // antes (con await), el navegador podría bloquear la ventana de
     // WhatsApp por no considerarla ya un click directo del usuario.
-    if (_sesionVendedor) _guardarSeguimientoVentas();
+    if (_sesionVendedor) _guardarSeguimientoVentas('whatsapp');
 }
 
 _cargarFicha();
