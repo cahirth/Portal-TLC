@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.08.02.2 (Fusión automática de ítems duplicados: al cargar un presupuesto, o al agregar un ítem que ya está en la lista (mismo nombre+precio+moneda), se suma la cantidad en vez de crear una línea nueva idéntica. Pedido por Cristian con captura de un presupuesto con 3 líneas iguales del mismo equipo — corrige automáticamente al reabrir, no hace falta borrar nada a mano.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.02.3 (Fix a la fusión de duplicados: fusionaba bien pero se quedaba con el descuento del PRIMER ítem encontrado, que en la práctica solía ser justo el viejo con 0% (residuo de un bug ya corregido) — perdía el descuento real de Contado al fusionar. Ahora se queda con el duplicado que tenga el mayor descuentoContadoOriginal como base. Reportado por Cristian: "fusiona, aunque no respeta la condición de contado... no carga los descuentos".) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -502,10 +502,7 @@ function _restaurarDraftYItemPendiente() {
 
 // Compara dos ítems por nombre (sin importar mayúsc./espacios), precio
 // unitario y moneda — si coinciden, se consideran "el mismo equipo" a
-// los fines de fusionar cantidades. El % Descuento y el IVA NO forman
-// parte de la comparación a propósito: si hay duplicados viejos con
-// descuentos inconsistentes (residuo de bugs previos), igual se
-// fusionan — se queda con el descuento del primero que aparece.
+// los fines de fusionar cantidades.
 function _mismoEquipo(a, b) {
   var nombreA = String(a.descripcion || '').trim().toLowerCase();
   var nombreB = String(b.descripcion || '').trim().toLowerCase();
@@ -516,18 +513,24 @@ function _mismoEquipo(a, b) {
 }
 
 function _fusionarDuplicados() {
-  var nuevos = [];
-  var fusionados = 0;
+  // Al fusionar, el % Descuento y el IVA NO se promedian ni se toman
+  // del primero que aparece — se elige como base el duplicado con
+  // MAYOR descuentoContadoOriginal. Motivo: cuando hay duplicados con
+  // descuentos inconsistentes es casi siempre porque uno viejo quedó
+  // en 0% por un bug ya corregido (apilarFichaTecnica/ficha-equipo.html
+  // no calculaban el descuento real todavía) y los más nuevos sí
+  // traen el % real de la lista de precios — quedarse con el 0% por
+  // "ser el primero" perdía el descuento real al fusionar. Reportado
+  // por Cristian: "fusiona, pero no carga los descuentos".
+  var grupos = [];
   ITEMS.forEach(function(it) {
-    var existente = nuevos.find(function(x){ return _mismoEquipo(x, it); });
-    if (existente) {
-      existente.cantidad = (existente.cantidad || 1) + (it.cantidad || 1);
-      fusionados++;
-    } else {
-      nuevos.push(it);
-    }
+    var grupo = grupos.find(function(g){ return _mismoEquipo(g.base, it); });
+    if (!grupo) { grupos.push({ base: it, cantidad: it.cantidad || 1 }); return; }
+    grupo.cantidad += (it.cantidad || 1);
+    if ((it.descuentoContadoOriginal || 0) > (grupo.base.descuentoContadoOriginal || 0)) grupo.base = it;
   });
-  ITEMS = nuevos;
+  var fusionados = ITEMS.length - grupos.length;
+  ITEMS = grupos.map(function(g){ g.base.cantidad = g.cantidad; return g.base; });
   return fusionados;
 }
 
