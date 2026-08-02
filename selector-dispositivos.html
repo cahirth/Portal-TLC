@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.08.02.1 (Nuevo: widget flotante "Asistente IA — Catálogo" (💬) igual que el de Negocios, pero con dos tools propias: buscarProducto (precio/stock por texto o voz) y crearOApilarNegocio (carga un negocio para un cliente con el equipo, preguntando el cliente si no se lo dijeron). Comparte la misma Cloud Function asistenteIA — no reimplementa lógica de negocio, le pega a las mismas acciones de FotoMap.gs que ya usa ficha-equipo.html. Pedido por Cristian.) -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.02.2 (Asistente IA: mismo fix que cotizaciones.html — historial de chat con la pregunta como burbuja arriba de la respuesta, en vez de una sola caja que se pisa. También se corrigió que el widget usaba una variable inexistente (currentUserNombre) para el nombre del vendedor.) -->
 
 <html lang="es">
 <head>
@@ -5802,8 +5802,7 @@ try {
 </script>
 <!-- ════════════════════════════════════════════════════════════
      ASISTENTE IA — widget flotante (Cloud Function + Gemini)
-     v2026.08.02 — versión para el catálogo: precio/stock de
-     equipos y crear/apilar negocios por texto o voz
+     v2026.08.01 — primera versión. Preguntá en texto o por voz
      cómo viene un evento/pipeline: totales, equipos más pedidos,
      leads fríos sin seguimiento hace más de 48hs.
      IMPORTANTE: reemplazar ASISTENTE_IA_URL de acá abajo por la URL
@@ -5830,7 +5829,11 @@ try {
     display: flex; align-items: center; justify-content: space-between;
   }
   #ia-panel-body { padding: 14px 16px; overflow-y: auto; flex: 1; font-size: 13px; color: #0f172a; }
-  #ia-respuesta { background: #f1f5f9; border-radius: 10px; padding: 12px; margin-top: 10px; line-height: 1.5; white-space: pre-wrap; }
+  #ia-historial { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  .ia-burbuja { border-radius: 12px; padding: 10px 14px; line-height: 1.5; white-space: pre-wrap; max-width: 88%; }
+  .ia-burbuja-pregunta { align-self: flex-end; background: #3a86ff; color: #fff; border-bottom-right-radius: 3px; }
+  .ia-burbuja-respuesta { align-self: flex-start; background: #f1f5f9; color: #0f172a; border-bottom-left-radius: 3px; }
+  .ia-burbuja-respuesta.ia-pensando { color: #64748b; font-style: italic; }
   #ia-panel-footer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #e2e8f0; }
   #ia-input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; outline: none; }
   #ia-btn-mic, #ia-btn-enviar {
@@ -5855,8 +5858,8 @@ try {
     <button onclick="_iaLeerEnVozAlta('Hola, así sueno yo.')" style="font-size:11px; padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer; white-space:nowrap;">Probar</button>
   </div>
   <div id="ia-panel-body">
-    <div style="color:#64748b;">Preguntame precio o stock de un equipo — ej. "¿Cuánto sale el Huvitz HVS-1?" — o pedime que lo cargue en un negocio, ej. "Cargalo para 20 de Junio".</div>
-    <div id="ia-respuesta" style="display:none;"></div>
+    <div id="ia-hint" style="color:#64748b;">Preguntame precio o stock de un equipo — ej. "¿Cuánto sale el Huvitz HVS-1?" — o pedime que lo cargue en un negocio, ej. "Cargalo para 20 de Junio".</div>
+    <div id="ia-historial"></div>
   </div>
   <div id="ia-panel-footer">
     <input type="text" id="ia-input" placeholder="Escribí o dictá tu pregunta..." onkeydown="if(event.key==='Enter') _iaEnviarPregunta();">
@@ -5879,10 +5882,29 @@ async function _iaEnviarPregunta() {
   const pregunta = (elInput.value || '').trim();
   if (!pregunta) return;
 
-  const elResp = document.getElementById('ia-respuesta');
-  elResp.style.display = 'block';
+  const elHint = document.getElementById('ia-hint');
+  const elHist = document.getElementById('ia-historial');
+  if (elHint) elHint.style.display = 'none';
+
+  // Burbuja de la pregunta (derecha) — se agrega siempre, sea cual
+  // sea el resultado. Pedido por Cristian: "mostrar la pregunta
+  // arriba en el chat", para que quede como un chat de verdad y no
+  // solo la última respuesta pisando a la anterior.
+  const elPregunta = document.createElement('div');
+  elPregunta.className = 'ia-burbuja ia-burbuja-pregunta';
+  elPregunta.textContent = pregunta;
+  elHist.appendChild(elPregunta);
+
+  // Burbuja de la respuesta (izquierda) — arranca en "Pensando..." y
+  // se completa cuando llega la respuesta real, sin crear una burbuja
+  // nueva (mismo elemento).
+  const elResp = document.createElement('div');
+  elResp.className = 'ia-burbuja ia-burbuja-respuesta ia-pensando';
   elResp.textContent = '⏳ Pensando...';
+  elHist.appendChild(elResp);
+
   elInput.value = '';
+  elHist.scrollIntoView({ block: 'end' });
 
   try {
     const vendedorEmail = (currentUser && (currentUser.email || currentUser.username)) || '';
@@ -5893,6 +5915,7 @@ async function _iaEnviarPregunta() {
       body: JSON.stringify({ pregunta: pregunta, vendedorEmail: vendedorEmail, vendedorNombre: vendedorNombre }),
     });
     const r = await resp.json();
+    elResp.classList.remove('ia-pensando');
     if (!r.ok) {
       elResp.textContent = '⚠️ ' + (r.error || 'No se pudo consultar al asistente.');
       return;
@@ -5900,6 +5923,7 @@ async function _iaEnviarPregunta() {
     elResp.textContent = r.respuesta;
     _iaLeerEnVozAlta(r.respuesta);
   } catch (e) {
+    elResp.classList.remove('ia-pensando');
     elResp.textContent = '⚠️ Error de conexión con el asistente.';
   }
 }
