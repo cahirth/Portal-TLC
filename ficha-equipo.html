@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.08.01.4 (Fix bug de ítems duplicados: el fix de velocidad anterior (ir directo a apilar en un 2do click sobre el mismo negocio) no distinguía "2do click = otro equipo" de "2do click = MISMA ficha de nuevo" — reportado por Cristian: "crea 2 items elegidos repetidos" al tocar Enviar WhatsApp y Crear Negocio para la misma ficha. Ahora un flag _fichaYaApiladaFicha corta el segundo apilado de la misma ficha antes de llamar al backend — apilarFichaTecnica en FotoMap.gs no deduplica, así que el corte tiene que hacerse del lado del front.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.08.02.1 (Fix bug de descuento 0% reportado por Cristian con captura: el ítem creado por "Crear Negocio" mandaba descuento:0 fijo en vez de calcular la diferencia real entre Precio Lista y Precio Contado del catálogo. Mismo fix aplicado en FotoMap.gs v139 para el camino "Enviar WhatsApp"/apilar a negocio existente, que tenía el mismo bug del lado del backend.) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -809,7 +809,16 @@ async function _guardarSeguimientoVentas(origen) {
         precio: _fichaPrecioListaActual,
         precioContado: _fichaPrecioContadoActual || _fichaPrecioListaActual, // ← v2026.07.30 — antes no viajaba, el Descuento en modalidad Contado quedaba siempre en 0%
         cantidad: 1,
-        descuento: 0,
+        // v2026.08.02 — antes iba fijo en 0: el ítem creado desde la
+        // Ficha Técnica nunca traía el descuento real de Contado
+        // (diferencia entre Precio Lista y Precio Contado del catálogo),
+        // a diferencia de un ítem agregado por selector-dispositivos.html
+        // que sí lo calculaba. Reportado por Cristian con captura: el
+        // ítem de la ficha quedaba con Descuento 0% mientras el resto
+        // del presupuesto sí traía su % real.
+        descuento: (_fichaPrecioListaActual > 0)
+          ? Math.max(0, Math.round(((_fichaPrecioListaActual - (_fichaPrecioContadoActual || _fichaPrecioListaActual)) / _fichaPrecioListaActual) * 10000) / 100)
+          : 0,
         iva: 10.5,
         moneda: 'USD',
         foto: fotoUrl(_fichaFotoRawActual) || '',
