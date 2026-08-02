@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.02.6 (Asistente IA: selector de voz para la lectura en voz alta — lista las voces en español disponibles en el celular/navegador, se acuerda de la elegida (localStorage), y botón "Probar" para escucharla sin mandar una pregunta real. Pedido por Cristian: "funciona con voz en el cel, le puedo cambiar la voz?".) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.02.7 (Fix: el widget nunca mandaba vendedorNombre a la Cloud Function (solo vendedorEmail) — no afectaba consultarKpisEvento, pero sí a crearOApilarNegocio (nuevo), que sin nombre caía al email como "vendedor" del negocio. Ahora manda los dos.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -4040,10 +4040,11 @@ async function _iaEnviarPregunta() {
 
   try {
     const vendedorEmail = (currentUser && (currentUser.email || currentUser.username)) || '';
+    const vendedorNombre = currentUserNombre || (currentUser && currentUser.name) || '';
     const resp = await fetch(ASISTENTE_IA_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pregunta: pregunta, vendedorEmail: vendedorEmail }),
+      body: JSON.stringify({ pregunta: pregunta, vendedorEmail: vendedorEmail, vendedorNombre: vendedorNombre }),
     });
     const r = await resp.json();
     if (!r.ok) {
