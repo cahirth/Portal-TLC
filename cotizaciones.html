@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.02.3 (Fix: las fotos de equipos arriba del detalle NO se fusionaban aunque la lista de Equipos abajo sí (fix anterior solo tocó esa sección) — quedaban inconsistentes entre sí, mostrando fotos repetidas. Se extrajo la fusión a una función compartida (_fusionarCarritoParaMostrar) y ahora la usan las dos secciones por igual. Reportado por Cristian con captura.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.02.4 (Mismo fix que presupuesto-editor.html: la fusión para mostrar comparaba el nombre completo, ahora compara solo el nombre base para detectar el mismo equipo aunque tenga la descripción de catálogo pegada en algún duplicado.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2195,23 +2195,35 @@ function _pcProcesarItemPendiente() {
 }
 
 // Fusiona ítems duplicados de un carrito PARA MOSTRAR (mismo criterio
-// que presupuesto-editor.html: nombre+precioLista+moneda, sumando
-// cantidad). El dato de fondo en /carrito puede seguir teniendo líneas
-// repetidas hasta que se pase por "Crear/Modificar Presupuesto" y se
-// guarde — ahí sí se persiste fusionado — pero se usa esta versión
-// fusionada en TODOS los lugares donde el detalle del negocio muestra
-// el carrito (fotos, lista de equipos), para que no se vea
-// inconsistente entre una sección y otra. Se prefiere como base el
-// ítem con mayor descuentoValor entre los duplicados (el de 0% suele
-// ser residuo de un bug ya corregido, no el real).
+// que presupuesto-editor.html: nombre BASE+precioLista+moneda, sumando
+// cantidad). Se compara solo el nombre base (antes de " — ") porque el
+// mismo equipo puede tener el nombre guardado "pelado" o con la
+// descripción de catálogo pegada según de dónde se haya agregado —
+// comparar el string completo no detectaba el duplicado. El dato de
+// fondo en /carrito puede seguir teniendo líneas repetidas hasta que
+// se pase por "Crear/Modificar Presupuesto" y se guarde — ahí sí se
+// persiste fusionado — pero se usa esta versión fusionada en TODOS los
+// lugares donde el detalle del negocio muestra el carrito (fotos,
+// lista de equipos), para que no se vea inconsistente entre una
+// sección y otra. Se prefiere como base el ítem con mayor
+// descuentoValor entre los duplicados (el de 0% suele ser residuo de
+// un bug ya corregido, no el real); en caso de empate, el de nombre
+// más completo.
+function _nombreBaseEquipo(nombre) {
+    const s = String(nombre || '').trim();
+    const idx = s.indexOf(' — ');
+    return (idx !== -1 ? s.slice(0, idx) : s).trim().toLowerCase();
+}
 function _fusionarCarritoParaMostrar(lista) {
     const grupos = [];
     (lista || []).forEach(function(it) {
-        const clave = String(it.nombre||'').trim().toLowerCase() + '|' + Math.round((it.precioLista||0)*100) + '|' + (it.moneda||'USD');
+        const clave = _nombreBaseEquipo(it.nombre) + '|' + Math.round((it.precioLista||0)*100) + '|' + (it.moneda||'USD');
         const existente = grupos.find(function(g){ return g.clave === clave; });
         if (!existente) { grupos.push({ clave: clave, base: it, cantidad: it.cantidad||1 }); return; }
         existente.cantidad += (it.cantidad || 1);
-        if ((it.descuentoValor||0) > (existente.base.descuentoValor||0)) existente.base = it;
+        const descIt = it.descuentoValor||0, descBase = existente.base.descuentoValor||0;
+        const esMejor = descIt > descBase || (descIt === descBase && String(it.nombre||'').length > String(existente.base.nombre||'').length);
+        if (esMejor) existente.base = it;
     });
     return grupos.map(function(g){ return Object.assign({}, g.base, { cantidad: g.cantidad }); });
 }

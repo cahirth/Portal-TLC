@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.08.02.4 (Fix real a la fusión: mi fix anterior comparaba por descuentoContadoOriginal para elegir el duplicado base, pero ese campo se recalcula fresco desde el catálogo en cada apertura y da el MISMO valor para todos los duplicados — nunca detectaba diferencia y se quedaba con el primero, que en la práctica era justo el viejo con 0%. Ahora compara por el descuento REAL guardado en cada duplicado (it.descuento), que sí difiere entre el viejo (0%) y los correctos (15,99%). Reportado por Cristian con captura: "fusiona, pero no carga los descuentos".) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.02.5 (Fix: la fusión comparaba el nombre COMPLETO del ítem, pero el mismo equipo puede llegar con dos formatos distintos de descripción — "pelado" si ya estaba en el carrito del negocio, o con la descripción de catálogo pegada ("— Autorrefractómetro...") si se agregó por "+ Agregar ítem" — así que el string nunca matcheaba exacto y no se fusionaban. Ahora se compara solo el nombre base (antes de " — "). También corregido en el chequeo que evita crear un duplicado al agregar un ítem que ya está en la lista. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -500,12 +500,26 @@ function _restaurarDraftYItemPendiente() {
   if (fusionados > 0) console.log('Se fusionaron ' + fusionados + ' ítem(s) duplicado(s) al cargar el presupuesto.');
 }
 
-// Compara dos ítems por nombre (sin importar mayúsc./espacios), precio
-// unitario y moneda — si coinciden, se consideran "el mismo equipo" a
-// los fines de fusionar cantidades.
+// Compara dos ítems por nombre BASE (sin importar mayúsc./espacios),
+// precio unitario y moneda — si coinciden, se consideran "el mismo
+// equipo" a los fines de fusionar cantidades. Se compara solo el
+// nombre base (lo que hay antes de " — ") y no la descripción
+// combinada completa, porque el mismo equipo puede llegar con dos
+// formatos de descripción distintos según de dónde se haya agregado:
+// un ítem que ya estaba en el carrito del negocio llega con nombre
+// "pelado" (ej. "ELI EZER ERK-9100"), mientras que uno agregado por
+// "+ Agregar ítem" (bridge de selector-dispositivos.html) llega con
+// la descripción de catálogo pegada (ej. "ELI EZER ERK-9100 —
+// Autorrefractómetro..."). Comparar el string completo nunca
+// matcheaba y no se fusionaban. Reportado por Cristian con captura.
+function _nombreBaseEquipo(descripcion) {
+  var s = String(descripcion || '').trim();
+  var idx = s.indexOf(' — ');
+  return (idx !== -1 ? s.slice(0, idx) : s).trim().toLowerCase();
+}
 function _mismoEquipo(a, b) {
-  var nombreA = String(a.descripcion || '').trim().toLowerCase();
-  var nombreB = String(b.descripcion || '').trim().toLowerCase();
+  var nombreA = _nombreBaseEquipo(a.descripcion);
+  var nombreB = _nombreBaseEquipo(b.descripcion);
   if (!nombreA || nombreA !== nombreB) return false;
   if (Math.round((a.precio || 0) * 100) !== Math.round((b.precio || 0) * 100)) return false;
   if ((a.moneda || 'USD') !== (b.moneda || 'USD')) return false;
@@ -521,14 +535,19 @@ function _fusionarDuplicados() {
   // que se reabre el negocio — da el MISMO valor para los 5 duplicados
   // aunque uno tenga guardado un descuento real distinto (0% viejo vs
   // 15,99% real). Comparar por ese campo nunca detectaba diferencia y
-  // se quedaba siempre con el primero (justo el 0% viejo). Reportado
-  // por Cristian con captura: "fusiona, pero no carga los descuentos".
+  // se quedaba siempre con el primero (justo el 0% viejo). En caso de
+  // empate en el descuento, se prefiere la descripción más completa
+  // (la que trae el detalle del catálogo), para no perder ese texto
+  // al fusionar.
   var grupos = [];
   ITEMS.forEach(function(it) {
     var grupo = grupos.find(function(g){ return _mismoEquipo(g.base, it); });
     if (!grupo) { grupos.push({ base: it, cantidad: it.cantidad || 1 }); return; }
     grupo.cantidad += (it.cantidad || 1);
-    if ((it.descuento || 0) > (grupo.base.descuento || 0)) grupo.base = it;
+    var descIt = it.descuento || 0, descBase = grupo.base.descuento || 0;
+    var esMejor = descIt > descBase ||
+      (descIt === descBase && (it.descripcion || '').length > (grupo.base.descripcion || '').length);
+    if (esMejor) grupo.base = it;
   });
   var fusionados = ITEMS.length - grupos.length;
   ITEMS = grupos.map(function(g){ g.base.cantidad = g.cantidad; return g.base; });
