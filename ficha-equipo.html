@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.08.02.1 (Fix bug de descuento 0% reportado por Cristian con captura: el ítem creado por "Crear Negocio" mandaba descuento:0 fijo en vez de calcular la diferencia real entre Precio Lista y Precio Contado del catálogo. Mismo fix aplicado en FotoMap.gs v139 para el camino "Enviar WhatsApp"/apilar a negocio existente, que tenía el mismo bug del lado del backend.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.08.02.2 (Header fijo: el logo + botón volver ahora quedan siempre visibles arriba de la pantalla al hacer scroll vertical, en vez de desaparecer con el resto del contenido. Pedido por Cristian con captura marcando la zona a inmovilizar.) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -19,11 +19,25 @@
         * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
         body { background:var(--bg-body); color:var(--text-dark); padding:32px 16px; display:flex; justify-content:center; }
         .wrap { width:100%; max-width:760px; }
+        /* Header fijo (logo + botón volver) — pedido por Cristian: que
+           siempre esté visible al hacer scroll vertical, no solo en la
+           carga inicial. padding-top del wrap compensa el espacio que
+           deja de ocupar el header al pasar a position:fixed. */
+        #ficha-wrap { padding-top: 74px; }
+        @media (max-width: 480px) { #ficha-wrap { padding-top: 58px; } }
 
         .card { background:var(--bg-card); border:1px solid var(--border-color); border-radius:14px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,.05); margin-bottom:16px; }
         .card-pad { padding:24px; }
 
-        .header-top { display:flex; justify-content:space-between; align-items:center; padding:16px 24px; border-bottom:1px solid var(--border-color); }
+        .header-top {
+            display:flex; justify-content:space-between; align-items:center; padding:16px 24px;
+            border-bottom:1px solid var(--border-color);
+            position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+            background: var(--bg-card);
+            max-width: 760px; margin: 0 auto;
+            border-radius: 14px 14px 0 0;
+        }
+        @media (max-width: 480px) { .header-top { padding:10px 16px; border-radius:0; } }
         .logo-img { height:34px; }
         .tag-ficha { font-size:11px; font-weight:700; color:var(--text-muted); background:var(--bg-muted); padding:5px 12px; border-radius:20px; }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.08.02.1 (Pedido por Cristian: elegir "Contado" en el desplegable a mano SIEMPRE reaplica el descuento real de lista a todos los ítems, incluso yendo y viniendo desde TLC 6/12 (que resetea a 0%) — antes, la protección contra pisar ediciones manuales (v2026.08.01.2) también bloqueaba este reaplicado real. Se separó _onCambiarFormaPago en dos modos: toggle real del dropdown → siempre reaplica y limpia el flag de edición manual; carga inicial de la página o vuelta automática por regla de negocio (leasing36 dejó de ser elegible) → sigue respetando ediciones ya guardadas.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.02.2 (Fusión automática de ítems duplicados: al cargar un presupuesto, o al agregar un ítem que ya está en la lista (mismo nombre+precio+moneda), se suma la cantidad en vez de crear una línea nueva idéntica. Pedido por Cristian con captura de un presupuesto con 3 líneas iguales del mismo equipo — corrige automáticamente al reabrir, no hace falta borrar nada a mano.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -476,10 +476,59 @@ function _restaurarDraftYItemPendiente() {
       var descuentoAuto = (precioLista > 0)
         ? Math.max(0, Math.round(((precioLista - precioContado) / precioLista) * 10000) / 100)
         : 0;
-      ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: 1, descuento: descuentoAuto, descuentoContadoOriginal: descuentoAuto, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
+      // Antes de agregar el ítem nuevo, ¿ya existe uno igual en la
+      // lista? (mismo nombre+precio+moneda — típico cuando se envía la
+      // misma ficha técnica más de una vez, o se agrega el mismo
+      // equipo dos veces por error). Si existe, no se crea una línea
+      // nueva: se le suma 1 a la cantidad del que ya está.
+      var iguales = ITEMS.filter(function(x){ return _mismoEquipo(x, { descripcion: descripcionCombinada, precio: precioLista, moneda: 'USD' }); });
+      if (iguales.length) {
+        iguales[0].cantidad = (iguales[0].cantidad || 1) + 1;
+      } else {
+        ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: 1, descuento: descuentoAuto, descuentoContadoOriginal: descuentoAuto, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
+      }
     }
   } catch (e) { console.warn('Error aplicando ítem pendiente:', e); }
   sessionStorage.removeItem('tlc_item_pendiente_presupuesto');
+
+  // Fusiona duplicados que ya vinieran cargados en el negocio (ej. la
+  // misma ficha técnica apilada más de una vez desde ficha-equipo.html
+  // antes del fix de esa duplicación) — se suman las cantidades en un
+  // solo ítem en vez de mostrar varias líneas idénticas. Pedido por
+  // Cristian con captura de un presupuesto con 3 líneas iguales.
+  var fusionados = _fusionarDuplicados();
+  if (fusionados > 0) console.log('Se fusionaron ' + fusionados + ' ítem(s) duplicado(s) al cargar el presupuesto.');
+}
+
+// Compara dos ítems por nombre (sin importar mayúsc./espacios), precio
+// unitario y moneda — si coinciden, se consideran "el mismo equipo" a
+// los fines de fusionar cantidades. El % Descuento y el IVA NO forman
+// parte de la comparación a propósito: si hay duplicados viejos con
+// descuentos inconsistentes (residuo de bugs previos), igual se
+// fusionan — se queda con el descuento del primero que aparece.
+function _mismoEquipo(a, b) {
+  var nombreA = String(a.descripcion || '').trim().toLowerCase();
+  var nombreB = String(b.descripcion || '').trim().toLowerCase();
+  if (!nombreA || nombreA !== nombreB) return false;
+  if (Math.round((a.precio || 0) * 100) !== Math.round((b.precio || 0) * 100)) return false;
+  if ((a.moneda || 'USD') !== (b.moneda || 'USD')) return false;
+  return true;
+}
+
+function _fusionarDuplicados() {
+  var nuevos = [];
+  var fusionados = 0;
+  ITEMS.forEach(function(it) {
+    var existente = nuevos.find(function(x){ return _mismoEquipo(x, it); });
+    if (existente) {
+      existente.cantidad = (existente.cantidad || 1) + (it.cantidad || 1);
+      fusionados++;
+    } else {
+      nuevos.push(it);
+    }
+  });
+  ITEMS = nuevos;
+  return fusionados;
 }
 
 // Guarda el borrador completo y navega al catálogo por categorías
