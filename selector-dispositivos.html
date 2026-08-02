@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.07.30.1 (Buscador ampliado en las 3 pantallas del selector: antes, buscar dentro de una categoría/subcategoría activa (ej. AUTOREFRACTOR) restringía los resultados a esa misma categoría; ahora, apenas hay texto en el buscador, se busca siempre contra el catálogo COMPLETO sin importar en qué pantalla/categoría se esté parado. Pedido por Cristian: "que abarque todos los equipos siempre". Sin texto, la navegación por categoría sigue funcionando igual que antes.) -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.02.1 (Nuevo: widget flotante "Asistente IA — Catálogo" (💬) igual que el de Negocios, pero con dos tools propias: buscarProducto (precio/stock por texto o voz) y crearOApilarNegocio (carga un negocio para un cliente con el equipo, preguntando el cliente si no se lo dijeron). Comparte la misma Cloud Function asistenteIA — no reimplementa lógica de negocio, le pega a las mismas acciones de FotoMap.gs que ya usa ficha-equipo.html. Pedido por Cristian.) -->
 
 <html lang="es">
 <head>
@@ -5800,5 +5800,195 @@ try {
     if (elFooterVerSel) elFooterVerSel.textContent = (typeof PORTAL_TLC_VERSION !== 'undefined') ? PORTAL_TLC_VERSION : '?';
 } catch(e) {}
 </script>
+<!-- ════════════════════════════════════════════════════════════
+     ASISTENTE IA — widget flotante (Cloud Function + Gemini)
+     v2026.08.02 — versión para el catálogo: precio/stock de
+     equipos y crear/apilar negocios por texto o voz
+     cómo viene un evento/pipeline: totales, equipos más pedidos,
+     leads fríos sin seguimiento hace más de 48hs.
+     IMPORTANTE: reemplazar ASISTENTE_IA_URL de acá abajo por la URL
+     real que te da `firebase deploy` (ver functions/index.js).
+     ════════════════════════════════════════════════════════════ -->
+<style>
+  #ia-btn-flotante {
+    position: fixed; bottom: 22px; right: 22px; z-index: 4000;
+    width: 56px; height: 56px; border-radius: 50%; border: none;
+    background: linear-gradient(135deg, #3a86ff, #7b5cff); color: #fff;
+    font-size: 24px; box-shadow: 0 6px 20px rgba(58,134,255,.4);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  #ia-panel {
+    position: fixed; bottom: 90px; right: 22px; z-index: 4000;
+    width: min(360px, 92vw); max-height: 70vh; background: #fff;
+    border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.25);
+    display: none; flex-direction: column; overflow: hidden;
+  }
+  #ia-panel.abierto { display: flex; }
+  #ia-panel-header {
+    background: linear-gradient(135deg, #3a86ff, #7b5cff); color: #fff;
+    padding: 14px 16px; font-weight: 800; font-size: 14px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #ia-panel-body { padding: 14px 16px; overflow-y: auto; flex: 1; font-size: 13px; color: #0f172a; }
+  #ia-respuesta { background: #f1f5f9; border-radius: 10px; padding: 12px; margin-top: 10px; line-height: 1.5; white-space: pre-wrap; }
+  #ia-panel-footer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #e2e8f0; }
+  #ia-input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; outline: none; }
+  #ia-btn-mic, #ia-btn-enviar {
+    border: none; border-radius: 8px; padding: 0 14px; cursor: pointer; font-weight: 700; color: #fff;
+  }
+  #ia-btn-mic { background: #64748b; }
+  #ia-btn-mic.grabando { background: #ef4444; animation: iaPulso 1s infinite; }
+  #ia-btn-enviar { background: #3a86ff; }
+  @keyframes iaPulso { 0%,100%{opacity:1;} 50%{opacity:.5;} }
+</style>
+
+<button id="ia-btn-flotante" onclick="_iaTogglePanel()" title="Asistente IA">💬</button>
+
+<div id="ia-panel">
+  <div id="ia-panel-header">
+    <span>💬 Asistente IA — Catálogo</span>
+    <span style="cursor:pointer;" onclick="_iaTogglePanel()">✕</span>
+  </div>
+  <div style="padding:8px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; gap:8px;">
+    <label for="ia-select-voz" style="font-size:11px; color:#64748b; white-space:nowrap;">🔊 Voz:</label>
+    <select id="ia-select-voz" style="flex:1; font-size:12px; padding:4px 6px; border-radius:6px; border:1px solid #cbd5e1;" onchange="_iaGuardarVozElegida(this.value)"></select>
+    <button onclick="_iaLeerEnVozAlta('Hola, así sueno yo.')" style="font-size:11px; padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer; white-space:nowrap;">Probar</button>
+  </div>
+  <div id="ia-panel-body">
+    <div style="color:#64748b;">Preguntame precio o stock de un equipo — ej. "¿Cuánto sale el Huvitz HVS-1?" — o pedime que lo cargue en un negocio, ej. "Cargalo para 20 de Junio".</div>
+    <div id="ia-respuesta" style="display:none;"></div>
+  </div>
+  <div id="ia-panel-footer">
+    <input type="text" id="ia-input" placeholder="Escribí o dictá tu pregunta..." onkeydown="if(event.key==='Enter') _iaEnviarPregunta();">
+    <button id="ia-btn-mic" onclick="_iaToggleMic()">🎙️</button>
+    <button id="ia-btn-enviar" onclick="_iaEnviarPregunta()">➤</button>
+  </div>
+</div>
+
+<script>
+// Reemplazar por la URL real que devuelve `firebase deploy --only functions`
+// (formato típico: https://asistenteia-XXXXXXXX-uc.a.run.app)
+const ASISTENTE_IA_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/asistenteIA';
+
+function _iaTogglePanel() {
+  document.getElementById('ia-panel').classList.toggle('abierto');
+}
+
+async function _iaEnviarPregunta() {
+  const elInput = document.getElementById('ia-input');
+  const pregunta = (elInput.value || '').trim();
+  if (!pregunta) return;
+
+  const elResp = document.getElementById('ia-respuesta');
+  elResp.style.display = 'block';
+  elResp.textContent = '⏳ Pensando...';
+  elInput.value = '';
+
+  try {
+    const vendedorEmail = (currentUser && (currentUser.email || currentUser.username)) || '';
+    const vendedorNombre = (currentUser && currentUser.name) || '';
+    const resp = await fetch(ASISTENTE_IA_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pregunta: pregunta, vendedorEmail: vendedorEmail, vendedorNombre: vendedorNombre }),
+    });
+    const r = await resp.json();
+    if (!r.ok) {
+      elResp.textContent = '⚠️ ' + (r.error || 'No se pudo consultar al asistente.');
+      return;
+    }
+    elResp.textContent = r.respuesta;
+    _iaLeerEnVozAlta(r.respuesta);
+  } catch (e) {
+    elResp.textContent = '⚠️ Error de conexión con el asistente.';
+  }
+}
+
+// ── Selector de voz — el celular/navegador trae varias voces
+// instaladas (distintos acentos en español, a veces alguna en
+// inglés). getVoices() puede tardar en poblarse (async en algunos
+// navegadores, especialmente Android), por eso se intenta apenas
+// carga la página Y de nuevo cuando dispara 'voiceschanged'. La
+// elección se guarda en localStorage para que se acuerde entre
+// sesiones — pedido por Cristian, "funciona con voz en el cel, le
+// puedo cambiar la voz?".
+const IA_VOZ_KEY = 'tlc_ia_voz_elegida';
+function _iaPoblarSelectorVoces() {
+  if (!window.speechSynthesis) return;
+  const el = document.getElementById('ia-select-voz');
+  if (!el) return;
+  const voces = window.speechSynthesis.getVoices();
+  if (!voces.length) return;
+  // Español primero (cualquier variante — es-AR, es-ES, es-MX, etc.),
+  // después el resto, por si alguien prefiere una voz en otro idioma.
+  const esp = voces.filter(v => v.lang && v.lang.toLowerCase().startsWith('es'));
+  const otras = voces.filter(v => !(v.lang && v.lang.toLowerCase().startsWith('es')));
+  const ordenadas = esp.concat(otras);
+  const guardada = localStorage.getItem(IA_VOZ_KEY) || '';
+  el.innerHTML = ordenadas.map(v =>
+    `<option value="${v.name}" ${v.name === guardada ? 'selected' : ''}>${v.name} (${v.lang})</option>`
+  ).join('');
+  // Si no había nada guardado todavía, dejamos elegida la primera en
+  // español por default (mejor que la que el navegador ponga por azar).
+  if (!guardada && esp.length) el.value = esp[0].name;
+}
+if (window.speechSynthesis) {
+  _iaPoblarSelectorVoces();
+  window.speechSynthesis.onvoiceschanged = _iaPoblarSelectorVoces;
+}
+function _iaGuardarVozElegida(nombre) {
+  try { localStorage.setItem(IA_VOZ_KEY, nombre); } catch (e) {}
+}
+
+// ── Lectura en voz alta — funciona bien en Android/Chrome, soporte
+// limitado o ausente en Safari/iOS (queda como bonus, el texto
+// siempre se ve igual en pantalla). ────────────────────────────────
+function _iaLeerEnVozAlta(texto) {
+  try {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = 'es-AR';
+    const nombreElegida = localStorage.getItem(IA_VOZ_KEY);
+    if (nombreElegida) {
+      const voz = window.speechSynthesis.getVoices().find(v => v.name === nombreElegida);
+      if (voz) { u.voice = voz; u.lang = voz.lang; }
+    }
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+// ── Dictado por voz — Web Speech API. En iPhone/Safari puede no estar
+// disponible; el botón simplemente no hace nada si falta soporte (el
+// texto sigue siendo el modo principal). ───────────────────────────
+var _iaReconocimiento = null;
+var _iaGrabando = false;
+function _iaToggleMic() {
+  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognitionAPI) {
+    alert('El reconocimiento de voz no está disponible en este navegador — escribí la pregunta.');
+    return;
+  }
+  const elBtnMic = document.getElementById('ia-btn-mic');
+  if (_iaGrabando) {
+    if (_iaReconocimiento) _iaReconocimiento.stop();
+    return;
+  }
+  _iaReconocimiento = new SpeechRecognitionAPI();
+  _iaReconocimiento.lang = 'es-AR';
+  _iaReconocimiento.interimResults = false;
+  _iaReconocimiento.maxAlternatives = 1;
+  _iaReconocimiento.onstart = function() { _iaGrabando = true; elBtnMic.classList.add('grabando'); };
+  _iaReconocimiento.onend = function() { _iaGrabando = false; elBtnMic.classList.remove('grabando'); };
+  _iaReconocimiento.onerror = function() { _iaGrabando = false; elBtnMic.classList.remove('grabando'); };
+  _iaReconocimiento.onresult = function(ev) {
+    const texto = ev.results[0][0].transcript;
+    document.getElementById('ia-input').value = texto;
+    _iaEnviarPregunta();
+  };
+  _iaReconocimiento.start();
+}
+</script>
+
 </body>
 </html>
