@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.02.2 (Fusión de ítems duplicados también en la vista de detalle del negocio, sección Equipos — antes solo se fusionaba al entrar a "Crear/Modificar Presupuesto"; en el detalle se veían las líneas repetidas tal cual estaban guardadas. Es fusión SOLO para mostrar, no persiste — se persiste de verdad al pasar por el editor y guardar. Se prefiere como base el ítem con mayor descuentoValor entre los duplicados.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.02.3 (Fix: las fotos de equipos arriba del detalle NO se fusionaban aunque la lista de Equipos abajo sí (fix anterior solo tocó esa sección) — quedaban inconsistentes entre sí, mostrando fotos repetidas. Se extrajo la fusión a una función compartida (_fusionarCarritoParaMostrar) y ahora la usan las dos secciones por igual. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2194,6 +2194,28 @@ function _pcProcesarItemPendiente() {
     } catch(e) { console.warn('_pcProcesarItemPendiente:', e); }
 }
 
+// Fusiona ítems duplicados de un carrito PARA MOSTRAR (mismo criterio
+// que presupuesto-editor.html: nombre+precioLista+moneda, sumando
+// cantidad). El dato de fondo en /carrito puede seguir teniendo líneas
+// repetidas hasta que se pase por "Crear/Modificar Presupuesto" y se
+// guarde — ahí sí se persiste fusionado — pero se usa esta versión
+// fusionada en TODOS los lugares donde el detalle del negocio muestra
+// el carrito (fotos, lista de equipos), para que no se vea
+// inconsistente entre una sección y otra. Se prefiere como base el
+// ítem con mayor descuentoValor entre los duplicados (el de 0% suele
+// ser residuo de un bug ya corregido, no el real).
+function _fusionarCarritoParaMostrar(lista) {
+    const grupos = [];
+    (lista || []).forEach(function(it) {
+        const clave = String(it.nombre||'').trim().toLowerCase() + '|' + Math.round((it.precioLista||0)*100) + '|' + (it.moneda||'USD');
+        const existente = grupos.find(function(g){ return g.clave === clave; });
+        if (!existente) { grupos.push({ clave: clave, base: it, cantidad: it.cantidad||1 }); return; }
+        existente.cantidad += (it.cantidad || 1);
+        if ((it.descuentoValor||0) > (existente.base.descuentoValor||0)) existente.base = it;
+    });
+    return grupos.map(function(g){ return Object.assign({}, g.base, { cantidad: g.cantidad }); });
+}
+
 // Fotos de equipos en el header del detalle. _buscarPrecio() es síncrona y
 // depende de _preciosCache, que carga en background (fire-and-forget) desde
 // el arranque de la app — si el detalle se abre ANTES de que termine esa
@@ -2201,7 +2223,8 @@ function _pcProcesarItemPendiente() {
 // todavía. Por eso esta función se llama dos veces: una al renderizar (con
 // lo que haya en caché en ese momento) y otra cuando _getPrecios() resuelve,
 // re-pintando solo el contenedor de fotos sin tocar el resto del detalle.
-function _renderFotosEquipos(carrito) {
+function _renderFotosEquipos(carritoRaw) {
+    const carrito = _fusionarCarritoParaMostrar(carritoRaw);
     if (!carrito.length) return '';
     // Foto más grande cuando hay pocos ítems (1-2), más chica si hay
     // varios para que no ocupen toda la pantalla.
@@ -2359,25 +2382,11 @@ function _renderDetalle(c) {
     </div>`;
 
     // ── EQUIPOS ───────────────────────────────────────────────────
-    // Fusión de duplicados PARA MOSTRAR (mismo criterio que
-    // presupuesto-editor.html: nombre+precioLista+moneda). El dato de
-    // fondo en /carrito puede seguir teniendo líneas repetidas hasta
-    // que se pase por "Crear/Modificar Presupuesto" y se guarde — ahí
-    // sí se persiste fusionado — pero acá evitamos mostrarlas
-    // duplicadas mientras tanto. Se prefiere como base el ítem con
-    // mayor descuentoValor entre los duplicados (el de 0% suele ser
-    // residuo de un bug ya corregido, no el real).
-    const carritoParaMostrar = (function(lista) {
-        const grupos = [];
-        lista.forEach(function(it) {
-            const clave = String(it.nombre||'').trim().toLowerCase() + '|' + Math.round((it.precioLista||0)*100) + '|' + (it.moneda||'USD');
-            const existente = grupos.find(function(g){ return g.clave === clave; });
-            if (!existente) { grupos.push({ clave: clave, base: it, cantidad: it.cantidad||1 }); return; }
-            existente.cantidad += (it.cantidad || 1);
-            if ((it.descuentoValor||0) > (existente.base.descuentoValor||0)) existente.base = it;
-        });
-        return grupos.map(function(g){ return Object.assign({}, g.base, { cantidad: g.cantidad }); });
-    })(carrito);
+    // Misma fusión que usan las fotos de arriba (_fusionarCarritoParaMostrar)
+    // — antes esta sección tenía su propia copia de la lógica y las fotos
+    // otra, por eso se veían inconsistentes entre sí (fotos sin fusionar,
+    // lista sí). Reportado por Cristian con captura.
+    const carritoParaMostrar = _fusionarCarritoParaMostrar(carrito);
 
     if (carritoParaMostrar.length || prods.length) {
         const equiposHtml = carritoParaMostrar.length

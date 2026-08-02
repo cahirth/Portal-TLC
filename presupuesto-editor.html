@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.08.02.3 (Fix a la fusión de duplicados: fusionaba bien pero se quedaba con el descuento del PRIMER ítem encontrado, que en la práctica solía ser justo el viejo con 0% (residuo de un bug ya corregido) — perdía el descuento real de Contado al fusionar. Ahora se queda con el duplicado que tenga el mayor descuentoContadoOriginal como base. Reportado por Cristian: "fusiona, aunque no respeta la condición de contado... no carga los descuentos".) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.02.4 (Fix real a la fusión: mi fix anterior comparaba por descuentoContadoOriginal para elegir el duplicado base, pero ese campo se recalcula fresco desde el catálogo en cada apertura y da el MISMO valor para todos los duplicados — nunca detectaba diferencia y se quedaba con el primero, que en la práctica era justo el viejo con 0%. Ahora compara por el descuento REAL guardado en cada duplicado (it.descuento), que sí difiere entre el viejo (0%) y los correctos (15,99%). Reportado por Cristian con captura: "fusiona, pero no carga los descuentos".) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -515,19 +515,20 @@ function _mismoEquipo(a, b) {
 function _fusionarDuplicados() {
   // Al fusionar, el % Descuento y el IVA NO se promedian ni se toman
   // del primero que aparece — se elige como base el duplicado con
-  // MAYOR descuentoContadoOriginal. Motivo: cuando hay duplicados con
-  // descuentos inconsistentes es casi siempre porque uno viejo quedó
-  // en 0% por un bug ya corregido (apilarFichaTecnica/ficha-equipo.html
-  // no calculaban el descuento real todavía) y los más nuevos sí
-  // traen el % real de la lista de precios — quedarse con el 0% por
-  // "ser el primero" perdía el descuento real al fusionar. Reportado
-  // por Cristian: "fusiona, pero no carga los descuentos".
+  // MAYOR descuento REAL (it.descuento). Ojo con esto: NO se compara
+  // por descuentoContadoOriginal, porque ese campo se recalcula fresco
+  // desde el catálogo por nombre en _irAPresupuestoEditor() cada vez
+  // que se reabre el negocio — da el MISMO valor para los 5 duplicados
+  // aunque uno tenga guardado un descuento real distinto (0% viejo vs
+  // 15,99% real). Comparar por ese campo nunca detectaba diferencia y
+  // se quedaba siempre con el primero (justo el 0% viejo). Reportado
+  // por Cristian con captura: "fusiona, pero no carga los descuentos".
   var grupos = [];
   ITEMS.forEach(function(it) {
     var grupo = grupos.find(function(g){ return _mismoEquipo(g.base, it); });
     if (!grupo) { grupos.push({ base: it, cantidad: it.cantidad || 1 }); return; }
     grupo.cantidad += (it.cantidad || 1);
-    if ((it.descuentoContadoOriginal || 0) > (grupo.base.descuentoContadoOriginal || 0)) grupo.base = it;
+    if ((it.descuento || 0) > (grupo.base.descuento || 0)) grupo.base = it;
   });
   var fusionados = ITEMS.length - grupos.length;
   ITEMS = grupos.map(function(g){ g.base.cantidad = g.cantidad; return g.base; });
