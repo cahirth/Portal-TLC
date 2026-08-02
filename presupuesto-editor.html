@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.08.01.2 (Fix bug reportado por Cristian: al reabrir un presupuesto en modalidad Contado, el sistema pisaba el % Descuento que el vendedor había editado a mano en un ítem puntual con el descuento automático de lista/contado — si ese automático daba negativo en algún ítem, encima INFLABA el precio en vez de bajarlo. Fix en dos capas: (1) _onCambiarFormaPago ahora respeta el descuento real de cada ítem si detecta que fue editado a mano (comparándolo contra el automático, funciona incluso después de guardar/reabrir); (2) _calcularItem nunca aplica un descuento negativo, clamp a 0 como red de seguridad. Mismo clamp aplicado en FotoMap.gs v137 y en cotizaciones.html al recalcular descuentoContadoOriginal.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.02.1 (Pedido por Cristian: elegir "Contado" en el desplegable a mano SIEMPRE reaplica el descuento real de lista a todos los ítems, incluso yendo y viniendo desde TLC 6/12 (que resetea a 0%) — antes, la protección contra pisar ediciones manuales (v2026.08.01.2) también bloqueaba este reaplicado real. Se separó _onCambiarFormaPago en dos modos: toggle real del dropdown → siempre reaplica y limpia el flag de edición manual; carga inicial de la página o vuelta automática por regla de negocio (leasing36 dejó de ser elegible) → sigue respetando ediciones ya guardadas.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1074,24 +1074,36 @@ function _renderModalidadesPago() {
 
 // Al cambiar la Forma de Pago: TLC 6/12/Leasing 36 → Descuento pasa a
 // 0% (precio de lista, sin descuentos) en todos los ítems. Contado →
-// vuelve a aplicar la fórmula real de contado, PERO SOLO en los
-// ítems que nunca fueron tocados a mano — si el vendedor ya editó el
-// % Descuento de un ítem puntual, se respeta el valor real que está
-// cargado en esa celda, no se lo vuelve a pisar con el cálculo
-// automático de lista. Se detecta "editado a mano" de dos formas
-// (cualquiera de las dos alcanza): el flag descuentoEditadoManual
-// (vivo solo durante esta sesión de edición) y, más importante,
-// comparar el descuento actualmente cargado contra el que daría la
-// fórmula automática — si no coinciden, es porque en algún momento
-// alguien lo cambió a mano, incluso si eso pasó en una sesión previa
-// y se guardó así (ese dato SÍ viaja siempre, es el que persiste).
-window._onCambiarFormaPago = function() {
+// vuelve a aplicar la fórmula real de contado.
+//
+// Hay DOS situaciones bien distintas que llaman a esta misma función,
+// y necesitan comportarse distinto (pedido de Cristian):
+//
+// 1) El vendedor TOCA el desplegable a mano (evento onchange real).
+//    Acá "Contado" siempre tiene que reaplicar el descuento de lista
+//    a TODOS los ítems, incluso si antes habían pasado por TLC 6/12
+//    (que los dejó en 0%) o si alguna vez se editaron a mano — elegir
+//    la modalidad de nuevo es una decisión explícita de "quiero los
+//    descuentos de Contado", no debe quedar pisada por un estado
+//    viejo. Esto también limpia el flag descuentoEditadoManual, para
+//    que el próximo toggle a Contado vuelva a aplicar limpio.
+//
+// 2) La página CARGA un presupuesto ya guardado en Contado (init, sin
+//    que el vendedor haya tocado nada todavía). Acá NO hay que pisar
+//    un descuento que el vendedor ya había editado y guardado en una
+//    sesión anterior — se detecta comparando el valor real contra el
+//    automático; si no coinciden, se respeta el real.
+window._onCambiarFormaPago = function(esCargaInicial) {
   var nueva = document.getElementById('cc-forma-pago').value;
   if (nueva === 'contado') {
     ITEMS.forEach(function(it) {
       var automatico = it.descuentoContadoOriginal || 0;
-      var yaEditadoAMano = it.descuentoEditadoManual || (Math.round((it.descuento || 0) * 100) !== Math.round(automatico * 100));
-      if (!yaEditadoAMano) it.descuento = automatico;
+      var respetar = !!esCargaInicial && (
+        it.descuentoEditadoManual ||
+        Math.round((it.descuento || 0) * 100) !== Math.round(automatico * 100)
+      );
+      if (!respetar) it.descuento = automatico;
+      if (!esCargaInicial) it.descuentoEditadoManual = false;
     });
   } else {
     ITEMS.forEach(function(it) { it.descuento = 0; });
@@ -1140,7 +1152,7 @@ function _actualizarDisponibilidadLeasing36() {
   elOpcion.disabled = !habilitado;
   if (!habilitado && elForma.value === 'leasing36') {
     elForma.value = 'contado';
-    window._onCambiarFormaPago();
+    window._onCambiarFormaPago(true); // vuelta automática por regla de negocio, no un click real del vendedor — respeta descuentos ya editados
   }
 }
 
@@ -1275,7 +1287,7 @@ if (_draftCondiciones) {
   // por Cristian: "en Contado no aplica el descuento". Se llama acá a
   // mano, mismo efecto que un onchange real (y ya incluye _render()
   // completo, así que reemplaza al _renderModalidadesPago() suelto).
-  window._onCambiarFormaPago();
+  window._onCambiarFormaPago(true);
   document.getElementById('cc-validez').value = _draftCondiciones.validez || '15';
   document.getElementById('cc-validez-fecha').value = _draftCondiciones.validezFecha || '';
   document.getElementById('cc-tiempo-entrega').value = _draftCondiciones.tiempoEntrega || 'inmediato';
