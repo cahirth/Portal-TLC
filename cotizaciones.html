@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.02.5 (Asistente IA activo: se insertó la URL real de la Cloud Function deployada — https://us-central1-portal-tlc.cloudfunctions.net/asistenteIA — reemplazando el placeholder. El botón 💬 ya funciona en producción.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.02.6 (Asistente IA: selector de voz para la lectura en voz alta — lista las voces en español disponibles en el celular/navegador, se acuerda de la elegida (localStorage), y botón "Probar" para escucharla sin mandar una pregunta real. Pedido por Cristian: "funciona con voz en el cel, le puedo cambiar la voz?".) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -4003,6 +4003,11 @@ try {
     <span>💬 Asistente IA — Ventas</span>
     <span style="cursor:pointer;" onclick="_iaTogglePanel()">✕</span>
   </div>
+  <div style="padding:8px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; gap:8px;">
+    <label for="ia-select-voz" style="font-size:11px; color:#64748b; white-space:nowrap;">🔊 Voz:</label>
+    <select id="ia-select-voz" style="flex:1; font-size:12px; padding:4px 6px; border-radius:6px; border:1px solid #cbd5e1;" onchange="_iaGuardarVozElegida(this.value)"></select>
+    <button onclick="_iaLeerEnVozAlta('Hola, así sueno yo.')" style="font-size:11px; padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer; white-space:nowrap;">Probar</button>
+  </div>
   <div id="ia-panel-body">
     <div style="color:#64748b;">Preguntame por un evento, campaña o pipeline — ej. "¿Cómo venimos con Faco Extrema?" o "¿Hay leads fríos en CAO Veterinaria?".</div>
     <div id="ia-respuesta" style="display:none;"></div>
@@ -4052,6 +4057,42 @@ async function _iaEnviarPregunta() {
   }
 }
 
+// ── Selector de voz — el celular/navegador trae varias voces
+// instaladas (distintos acentos en español, a veces alguna en
+// inglés). getVoices() puede tardar en poblarse (async en algunos
+// navegadores, especialmente Android), por eso se intenta apenas
+// carga la página Y de nuevo cuando dispara 'voiceschanged'. La
+// elección se guarda en localStorage para que se acuerde entre
+// sesiones — pedido por Cristian, "funciona con voz en el cel, le
+// puedo cambiar la voz?".
+const IA_VOZ_KEY = 'tlc_ia_voz_elegida';
+function _iaPoblarSelectorVoces() {
+  if (!window.speechSynthesis) return;
+  const el = document.getElementById('ia-select-voz');
+  if (!el) return;
+  const voces = window.speechSynthesis.getVoices();
+  if (!voces.length) return;
+  // Español primero (cualquier variante — es-AR, es-ES, es-MX, etc.),
+  // después el resto, por si alguien prefiere una voz en otro idioma.
+  const esp = voces.filter(v => v.lang && v.lang.toLowerCase().startsWith('es'));
+  const otras = voces.filter(v => !(v.lang && v.lang.toLowerCase().startsWith('es')));
+  const ordenadas = esp.concat(otras);
+  const guardada = localStorage.getItem(IA_VOZ_KEY) || '';
+  el.innerHTML = ordenadas.map(v =>
+    `<option value="${v.name}" ${v.name === guardada ? 'selected' : ''}>${v.name} (${v.lang})</option>`
+  ).join('');
+  // Si no había nada guardado todavía, dejamos elegida la primera en
+  // español por default (mejor que la que el navegador ponga por azar).
+  if (!guardada && esp.length) el.value = esp[0].name;
+}
+if (window.speechSynthesis) {
+  _iaPoblarSelectorVoces();
+  window.speechSynthesis.onvoiceschanged = _iaPoblarSelectorVoces;
+}
+function _iaGuardarVozElegida(nombre) {
+  try { localStorage.setItem(IA_VOZ_KEY, nombre); } catch (e) {}
+}
+
 // ── Lectura en voz alta — funciona bien en Android/Chrome, soporte
 // limitado o ausente en Safari/iOS (queda como bonus, el texto
 // siempre se ve igual en pantalla). ────────────────────────────────
@@ -4061,6 +4102,11 @@ function _iaLeerEnVozAlta(texto) {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(texto);
     u.lang = 'es-AR';
+    const nombreElegida = localStorage.getItem(IA_VOZ_KEY);
+    if (nombreElegida) {
+      const voz = window.speechSynthesis.getVoices().find(v => v.name === nombreElegida);
+      if (voz) { u.voice = voz; u.lang = voz.lang; }
+    }
     window.speechSynthesis.speak(u);
   } catch (e) {}
 }
