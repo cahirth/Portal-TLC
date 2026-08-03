@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.08.03.1 (Mismo fix que cotizaciones.html: navegabilidad completa vía asistente IA.) -->
+<!-- Portal TLC | empresas.html | v2026.08.03.2 (Mismo fix que cotizaciones.html: link clickeable en vez de window.open() automático.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1299,10 +1299,21 @@ async function _iaEnviarPregunta() {
     elResp.innerHTML = _iaMarkdownAHtml(r.respuesta);
     _iaLeerEnVozAlta(_iaLimpiarMarkdown(r.respuesta));
     if (r.navegacion && r.navegacion.url) {
-      // Pestaña nueva a propósito — así no se pierde el negocio/pantalla
-      // en la que estaba parado el vendedor solo por pedirle al
-      // asistente que le abra otra cosa.
-      window.open(r.navegacion.url, '_blank');
+      // NO usamos window.open() automático acá — los navegadores lo
+      // bloquean como popup no solicitado si pasó más de un puñado de
+      // segundos desde el último click real (y este fetch puede tardar
+      // 10-20s con este modelo). En vez de eso, un link clickeable
+      // dentro de la burbuja: ese click SÍ es del vendedor, ningún
+      // navegador lo bloquea nunca. Reportado por Cristian: "desde
+      // index.html no abre la ficha técnica".
+      const elLink = document.createElement('a');
+      elLink.href = r.navegacion.url;
+      elLink.target = '_blank';
+      elLink.rel = 'noopener';
+      elLink.textContent = '↗ Abrir ' + (r.navegacion.etiqueta || 'ahora');
+      elLink.style.cssText = 'display:inline-block;margin-top:8px;padding:6px 12px;background:#3a86ff;color:#fff;border-radius:8px;text-decoration:none;font-size:12px;font-weight:700;';
+      elResp.appendChild(document.createElement('br'));
+      elResp.appendChild(elLink);
     }
   } catch (e) {
     elResp.classList.remove('ia-pensando');
@@ -1404,6 +1415,7 @@ function _iaToggleMic() {
   _iaReconocimiento.start();
 }
 </script>
+
 
 
 

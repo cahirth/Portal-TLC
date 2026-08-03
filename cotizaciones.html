@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.03.1 (Navegabilidad completa: el asistente ahora puede abrir la ficha técnica de un equipo, el negocio de un cliente, la ficha de una empresa, o la última versión de un presupuesto — pedido explícito ("abrí", "mostrame"), abre en pestaña nueva para no perder la pantalla actual. Pedido por Cristian.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.03.2 (Fix: la navegación abría en window.open() automático apenas llegaba la respuesta — con este modelo, que a veces tarda 10-20s, los navegadores lo bloquean como popup no solicitado. Ahora es un link clickeable dentro de la burbuja de respuesta, así el click siempre es del vendedor y ningún navegador lo bloquea. Reportado por Cristian: "desde index.html no abre la ficha técnica".) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -4115,10 +4115,21 @@ async function _iaEnviarPregunta() {
     elResp.innerHTML = _iaMarkdownAHtml(r.respuesta);
     _iaLeerEnVozAlta(_iaLimpiarMarkdown(r.respuesta));
     if (r.navegacion && r.navegacion.url) {
-      // Pestaña nueva a propósito — así no se pierde el negocio/pantalla
-      // en la que estaba parado el vendedor solo por pedirle al
-      // asistente que le abra otra cosa.
-      window.open(r.navegacion.url, '_blank');
+      // NO usamos window.open() automático acá — los navegadores lo
+      // bloquean como popup no solicitado si pasó más de un puñado de
+      // segundos desde el último click real (y este fetch puede tardar
+      // 10-20s con este modelo). En vez de eso, un link clickeable
+      // dentro de la burbuja: ese click SÍ es del vendedor, ningún
+      // navegador lo bloquea nunca. Reportado por Cristian: "desde
+      // index.html no abre la ficha técnica".
+      const elLink = document.createElement('a');
+      elLink.href = r.navegacion.url;
+      elLink.target = '_blank';
+      elLink.rel = 'noopener';
+      elLink.textContent = '↗ Abrir ' + (r.navegacion.etiqueta || 'ahora');
+      elLink.style.cssText = 'display:inline-block;margin-top:8px;padding:6px 12px;background:#3a86ff;color:#fff;border-radius:8px;text-decoration:none;font-size:12px;font-weight:700;';
+      elResp.appendChild(document.createElement('br'));
+      elResp.appendChild(elLink);
     }
   } catch (e) {
     elResp.classList.remove('ia-pensando');
