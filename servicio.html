@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.08.02.2 (Mismo fix que cotizaciones.html: CSS del selector de voz, markdown liviano en respuestas, prioridad de voces es-AR/latinas.) -->
+<!-- Portal TLC | servicio.html | v2026.08.03.1 (Mismo fix que cotizaciones.html: navegabilidad completa vía asistente IA.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -3574,7 +3574,7 @@ try {
     <button onclick="_iaLeerEnVozAlta('Hola, así sueno yo.')" style="font-size:11px; padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer; white-space:nowrap;">Probar</button>
   </div>
   <div id="ia-panel-body">
-    <div id="ia-hint" style="color:#64748b;">Preguntame por tickets de Servicio, negocios, o precio/stock de un equipo. Ej. "¿Cuántos tickets vencidos hay?", "¿Cómo va el service de tal clínica?".</div>
+    <div id="ia-hint" style="color:#64748b;">Preguntame por tickets, negocios, o pedime que te abra la ficha de un equipo o de un negocio.</div>
     <div id="ia-historial"></div>
   </div>
   <div id="ia-panel-footer">
@@ -3673,6 +3673,12 @@ async function _iaEnviarPregunta() {
     }
     elResp.innerHTML = _iaMarkdownAHtml(r.respuesta);
     _iaLeerEnVozAlta(_iaLimpiarMarkdown(r.respuesta));
+    if (r.navegacion && r.navegacion.url) {
+      // Pestaña nueva a propósito — así no se pierde el negocio/pantalla
+      // en la que estaba parado el vendedor solo por pedirle al
+      // asistente que le abra otra cosa.
+      window.open(r.navegacion.url, '_blank');
+    }
   } catch (e) {
     elResp.classList.remove('ia-pensando');
     elResp.textContent = '⚠️ Error de conexión con el asistente.';
@@ -3773,6 +3779,7 @@ function _iaToggleMic() {
   _iaReconocimiento.start();
 }
 </script>
+
 
 
 </body>

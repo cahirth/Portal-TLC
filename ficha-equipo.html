@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.08.02.4 (Mismo fix que cotizaciones.html: CSS del selector de voz, markdown liviano en respuestas, prioridad de voces es-AR/latinas.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.08.03.1 (Mismo fix que cotizaciones.html: navegabilidad completa vía asistente IA — sigue gateado, no aparece en modo=cliente.) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -931,7 +931,7 @@ _cargarFicha();
     <button onclick="_iaLeerEnVozAlta('Hola, así sueno yo.')" style="font-size:11px; padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer; white-space:nowrap;">Probar</button>
   </div>
   <div id="ia-panel-body">
-    <div id="ia-hint" style="color:#64748b;">Preguntame precio o stock de otro equipo, un negocio, o pedime que cargue este en un negocio para algún cliente.</div>
+    <div id="ia-hint" style="color:#64748b;">Preguntame precio o stock de otro equipo, un negocio, o pedime que cargue este equipo en un negocio para algún cliente.</div>
     <div id="ia-historial"></div>
   </div>
   <div id="ia-panel-footer">
@@ -1030,6 +1030,12 @@ async function _iaEnviarPregunta() {
     }
     elResp.innerHTML = _iaMarkdownAHtml(r.respuesta);
     _iaLeerEnVozAlta(_iaLimpiarMarkdown(r.respuesta));
+    if (r.navegacion && r.navegacion.url) {
+      // Pestaña nueva a propósito — así no se pierde el negocio/pantalla
+      // en la que estaba parado el vendedor solo por pedirle al
+      // asistente que le abra otra cosa.
+      window.open(r.navegacion.url, '_blank');
+    }
   } catch (e) {
     elResp.classList.remove('ia-pensando');
     elResp.textContent = '⚠️ Error de conexión con el asistente.';
@@ -1139,6 +1145,7 @@ if (!_modoReceptor && _sesionVendedor) {
   if (_elIaBtn) _elIaBtn.style.display = '';
 }
 </script>
+
 
 
 </body>
