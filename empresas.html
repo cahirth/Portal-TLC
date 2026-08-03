@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.08.02.1 (Nuevo: widget flotante "Asistente IA" (💬), mismas 4 capacidades que en el resto del Portal. Pedido por Cristian.) -->
+<!-- Portal TLC | empresas.html | v2026.08.02.2 (Mismo fix que cotizaciones.html: CSS del selector de voz, markdown liviano en respuestas, prioridad de voces es-AR/latinas.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1168,9 +1168,11 @@ window._confirmarImportacion = async function() {
   }
   #ia-panel-body { padding: 14px 16px; overflow-y: auto; flex: 1; font-size: 13px; color: #0f172a; }
   #ia-historial { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
-  .ia-burbuja { border-radius: 12px; padding: 10px 14px; line-height: 1.5; white-space: pre-wrap; max-width: 88%; }
-  .ia-burbuja-pregunta { align-self: flex-end; background: #3a86ff; color: #fff; border-bottom-right-radius: 3px; }
-  .ia-burbuja-respuesta { align-self: flex-start; background: #f1f5f9; color: #0f172a; border-bottom-left-radius: 3px; }
+  .ia-burbuja { border-radius: 12px; padding: 10px 14px; line-height: 1.5; max-width: 88%; }
+  .ia-burbuja-pregunta { align-self: flex-end; background: #3a86ff; color: #fff; border-bottom-right-radius: 3px; white-space: pre-wrap; }
+  .ia-burbuja-respuesta { align-self: flex-start; background: #f1f5f9; color: #0f172a; border-bottom-left-radius: 3px; white-space: normal; }
+  .ia-burbuja-respuesta ul { margin: 4px 0; padding-left: 18px; }
+  .ia-burbuja-respuesta li { margin-bottom: 2px; }
   .ia-burbuja-respuesta.ia-pensando { color: #64748b; font-style: italic; }
   #ia-panel-footer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #e2e8f0; }
   #ia-input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; outline: none; }
@@ -1192,7 +1194,7 @@ window._confirmarImportacion = async function() {
   </div>
   <div style="padding:8px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; gap:8px;">
     <label for="ia-select-voz" style="font-size:11px; color:#64748b; white-space:nowrap;">🔊 Voz:</label>
-    <select id="ia-select-voz" style="flex:1; font-size:12px; padding:4px 6px; border-radius:6px; border:1px solid #cbd5e1;" onchange="_iaGuardarVozElegida(this.value)"></select>
+    <select id="ia-select-voz" style="flex:1; min-width:0; font-size:12px; padding:4px 6px; border-radius:6px; border:1px solid #cbd5e1;" onchange="_iaGuardarVozElegida(this.value)"></select>
     <button onclick="_iaLeerEnVozAlta('Hola, así sueno yo.')" style="font-size:11px; padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer; white-space:nowrap;">Probar</button>
   </div>
   <div id="ia-panel-body">
@@ -1213,6 +1215,41 @@ const ASISTENTE_IA_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/asis
 
 function _iaTogglePanel() {
   document.getElementById('ia-panel').classList.toggle('abierto');
+}
+
+// ── Markdown liviano — el asistente puede responder con **negrita** y
+// viñetas "- " (se lo pedimos en el prompt del backend). Se separan
+// dos usos: _iaMarkdownAHtml() arma el HTML lindo para la pantalla,
+// _iaLimpiarMarkdown() saca los símbolos para que la lectura en voz
+// alta no diga "asterisco asterisco" ni "guión" al hablar. Deliberado
+// no usar una librería de markdown completa — el formato que devuelve
+// el asistente es siempre simple (negrita + viñetas + saltos de
+// línea), no hace falta más.
+function _iaEscapeHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function _iaMarkdownAHtml(texto) {
+  const lineas = _iaEscapeHtml(texto).split('\n');
+  let html = '';
+  let dentroDeLista = false;
+  lineas.forEach(function(linea) {
+    const esVineta = /^\s*[-*]\s+/.test(linea);
+    if (esVineta) {
+      if (!dentroDeLista) { html += '<ul style="margin:4px 0;padding-left:18px;">'; dentroDeLista = true; }
+      html += '<li>' + linea.replace(/^\s*[-*]\s+/, '') + '</li>';
+    } else {
+      if (dentroDeLista) { html += '</ul>'; dentroDeLista = false; }
+      html += (linea.trim() === '' ? '<br>' : (html ? '<br>' : '') + linea);
+    }
+  });
+  if (dentroDeLista) html += '</ul>';
+  return html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+function _iaLimpiarMarkdown(texto) {
+  return String(texto || '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/^\s*[-*]\s+/gm, '')
+    .replace(/[_`#]/g, '');
 }
 
 async function _iaEnviarPregunta() {
@@ -1259,8 +1296,8 @@ async function _iaEnviarPregunta() {
       elResp.textContent = '⚠️ ' + (r.error || 'No se pudo consultar al asistente.');
       return;
     }
-    elResp.textContent = r.respuesta;
-    _iaLeerEnVozAlta(r.respuesta);
+    elResp.innerHTML = _iaMarkdownAHtml(r.respuesta);
+    _iaLeerEnVozAlta(_iaLimpiarMarkdown(r.respuesta));
   } catch (e) {
     elResp.classList.remove('ia-pensando');
     elResp.textContent = '⚠️ Error de conexión con el asistente.';
@@ -1282,10 +1319,19 @@ function _iaPoblarSelectorVoces() {
   if (!el) return;
   const voces = window.speechSynthesis.getVoices();
   if (!voces.length) return;
-  // Español primero (cualquier variante — es-AR, es-ES, es-MX, etc.),
-  // después el resto, por si alguien prefiere una voz en otro idioma.
+  // Español primero (cualquier variante), y dentro del español,
+  // priorizamos es-AR y el resto de Latinoamérica antes que es-ES —
+  // la pronunciación de números y dólares suena más natural con esas
+  // variantes que con el acento de España.
   const esp = voces.filter(v => v.lang && v.lang.toLowerCase().startsWith('es'));
   const otras = voces.filter(v => !(v.lang && v.lang.toLowerCase().startsWith('es')));
+  function _prioridadVoz(v) {
+    const lang = (v.lang || '').toLowerCase();
+    if (lang === 'es-ar') return 0;
+    if (lang !== 'es-es') return 1; // cualquier otra variante latina (es-us, es-mx, es-419, etc.)
+    return 2; // es-es al final
+  }
+  esp.sort((a, b) => _prioridadVoz(a) - _prioridadVoz(b));
   const ordenadas = esp.concat(otras);
   const guardada = localStorage.getItem(IA_VOZ_KEY) || '';
   el.innerHTML = ordenadas.map(v =>
@@ -1352,6 +1398,7 @@ function _iaToggleMic() {
   _iaReconocimiento.start();
 }
 </script>
+
 
 </body>
 </html>
