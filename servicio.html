@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.08.03.4 (Mismo fix que cotizaciones.html: se muestra el error real en la burbuja, no solo un mensaje genérico — clave para diagnosticar el error reportado varias veces acá puntualmente.) -->
+<!-- Portal TLC | servicio.html | v2026.08.03.5 (BUG REAL encontrado y corregido: el script principal está envuelto en un (function(){...})() — _session se declaraba ADENTRO de ese IIFE, invisible para el widget del Asistente IA que vive en un <script> aparte, afuera. Por eso tiraba "ReferenceError: _session is not defined" apenas se mandaba cualquier pregunta — el fetch nunca llegaba a dispararse. Se expone _session a window en el momento exacto en que se resuelve la sesión real. Este era el error de conexión reportado varias veces en Servicio.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -853,6 +853,14 @@ async function _cargarSesion() {
       _session = payload;
     }
     if (!_session || !_session.username) { _redirigirLogin(); return; }
+    // El widget del Asistente IA vive en un <script> aparte, AFUERA del
+    // (function(){...})() que envuelve todo este archivo — _session
+    // vive adentro de ese IIFE y no era visible desde ahí, por eso
+    // tiraba "ReferenceError: _session is not defined" apenas se
+    // mandaba cualquier pregunta. Se expone acá a window en el mismo
+    // momento en que se resuelve de verdad. Reportado por Cristian con
+    // captura de consola.
+    window._session = _session;
 
     // Validación real de acceso al módulo — columna "Servicio Tecnico"
     // en la solapa Vendedores. Si da FALSE, ya muestra el alert y
@@ -3658,8 +3666,8 @@ async function _iaEnviarPregunta() {
   elHist.scrollIntoView({ block: 'end' });
 
   try {
-    const vendedorEmail = (_session && _session.username) || '';
-    const vendedorNombre = (_session && _session.name) || '';
+    const vendedorEmail = (window._session && window._session.username) || '';
+    const vendedorNombre = (window._session && window._session.name) || '';
     const resp = await fetch(ASISTENTE_IA_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
