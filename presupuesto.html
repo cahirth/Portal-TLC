@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto.html | v2026.07.28.5 (El fix anterior (page-break-inside:avoid en 3 bloques separados) no alcanzó — "Datos Bancarios" directamente desaparecía en vez de solo cortarse, según captura real de Cristian. Se agruparon Atentamente + Datos Bancarios + firma/logo en UN SOLO bloque atómico con page-break-inside:avoid, en vez de 3 bloques separados que podían interactuar mal entre sí — así el motor de impresión los mueve todos juntos a la página siguiente o los deja todos juntos en la actual, sin casos intermedios raros.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.4 (Fix real del bug de página 2 cortada/con info faltante al guardar como PDF: los bloques de Condiciones Comerciales, Atentamente, Datos Bancarios y la firma final NO tenían page-break-inside:avoid — solo las filas de la tabla de ítems lo tenían. Si alguno de esos bloques caía justo en el borde entre página 1 y 2, el motor de PDF lo cortaba a la mitad; el texto seguía "adentro" del PDF (por eso aparecía en la extracción de texto) pero no se pintaba bien visualmente. Reportado por Cristian con PDF real adjunto.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.3 (Saltos de página reales para impresión/PDF: el header (logo+título+numeración) se repite arriba de cada página con position:fixed, numeración real "Página X de Y" con counter(page)/counter(pages) en @page (reemplaza el "Hoja 1 de 1" hardcodeado), y page-break-inside:avoid en cada fila de ítem para que no se corte a la mitad. El alto exacto reservado arriba puede necesitar un ajuste fino después de probarlo imprimiendo de verdad.) -->
 <html lang="es">
@@ -407,23 +408,27 @@
         '</div>' +
       '</div>' +
 
-      '<div style="text-align:right;font-size:12px;font-family:Arial,sans-serif;color:#374151;margin-bottom:24px;page-break-inside:avoid;">' +
+      '<div style="page-break-inside:avoid;">' +
+
+      '<div style="text-align:right;font-size:12px;font-family:Arial,sans-serif;color:#374151;margin-bottom:24px;">' +
         'Atentamente,<br>' +
         '<strong>' + esc(p.vendedor || 'Tecnología Láser Corneal') + '</strong><br>' +
         'info@tlcsrl.com.ar' +
       '</div>' +
 
-      '<div style="border-top:1px solid #e2e8f0;padding-top:12px;margin-bottom:20px;page-break-inside:avoid;">' +
+      '<div style="border-top:1px solid #e2e8f0;padding-top:12px;margin-bottom:20px;">' +
         '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;font-family:Arial,sans-serif;margin-bottom:8px;">Datos Bancarios</div>' +
         '<table><tbody>' + bancosHtml + '</tbody></table>' +
       '</div>' +
 
-      '<div style="border-top:2px solid #0f172a;padding-top:12px;display:flex;align-items:center;gap:16px;page-break-inside:avoid;">' +
+      '<div style="border-top:2px solid #0f172a;padding-top:12px;display:flex;align-items:center;gap:16px;">' +
         '<img src="' + LOGO_URL + '" alt="TLC" style="width:80px;height:auto;flex-shrink:0;" onerror="this.style.display=\'none\'">' +
         '<div style="font-size:11px;color:#0f172a;font-family:Arial,sans-serif;line-height:1.6;">' +
           '<strong>TECNOLOGÍA LÁSER CORNEAL S.R.L.</strong><br>' +
           'Pasaje del Carmen 716 LOCAL PB C1019AAB · Buenos Aires, Argentina' +
         '</div>' +
+      '</div>' +
+
       '</div>';
 
     document.title = 'Presupuesto TLC — ' + (p.nombreMedico || '') + ' — ' + idCot;
