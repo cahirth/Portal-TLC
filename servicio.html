@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.08.03.5 (BUG REAL encontrado y corregido: el script principal está envuelto en un (function(){...})() — _session se declaraba ADENTRO de ese IIFE, invisible para el widget del Asistente IA que vive en un <script> aparte, afuera. Por eso tiraba "ReferenceError: _session is not defined" apenas se mandaba cualquier pregunta — el fetch nunca llegaba a dispararse. Se expone _session a window en el momento exacto en que se resuelve la sesión real. Este era el error de conexión reportado varias veces en Servicio.) -->
+<!-- Portal TLC | servicio.html | v2026.08.04.1 (Restringido a Administrador el bloque completo de "Presupuesto vinculado" en la tarjeta del ticket — antes el checkbox "Presupuesto aprobado" quedaba visible para todos, aunque el botón y el historial ya eran admin-only. Ver FotoMap.gs v141 para el fix real de fondo: los presupuestos de Servicio ya no crean negocio en el Kanban de Ventas. Pedido por Cristian: "no quiero mezclar Ventas con Servicio... visibilidad solo para administradores".) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2502,7 +2502,10 @@ function _renderCamposTecnicos(t, puedeEditar) {
     '</div>';
   }
 
-  var presupHtml = '<div class="campo-tecnico-wrap">' +
+  // Sección entera admin-only — pedido por Cristian: "la visibilidad es
+  // solo para administradores nada más". El botón Generar/Modificar y el
+  // historial ya lo eran; faltaba el checkbox "Presupuesto aprobado".
+  var presupHtml = !_permisos.admin ? '' : ('<div class="campo-tecnico-wrap">' +
     '<div class="campo-tecnico-label">Presupuesto vinculado ' + _campoBadge(dep,'presupuesto') + '</div>' +
     '<div class="presupuesto-wrap">' +
       '<label class="checkbox-row">' +
@@ -2513,7 +2516,7 @@ function _renderCamposTecnicos(t, puedeEditar) {
       '</label>' +
       historialHtml +
     '</div>' +
-  '</div>';
+  '</div>');
 
   // ── Partes utilizadas (activo desde diagnóstico) ──
   var repDisabled = (idxDep < FLUJO_ETAPAS.indexOf('diagnostico')) || soloLectura;
