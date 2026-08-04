@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.08.04.1 (Restringido a Administrador el bloque completo de "Presupuesto vinculado" en la tarjeta del ticket — antes el checkbox "Presupuesto aprobado" quedaba visible para todos, aunque el botón y el historial ya eran admin-only. Ver FotoMap.gs v141 para el fix real de fondo: los presupuestos de Servicio ya no crean negocio en el Kanban de Ventas. Pedido por Cristian: "no quiero mezclar Ventas con Servicio... visibilidad solo para administradores".) -->
+<!-- Portal TLC | servicio.html | v2026.08.04.2 (Fix: "Modificar Presupuesto" en un ticket traía todo en blanco — leía de la raíz de /cotizaciones/{id}, que desde FotoMap.gs v141 ya no se escribe para presupuestos vinculados a un ticket (a propósito). Ahora lee del sub-nodo /presupuesto, donde realmente se guarda, con los campos planos correctos. Reportado por Cristian: "modificar trae un presupuesto en blanco y no el que ya está hecho".) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2605,7 +2605,13 @@ window._generarPresupuestoTecnico = async function(id) {
 
   if (idCotExistente) {
     try {
-      var res = await fetch(RTDB_URL + '/cotizaciones/' + encodeURIComponent(idCotExistente) + '.json?_=' + Date.now());
+      // v141 de FotoMap.gs dejó de escribir la raíz de /cotizaciones/{id}
+      // para los presupuestos vinculados a un ticket (a propósito, para
+      // no aparecer en el Kanban de Ventas) — los datos reales viven en
+      // el sub-nodo /presupuesto. Leer de la raíz como antes traía todo
+      // vacío. Reportado por Cristian: "modificar trae un presupuesto
+      // en blanco y no el que ya está hecho".
+      var res = await fetch(RTDB_URL + '/cotizaciones/' + encodeURIComponent(idCotExistente) + '/presupuesto.json?_=' + Date.now());
       var c = res.ok ? await res.json() : null;
       if (c) {
         var carritoActual = Array.isArray(c.carrito) ? c.carrito : [];
@@ -2623,16 +2629,17 @@ window._generarPresupuestoTecnico = async function(id) {
             linkVideo: it.linkVideo || '',
           };
         });
-        var cond = c.condicionesComerciales || {};
+        // Campos PLANOS (no anidados bajo condicionesComerciales) — así
+        // es como los escribe guardarPresupuestoEditor para este camino.
         condiciones = {
-          formaPago: cond.formaPago || '', validez: cond.validez || '15', validezFecha: cond.validezFecha || '',
-          tiempoEntrega: cond.tiempoEntrega || 'inmediato', tiempoEntregaCustom: cond.tiempoEntregaCustom || '',
-          lugarEntrega: cond.lugarEntrega || 'cliente', notas: cond.notas || '',
+          formaPago: c.formaPago || '', validez: c.validez || '15', validezFecha: c.validezFecha || '',
+          tiempoEntrega: c.tiempoEntrega || 'inmediato', tiempoEntregaCustom: c.tiempoEntregaCustom || '',
+          lugarEntrega: c.lugarEntrega || 'cliente', notas: c.notas || '',
         };
         moneda = c.monedaTotales || 'USD';
-        // Si la cotización ya tiene su propio cliente/contacto guardado
-        // (pudo haberse editado desde Ventas), usar eso en vez de los
-        // datos crudos del ticket.
+        // Si el presupuesto ya tiene su propio cliente/contacto guardado
+        // (pudo haberse editado antes), usar eso en vez de los datos
+        // crudos del ticket.
         if (c.razonSocial) clienteSel.razonSocial = c.razonSocial;
         if (c.cuit) clienteSel.cuit = c.cuit;
         if (c.domicilio) clienteSel.domicilio = c.domicilio;
