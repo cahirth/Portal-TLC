@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.08.03.2 (Mismo fix que cotizaciones.html: link clickeable en vez de window.open() automático — era acá justo donde Cristian lo notó primero.) -->
+<!-- Portal TLC | index.html | v2026.08.03.3 (Mismo fix que cotizaciones.html: se muestra el error real en la burbuja, no solo un mensaje genérico.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -3004,7 +3004,8 @@ async function _iaEnviarPregunta() {
     }
   } catch (e) {
     elResp.classList.remove('ia-pensando');
-    elResp.textContent = '⚠️ Error de conexión con el asistente.';
+    console.error('Asistente IA — error en _iaEnviarPregunta:', e);
+    elResp.textContent = '⚠️ Error: ' + (e && e.message ? e.message : String(e));
   }
 }
 

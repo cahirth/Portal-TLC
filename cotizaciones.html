@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.03.2 (Fix: la navegación abría en window.open() automático apenas llegaba la respuesta — con este modelo, que a veces tarda 10-20s, los navegadores lo bloquean como popup no solicitado. Ahora es un link clickeable dentro de la burbuja de respuesta, así el click siempre es del vendedor y ningún navegador lo bloquea. Reportado por Cristian: "desde index.html no abre la ficha técnica".) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.03.3 (Fix de diagnóstico: el catch de _iaEnviarPregunta tapaba en silencio el error real, mostrando solo "Error de conexión con el asistente" sin loguear nada — imposible saber la causa sin abrir la consola del navegador. Ahora loguea el error completo en consola Y lo muestra en la burbuja del chat, así se puede diagnosticar con una sola captura. Reportado por Cristian con captura de consola vacía.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -4133,7 +4133,8 @@ async function _iaEnviarPregunta() {
     }
   } catch (e) {
     elResp.classList.remove('ia-pensando');
-    elResp.textContent = '⚠️ Error de conexión con el asistente.';
+    console.error('Asistente IA — error en _iaEnviarPregunta:', e);
+    elResp.textContent = '⚠️ Error: ' + (e && e.message ? e.message : String(e));
   }
 }
 
