@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.08.03.3 (Mismo fix que cotizaciones.html: se muestra el error real en la burbuja, no solo un mensaje genérico.) -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.04.4 (Agregada la leyenda "+ IVA 10,5%" al Precio de Lista (estático, arriba) y al Precio Contado (en el box de modalidad) en la vista de detalle. Pedido por Cristian.) -->
 
 <html lang="es">
 <head>
@@ -3091,7 +3091,7 @@ function abrirDetalle(idx) {
     const plWrap = document.getElementById('precio-lista-wrap');
     const plValor = document.getElementById('precio-lista-valor');
     if (tieneValor(precioLista)) {
-        plValor.textContent = fmtUSD(precioLista);
+        plValor.textContent = fmtUSD(precioLista) + ' + IVA 10,5%';
         plWrap.style.display = 'block';
     } else {
         plWrap.style.display = 'none';
@@ -3247,7 +3247,7 @@ function seleccionarModalidad(key) {
     let precioBaseComision = 0;
     if (esCNO) {
         const precioCNO = d['Precio CONTADO CNO'];
-        document.getElementById('precio-principal').textContent = tieneValor(precioCNO) ? fmtUSD(precioCNO) : '—';
+        document.getElementById('precio-principal').textContent = tieneValor(precioCNO) ? fmtUSD(precioCNO) + ' + IVA 10,5%' : '—';
         document.getElementById('precio-lista-label').textContent = 'Precio Contado';
         precioBaseComision = parseNum(precioCNO) || 0;
     } else {

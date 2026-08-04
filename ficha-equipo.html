@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | ficha-equipo.html | v2026.08.03.3 (Mismo fix que cotizaciones.html: se muestra el error real en la burbuja, no solo un mensaje genérico.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.08.04.5 (Agregada la leyenda "+ IVA 10,5%" junto al Precio de Lista — antes solo la tenían las tarjetas de financiación, el precio principal no aclaraba que era sin IVA. Pedido por Cristian.) -->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -142,7 +142,10 @@
 
             <div class="precio-lista-box">
                 <div class="precio-lista-label">Precio de Lista</div>
-                <div class="precio-lista-val" id="fi-precio-lista">—</div>
+                <div class="precio-lista-val" style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
+                    <span id="fi-precio-lista">—</span>
+                    <span id="fi-precio-lista-iva" style="font-size:14px; font-weight:700; color:var(--text-muted);"></span>
+                </div>
             </div>
         </div>
     </div>
@@ -442,6 +445,7 @@ async function _cargarFicha() {
         _fichaPrecioListaActual = !isNaN(precioLista) ? precioLista : 0;
         _fichaFotoRawActual = d.Foto || '';
         document.getElementById('fi-precio-lista').textContent = !isNaN(precioLista) ? _fmtMoneda(precioLista, 'USD') : 'Consultar';
+        document.getElementById('fi-precio-lista-iva').textContent = !isNaN(precioLista) ? '+ IVA 10,5%' : '';
 
         // Precio contado, si tiene
         var finGrid = document.getElementById('fi-financiacion-grid');
