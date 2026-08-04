@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.08.04.2 (Fix: "Modificar Presupuesto" en un ticket traía todo en blanco — leía de la raíz de /cotizaciones/{id}, que desde FotoMap.gs v141 ya no se escribe para presupuestos vinculados a un ticket (a propósito). Ahora lee del sub-nodo /presupuesto, donde realmente se guarda, con los campos planos correctos. Reportado por Cristian: "modificar trae un presupuesto en blanco y no el que ya está hecho".) -->
+<!-- Portal TLC | servicio.html | v2026.08.04.3 (Título de la tarjeta (Kanban y Lista) ahora usa marca+modelo completo del equipo + mes/año de ingreso, en vez de solo el modelo pelado — mismo criterio que la nomenclatura automática de negocios en Ventas. No repite el cliente en el título porque ya se muestra aparte en las dos tarjetas. Pedido por Cristian: "hacer el mismo razonamiento de negocios".) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -1192,7 +1192,7 @@ function _renderLista(tickets) {
       return '<div class="lista-ticket" onclick="_abrirDetalle(\'' + t.id_ticket + '\')">'
         + '<span class="lista-col-dot" style="background:' + col.color + '"></span>'
         + '<div class="lista-ticket-main">'
-          + '<div class="lista-ticket-modelo">' + _esc(t.equipo_modelo||'—') + '</div>'
+          + '<div class="lista-ticket-modelo">' + _esc(_nombreTarjetaTicket(t)) + '</div>'
           + '<div class="lista-ticket-cliente">' + _esc(t.cliente||'—') + (t.equipo_serie ? ' · ' + _esc(t.equipo_serie) : '') + '</div>'
         + '</div>'
         + '<div class="lista-ticket-badges">'
@@ -1281,7 +1281,7 @@ function _renderTarjeta(t) {
     (puedeEditar ? 'draggable="true" ondragstart="_onDragStart(event,\'' + t.id_ticket + '\')" ' : '') +
     'onclick="_abrirDetalle(\'' + t.id_ticket + '\')">' +
     '<div class="st-ticket-top">' +
-      '<div class="st-ticket-modelo">' + _esc(t.equipo_modelo || '—') + '</div>' +
+      '<div class="st-ticket-modelo">' + _esc(_nombreTarjetaTicket(t)) + '</div>' +
     '</div>' +
     '<div class="st-ticket-cliente">' + _esc(t.cliente || '—') + '</div>' +
     (t.equipo_serie ? '<div class="st-ticket-serie">' + _esc(t.equipo_serie) + '</div>' : '') +
@@ -1315,6 +1315,23 @@ function _esc(s) {
   return String(s||'').replace(/[&<>"']/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
   });
+}
+
+// Mismo criterio de nomenclatura que los negocios de Ventas
+// (_generarNombreNegocio en FotoMap.gs): equipo completo (marca +
+// modelo, no solo el modelo pelado) + mes/año — antes la tarjeta
+// mostraba solo el modelo suelto. NO se repite el cliente acá porque
+// las dos tarjetas (Kanban y Lista) ya lo muestran aparte, en su
+// propia línea debajo del título. Se usa la fecha de INGRESO del
+// ticket (creado_en), no la fecha actual, para que el nombre no
+// cambie cada vez que se recalcula. Pedido por Cristian: "hacer el
+// mismo razonamiento de negocios".
+var MESES_TICKET = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+function _nombreTarjetaTicket(t) {
+  var equipo = [t.equipo_marca, t.equipo_modelo].filter(function(x){ return x && x.trim(); }).join(' ').trim() || 'Sin equipo';
+  var fechaBase = t.creado_en ? new Date(t.creado_en) : new Date();
+  var mesAno = isNaN(fechaBase.getTime()) ? '' : (MESES_TICKET[fechaBase.getMonth()] + ' ' + fechaBase.getFullYear());
+  return equipo + (mesAno ? ' - ' + mesAno : '');
 }
 
 // ── Drag & Drop ────────────────────────────────────────────────────
