@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.08.03.3 (Mismo fix que cotizaciones.html: se muestra el error real en la burbuja, no solo un mensaje genérico.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.04.1 (BUG REAL encontrado: _irASelectorDispositivos() (el botón "+ Agregar ítem") guardaba el borrador SIN el TICKET_ID, y la URL de vuelta desde selector-dispositivos.html tampoco lo traía — así que agregar un ítem a mitad de armar un presupuesto de Servicio perdía el vínculo con el ticket, y el guardado siguiente creaba un negocio de Ventas en el Kanban en vez de quedarse en Servicio. Ahora se persiste y se restaura junto con el resto del borrador. Ver también FotoMap.gs v141 (el corte de fondo que ya no crea el negocio si el ticket SÍ llega). Reportado por Cristian con captura: "lo sigue generando en negocios, desde servicio".) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -455,6 +455,12 @@ function _restaurarDraftYItemPendiente() {
       _itemSeq = draft.itemSeq || ITEMS.length;
       NEGOCIO_ID = draft.negocioId || null;
       PRESUPUESTO_ID = draft.presupuestoId || null;
+      // La URL de vuelta desde selector-dispositivos.html es solo
+      // "?restaurarDraft=1", sin &ticket=... — sin esto, TICKET_ID
+      // quedaba en null apenas se agregaba un ítem a mitad de armar un
+      // presupuesto de Servicio, y el guardado siguiente creaba un
+      // negocio de Ventas en vez de quedarse en el ticket.
+      if (draft.ticketId) TICKET_ID = draft.ticketId;
       _draftCondiciones = draft.condiciones || null;
       _draftMoneda = draft.moneda || null;
     }
@@ -568,6 +574,11 @@ function _irASelectorDispositivos() {
       itemSeq: _itemSeq,
       negocioId: NEGOCIO_ID,
       presupuestoId: PRESUPUESTO_ID,
+      ticketId: TICKET_ID, // ← si no se persiste acá, se pierde el vínculo
+      // al volver de selector-dispositivos.html — el guardado siguiente
+      // caía en el camino normal de Ventas y creaba un negocio visible
+      // en el Kanban. Reportado por Cristian con captura: "lo sigue
+      // generando en negocios, desde servicio".
       condiciones: {
         formaPago: document.getElementById('cc-forma-pago').value,
         validez: document.getElementById('cc-validez').value,
