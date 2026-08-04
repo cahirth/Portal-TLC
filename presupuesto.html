@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto.html | v2026.07.28.6 (CAUSA RAÍZ REAL encontrada, con 2 capturas de Cristian: no era un problema de saltos de página — el header fijo (position:fixed, se repite en cada página) mide más de los 175px reservados en @page margin-top, así que se pinta ENCIMA de lo que arranca justo debajo: en página 1 tapaba los datos del cliente (Señores/CUIT/Domicilio), en página 2 tapaba Atentamente + Datos Bancarios — por eso "desaparecían" en vez de solo cortarse. Subido el margen a 225px, con aire de sobra contra el contenido real del header (título+subtítulo+N°+disclaimer de 3 líneas+fecha+validez). Los fixes anteriores (page-break-inside:avoid) quedan igual, no hacen daño, pero la causa real era esta.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.5 (El fix anterior (page-break-inside:avoid en 3 bloques separados) no alcanzó — "Datos Bancarios" directamente desaparecía en vez de solo cortarse, según captura real de Cristian. Se agruparon Atentamente + Datos Bancarios + firma/logo en UN SOLO bloque atómico con page-break-inside:avoid, en vez de 3 bloques separados que podían interactuar mal entre sí — así el motor de impresión los mueve todos juntos a la página siguiente o los deja todos juntos en la actual, sin casos intermedios raros.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.4 (Fix real del bug de página 2 cortada/con info faltante al guardar como PDF: los bloques de Condiciones Comerciales, Atentamente, Datos Bancarios y la firma final NO tenían page-break-inside:avoid — solo las filas de la tabla de ítems lo tenían. Si alguno de esos bloques caía justo en el borde entre página 1 y 2, el motor de PDF lo cortaba a la mitad; el texto seguía "adentro" del PDF (por eso aparecía en la extracción de texto) pero no se pintaba bien visualmente. Reportado por Cristian con PDF real adjunto.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.3 (Saltos de página reales para impresión/PDF: el header (logo+título+numeración) se repite arriba de cada página con position:fixed, numeración real "Página X de Y" con counter(page)/counter(pages) en @page (reemplaza el "Hoja 1 de 1" hardcodeado), y page-break-inside:avoid en cada fila de ítem para que no se corte a la mitad. El alto exacto reservado arriba puede necesitar un ajuste fino después de probarlo imprimiendo de verdad.) -->
@@ -45,7 +46,7 @@
   }
 
   @page {
-    margin: 175px 28px 45px 28px;
+    margin: 225px 28px 45px 28px;
     @bottom-center {
       content: "Página " counter(page) " de " counter(pages);
       font-size: 10px;
