@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto.html | v2026.07.28.8 (Condiciones Comerciales: "Forma de Pago" mostraba el valor crudo guardado (ej. "tlc6") en vez de un texto legible — ahora dice "TLC 6 cuotas". Se agregó el desglose real de la modalidad elegida (anticipo % + cuotas, o maxicanon + cánones para Leasing), mismo cálculo que la tarjeta de presupuesto-editor.html. Se agregó también la referencia del Tipo de Cambio oficial usado ("TC = $...") para cualquier modalidad financiada, no solo cuando los totales están en AR$. Pedido por Cristian.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.7 (Corte definitivo del problema: se sacó el position:fixed del header repetido — esa técnica depende de calcular bien su altura real contra el margen de @page, y con captura del preview real de Chrome (Márgenes: Predeterminados confirmado) quedó demostrado que ni 175px ni 225px alcanzaban, sin forma de saber a ciegas cuánto hace falta. Ahora el header es contenido normal, aparece una sola vez arriba de la página 1, margen vuelto a un valor chico normal (40px). Se pierde el logo repetido en cada página, pero se termina la categoría entera de bugs de superposición. Pedido por Cristian: "no quiero perder más tiempo con esto".) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.6 (CAUSA RAÍZ REAL encontrada, con 2 capturas de Cristian: no era un problema de saltos de página — el header fijo (position:fixed, se repite en cada página) mide más de los 175px reservados en @page margin-top, así que se pinta ENCIMA de lo que arranca justo debajo: en página 1 tapaba los datos del cliente (Señores/CUIT/Domicilio), en página 2 tapaba Atentamente + Datos Bancarios — por eso "desaparecían" en vez de solo cortarse. Subido el margen a 225px, con aire de sobra contra el contenido real del header (título+subtítulo+N°+disclaimer de 3 líneas+fecha+validez). Los fixes anteriores (page-break-inside:avoid) quedan igual, no hacen daño, pero la causa real era esta.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.5 (El fix anterior (page-break-inside:avoid en 3 bloques separados) no alcanzó — "Datos Bancarios" directamente desaparecía en vez de solo cortarse, según captura real de Cristian. Se agruparon Atentamente + Datos Bancarios + firma/logo en UN SOLO bloque atómico con page-break-inside:avoid, en vez de 3 bloques separados que podían interactuar mal entre sí — así el motor de impresión los mueve todos juntos a la página siguiente o los deja todos juntos en la actual, sin casos intermedios raros.) -->
@@ -153,7 +154,7 @@
   // - VIEJO (selector-dispositivos.html, vía _accionRegistrarCotizacion):
   //   p.condicionesComerciales (texto libre) + p.detalleFinanciacion.
   // Se detecta cuál usar mirando si hay campos del formato nuevo.
-  function construirCondicionesComerciales(p, etiquetaMoneda) {
+  function construirCondicionesComerciales(p, etiquetaMoneda, netoTotalUSD) {
     var esFormatoNuevo = !!(p.formaPago || p.tiempoEntrega || p.lugarEntrega);
 
     if (!esFormatoNuevo) {
@@ -176,13 +177,61 @@
       ? 'Se entrega en nuestra oficina en Del Carmen 716 PB CABA. El envío y el seguro están a cargo del comprador.'
       : 'Clínica del Cliente.';
 
-    // Tipo de cambio — solo si los totales están en AR$ y se guardó un
-    // TC real al momento de generar el presupuesto (p.tcOficial).
-    var tcTexto = (p.monedaTotales === 'ARS' && p.tcOficial)
-      ? '<strong>Tipo de Cambio:</strong> $' + Number(p.tcOficial).toLocaleString('es-AR') + ' (oficial, al momento de generar este presupuesto)<br>'
+    // Forma de Pago — antes mostraba el VALOR CRUDO guardado (ej.
+    // "tlc6"), no un texto legible. Mismas 4 modalidades reales que
+    // ofrece presupuesto-editor.html.
+    var LABELS_FORMA_PAGO = { contado: 'Contado', tlc6: 'TLC 6 cuotas', tlc12: 'TLC 12 cuotas', leasing36: 'Leasing 36 meses (AR$)' };
+    var formaPagoLabel = LABELS_FORMA_PAGO[p.formaPago] || p.formaPago;
+
+    // Desglose de la modalidad elegida (anticipo + cuotas, o
+    // maxicanon + cánones para leasing) — mismos parámetros de negocio
+    // que PARAMS_PAGO en presupuesto-editor.html. Si Cristian ajusta
+    // esos números allá, hay que actualizarlos acá también.
+    var PARAMS_PAGO_PDF = {
+      tlc6:  { anticipoPct: 35, cuotas: 6 },
+      tlc12: { anticipoPct: 50, cuotas: 12 },
+      leasing36: { maxicanonPct: 15, tna: 39, canonesAPagar: 35 },
+    };
+    var desgloseModalidad = '';
+    if (p.formaPago === 'tlc6' || p.formaPago === 'tlc12') {
+      var parTlc = PARAMS_PAGO_PDF[p.formaPago];
+      var baseTlc = netoTotalUSD || 0;
+      var mostrarEnArsTlc = (p.monedaTotales === 'ARS' && p.tcOficial);
+      var anticipoTlc = baseTlc * parTlc.anticipoPct / 100;
+      var cuotaTlc = (baseTlc - anticipoTlc) / parTlc.cuotas;
+      if (mostrarEnArsTlc) { anticipoTlc *= p.tcOficial; cuotaTlc *= p.tcOficial; }
+      var fmtTlcPdf = mostrarEnArsTlc
+        ? function(n) { return '$' + Math.round(n).toLocaleString('es-AR'); }
+        : function(n) { return 'USD ' + Math.round(n).toLocaleString('es-AR'); };
+      desgloseModalidad = '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin:6px 0 10px;font-size:12px;">' +
+        'Anticipo ' + parTlc.anticipoPct + '%: <strong>' + fmtTlcPdf(anticipoTlc) + ' + IVA</strong><br>' +
+        parTlc.cuotas + ' cuotas fijas de: <strong>' + fmtTlcPdf(cuotaTlc) + ' + IVA c/u</strong>' +
+      '</div>';
+    } else if (p.formaPago === 'leasing36' && p.tcOficial) {
+      var parL = PARAMS_PAGO_PDF.leasing36;
+      var baseArsL = (netoTotalUSD || 0) * p.tcOficial;
+      var iMensual = (parL.tna / 100) / 12;
+      var maxicanonL = baseArsL * parL.maxicanonPct / 100;
+      var capitalL = baseArsL - maxicanonL;
+      var canonL = capitalL * iMensual / (1 - Math.pow(1 + iMensual, -parL.canonesAPagar));
+      var fmtArsL = function(n) { return '$' + Math.round(n).toLocaleString('es-AR'); };
+      desgloseModalidad = '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin:6px 0 10px;font-size:12px;">' +
+        'Maxicanon: <strong>' + fmtArsL(maxicanonL) + ' + IVA</strong><br>' +
+        parL.canonesAPagar + ' cánones fijos de: <strong>' + fmtArsL(canonL) + ' + IVA c/u</strong><br>' +
+        '<span style="font-size:11px;color:#64748b;">+ 1 canon en garantía (se aplica a los últimos) · Opción de compra al finalizar: ' + fmtArsL(canonL) + ' + IVA · TNA ' + parL.tna + '%</span>' +
+      '</div>';
+    }
+
+    // Referencia de TC — se muestra en cualquier modalidad financiada
+    // (no solo cuando los totales están en AR$), como dato informativo
+    // del tipo de cambio vigente el día que se generó este presupuesto.
+    // Pedido por Cristian: "mostrar la referencia del día del TC dólar
+    // vendedor ej: TC =1515".
+    var tcTexto = (p.formaPago && p.formaPago !== 'contado' && p.tcOficial)
+      ? '<strong>Tipo de Cambio de referencia:</strong> TC = $' + Number(p.tcOficial).toLocaleString('es-AR') + ' (oficial, al momento de generar este presupuesto)<br>'
       : '';
 
-    return (p.formaPago ? '<strong>Forma de Pago:</strong> ' + esc(p.formaPago) + '<br>' : '') +
+    return (p.formaPago ? '<strong>Forma de Pago:</strong> ' + esc(formaPagoLabel) + '<br>' + desgloseModalidad : '') +
       (validezTexto2 ? '<strong>Validez de la Propuesta:</strong> ' + esc(validezTexto2) + '<br>' : '') +
       (tiempoTexto ? '<strong>Tiempo de Entrega:</strong> ' + esc(tiempoTexto) + '<br>' : '') +
       '<strong>Lugar de Entrega:</strong> ' + esc(lugarTexto) + '<br>' +
@@ -402,7 +451,7 @@
       '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:24px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);page-break-inside:avoid;">' +
         '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:10px;font-family:Arial,sans-serif;">Condiciones Comerciales</div>' +
         '<div style="font-size:12px;color:#374151;font-family:Arial,sans-serif;line-height:1.9;">' +
-          construirCondicionesComerciales(p, etiquetaMoneda) +
+          construirCondicionesComerciales(p, etiquetaMoneda, netoTotalUSD) +
         '</div>' +
       '</div>' +
 
