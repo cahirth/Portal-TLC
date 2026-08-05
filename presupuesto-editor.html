@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.08.04.2 (Pasa a ser la ÚNICA fuente que calcula la modalidad de pago (anticipo/cuotas, maxicanon/cánones) — el resultado ya calculado se guarda como modalidadPago junto con el resto del presupuesto (ver FotoMap.gs v144). presupuesto.html ya no tiene su propia copia de estos parámetros de negocio, evitando que se desincronicen entre los dos archivos. Pedido por Cristian: "el amo es el presupuesto editor, presupuesto debería obedecer a editor".) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.04.3 (El selector de Contacto pasa a ser multi-selección con checkboxes, mismo criterio que empresas.html y cotizaciones.html — antes solo dejaba elegir uno con un dropdown. Si se edita un negocio existente (?idNegocio=), se traen y se tildan solos los contactos ya guardados ahí (contacto principal + contactosAdicionales, ver FotoMap.gs v147). Persiste correctamente en el borrador al ir a "+ Agregar ítem" y volver. Pedido por Cristian: "cargar los contactos seleccionados en negocio y permitir agregar más si existen más".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.1 (BUG REAL encontrado: _irASelectorDispositivos() (el botón "+ Agregar ítem") guardaba el borrador SIN el TICKET_ID, y la URL de vuelta desde selector-dispositivos.html tampoco lo traía — así que agregar un ítem a mitad de armar un presupuesto de Servicio perdía el vínculo con el ticket, y el guardado siguiente creaba un negocio de Ventas en el Kanban en vez de quedarse en Servicio. Ahora se persiste y se restaura junto con el resto del borrador. Ver también FotoMap.gs v141 (el corte de fondo que ya no crea el negocio si el ticket SÍ llega). Reportado por Cristian con captura: "lo sigue generando en negocios, desde servicio".) -->
 <html lang="es">
 <head>
@@ -381,7 +381,8 @@ function _leerSesionCompartida() {
 
 var EMPRESAS_CACHE = null;   // se llena al primer uso del buscador
 var CLIENTE_SEL = null;      // { id, razonSocial, cuit, contactos:[...] }
-var CONTACTO_SEL = null;     // { id, nombre, cargo, email, telefono } | null
+var CONTACTO_SEL = null;     // { id, nombre, cargo, email, telefono } | null — el "principal", mismo campo de siempre
+var CONTACTOS_ADICIONALES_SEL = []; // resto de contactos tildados, además del principal
 var ITEMS = [];
 var _itemSeq = 0;
 
@@ -419,11 +420,32 @@ function _actualizarTituloHeader() {
 var _draftCondiciones = null;
 var _draftMoneda = null;
 
+// Trae los contactos adicionales YA guardados en el negocio (si se
+// está editando uno existente) — mismo campo que empresas.html y
+// cotizaciones.html ya guardan cuando se tildan varios contactos.
+// Fetch directo a RTDB (público de lectura en /cotizaciones, mismo
+// criterio que presupuesto.html), no hace falta pasar por el backend.
+// Pedido por Cristian: "cargar los contactos seleccionados en negocio
+// y permitir agregar más si existen más".
+var FIREBASE_DB_URL_PE = 'https://portal-tlc-default-rtdb.firebaseio.com';
+function _cargarContactosAdicionalesDelNegocio(idNegocio) {
+  fetch(FIREBASE_DB_URL_PE + '/cotizaciones/' + encodeURIComponent(idNegocio) + '/contactosAdicionales.json?_=' + Date.now(), { cache: 'no-store' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (Array.isArray(data)) {
+        CONTACTOS_ADICIONALES_SEL = data.filter(function(ct) { return ct && ct.nombre; });
+        _renderBloqueContacto();
+      }
+    })
+    .catch(function(e) { console.warn('No se pudieron traer los contactos adicionales del negocio:', e); });
+}
+
 function _leerParamsIniciales() {
   var p = new URLSearchParams(window.location.search);
   TICKET_ID = p.get('ticket') || null;
   if (p.get('restaurarDraft') === '1') { _restaurarDraftYItemPendiente(); return; }
   NEGOCIO_ID = p.get('idNegocio') || null;
+  if (NEGOCIO_ID) _cargarContactosAdicionalesDelNegocio(NEGOCIO_ID);
   if (!p.get('razon') && !p.get('empresa')) return;
   CLIENTE_SEL = {
     id: p.get('empresa') || null,
@@ -452,6 +474,7 @@ function _restaurarDraftYItemPendiente() {
       var draft = JSON.parse(raw);
       CLIENTE_SEL = draft.clienteSel || null;
       CONTACTO_SEL = draft.contactoSel || null;
+      CONTACTOS_ADICIONALES_SEL = Array.isArray(draft.contactosAdicionalesSel) ? draft.contactosAdicionalesSel : [];
       ITEMS = Array.isArray(draft.items) ? draft.items : [];
       _itemSeq = draft.itemSeq || ITEMS.length;
       NEGOCIO_ID = draft.negocioId || null;
@@ -571,6 +594,7 @@ function _irASelectorDispositivos() {
     sessionStorage.setItem('tlc_presupuesto_draft', JSON.stringify({
       clienteSel: CLIENTE_SEL,
       contactoSel: CONTACTO_SEL,
+      contactosAdicionalesSel: CONTACTOS_ADICIONALES_SEL,
       items: ITEMS,
       itemSeq: _itemSeq,
       negocioId: NEGOCIO_ID,
@@ -646,6 +670,7 @@ window._seleccionarClienteIdx = function(i) {
   if (!e) return;
   CLIENTE_SEL = e;
   CONTACTO_SEL = (e.contactos && e.contactos.length === 1) ? e.contactos[0] : null;
+  CONTACTOS_ADICIONALES_SEL = [];
   document.getElementById('resultados-cliente').style.display = 'none';
   document.getElementById('input-buscar-cliente').value = '';
   _renderCliente();
@@ -654,6 +679,7 @@ window._seleccionarClienteIdx = function(i) {
 function _cambiarCliente() {
   CLIENTE_SEL = null;
   CONTACTO_SEL = null;
+  CONTACTOS_ADICIONALES_SEL = [];
   _renderCliente();
 }
 
@@ -718,16 +744,47 @@ function _renderBloqueContacto() {
     '</div>';
     return;
   }
-  var opciones = contactos.map(function(c, i) {
-    var sel = CONTACTO_SEL && CONTACTO_SEL.nombre === c.nombre ? ' selected' : '';
-    return '<option value="' + i + '"' + sel + '>' + c.nombre + (c.cargo ? ' — ' + c.cargo : '') + '</option>';
+  // Checkboxes en vez de <select> — permite tildar varios contactos a
+  // la vez, no solo elegir uno. Mismo criterio que empresas.html y
+  // cotizaciones.html. Pedido por Cristian: "permitir agregar más si
+  // existen más, ahora solo se puede elegir uno con un dropdown".
+  var nombresSeleccionados = [];
+  if (CONTACTO_SEL && CONTACTO_SEL.nombre) nombresSeleccionados.push(CONTACTO_SEL.nombre.trim());
+  CONTACTOS_ADICIONALES_SEL.forEach(function(ct) { if (ct.nombre) nombresSeleccionados.push(ct.nombre.trim()); });
+
+  var filas = contactos.map(function(c, i) {
+    var marcado = nombresSeleccionados.indexOf((c.nombre||'').trim()) !== -1 ? ' checked' : '';
+    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;">' +
+      '<input type="checkbox" value="' + i + '"' + marcado + ' onchange="_toggleContactoEditor(' + i + ', this.checked)">' +
+      '<span>' + c.nombre + (c.cargo ? ' — ' + c.cargo : '') + '</span>' +
+    '</label>';
   }).join('');
-  var placeholder = contactos.length > 1 && !CONTACTO_SEL ? '<option value="" selected disabled>Seleccioná un contacto...</option>' : '';
-  cont.innerHTML = '<label>Contacto</label>' +
-    '<select onchange="_seleccionarContacto(this.value)">' + placeholder + opciones + '</select>' +
+
+  cont.innerHTML = '<label>Contacto' + (contactos.length > 1 ? 's (podés elegir más de uno)' : '') + '</label>' + filas +
     '<div class="contacto-datos" id="contacto-datos-linea"></div>';
   _renderContactoDatos();
 }
+
+window._toggleContactoEditor = function(i, marcado) {
+  var contactos = CLIENTE_SEL.contactos || [];
+  var c = contactos[i];
+  if (!c) return;
+  if (marcado) {
+    // Si todavía no hay principal, este pasa a serlo; si ya hay uno,
+    // este se suma como adicional.
+    if (!CONTACTO_SEL) CONTACTO_SEL = c;
+    else if (!CONTACTOS_ADICIONALES_SEL.some(function(ct){ return ct.nombre === c.nombre; })) CONTACTOS_ADICIONALES_SEL.push(c);
+  } else {
+    if (CONTACTO_SEL && CONTACTO_SEL.nombre === c.nombre) {
+      // Se destildó el principal — el primer adicional (si hay) pasa a
+      // ser el nuevo principal, para no perder la selección entera.
+      CONTACTO_SEL = CONTACTOS_ADICIONALES_SEL.length ? CONTACTOS_ADICIONALES_SEL.shift() : null;
+    } else {
+      CONTACTOS_ADICIONALES_SEL = CONTACTOS_ADICIONALES_SEL.filter(function(ct){ return ct.nombre !== c.nombre; });
+    }
+  }
+  _renderContactoDatos();
+};
 
 // Carga TODOS los contactos reales de la empresa (vía listarEmpresas,
 // mismo endpoint que usa empresas.html) para que el dropdown deje
@@ -757,6 +814,13 @@ async function _cargarContactosCompletosCliente() {
       var contactoFresco = empresa.contactos.find(function(c) { return c.nombre === CONTACTO_SEL.nombre; });
       if (contactoFresco) { CONTACTO_SEL = contactoFresco; _renderContactoDatos(); }
     }
+    // Mismo resync para los adicionales.
+    if (CONTACTOS_ADICIONALES_SEL.length) {
+      CONTACTOS_ADICIONALES_SEL = CONTACTOS_ADICIONALES_SEL.map(function(ct) {
+        var fresco = empresa.contactos.find(function(c) { return c.nombre === ct.nombre; });
+        return fresco || ct;
+      });
+    }
     _renderBloqueContacto();
   } catch (e) { console.warn('_cargarContactosCompletosCliente:', e); }
 }
@@ -768,13 +832,9 @@ function _renderContactoDatos() {
   var partes = [];
   if (CONTACTO_SEL.telefono) partes.push('📞 ' + CONTACTO_SEL.telefono);
   if (CONTACTO_SEL.email) partes.push('✉️ ' + CONTACTO_SEL.email);
+  if (CONTACTOS_ADICIONALES_SEL.length) partes.push('+ ' + CONTACTOS_ADICIONALES_SEL.length + ' contacto' + (CONTACTOS_ADICIONALES_SEL.length !== 1 ? 's' : '') + ' más');
   el.innerHTML = partes.join(' &nbsp;·&nbsp; ');
 }
-
-window._seleccionarContacto = function(i) {
-  CONTACTO_SEL = CLIENTE_SEL.contactos[i];
-  _renderContactoDatos();
-};
 
 // ── ÍTEMS ──
 function _agregarItem() {
@@ -1314,6 +1374,7 @@ async function _generarPresupuesto() {
     contactoNombre: (CONTACTO_SEL && CONTACTO_SEL.nombre) || '',
     contactoEmail: (CONTACTO_SEL && CONTACTO_SEL.email) || '',
     contactoTelefono: (CONTACTO_SEL && CONTACTO_SEL.telefono) || '',
+    contactosAdicionales: CONTACTOS_ADICIONALES_SEL.map(function(ct) { return { id: ct.id||'', nombre: ct.nombre||'', email: ct.email||'', telefono: ct.telefono||'' }; }),
     vendedor: vendedor,
     items: ITEMS.map(function(it) {
       return { nombre: it.descripcion, precio: it.precio, precioContado: it.precioContado || it.precio, cantidad: it.cantidad, descuento: it.descuento, iva: it.iva, moneda: it.moneda || 'USD', foto: it.foto || '', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' };
