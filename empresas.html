@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.04.5 (3 pedidos de Cristian: (1) búsqueda ahora también matchea por N° de serie de equipos vinculados vía tickets de Servicio; (2) botón "Borrar empresa" oculto para no-administradores (con chequeo también del lado del servidor en FotoMap.gs v145); (3) 4 campos nuevos en la ficha: Domicilio Fiscal, Domicilio Comercial, Domicilio de Envío, Comentarios Generales.) -->
 <!-- Portal TLC | empresas.html | v2026.08.03.4 (Mismo fix que cotizaciones.html: se muestra el error real en la burbuja, no solo un mensaje genérico.) -->
 <html lang="es">
 <head>
@@ -180,7 +181,7 @@
     <!-- VISTA LISTA -->
     <div id="vista-lista">
       <div class="buscador-row" style="margin-bottom:10px;">
-        <input type="text" class="buscador-input" id="buscador-empresas" placeholder="Buscar por razón social, CUIT o contacto..." oninput="_filtrarEmpresas(this.value)">
+        <input type="text" class="buscador-input" id="buscador-empresas" placeholder="Buscar por razón social, CUIT, contacto o N° de serie..." oninput="_filtrarEmpresas(this.value)">
       </div>
       <div class="buscador-row">
         <button class="btn-nueva" onclick="_toggleFormNuevaEmpresa()">+ Nueva empresa</button>
@@ -250,10 +251,26 @@
             <label>Domicilio</label>
             <input type="text" id="det-domicilio">
           </div>
+          <div class="campo">
+            <label>Domicilio Fiscal</label>
+            <input type="text" id="det-domicilio-fiscal">
+          </div>
+          <div class="campo">
+            <label>Domicilio Comercial</label>
+            <input type="text" id="det-domicilio-comercial">
+          </div>
+          <div class="campo">
+            <label>Domicilio de Envío</label>
+            <input type="text" id="det-domicilio-envio">
+          </div>
+          <div class="campo">
+            <label>Comentarios Generales</label>
+            <textarea id="det-comentarios" rows="3" style="width:100%;resize:vertical;font-family:inherit;font-size:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--border-color);"></textarea>
+          </div>
         </div>
         <div class="acciones-empresa">
           <button class="btn-guardar-empresa" id="btn-guardar-cambios-empresa" onclick="_guardarCambiosEmpresa()">✓ Guardar cambios</button>
-          <button class="btn-borrar-empresa" onclick="_borrarEmpresaActual()">🗑 Borrar empresa</button>
+          <button class="btn-borrar-empresa" id="btn-borrar-empresa-actual" onclick="_borrarEmpresaActual()" style="display:none;">🗑 Borrar empresa</button>
         </div>
       </div>
 
@@ -403,6 +420,7 @@ async function _cargarNegociosCruzados() {
           monto: 0,
           moneda: '',
           fecha: t.creado_en || '',
+          equipoSerie: t.equipo_serie || '', // ← para poder buscar empresas por n° de serie del equipo
         });
       });
 
@@ -448,19 +466,26 @@ function _renderListaEmpresas(filtro) {
     if (!q) return true;
     if (e.razonSocial.toLowerCase().includes(q)) return true;
     if ((e.cuit||'').includes(q)) return true;
-    return (e.contactos||[]).some(function(c) { return (c.nombre||'').toLowerCase().includes(q); });
+    if ((e.contactos||[]).some(function(c) { return (c.nombre||'').toLowerCase().includes(q); })) return true;
+    return (e.negocios||[]).some(function(n) { return n.equipoSerie && n.equipoSerie.toLowerCase().includes(q); });
   }).sort(function(a, b) { return a.razonSocial.localeCompare(b.razonSocial, 'es', { sensitivity:'base' }); });
   if (!lista.length) { cont.innerHTML = '<div class="empty-lista">' + (EMPRESAS.length ? 'Sin resultados.' : 'Todavía no cargaste ninguna empresa.') + '</div>'; return; }
   cont.innerHTML = lista.map(function(e) {
     var contactoQueMatchea = null;
+    var serieQueMatchea = null;
     if (q && !e.razonSocial.toLowerCase().includes(q) && !(e.cuit||'').includes(q)) {
       contactoQueMatchea = (e.contactos||[]).find(function(c) { return (c.nombre||'').toLowerCase().includes(q); });
+      if (!contactoQueMatchea) {
+        var negocioConSerie = (e.negocios||[]).find(function(n) { return n.equipoSerie && n.equipoSerie.toLowerCase().includes(q); });
+        if (negocioConSerie) serieQueMatchea = negocioConSerie.equipoSerie;
+      }
     }
     return '<div class="empresa-card" onclick="_abrirDetalleEmpresa(\'' + e.id + '\')">' +
       '<div class="empresa-card-top">' +
         '<div><div class="empresa-card-razon">' + e.razonSocial + '</div><div class="empresa-card-cuit">CUIT ' + (e.cuit||'sin CUIT') + '</div></div>' +
       '</div>' +
       (contactoQueMatchea ? '<div style="font-size:11px;color:#3a86ff;margin-top:2px;">👤 Coincide por contacto: ' + contactoQueMatchea.nombre + '</div>' : '') +
+      (serieQueMatchea ? '<div style="font-size:11px;color:#3a86ff;margin-top:2px;">🔧 Coincide por N° de serie: ' + serieQueMatchea + '</div>' : '') +
       '<div class="empresa-card-meta">' +
         '<span>👤 <b>' + e.contactos.length + '</b> contacto' + (e.contactos.length!==1?'s':'') + '</span>' +
         '<span>💼 <b>' + e.negocios.length + '</b> negocio' + (e.negocios.length!==1?'s':'') + '</span>' +
@@ -551,6 +576,13 @@ window._abrirDetalleEmpresa = function(id) {
   document.getElementById('det-cuit').value = e.cuit;
   document.getElementById('det-telefono').value = e.telefono;
   document.getElementById('det-domicilio').value = e.domicilio;
+  document.getElementById('det-domicilio-fiscal').value = e.domicilioFiscal || '';
+  document.getElementById('det-domicilio-comercial').value = e.domicilioComercial || '';
+  document.getElementById('det-domicilio-envio').value = e.domicilioEnvio || '';
+  document.getElementById('det-comentarios').value = e.comentariosGenerales || '';
+  var _sesionAdmin = _leerSesionCompartida();
+  var btnBorrarEmpresa = document.getElementById('btn-borrar-empresa-actual');
+  if (btnBorrarEmpresa) btnBorrarEmpresa.style.display = (_sesionAdmin && _sesionAdmin.rol === 'Administrador') ? '' : 'none';
   _renderContactos(e);
   _renderNegocios(e);
   window.scrollTo(0,0);
@@ -572,15 +604,21 @@ window._guardarCambiosEmpresa = function() {
   var cuit = document.getElementById('det-cuit').value.trim();
   var telefono = document.getElementById('det-telefono').value.trim();
   var domicilio = document.getElementById('det-domicilio').value.trim();
+  var domicilioFiscal = document.getElementById('det-domicilio-fiscal').value.trim();
+  var domicilioComercial = document.getElementById('det-domicilio-comercial').value.trim();
+  var domicilioEnvio = document.getElementById('det-domicilio-envio').value.trim();
+  var comentariosGenerales = document.getElementById('det-comentarios').value.trim();
   var btn = document.getElementById('btn-guardar-cambios-empresa');
   var textoOriginal = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'guardarEmpresa', id:e.id, razonSocial:razon, cuit:cuit, telefono:telefono, domicilio:domicilio }) })
+    body: JSON.stringify({ accion:'guardarEmpresa', id:e.id, razonSocial:razon, cuit:cuit, telefono:telefono, domicilio:domicilio,
+      domicilioFiscal:domicilioFiscal, domicilioComercial:domicilioComercial, domicilioEnvio:domicilioEnvio, comentariosGenerales:comentariosGenerales }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert('Error al guardar: ' + (r.error||'desconocido')); return; }
       e.razonSocial = razon; e.cuit = cuit; e.telefono = telefono; e.domicilio = domicilio;
+      e.domicilioFiscal = domicilioFiscal; e.domicilioComercial = domicilioComercial; e.domicilioEnvio = domicilioEnvio; e.comentariosGenerales = comentariosGenerales;
       document.getElementById('hdr-titulo').textContent = razon;
     })
     .catch(function(){ alert('Error de conexión al guardar.'); })
@@ -591,8 +629,9 @@ window._borrarEmpresaActual = function() {
   var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
   if (!e) return;
   if (!confirm('¿Borrar "' + e.razonSocial + '" y todos sus contactos? Esta acción no se puede deshacer.')) return;
+  var sesionBorrar = _leerSesionCompartida();
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'borrarEmpresa', id:e.id }) })
+    body: JSON.stringify({ accion:'borrarEmpresa', id:e.id, vendedorRol: (sesionBorrar && sesionBorrar.rol) || '' }) })
     .then(function(r){ return r.json(); })
     .then(async function(r) {
       if (!r.ok) { alert('Error al borrar: ' + (r.error||'desconocido')); return; }
