@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.04.9 (Fix: los checkboxes de contacto se ponían oscuros al pasar el cursor encima — no tenían fondo/hover explícitos, así que el navegador podía aplicar un estado por defecto. Ahora usan una clase con fondo y hover fijos (blanco → gris clarito), igual que el resto de los inputs de esta tarjeta. Reportado por Cristian.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.04.8 (Fix: los checkboxes de contacto no tenían color de texto fijo — usaban el color ambiente que cambia con el tema, a diferencia de los inputs vecinos (VENDEDOR, TELÉFONO) que siempre son fondo blanco/texto oscuro sin importar el tema. Ahora siguen el mismo patrón fijo. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
@@ -150,6 +151,14 @@
         }
         .det-hero-badge-select:hover { box-shadow:0 0 0 2px rgba(58,134,255,0.25); }
         body.tema-claro .det-hero-badge-select { background-color:white; }
+        /* Filas de checkbox de contacto — fondo y hover EXPLÍCITOS, para
+           que no dependa del estilo por defecto del navegador/sistema
+           (que en algunos casos oscurece el hover de un <label> sin
+           fondo propio). Reportado por Cristian: "si pongo el cursor
+           encima se pone oscuro". */
+        .contacto-checkbox-fila { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px;
+            background:#ffffff; color:#0f172a; cursor:pointer; }
+        .contacto-checkbox-fila:hover { background:#f1f5f9; }
         /* Flecha con borders CSS puros — no depende de que cargue ninguna
            imagen/SVG (versiones anteriores con background-image de SVG
            no se veían de forma consistente), así que no puede fallar. */
@@ -2690,7 +2699,7 @@ async function _cargarOtrosContactosParaNegocio(idCot, c) {
         // "poder seleccionar varios contactos tildando los disponibles".
         box.innerHTML = empresa.contactos.map((ct, i) => {
             const marcado = nombresYaAsociados.includes((ct.nombre||'').trim()) ? ' checked' : '';
-            return `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer;color:#0f172a;">
+            return `<label class="contacto-checkbox-fila">
                 <input type="checkbox" value="${i}"${marcado} onchange="_toggleContactoCotizacion('${idCot}', ${i}, this.checked)">
                 <span>${ct.nombre}${ct.cargo ? ' — ' + ct.cargo : ''}</span>
             </label>`;

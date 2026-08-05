@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.04.4 (2 cambios pedidos por Cristian: (1) fix de hover oscuro en los checkboxes de contacto (fondo/hover ahora explícitos, no dependen del navegador/sistema); (2) el campo Descuento por ítem ahora tiene un toggle %/USD, igual estilo que el toggle de moneda que ya existía — antes solo se podía descontar en %. Ver FotoMap.gs v148 para el cálculo del lado del servidor.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.3 (El selector de Contacto pasa a ser multi-selección con checkboxes, mismo criterio que empresas.html y cotizaciones.html — antes solo dejaba elegir uno con un dropdown. Si se edita un negocio existente (?idNegocio=), se traen y se tildan solos los contactos ya guardados ahí (contacto principal + contactosAdicionales, ver FotoMap.gs v147). Persiste correctamente en el borrador al ir a "+ Agregar ítem" y volver. Pedido por Cristian: "cargar los contactos seleccionados en negocio y permitir agregar más si existen más".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.1 (BUG REAL encontrado: _irASelectorDispositivos() (el botón "+ Agregar ítem") guardaba el borrador SIN el TICKET_ID, y la URL de vuelta desde selector-dispositivos.html tampoco lo traía — así que agregar un ítem a mitad de armar un presupuesto de Servicio perdía el vínculo con el ticket, y el guardado siguiente creaba un negocio de Ventas en el Kanban en vez de quedarse en Servicio. Ahora se persiste y se restaura junto con el resto del borrador. Ver también FotoMap.gs v141 (el corte de fondo que ya no crea el negocio si el ticket SÍ llega). Reportado por Cristian con captura: "lo sigue generando en negocios, desde servicio".) -->
 <html lang="es">
@@ -79,6 +80,12 @@
     font-size:12px; color:var(--accent-orange); margin-top:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
   .contacto-warning a { color:var(--accent-orange); font-weight:700; text-decoration:underline; }
   .contacto-datos { font-size:11px; color:var(--text-muted); margin-top:8px; }
+  /* Filas de checkbox de contacto — fondo y hover explícitos, no
+     dependen del default del navegador/sistema. Reportado por
+     Cristian: "si pongo el cursor encima se pone oscuro". */
+  .contacto-checkbox-fila { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px;
+    cursor:pointer; background:#ffffff; color:#0f172a; }
+  .contacto-checkbox-fila:hover { background:#f1f5f9; }
 
   /* ── ÍTEMS ── */
   .item-card { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:12px; padding:14px; margin-bottom:12px; }
@@ -515,7 +522,7 @@ function _restaurarDraftYItemPendiente() {
       if (iguales.length) {
         iguales[0].cantidad = (iguales[0].cantidad || 1) + 1;
       } else {
-        ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: 1, descuento: descuentoAuto, descuentoContadoOriginal: descuentoAuto, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
+        ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: 1, descuento: descuentoAuto, descuentoTipo: '%', descuentoContadoOriginal: descuentoAuto, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
       }
     }
   } catch (e) { console.warn('Error aplicando ítem pendiente:', e); }
@@ -754,7 +761,7 @@ function _renderBloqueContacto() {
 
   var filas = contactos.map(function(c, i) {
     var marcado = nombresSeleccionados.indexOf((c.nombre||'').trim()) !== -1 ? ' checked' : '';
-    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;">' +
+    return '<label class="contacto-checkbox-fila">' +
       '<input type="checkbox" value="' + i + '"' + marcado + ' onchange="_toggleContactoEditor(' + i + ', this.checked)">' +
       '<span>' + c.nombre + (c.cargo ? ' — ' + c.cargo : '') + '</span>' +
     '</label>';
@@ -838,7 +845,7 @@ function _renderContactoDatos() {
 
 // ── ÍTEMS ──
 function _agregarItem() {
-  ITEMS.push({ id: ++_itemSeq, foto:null, descripcion:'', precio:0, precioContado:0, cantidad:1, descuento:0, descuentoContadoOriginal:0, iva:10.5, moneda:'USD' });
+  ITEMS.push({ id: ++_itemSeq, foto:null, descripcion:'', precio:0, precioContado:0, cantidad:1, descuento:0, descuentoTipo:'%', descuentoContadoOriginal:0, iva:10.5, moneda:'USD' });
   _render();
 }
 window._borrarItem = function(id) {
@@ -887,6 +894,18 @@ window._toggleMonedaItem = function(id) {
   if (!it) return;
   if (it.moneda !== 'ARS' && !TC_OFICIAL) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
   it.moneda = (it.moneda === 'ARS') ? 'USD' : 'ARS';
+  _render();
+};
+window._toggleDescuentoTipoItem = function(id) {
+  var it = ITEMS.find(function(x){ return x.id === id; });
+  if (!it) return;
+  it.descuentoTipo = ((it.descuentoTipo || '%') === 'USD') ? '%' : 'USD';
+  // Al cambiar de tipo, el número que había tipeado en el otro tipo ya
+  // no tiene sentido (35 en % no es lo mismo que 35 en USD) — se
+  // resetea a 0 para no dejar un descuento fantasma aplicado sin que
+  // el vendedor se dé cuenta.
+  it.descuento = 0;
+  it.descuentoEditadoManual = true;
   _render();
 };
 window._fotoItem = function(id, input) {
@@ -968,8 +987,21 @@ function _calcularItem(it) {
   // pasaba antes, simplemente no se aplica ningún descuento. Reportado
   // por Cristian: un descuento negativo terminaba inflando el total en
   // vez de bajarlo.
-  var descuentoPct = Math.max(0, it.descuento || 0);
-  var conDescuento = bruto * (1 - descuentoPct / 100);
+  //
+  // Descuento en USD (además de %): pedido por Cristian — "poder
+  // agregar descuento no solo con % sino también en USD". El monto en
+  // USD se resta directo del total de la línea (precio × cantidad),
+  // en la misma base interna en USD que usa todo el resto del cálculo
+  // — no hace falta convertir aunque el ítem se esté mostrando en AR$.
+  var descuentoTipo = it.descuentoTipo || '%';
+  var conDescuento;
+  if (descuentoTipo === 'USD') {
+    var descuentoUSD = Math.max(0, it.descuento || 0);
+    conDescuento = Math.max(0, bruto - descuentoUSD);
+  } else {
+    var descuentoPct = Math.max(0, it.descuento || 0);
+    conDescuento = bruto * (1 - descuentoPct / 100);
+  }
   var iva = conDescuento * (it.iva || 0) / 100;
   return { bruto:bruto, descontado:conDescuento, iva:iva, total:conDescuento + iva };
 }
@@ -1007,9 +1039,12 @@ function _renderItems() {
           '<input type="text" inputmode="decimal" value="' + _formatMilesInput(precioMostrado) + '" onchange="_actualizarItem(' + it.id + ',\'precio\',this.value)">' +
         '</div></div>' +
         '<div class="campo"><label>Cantidad</label><input type="number" min="1" value="' + it.cantidad + '" onchange="_actualizarItem(' + it.id + ',\'cantidad\',this.value)"></div>' +
-        '<div class="campo"><label>Descuento</label><div class="descuento-input-wrap">' +
-          '<input type="number" min="0" max="100" value="' + it.descuento + '" onchange="_actualizarItem(' + it.id + ',\'descuento\',this.value)">' +
-          '<span class="descuento-sufijo">%</span>' +
+        '<div class="campo"><label>Descuento</label><div class="descuento-input-wrap" style="display:flex;align-items:center;gap:6px;">' +
+          '<input type="number" min="0" ' + ((it.descuentoTipo||'%') === '%' ? 'max="100"' : '') + ' value="' + it.descuento + '" onchange="_actualizarItem(' + it.id + ',\'descuento\',this.value)" style="flex:1;min-width:0;">' +
+          '<div class="moneda-switch" onclick="_toggleDescuentoTipoItem(' + it.id + ')" title="Cambiar tipo de descuento">' +
+            '<span class="' + ((it.descuentoTipo||'%') !== 'USD' ? 'activo' : '') + '">%</span>' +
+            '<span class="' + ((it.descuentoTipo||'%') === 'USD' ? 'activo' : '') + '">USD</span>' +
+          '</div>' +
         '</div></div>' +
         '<div class="campo"><label>IVA %</label><select onchange="_actualizarItem(' + it.id + ',\'iva\',this.value)">' +
           [0,10.5,21,27].map(function(v){ return '<option value="' + v + '"' + (it.iva===v?' selected':'') + '>' + v + '%</option>'; }).join('') +
@@ -1377,7 +1412,7 @@ async function _generarPresupuesto() {
     contactosAdicionales: CONTACTOS_ADICIONALES_SEL.map(function(ct) { return { id: ct.id||'', nombre: ct.nombre||'', email: ct.email||'', telefono: ct.telefono||'' }; }),
     vendedor: vendedor,
     items: ITEMS.map(function(it) {
-      return { nombre: it.descripcion, precio: it.precio, precioContado: it.precioContado || it.precio, cantidad: it.cantidad, descuento: it.descuento, iva: it.iva, moneda: it.moneda || 'USD', foto: it.foto || '', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' };
+      return { nombre: it.descripcion, precio: it.precio, precioContado: it.precioContado || it.precio, cantidad: it.cantidad, descuento: it.descuento, descuentoTipo: it.descuentoTipo || '%', iva: it.iva, moneda: it.moneda || 'USD', foto: it.foto || '', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' };
     }),
     formaPago: document.getElementById('cc-forma-pago').value,
     modalidadPago: _calcularModalidadPagoParaGuardar(),

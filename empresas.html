@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.04.9 (Mismo fix de hover que cotizaciones.html: los checkboxes de contacto en el modal "Nuevo Negocio" ahora tienen fondo/hover explícitos, no dependen del navegador/sistema.) -->
 <!-- Portal TLC | empresas.html | v2026.08.04.8 (Modal "Nuevo Negocio": checkboxes de contactos en vez de un dropdown de uno solo — se puede tildar varios (el primero queda como principal, el resto como adicionales, ver FotoMap.gs v146). Nueva navegación ?volverA=negocio&idNegocio=X — la flecha del header vuelve directo al negocio si se llegó desde ahí (ver cotizaciones.html v2026.08.04.7). Pedido por Cristian.) -->
 <!-- Portal TLC | empresas.html | v2026.08.03.4 (Mismo fix que cotizaciones.html: se muestra el error real en la burbuja, no solo un mensaje genérico.) -->
 <html lang="es">
@@ -71,6 +72,14 @@
     padding:9px 11px; color:var(--text-main); font-size:12px; outline:none; font-family:inherit; }
   .det-campo input:focus, .det-campo textarea:focus { border-color:var(--accent-blue); }
   .det-campo textarea { resize:vertical; min-height:60px; }
+  /* Filas de checkbox de contacto — fondo y hover explícitos, no
+     dependen del default del navegador/sistema. Reportado por
+     Cristian: "si pongo el cursor encima se pone oscuro". */
+  .contacto-checkbox-fila { display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--border-glow);
+    border-radius:8px; margin-bottom:6px; cursor:pointer; background:#ffffff; color:#0f172a; }
+  .contacto-checkbox-fila:hover { background:#f1f5f9; }
+  body.tema-claro .contacto-checkbox-fila { background:#ffffff !important; color:#0f172a !important; }
+  body.tema-claro .contacto-checkbox-fila:hover { background:#f1f5f9 !important; }
   .det-campo.full { grid-column:1 / -1; }
 
   .acciones-empresa { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
@@ -906,7 +915,7 @@ function _renderModalNuevoNegocio() {
   // seleccionar varios contactos tildando los disponibles".
   var filas = contactos.map(function(c, i) {
     var checked = _mnnContactoIdxs.indexOf(i) !== -1 ? ' checked' : '';
-    return '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border-glow);border-radius:8px;margin-bottom:6px;cursor:pointer;">' +
+    return '<label class="contacto-checkbox-fila">' +
       '<input type="checkbox" value="' + i + '"' + checked + ' onchange="_mnnToggleContacto(' + i + ', this.checked)">' +
       '<span>' + c.nombre + (c.cargo ? ' — ' + c.cargo : '') + '</span>' +
     '</label>';
