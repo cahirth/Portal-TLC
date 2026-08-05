@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.04.11 (Mismo fix que servicio.html: hover-para-expandir en el panel de notificaciones.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.04.12 (Mismo fix que servicio.html: reacción rápida 👍/👎 en el panel de notificaciones.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.04.8 (Fix: los checkboxes de contacto no tenían color de texto fijo — usaban el color ambiente que cambia con el tema, a diferencia de los inputs vecinos (VENDEDOR, TELÉFONO) que siempre son fondo blanco/texto oscuro sin importar el tema. Ahora siguen el mismo patrón fijo. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
@@ -448,6 +448,13 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
         white-space:nowrap; transition: font-size .15s ease; }
       .notif-fila:hover .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
       body.tema-claro .notif-texto { color:#0f172a; }
+      .notif-reacciones { display:flex; gap:2px; opacity:0; transform:translateX(4px);
+        transition:opacity .15s ease, transform .15s ease; flex-shrink:0; }
+      .notif-fila:hover .notif-reacciones, .notif-fila:focus-within .notif-reacciones { opacity:1; transform:translateX(0); }
+      .notif-reacciones button { background:none; border:none; font-size:15px; cursor:pointer; padding:3px 5px;
+        border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
+      .notif-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
+      .notif-reaccion-guardada { font-size:12px; margin-left:4px; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
@@ -1482,12 +1489,28 @@ function _renderCampanaListaCot() {
             '<div style="flex:1;min-width:0;">' +
                 (n.autor_nombre ? '<div style="font-size:12px;font-weight:700;color:#f1f5f9;">' + _escCot(n.autor_nombre) + '</div>' : '') +
                 '<div class="notif-texto">' + _escCot(n.texto || '') + '</div>' +
-                '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + _escCot(n.ticket_titulo || '') + (n.ticket_titulo ? ' · ' : '') + _tiempoRelativoCampanaCot(n.fecha) + '</div>' +
+                '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + _escCot(n.ticket_titulo || '') + (n.ticket_titulo ? ' · ' : '') + _tiempoRelativoCampanaCot(n.fecha) +
+                  (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : '👎') + '</span>' : '') +
+                '</div>' +
+            '</div>' +
+            '<div class="notif-reacciones">' +
+                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'ok\')" title="Ok">👍</button>' +
+                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'no_ok\')" title="No ok">👎</button>' +
             '</div>' +
             (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
         '</div>';
     }).join('');
 }
+
+window._reaccionarNotifCot = function(ev, idNoti, tipo) {
+    if (ev) ev.stopPropagation();
+    var cuenta = _leerSesionCompartida();
+    var email = cuenta ? cuenta.username : '';
+    if (!email) return;
+    fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ accion:'reaccionarNotificacion', email:email, id:idNoti, reaccion:tipo }) })
+        .then(function(){ _cargarNotificaciones(true); });
+};
 
 window._toggleCampanaNotificaciones = function(ev) {
     ev.stopPropagation();
