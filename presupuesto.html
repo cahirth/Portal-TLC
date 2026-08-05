@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.28.9 (Sacada la lógica de negocio duplicada — ya no recalcula el desglose de modalidad de pago con su propia copia de parámetros (anticipo %, TNA, etc.). Ahora solo muestra p.modalidadPago, que llega YA CALCULADO desde presupuesto-editor.html (ver v2026.08.04.2 de ese archivo y FotoMap.gs v144). Fuente única de verdad. Pedido por Cristian: "el amo es el presupuesto editor".) -->
+<!-- Portal TLC | presupuesto.html | v2026.07.28.10 (Botón "Enviar por WhatsApp": si el negocio tiene más de un contacto con teléfono, ahora abre un selector preguntando a quién enviárselo, en vez de mandar siempre al contacto "principal" nomás. Lee los contactos de la raíz del negocio (contacto + contactosAdicionales, ver FotoMap.gs v146 y cotizaciones.html v2026.08.04.7). Pedido por Cristian.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.7 (Corte definitivo del problema: se sacó el position:fixed del header repetido — esa técnica depende de calcular bien su altura real contra el margen de @page, y con captura del preview real de Chrome (Márgenes: Predeterminados confirmado) quedó demostrado que ni 175px ni 225px alcanzaban, sin forma de saber a ciegas cuánto hace falta. Ahora el header es contenido normal, aparece una sola vez arriba de la página 1, margen vuelto a un valor chico normal (40px). Se pierde el logo repetido en cada página, pero se termina la categoría entera de bugs de superposición. Pedido por Cristian: "no quiero perder más tiempo con esto".) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.6 (CAUSA RAÍZ REAL encontrada, con 2 capturas de Cristian: no era un problema de saltos de página — el header fijo (position:fixed, se repite en cada página) mide más de los 175px reservados en @page margin-top, así que se pinta ENCIMA de lo que arranca justo debajo: en página 1 tapaba los datos del cliente (Señores/CUIT/Domicilio), en página 2 tapaba Atentamente + Datos Bancarios — por eso "desaparecían" en vez de solo cortarse. Subido el margen a 225px, con aire de sobra contra el contenido real del header (título+subtítulo+N°+disclaimer de 3 líneas+fecha+validez). Los fixes anteriores (page-break-inside:avoid) quedan igual, no hacen daño, pero la causa real era esta.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.5 (El fix anterior (page-break-inside:avoid en 3 bloques separados) no alcanzó — "Datos Bancarios" directamente desaparecía en vez de solo cortarse, según captura real de Cristian. Se agruparon Atentamente + Datos Bancarios + firma/logo en UN SOLO bloque atómico con page-break-inside:avoid, en vez de 3 bloques separados que podían interactuar mal entre sí — así el motor de impresión los mueve todos juntos a la página siguiente o los deja todos juntos en la actual, sin casos intermedios raros.) -->
@@ -290,7 +290,46 @@
     return d;
   }
 
-  function renderPresupuesto(idCot, p, esHistorico, numeroVersion) {
+  // Popup simple para elegir a cuál contacto mandarle el WhatsApp,
+  // cuando el negocio tiene más de uno. Se arma con JS puro (sin
+  // depender de ninguna librería) para no sumar dependencias a una
+  // página que tiene que cargar rápido en el celular del cliente.
+  window._elegirContactoWhatsApp = function() {
+    var contactos = window._CONTACTOS_WSP || [];
+    if (!contactos.length) return;
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.onclick = function(ev) { if (ev.target === overlay) document.body.removeChild(overlay); };
+    var caja = document.createElement('div');
+    caja.style.cssText = 'background:#fff;border-radius:14px;padding:20px;max-width:340px;width:100%;font-family:Arial,sans-serif;box-shadow:0 12px 40px rgba(0,0,0,.25);';
+    var titulo = document.createElement('div');
+    titulo.textContent = '¿A quién le enviás el presupuesto?';
+    titulo.style.cssText = 'font-size:14px;font-weight:800;color:#0f172a;margin-bottom:14px;';
+    caja.appendChild(titulo);
+    contactos.forEach(function(ct) {
+      var btn = document.createElement('button');
+      btn.textContent = ct.nombre + (ct.cargo ? ' — ' + ct.cargo : '');
+      btn.style.cssText = 'display:block;width:100%;text-align:left;padding:10px 14px;margin-bottom:8px;border-radius:9px;border:1px solid #e2e8f0;background:#f8fafc;color:#0f172a;font-size:13px;cursor:pointer;font-family:inherit;';
+      btn.onmouseover = function() { btn.style.borderColor = '#25D366'; };
+      btn.onmouseout = function() { btn.style.borderColor = '#e2e8f0'; };
+      btn.onclick = function() {
+        var tel = formatearTelefonoWsp(ct.telefono);
+        var msg = encodeURIComponent(window._SALUDO_WSP + ':\n' + window._URL_COMPARTIR_WSP);
+        window.open('https://wa.me/' + tel + '?text=' + msg, '_blank');
+        document.body.removeChild(overlay);
+      };
+      caja.appendChild(btn);
+    });
+    var cancelar = document.createElement('button');
+    cancelar.textContent = 'Cancelar';
+    cancelar.style.cssText = 'display:block;width:100%;text-align:center;padding:8px;margin-top:4px;border-radius:9px;border:none;background:transparent;color:#64748b;font-size:12px;cursor:pointer;font-family:inherit;';
+    cancelar.onclick = function() { document.body.removeChild(overlay); };
+    caja.appendChild(cancelar);
+    overlay.appendChild(caja);
+    document.body.appendChild(overlay);
+  };
+
+  function renderPresupuesto(idCot, p, esHistorico, numeroVersion, contactosDisponibles) {
     var c = p.carrito || [];
     var totales = p.totales || {};
     var netoTotalUSD = totales.subtotal_neto != null ? totales.subtotal_neto : 0;
@@ -354,6 +393,23 @@
       return telWsp ? ('https://wa.me/' + telWsp + '?text=' + msg) : ('https://wa.me/?text=' + msg);
     })();
 
+    // Botón de WhatsApp: si hay más de un contacto disponible para
+    // este negocio, en vez de un link directo se abre un selector
+    // preguntando a quién enviárselo — antes siempre mandaba al
+    // teléfono "principal" nomás, sin importar cuántos contactos
+    // hubiera. Pedido por Cristian: "si tiene más de 1 contacto que el
+    // sistema pregunte a quién enviárselo".
+    var contactosConTelefono = (contactosDisponibles || []).filter(function(ct) { return ct && ct.telefono; });
+    var botonWsp;
+    if (contactosConTelefono.length > 1) {
+      window._CONTACTOS_WSP = contactosConTelefono;
+      window._SALUDO_WSP = saludo;
+      window._URL_COMPARTIR_WSP = urlParaCompartir;
+      botonWsp = '<button class="btn-accion btn-ws-active" onclick="window._elegirContactoWhatsApp()">💬 Enviar por WhatsApp</button>';
+    } else {
+      botonWsp = '<a href="' + linkWsp + '" target="_blank" rel="noopener noreferrer" class="btn-accion btn-ws-active" style="text-decoration:none;">💬 Enviar por WhatsApp</a>';
+    }
+
     var bancosHtml =
       '<tr><td colspan="4" style="padding:6px 10px;font-size:11px;color:#374151;">' +
       '<strong>Credicoop AR$:</strong> CC$ 191-218-015278/6 &nbsp;·&nbsp; CBU: 19102182-55021801527864 &nbsp;·&nbsp; Alias: jade.lado.persa' +
@@ -376,7 +432,7 @@
         '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
           '<button class="btn-accion btn-pdf" onclick="window.print()">&#8595; Guardar PDF</button>' +
           (p.ticketId ? '<a href="https://cahirth.github.io/Portal-TLC/orden-servicio.html?id=' + encodeURIComponent(p.ticketId) + '" target="_blank" rel="noopener noreferrer" class="btn-accion btn-volver" style="text-decoration:none;">🔧 Ver Orden de Servicio</a>' : '') +
-          (esHistorico ? '' : '<a href="' + linkWsp + '" target="_blank" rel="noopener noreferrer" class="btn-accion btn-ws-active" style="text-decoration:none;">💬 Enviar por WhatsApp</a>') +
+          (esHistorico ? '' : botonWsp) +
         '</div>' +
       '</div>' +
 
@@ -483,7 +539,22 @@
       })
       .then(function(data) {
         if (data) {
-          renderPresupuesto(idCot, data, esHistorico, numeroVersion);
+          // Contactos disponibles para el selector de WhatsApp — viven
+          // en la raíz del negocio (no en el documento de presupuesto),
+          // los guarda cotizaciones.html cuando se tildan varios
+          // contactos. Fetch aparte, chico, no bloquea el render si
+          // falla. Pedido por Cristian: "si tiene más de 1 contacto que
+          // el sistema pregunte a quién enviárselo".
+          Promise.all([
+            fetch(FIREBASE_DB_URL + '/cotizaciones/' + encodeURIComponent(idCot) + '/contacto.json?_=' + Date.now(), { cache: 'no-store' }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }),
+            fetch(FIREBASE_DB_URL + '/cotizaciones/' + encodeURIComponent(idCot) + '/contactosAdicionales.json?_=' + Date.now(), { cache: 'no-store' }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }),
+          ]).then(function(res) {
+            var contactoPrincipal = res[0], adicionales = res[1];
+            var contactos = [];
+            if (contactoPrincipal && contactoPrincipal.nombre) contactos.push(contactoPrincipal);
+            if (Array.isArray(adicionales)) contactos = contactos.concat(adicionales.filter(function(ct){ return ct && ct.nombre; }));
+            renderPresupuesto(idCot, data, esHistorico, numeroVersion, contactos);
+          }).catch(function() { renderPresupuesto(idCot, data, esHistorico, numeroVersion, []); });
           return;
         }
         if (intento < MAX_INTENTOS) {

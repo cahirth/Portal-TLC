@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.08.04.7 (Fix: el textarea de Comentarios Generales salía con fondo negro en modo Tema Claro — las reglas CSS que fuerzan fondo blanco en ese tema apuntaban solo a "input", no a "textarea". Agregado a las dos reglas de body.tema-claro. Reportado por Cristian con captura.) -->
+<!-- Portal TLC | empresas.html | v2026.08.04.8 (Modal "Nuevo Negocio": checkboxes de contactos en vez de un dropdown de uno solo — se puede tildar varios (el primero queda como principal, el resto como adicionales, ver FotoMap.gs v146). Nueva navegación ?volverA=negocio&idNegocio=X — la flecha del header vuelve directo al negocio si se llegó desde ahí (ver cotizaciones.html v2026.08.04.7). Pedido por Cristian.) -->
 <!-- Portal TLC | empresas.html | v2026.08.03.4 (Mismo fix que cotizaciones.html: se muestra el error real en la burbuja, no solo un mensaje genérico.) -->
 <html lang="es">
 <head>
@@ -471,6 +471,11 @@ _aplicarTema();
 
 // ── Header: back button cambia de comportamiento según la vista ──
 window._volverDesdeHeader = function() {
+  // Si se llegó acá desde el detalle de un negocio (?volverA=negocio),
+  // la flecha de volver lleva directo de vuelta ahí, en vez de solo
+  // cerrar la ficha de empresa. Pedido por Cristian: "que vaya al
+  // módulo empresas pero que al volver, vuelva a ese negocio".
+  if (_volverANegocioId) { window.location.href = 'cotizaciones.html?id=' + encodeURIComponent(_volverANegocioId); return; }
   if (_empresaActualId) { _cerrarDetalle(); return; }
   history.back();
 };
@@ -849,11 +854,11 @@ window._nuevoNegocio = function(tipo) {
 // precargado. No toca el flujo viejo de selector-dispositivos.html.
 // ══════════════════════════════════════════════════════════════════
 var _mnnEmpresa = null;
-var _mnnContactoIdx = null;
+var _mnnContactoIdxs = []; // array de índices — permite seleccionar varios contactos, no solo uno
 
 function _abrirModalNuevoNegocio(e) {
   _mnnEmpresa = e;
-  _mnnContactoIdx = (e.contactos && e.contactos.length === 1) ? 0 : null;
+  _mnnContactoIdxs = (e.contactos && e.contactos.length === 1) ? [0] : [];
   document.getElementById('mnn-empresa-nombre').textContent =
     (e.razonSocial || 'Sin nombre') + (e.cuit ? ' · CUIT ' + e.cuit : '');
   // Nomenclatura 100% automática (pedido por Cristian, eliminado el
@@ -874,7 +879,7 @@ function _abrirModalNuevoNegocio(e) {
 function _cerrarModalNuevoNegocio() {
   document.getElementById('modal-nuevo-negocio').classList.remove('open');
   _mnnEmpresa = null;
-  _mnnContactoIdx = null;
+  _mnnContactoIdxs = [];
 }
 
 function _renderModalNuevoNegocio() {
@@ -896,27 +901,41 @@ function _renderModalNuevoNegocio() {
   btnCrear.style.opacity = '1';
   btnCrear.style.cursor = 'pointer';
 
-  var placeholder = contactos.length > 1 && _mnnContactoIdx === null
-    ? '<option value="" selected disabled>Seleccioná un contacto...</option>' : '';
-  var opciones = contactos.map(function(c, i) {
-    var sel = _mnnContactoIdx === i ? ' selected' : '';
-    return '<option value="' + i + '"' + sel + '>' + c.nombre + (c.cargo ? ' — ' + c.cargo : '') + '</option>';
+  // Checkboxes en vez de <select> — permite tildar varios contactos a
+  // la vez, no solo elegir uno. Pedido por Cristian: "poder
+  // seleccionar varios contactos tildando los disponibles".
+  var filas = contactos.map(function(c, i) {
+    var checked = _mnnContactoIdxs.indexOf(i) !== -1 ? ' checked' : '';
+    return '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border-glow);border-radius:8px;margin-bottom:6px;cursor:pointer;">' +
+      '<input type="checkbox" value="' + i + '"' + checked + ' onchange="_mnnToggleContacto(' + i + ', this.checked)">' +
+      '<span>' + c.nombre + (c.cargo ? ' — ' + c.cargo : '') + '</span>' +
+    '</label>';
   }).join('');
 
-  cont.innerHTML = '<div class="modal-campo"><label>Contacto</label>' +
-    '<select onchange="_mnnContactoIdx = this.value === \'\' ? null : parseInt(this.value,10);">' +
-    placeholder + opciones + '</select></div>';
+  cont.innerHTML = '<div class="modal-campo"><label>Contacto' + (contactos.length > 1 ? 's (podés elegir más de uno)' : '') + '</label>' + filas + '</div>';
 }
+
+window._mnnToggleContacto = function(i, marcado) {
+  var pos = _mnnContactoIdxs.indexOf(i);
+  if (marcado && pos === -1) _mnnContactoIdxs.push(i);
+  else if (!marcado && pos !== -1) _mnnContactoIdxs.splice(pos, 1);
+};
 
 async function _confirmarNuevoNegocio() {
   var e = _mnnEmpresa;
   if (!e) return;
   var contactos = (e.contactos || []);
-  if (contactos.length && _mnnContactoIdx === null) {
-    alert('Elegí un contacto antes de continuar.');
+  if (contactos.length && !_mnnContactoIdxs.length) {
+    alert('Elegí al menos un contacto antes de continuar.');
     return;
   }
-  var c = (_mnnContactoIdx !== null) ? contactos[_mnnContactoIdx] : null;
+  // El primer contacto tildado queda como "principal" (mismo campo de
+  // siempre, para no romper nada de lo que ya funciona con un solo
+  // contacto — WhatsApp, presupuesto, etc.); el resto se manda como
+  // adicionales. Pedido por Cristian: seleccionar varios contactos.
+  var seleccionados = _mnnContactoIdxs.map(function(i) { return contactos[i]; }).filter(Boolean);
+  var c = seleccionados[0] || null;
+  var adicionales = seleccionados.slice(1);
   var etapa = document.getElementById('mnn-etapa').value;
   var sesion = _leerSesionCompartida();
   var vendedor = (sesion && sesion.name) || '';
@@ -942,6 +961,7 @@ async function _confirmarNuevoNegocio() {
       contactoNombre: c ? (c.nombre || '') : '',
       contactoEmail: c ? (c.email || '') : '',
       contactoTelefono: c ? (c.telefono || '') : '',
+      contactosAdicionales: adicionales.map(function(ct) { return { id: ct.id || '', nombre: ct.nombre || '', email: ct.email || '', telefono: ct.telefono || '' }; }),
     };
     console.log('[Nuevo Negocio] Payload enviado:', payload);
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
@@ -1161,13 +1181,25 @@ window._confirmarImportacion = async function() {
 };
 
 // ── Origen: ?empresa=ID para entrar directo a una ficha (ej. desde una tarjeta) ──
+// ── ?volverA=negocio&idNegocio=X — se llegó desde el detalle de un
+//    negocio en cotizaciones.html; la flecha de volver del header
+//    lleva directo de vuelta ahí (ver _volverDesdeHeader), en vez de
+//    solo cerrar la ficha de empresa.
+var _volverANegocioId = null;
 (async function() {
   var acceso = await validarAccesoModulo('Empresas');
   if (!acceso) return; // ya mostró el alert y redirigió a index.html
   var params = new URLSearchParams(window.location.search);
   var empresaId = params.get('empresa');
+  if (params.get('volverA') === 'negocio' && params.get('idNegocio')) {
+    _volverANegocioId = params.get('idNegocio');
+  }
   await _cargarEmpresas();
   if (empresaId) _abrirDetalleEmpresa(empresaId);
+  if (_volverANegocioId) {
+    var hdrSub = document.getElementById('hdr-sub');
+    if (hdrSub) hdrSub.textContent = '← Volviendo de un negocio — tocá la flecha para volver ahí';
+  }
 })();
 </script>
   <!-- MODAL NUEVO NEGOCIO (VENTAS) -->
