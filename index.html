@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.08.04.6 (Mismo fix que servicio.html: reacción rápida 👍/👎 en el panel de notificaciones.) -->
+<!-- Portal TLC | index.html | v2026.08.04.7 (Sumado ❤️ a la reacción de la campanita, mismo criterio que servicio.html y cotizaciones.html.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2253,12 +2253,13 @@ body.tema-claro .notif-texto { color:#0f172a; }
             (n.autor_nombre ? '<div style="font-size:12px;font-weight:700;color:#f1f5f9;">' + _escIdxCl(n.autor_nombre) + '</div>' : '') +
             '<div class="notif-texto">' + _escIdxCl(n.texto || '') + '</div>' +
             '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + _escIdxCl(n.ticket_titulo || '') + (n.ticket_titulo ? ' · ' : '') + _tiempoRelativoCampanaIdx(n.fecha) +
-              (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : '👎') + '</span>' : '') +
+              (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : n.reaccion === 'no_ok' ? '👎' : '❤️') + '</span>' : '') +
             '</div>' +
           '</div>' +
           '<div class="notif-reacciones">' +
             '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'ok\')" title="Ok">👍</button>' +
             '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'no_ok\')" title="No ok">👎</button>' +
+            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'corazon\')" title="Me encanta">❤️</button>' +
           '</div>' +
           (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
         '</div>';

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.04.12 (Mismo fix que servicio.html: reacción rápida 👍/👎 en el panel de notificaciones.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.04.14 (Mismo agregado que servicio.html: tocar el resumen de reacciones muestra quién fue.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.04.8 (Fix: los checkboxes de contacto no tenían color de texto fijo — usaban el color ambiente que cambia con el tema, a diferencia de los inputs vecinos (VENDEDOR, TELÉFONO) que siempre son fondo blanco/texto oscuro sin importar el tema. Ahora siguen el mismo patrón fijo. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
@@ -455,6 +455,25 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
         border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
       .notif-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
       .notif-reaccion-guardada { font-size:12px; margin-left:4px; }
+      /* Mensajes internos (negocio) — mismo tratamiento que las
+         notificaciones: hover agranda el texto, aparecen 3 botones de
+         reacción, y el resumen de reacciones ya puestas queda visible
+         siempre (no solo en hover) para todo el equipo. Pedido por
+         Cristian: mismo hover-zoom + emojis acá también. */
+      .msg-fila { transition: background .12s ease, border-color .12s ease; cursor:default; }
+      .msg-fila:hover, .msg-fila:focus-within { background:#132540 !important; border-color:#3a86ff55 !important; }
+      .msg-texto { transition:font-size .15s ease; }
+      .msg-fila:hover .msg-texto { font-size:13px; }
+      .msg-reacciones { display:flex; gap:2px; opacity:0; transition:opacity .15s ease; margin-top:5px; }
+      .msg-fila:hover .msg-reacciones, .msg-fila:focus-within .msg-reacciones { opacity:1; }
+      .msg-reacciones button { background:none; border:none; font-size:14px; cursor:pointer; padding:2px 5px;
+        border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
+      .msg-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
+      .msg-reacciones-resumen { font-size:11px; margin-top:5px; color:#94a3b8; }
+      .msg-reaccion-pill { cursor:pointer; padding:2px 6px; border-radius:10px; background:rgba(58,134,255,.1); transition:background .1s ease; }
+      .msg-reaccion-pill:hover { background:rgba(58,134,255,.22); }
+      body.tema-claro .msg-fila:hover { background:#eef2ff !important; }
+      body.tema-claro .msg-reacciones-resumen { color:#64748b; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
@@ -1110,18 +1129,78 @@ function _tiempoRelativoCot(fechaIso) {
     return Math.floor(hs / 24) + ' d';
 }
 
+function _resumenReaccionesCot(reacciones) {
+    if (!reacciones) return '';
+    var grupos = { ok:[], no_ok:[], corazon:[] };
+    Object.keys(reacciones).forEach(function(k) {
+        var r = reacciones[k];
+        var tipo = (r && typeof r === 'object') ? r.reaccion : r; // compat con datos viejos (guardaban solo el string)
+        var nombre = (r && typeof r === 'object') ? (r.nombre || '') : '';
+        if (grupos[tipo]) grupos[tipo].push(nombre || 'Alguien');
+    });
+    var emojis = { ok:'👍', no_ok:'👎', corazon:'❤️' };
+    var partes = [];
+    Object.keys(grupos).forEach(function(tipo) {
+        if (!grupos[tipo].length) return;
+        var nombresStr = grupos[tipo].join(', ').replace(/'/g, "\\'");
+        partes.push('<span class="msg-reaccion-pill" onclick="_mostrarQuienReaccionoCot(event,\'' + emojis[tipo] + '\',\'' + nombresStr + '\')" title="' + grupos[tipo].join(', ') + '">' + emojis[tipo] + ' ' + grupos[tipo].length + '</span>');
+    });
+    if (!partes.length) return '';
+    return '<div class="msg-reacciones-resumen">' + partes.join('&nbsp;&nbsp;') + '</div>';
+}
+
+window._mostrarQuienReaccionoCot = function(ev, emoji, nombresStr) {
+    if (ev) ev.stopPropagation();
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.onclick = function(e) { if (e.target === overlay) document.body.removeChild(overlay); };
+    var caja = document.createElement('div');
+    caja.style.cssText = 'background:#0f1b2e;border:1px solid #1e3050;border-radius:14px;padding:18px 20px;max-width:300px;width:100%;font-family:inherit;box-shadow:0 12px 40px rgba(0,0,0,.4);';
+    caja.innerHTML = '<div style="font-size:22px;text-align:center;margin-bottom:8px;">' + emoji + '</div>' +
+        '<div style="font-size:13px;color:#f1f5f9;text-align:center;line-height:1.6;">' + nombresStr.split(', ').map(function(n){return _escCot(n);}).join('<br>') + '</div>';
+    overlay.appendChild(caja);
+    document.body.appendChild(overlay);
+    setTimeout(function() { document.addEventListener('click', function cerrar(e2) {
+        if (!caja.contains(e2.target)) { if (overlay.parentNode) document.body.removeChild(overlay); document.removeEventListener('click', cerrar); }
+    }); }, 50);
+};
+
 function _construirHtmlListaMensajesCot() {
     if (!_mensajesCotActual.length) return '<div style="font-size:12px;color:#94a3b8;text-align:center;padding:16px 0;">Todavía no hay mensajes en esta cotización.</div>';
-    return _mensajesCotActual.map(function(m) {
-        return '<div style="padding:8px 10px;border-radius:10px;background:#0f1b2e;border:1px solid #1e3050;margin-bottom:8px;">' +
+    return _mensajesCotActual.map(function(m, i) {
+        return '<div class="msg-fila" tabindex="0" style="padding:8px 10px;border-radius:10px;background:#0f1b2e;border:1px solid #1e3050;margin-bottom:8px;">' +
             '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
                 '<span style="font-size:11px;font-weight:700;color:#f1f5f9;">' + _escCot(m.autor_nombre || m.autor_email || '—') + '</span>' +
                 '<span style="font-size:10px;color:#64748b;white-space:nowrap;">' + _tiempoRelativoCot(m.fecha) + '</span>' +
             '</div>' +
-            '<div style="font-size:12px;color:#f1f5f9;white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTextoCot(_escCot(m.texto || '')) + '</div>' +
+            '<div class="msg-texto" style="font-size:12px;color:#f1f5f9;white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTextoCot(_escCot(m.texto || '')) + '</div>' +
+            _resumenReaccionesCot(m.reacciones) +
+            '<div class="msg-reacciones">' +
+                '<button onclick="_reaccionarMensajeCot(event,' + i + ',\'ok\')" title="Ok">👍</button>' +
+                '<button onclick="_reaccionarMensajeCot(event,' + i + ',\'no_ok\')" title="No ok">👎</button>' +
+                '<button onclick="_reaccionarMensajeCot(event,' + i + ',\'corazon\')" title="Me encanta">❤️</button>' +
+            '</div>' +
         '</div>';
     }).join('');
 }
+
+window._reaccionarMensajeCot = function(ev, indice, tipo) {
+    if (ev) ev.stopPropagation();
+    var cuenta = _leerSesionCompartida();
+    var email = cuenta ? cuenta.username : '';
+    var nombre = cuenta ? cuenta.name : '';
+    if (!email || !_idCotActual) return;
+    fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ accion:'cot_reaccionarMensaje', id_cotizacion:_idCotActual, indice:indice, autor_email:email, autor_nombre:nombre, reaccion:tipo }) })
+        .then(function(r){ return r.json(); })
+        .then(function(r) {
+            if (r.ok && Array.isArray(r.mensajes)) {
+                _mensajesCotActual = r.mensajes;
+                var lista = document.getElementById('mensajes-lista-cot');
+                if (lista) lista.innerHTML = _construirHtmlListaMensajesCot();
+            }
+        });
+};
 
 async function _renderPanelMensajesCot(id) {
     var panel = document.getElementById('det-mensajes-panel');
@@ -1490,12 +1569,13 @@ function _renderCampanaListaCot() {
                 (n.autor_nombre ? '<div style="font-size:12px;font-weight:700;color:#f1f5f9;">' + _escCot(n.autor_nombre) + '</div>' : '') +
                 '<div class="notif-texto">' + _escCot(n.texto || '') + '</div>' +
                 '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + _escCot(n.ticket_titulo || '') + (n.ticket_titulo ? ' · ' : '') + _tiempoRelativoCampanaCot(n.fecha) +
-                  (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : '👎') + '</span>' : '') +
+                  (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : n.reaccion === 'no_ok' ? '👎' : '❤️') + '</span>' : '') +
                 '</div>' +
             '</div>' +
             '<div class="notif-reacciones">' +
                 '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'ok\')" title="Ok">👍</button>' +
                 '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'no_ok\')" title="No ok">👎</button>' +
+                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'corazon\')" title="Me encanta">❤️</button>' +
             '</div>' +
             (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
         '</div>';
