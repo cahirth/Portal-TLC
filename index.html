@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.08.04.4 (Mismo fix de color-scheme que cotizaciones.html — causa raíz real del hover oscuro en modo claro.) -->
+<!-- Portal TLC | index.html | v2026.08.04.5 (Mismo fix que servicio.html: hover-para-expandir en el panel de notificaciones.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -340,6 +340,16 @@ body.tema-claro #campana-panel [style*="border-bottom:1px solid #1e3050"] { bord
 body.tema-claro #campana-panel [style*="color:#f1f5f9"] { color:#0f172a !important; }
 body.tema-claro #campana-panel [style*="color:#94a3b8"] { color:#64748b !important; }
 body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#cbd5e1 !important; color:#0f172a !important; }
+/* Notificaciones — al pasar el mouse (o tocar en celular), el texto
+   truncado se expande y se agranda un poco, en vez de quedarse
+   cortado con "...". Pedido por Cristian: "que se vea el mensaje más
+   grande, tipo zoom responsivo" — en todas las campanitas. */
+.notif-fila { transition: background .12s ease; }
+.notif-fila:hover, .notif-fila:focus-within { background: rgba(58,134,255,.10) !important; }
+.notif-texto { font-size:12px; color:#f1f5f9; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; transition: font-size .15s ease; }
+.notif-fila:hover .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
+body.tema-claro .notif-texto { color:#0f172a; }
     </style>
 </head>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -2229,12 +2239,12 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
       }
       cont.innerHTML = items.map(function(n) {
         var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.08)';
-        return '<div onclick="_clickNotificacionIdx(\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'servicio') + '\')" ' +
+        return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacionIdx(\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'servicio') + '\')" ' +
           'style="padding:11px 14px;border-bottom:1px solid #1e3050;cursor:pointer;background:' + noLeidaBg + ';display:flex;gap:10px;align-items:flex-start;">' +
           '<span style="font-size:16px;flex-shrink:0;">' + _iconoTipoNotificacionIdx(n.tipo) + '</span>' +
           '<div style="flex:1;min-width:0;">' +
             (n.autor_nombre ? '<div style="font-size:12px;font-weight:700;color:#f1f5f9;">' + _escIdxCl(n.autor_nombre) + '</div>' : '') +
-            '<div style="font-size:12px;color:#f1f5f9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _escIdxCl(n.texto || '') + '</div>' +
+            '<div class="notif-texto">' + _escIdxCl(n.texto || '') + '</div>' +
             '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + _escIdxCl(n.ticket_titulo || '') + (n.ticket_titulo ? ' · ' : '') + _tiempoRelativoCampanaIdx(n.fecha) + '</div>' +
           '</div>' +
           (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
