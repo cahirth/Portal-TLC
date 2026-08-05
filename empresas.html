@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | empresas.html | v2026.08.04.5 (3 pedidos de Cristian: (1) búsqueda ahora también matchea por N° de serie de equipos vinculados vía tickets de Servicio; (2) botón "Borrar empresa" oculto para no-administradores (con chequeo también del lado del servidor en FotoMap.gs v145); (3) 4 campos nuevos en la ficha: Domicilio Fiscal, Domicilio Comercial, Domicilio de Envío, Comentarios Generales.) -->
+<!-- Portal TLC | empresas.html | v2026.08.04.6 (2 fixes sobre lo anterior, reportados por Cristian con capturas: (1) los 4 campos nuevos usaban una clase CSS inexistente ("campo" en vez de "det-campo"), por eso salían con estilo roto/sin recuadro — corregido, y se agregó estilo de textarea a la misma clase para que Comentarios Generales también tenga borde. La grilla ya era responsiva (se apila en 1 columna bajo 640px), no hacía falta nada extra ahí. (2) Los 4 campos nuevos faltaban en el modal "Nueva Empresa" — agregados ahí también, con el mismo formato.) -->
 <!-- Portal TLC | empresas.html | v2026.08.03.4 (Mismo fix que cotizaciones.html: se muestra el error real en la burbuja, no solo un mensaje genérico.) -->
 <html lang="es">
 <head>
@@ -67,9 +67,10 @@
 
   .det-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .det-campo label { font-size:9px; color:var(--text-dim); text-transform:uppercase; font-weight:700; display:block; margin-bottom:4px; }
-  .det-campo input { width:100%; background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:8px;
-    padding:9px 11px; color:var(--text-main); font-size:12px; outline:none; }
-  .det-campo input:focus { border-color:var(--accent-blue); }
+  .det-campo input, .det-campo textarea { width:100%; background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:8px;
+    padding:9px 11px; color:var(--text-main); font-size:12px; outline:none; font-family:inherit; }
+  .det-campo input:focus, .det-campo textarea:focus { border-color:var(--accent-blue); }
+  .det-campo textarea { resize:vertical; min-height:60px; }
   .det-campo.full { grid-column:1 / -1; }
 
   .acciones-empresa { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
@@ -217,7 +218,23 @@
           </div>
           <div class="det-campo full">
             <label>Domicilio</label>
-            <input type="text" id="ne-domicilio" placeholder="Domicilio fiscal">
+            <input type="text" id="ne-domicilio" placeholder="Dirección de la empresa">
+          </div>
+          <div class="det-campo">
+            <label>Domicilio Fiscal</label>
+            <input type="text" id="ne-domicilio-fiscal">
+          </div>
+          <div class="det-campo">
+            <label>Domicilio Comercial</label>
+            <input type="text" id="ne-domicilio-comercial">
+          </div>
+          <div class="det-campo">
+            <label>Domicilio de Envío</label>
+            <input type="text" id="ne-domicilio-envio">
+          </div>
+          <div class="det-campo full">
+            <label>Comentarios Generales</label>
+            <textarea id="ne-comentarios" rows="3"></textarea>
           </div>
         </div>
         <div class="acciones-empresa">
@@ -251,21 +268,21 @@
             <label>Domicilio</label>
             <input type="text" id="det-domicilio">
           </div>
-          <div class="campo">
+          <div class="det-campo">
             <label>Domicilio Fiscal</label>
             <input type="text" id="det-domicilio-fiscal">
           </div>
-          <div class="campo">
+          <div class="det-campo">
             <label>Domicilio Comercial</label>
             <input type="text" id="det-domicilio-comercial">
           </div>
-          <div class="campo">
+          <div class="det-campo">
             <label>Domicilio de Envío</label>
             <input type="text" id="det-domicilio-envio">
           </div>
-          <div class="campo">
+          <div class="det-campo full">
             <label>Comentarios Generales</label>
-            <textarea id="det-comentarios" rows="3" style="width:100%;resize:vertical;font-family:inherit;font-size:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--border-color);"></textarea>
+            <textarea id="det-comentarios" rows="3"></textarea>
           </div>
         </div>
         <div class="acciones-empresa">
@@ -500,7 +517,7 @@ window._toggleFormNuevaEmpresa = function() {
   var abrir = panel.style.display !== 'block';
   panel.style.display = abrir ? 'block' : 'none';
   if (abrir) {
-    ['ne-cuit','ne-telefono','ne-razon','ne-domicilio'].forEach(function(id){ document.getElementById(id).value = ''; });
+    ['ne-cuit','ne-telefono','ne-razon','ne-domicilio','ne-domicilio-fiscal','ne-domicilio-comercial','ne-domicilio-envio','ne-comentarios'].forEach(function(id){ document.getElementById(id).value = ''; });
     document.getElementById('ne-razon').focus();
   }
 };
@@ -537,6 +554,10 @@ window._crearNuevaEmpresa = function() {
   var cuit = document.getElementById('ne-cuit').value.trim();
   var telefono = document.getElementById('ne-telefono').value.trim();
   var domicilio = document.getElementById('ne-domicilio').value.trim();
+  var domicilioFiscal = document.getElementById('ne-domicilio-fiscal').value.trim();
+  var domicilioComercial = document.getElementById('ne-domicilio-comercial').value.trim();
+  var domicilioEnvio = document.getElementById('ne-domicilio-envio').value.trim();
+  var comentariosGenerales = document.getElementById('ne-comentarios').value.trim();
 
   var existente = _buscarEmpresaExistente(razon, cuit);
   if (existente) {
@@ -551,7 +572,8 @@ window._crearNuevaEmpresa = function() {
   if (btnCrearEmp) { btnCrearEmp.disabled = true; btnCrearEmp.textContent = 'Guardando...'; }
 
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:razon, cuit:cuit, telefono:telefono, domicilio:domicilio }) })
+    body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:razon, cuit:cuit, telefono:telefono, domicilio:domicilio,
+      domicilioFiscal:domicilioFiscal, domicilioComercial:domicilioComercial, domicilioEnvio:domicilioEnvio, comentariosGenerales:comentariosGenerales }) })
     .then(function(r){ return r.json(); })
     .then(async function(r) {
       if (!r.ok) { alert('Error al crear la empresa: ' + (r.error||'desconocido')); return; }
