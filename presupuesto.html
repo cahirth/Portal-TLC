@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto.html | v2026.07.28.8 (Condiciones Comerciales: "Forma de Pago" mostraba el valor crudo guardado (ej. "tlc6") en vez de un texto legible — ahora dice "TLC 6 cuotas". Se agregó el desglose real de la modalidad elegida (anticipo % + cuotas, o maxicanon + cánones para Leasing), mismo cálculo que la tarjeta de presupuesto-editor.html. Se agregó también la referencia del Tipo de Cambio oficial usado ("TC = $...") para cualquier modalidad financiada, no solo cuando los totales están en AR$. Pedido por Cristian.) -->
+<!-- Portal TLC | presupuesto.html | v2026.07.28.9 (Sacada la lógica de negocio duplicada — ya no recalcula el desglose de modalidad de pago con su propia copia de parámetros (anticipo %, TNA, etc.). Ahora solo muestra p.modalidadPago, que llega YA CALCULADO desde presupuesto-editor.html (ver v2026.08.04.2 de ese archivo y FotoMap.gs v144). Fuente única de verdad. Pedido por Cristian: "el amo es el presupuesto editor".) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.7 (Corte definitivo del problema: se sacó el position:fixed del header repetido — esa técnica depende de calcular bien su altura real contra el margen de @page, y con captura del preview real de Chrome (Márgenes: Predeterminados confirmado) quedó demostrado que ni 175px ni 225px alcanzaban, sin forma de saber a ciegas cuánto hace falta. Ahora el header es contenido normal, aparece una sola vez arriba de la página 1, margen vuelto a un valor chico normal (40px). Se pierde el logo repetido en cada página, pero se termina la categoría entera de bugs de superposición. Pedido por Cristian: "no quiero perder más tiempo con esto".) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.6 (CAUSA RAÍZ REAL encontrada, con 2 capturas de Cristian: no era un problema de saltos de página — el header fijo (position:fixed, se repite en cada página) mide más de los 175px reservados en @page margin-top, así que se pinta ENCIMA de lo que arranca justo debajo: en página 1 tapaba los datos del cliente (Señores/CUIT/Domicilio), en página 2 tapaba Atentamente + Datos Bancarios — por eso "desaparecían" en vez de solo cortarse. Subido el margen a 225px, con aire de sobra contra el contenido real del header (título+subtítulo+N°+disclaimer de 3 líneas+fecha+validez). Los fixes anteriores (page-break-inside:avoid) quedan igual, no hacen daño, pero la causa real era esta.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.5 (El fix anterior (page-break-inside:avoid en 3 bloques separados) no alcanzó — "Datos Bancarios" directamente desaparecía en vez de solo cortarse, según captura real de Cristian. Se agruparon Atentamente + Datos Bancarios + firma/logo en UN SOLO bloque atómico con page-break-inside:avoid, en vez de 3 bloques separados que podían interactuar mal entre sí — así el motor de impresión los mueve todos juntos a la página siguiente o los deja todos juntos en la actual, sin casos intermedios raros.) -->
@@ -178,47 +178,33 @@
       : 'Clínica del Cliente.';
 
     // Forma de Pago — antes mostraba el VALOR CRUDO guardado (ej.
-    // "tlc6"), no un texto legible. Mismas 4 modalidades reales que
-    // ofrece presupuesto-editor.html.
+    // "tlc6"), no un texto legible.
     var LABELS_FORMA_PAGO = { contado: 'Contado', tlc6: 'TLC 6 cuotas', tlc12: 'TLC 12 cuotas', leasing36: 'Leasing 36 meses (AR$)' };
-    var formaPagoLabel = LABELS_FORMA_PAGO[p.formaPago] || p.formaPago;
+    var formaPagoLabel = (p.modalidadPago && p.modalidadPago.label) || LABELS_FORMA_PAGO[p.formaPago] || p.formaPago;
 
-    // Desglose de la modalidad elegida (anticipo + cuotas, o
-    // maxicanon + cánones para leasing) — mismos parámetros de negocio
-    // que PARAMS_PAGO en presupuesto-editor.html. Si Cristian ajusta
-    // esos números allá, hay que actualizarlos acá también.
-    var PARAMS_PAGO_PDF = {
-      tlc6:  { anticipoPct: 35, cuotas: 6 },
-      tlc12: { anticipoPct: 50, cuotas: 12 },
-      leasing36: { maxicanonPct: 15, tna: 39, canonesAPagar: 35 },
-    };
+    // Desglose de la modalidad (anticipo+cuotas, o maxicanon+cánones) —
+    // YA VIENE CALCULADO desde presupuesto-editor.html (p.modalidadPago),
+    // acá solo se formatea para mostrar. presupuesto-editor.html es la
+    // única fuente que sabe los parámetros de negocio (%, TNA, etc.) —
+    // antes esos mismos números estaban copiados a mano en este archivo
+    // también, con riesgo real de desincronizarse. Pedido por Cristian:
+    // "el amo es el presupuesto editor, presupuesto debería obedecer".
     var desgloseModalidad = '';
-    if (p.formaPago === 'tlc6' || p.formaPago === 'tlc12') {
-      var parTlc = PARAMS_PAGO_PDF[p.formaPago];
-      var baseTlc = netoTotalUSD || 0;
-      var mostrarEnArsTlc = (p.monedaTotales === 'ARS' && p.tcOficial);
-      var anticipoTlc = baseTlc * parTlc.anticipoPct / 100;
-      var cuotaTlc = (baseTlc - anticipoTlc) / parTlc.cuotas;
-      if (mostrarEnArsTlc) { anticipoTlc *= p.tcOficial; cuotaTlc *= p.tcOficial; }
-      var fmtTlcPdf = mostrarEnArsTlc
+    var mp = p.modalidadPago;
+    if (mp && (mp.tipo === 'tlc6' || mp.tipo === 'tlc12')) {
+      var fmtTlcPdf = mp.moneda === 'ARS'
         ? function(n) { return '$' + Math.round(n).toLocaleString('es-AR'); }
         : function(n) { return 'USD ' + Math.round(n).toLocaleString('es-AR'); };
       desgloseModalidad = '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin:6px 0 10px;font-size:12px;">' +
-        'Anticipo ' + parTlc.anticipoPct + '%: <strong>' + fmtTlcPdf(anticipoTlc) + ' + IVA</strong><br>' +
-        parTlc.cuotas + ' cuotas fijas de: <strong>' + fmtTlcPdf(cuotaTlc) + ' + IVA c/u</strong>' +
+        'Anticipo ' + mp.anticipoPct + '%: <strong>' + fmtTlcPdf(mp.anticipo) + ' + IVA</strong><br>' +
+        mp.cuotas + ' cuotas fijas de: <strong>' + fmtTlcPdf(mp.cuota) + ' + IVA c/u</strong>' +
       '</div>';
-    } else if (p.formaPago === 'leasing36' && p.tcOficial) {
-      var parL = PARAMS_PAGO_PDF.leasing36;
-      var baseArsL = (netoTotalUSD || 0) * p.tcOficial;
-      var iMensual = (parL.tna / 100) / 12;
-      var maxicanonL = baseArsL * parL.maxicanonPct / 100;
-      var capitalL = baseArsL - maxicanonL;
-      var canonL = capitalL * iMensual / (1 - Math.pow(1 + iMensual, -parL.canonesAPagar));
+    } else if (mp && mp.tipo === 'leasing36') {
       var fmtArsL = function(n) { return '$' + Math.round(n).toLocaleString('es-AR'); };
       desgloseModalidad = '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin:6px 0 10px;font-size:12px;">' +
-        'Maxicanon: <strong>' + fmtArsL(maxicanonL) + ' + IVA</strong><br>' +
-        parL.canonesAPagar + ' cánones fijos de: <strong>' + fmtArsL(canonL) + ' + IVA c/u</strong><br>' +
-        '<span style="font-size:11px;color:#64748b;">+ 1 canon en garantía (se aplica a los últimos) · Opción de compra al finalizar: ' + fmtArsL(canonL) + ' + IVA · TNA ' + parL.tna + '%</span>' +
+        'Maxicanon: <strong>' + fmtArsL(mp.maxicanon) + ' + IVA</strong><br>' +
+        mp.canones + ' cánones fijos de: <strong>' + fmtArsL(mp.canon) + ' + IVA c/u</strong><br>' +
+        '<span style="font-size:11px;color:#64748b;">+ 1 canon en garantía (se aplica a los últimos) · Opción de compra al finalizar: ' + fmtArsL(mp.vr) + ' + IVA · TNA ' + mp.tna + '%</span>' +
       '</div>';
     }
 

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.04.2 (Pasa a ser la ÚNICA fuente que calcula la modalidad de pago (anticipo/cuotas, maxicanon/cánones) — el resultado ya calculado se guarda como modalidadPago junto con el resto del presupuesto (ver FotoMap.gs v144). presupuesto.html ya no tiene su propia copia de estos parámetros de negocio, evitando que se desincronicen entre los dos archivos. Pedido por Cristian: "el amo es el presupuesto editor, presupuesto debería obedecer a editor".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.1 (BUG REAL encontrado: _irASelectorDispositivos() (el botón "+ Agregar ítem") guardaba el borrador SIN el TICKET_ID, y la URL de vuelta desde selector-dispositivos.html tampoco lo traía — así que agregar un ítem a mitad de armar un presupuesto de Servicio perdía el vínculo con el ticket, y el guardado siguiente creaba un negocio de Ventas en el Kanban en vez de quedarse en Servicio. Ahora se persiste y se restaura junto con el resto del borrador. Ver también FotoMap.gs v141 (el corte de fondo que ya no crea el negocio si el ticket SÍ llega). Reportado por Cristian con captura: "lo sigue generando en negocios, desde servicio".) -->
 <html lang="es">
 <head>
@@ -1246,6 +1247,44 @@ function _render() {
   _renderModalidadesPago();
 }
 
+// Snapshot de la modalidad de pago elegida, YA CALCULADO, para guardar
+// junto con el presupuesto — presupuesto.html (el documento que ve el
+// cliente) ya NO recalcula nada por su cuenta, solo muestra esto tal
+// cual. Antes existía la misma lógica de PARAMS_PAGO duplicada en los
+// dos archivos, con riesgo real de que se desincronicen si Cristian
+// ajusta un número en uno y se olvida del otro. Pedido por Cristian:
+// "el amo es el presupuesto editor, presupuesto debería obedecer".
+function _calcularModalidadPagoParaGuardar() {
+  var formaPago = document.getElementById('cc-forma-pago').value;
+  var LABELS = { contado: 'Contado', tlc6: 'TLC 6 cuotas', tlc12: 'TLC 12 cuotas', leasing36: 'Leasing 36 meses (AR$)' };
+  var base = { tipo: formaPago, label: LABELS[formaPago] || formaPago };
+
+  if (formaPago === 'tlc6' || formaPago === 'tlc12') {
+    var netoUSD = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).descontado; }, 0);
+    var p = PARAMS_PAGO[formaPago];
+    var r = _calcularTLC(netoUSD, p);
+    var monedaGeneral = (document.getElementById('moneda-presupuesto') || {}).value || 'USD';
+    var mostrarEnArs = monedaGeneral === 'ARS' && TC_OFICIAL;
+    base.moneda = mostrarEnArs ? 'ARS' : 'USD';
+    base.anticipoPct = p.anticipoPct;
+    base.anticipo = mostrarEnArs ? r.anticipo * TC_OFICIAL : r.anticipo;
+    base.cuotas = r.cuotas;
+    base.cuota = mostrarEnArs ? r.cuota * TC_OFICIAL : r.cuota;
+  } else if (formaPago === 'leasing36' && TC_OFICIAL) {
+    var netoUSD2 = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).descontado; }, 0);
+    var baseARS = netoUSD2 * TC_OFICIAL;
+    var l = _calcularLeasing36(baseARS);
+    base.moneda = 'ARS';
+    base.maxicanonPct = PARAMS_PAGO.leasing36.maxicanonPct;
+    base.maxicanon = l.maxicanon;
+    base.canones = l.canones;
+    base.canon = l.canon;
+    base.vr = l.vr;
+    base.tna = PARAMS_PAGO.leasing36.tna;
+  }
+  return base;
+}
+
 // ── GENERAR (todavía mock — guardado real es el próximo paso) ──
 async function _generarPresupuesto() {
   if (!CLIENTE_SEL) { alert('Elegí un cliente antes de generar el presupuesto.'); return; }
@@ -1280,6 +1319,7 @@ async function _generarPresupuesto() {
       return { nombre: it.descripcion, precio: it.precio, precioContado: it.precioContado || it.precio, cantidad: it.cantidad, descuento: it.descuento, iva: it.iva, moneda: it.moneda || 'USD', foto: it.foto || '', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' };
     }),
     formaPago: document.getElementById('cc-forma-pago').value,
+    modalidadPago: _calcularModalidadPagoParaGuardar(),
     validez: document.getElementById('cc-validez').value,
     validezFecha: document.getElementById('cc-validez-fecha').value,
     tiempoEntrega: document.getElementById('cc-tiempo-entrega').value,
