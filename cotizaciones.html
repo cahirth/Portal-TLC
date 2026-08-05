@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.04.7 (3 cambios pedidos por Cristian: (1) multi-selección de contactos con checkboxes en el detalle del negocio, mismo criterio que empresas.html; (2) la tarjeta "Cliente" ahora es clickeable — navega a empresas.html para editar la ficha y vuelve directo a este negocio al tocar la flecha de volver; (3) ver también presupuesto.html v2026.07.28.10 para el selector de WhatsApp cuando hay varios contactos.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.04.8 (Fix: los checkboxes de contacto no tenían color de texto fijo — usaban el color ambiente que cambia con el tema, a diferencia de los inputs vecinos (VENDEDOR, TELÉFONO) que siempre son fondo blanco/texto oscuro sin importar el tema. Ahora siguen el mismo patrón fijo. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2690,7 +2690,7 @@ async function _cargarOtrosContactosParaNegocio(idCot, c) {
         // "poder seleccionar varios contactos tildando los disponibles".
         box.innerHTML = empresa.contactos.map((ct, i) => {
             const marcado = nombresYaAsociados.includes((ct.nombre||'').trim()) ? ' checked' : '';
-            return `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer;">
+            return `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer;color:#0f172a;">
                 <input type="checkbox" value="${i}"${marcado} onchange="_toggleContactoCotizacion('${idCot}', ${i}, this.checked)">
                 <span>${ct.nombre}${ct.cargo ? ' — ' + ct.cargo : ''}</span>
             </label>`;
