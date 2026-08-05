@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | selector-dispositivos.html | v2026.08.04.5 (Faltaba agregar "+ IVA 10,5%" también al Precio Lista que se muestra dentro del box cuando la modalidad elegida es Financiado (no solo Contado) — quedó consistente en las 3 variantes ahora. Reportado por Cristian con captura.) -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.04.6 (Fix: la cantidad elegida con el stepper no viajaba al volver a presupuesto-editor.html vía "+ Agregar ítem" — el puente ?volverAPresupuesto=1 nunca mandaba cantidad, siempre quedaba en 1 sin importar lo que se hubiera elegido acá. Reportado por Cristian con captura.) -->
 
 <html lang="es">
 <head>
@@ -3528,6 +3528,7 @@ function agregarAlCarrito() {
                 descripcionCatalogo: d['Descripcion'] || '',
                 precio: isNaN(precioListaPP) ? 0 : precioListaPP,
                 precioContado: parseNum(d['Precio CONTADO CNO']) || (isNaN(precioListaPP) ? 0 : precioListaPP),
+                cantidad: cantidadActual, // ← antes no viajaba, siempre quedaba en 1 sin importar lo que se hubiera elegido acá
                 foto: fotoUrl(d['Foto'] || ''),
                 linkFolleto: d['Link_Folleto'] || '',
                 linkVideo: d['Link_Web'] || '',

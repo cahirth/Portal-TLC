@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.08.04.4 (2 cambios pedidos por Cristian: (1) fix de hover oscuro en los checkboxes de contacto (fondo/hover ahora explícitos, no dependen del navegador/sistema); (2) el campo Descuento por ítem ahora tiene un toggle %/USD, igual estilo que el toggle de moneda que ya existía — antes solo se podía descontar en %. Ver FotoMap.gs v148 para el cálculo del lado del servidor.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.04.5 (Fix complementario a selector-dispositivos.html v2026.08.04.6: acá también estaba hardcodeado cantidad:1 al recibir un ítem pendiente, ignorando lo que llegara — ahora usa la cantidad real, tanto para un ítem nuevo como para el caso "ya existe, sumar cantidad". Reportado por Cristian con captura.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.3 (El selector de Contacto pasa a ser multi-selección con checkboxes, mismo criterio que empresas.html y cotizaciones.html — antes solo dejaba elegir uno con un dropdown. Si se edita un negocio existente (?idNegocio=), se traen y se tildan solos los contactos ya guardados ahí (contacto principal + contactosAdicionales, ver FotoMap.gs v147). Persiste correctamente en el borrador al ir a "+ Agregar ítem" y volver. Pedido por Cristian: "cargar los contactos seleccionados en negocio y permitir agregar más si existen más".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.1 (BUG REAL encontrado: _irASelectorDispositivos() (el botón "+ Agregar ítem") guardaba el borrador SIN el TICKET_ID, y la URL de vuelta desde selector-dispositivos.html tampoco lo traía — así que agregar un ítem a mitad de armar un presupuesto de Servicio perdía el vínculo con el ticket, y el guardado siguiente creaba un negocio de Ventas en el Kanban en vez de quedarse en Servicio. Ahora se persiste y se restaura junto con el resto del borrador. Ver también FotoMap.gs v141 (el corte de fondo que ya no crea el negocio si el ticket SÍ llega). Reportado por Cristian con captura: "lo sigue generando en negocios, desde servicio".) -->
 <html lang="es">
@@ -518,11 +518,12 @@ function _restaurarDraftYItemPendiente() {
       // misma ficha técnica más de una vez, o se agrega el mismo
       // equipo dos veces por error). Si existe, no se crea una línea
       // nueva: se le suma 1 a la cantidad del que ya está.
+      var cantidadPendiente = Math.max(1, parseInt(it.cantidad, 10) || 1);
       var iguales = ITEMS.filter(function(x){ return _mismoEquipo(x, { descripcion: descripcionCombinada, precio: precioLista, moneda: 'USD' }); });
       if (iguales.length) {
-        iguales[0].cantidad = (iguales[0].cantidad || 1) + 1;
+        iguales[0].cantidad = (iguales[0].cantidad || 1) + cantidadPendiente;
       } else {
-        ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: 1, descuento: descuentoAuto, descuentoTipo: '%', descuentoContadoOriginal: descuentoAuto, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
+        ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: cantidadPendiente, descuento: descuentoAuto, descuentoTipo: '%', descuentoContadoOriginal: descuentoAuto, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
       }
     }
   } catch (e) { console.warn('Error aplicando ítem pendiente:', e); }
