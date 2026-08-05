@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.04.9 (Fix: los checkboxes de contacto se ponían oscuros al pasar el cursor encima — no tenían fondo/hover explícitos, así que el navegador podía aplicar un estado por defecto. Ahora usan una clase con fondo y hover fijos (blanco → gris clarito), igual que el resto de los inputs de esta tarjeta. Reportado por Cristian.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.04.10 (CAUSA RAÍZ REAL del hover oscuro en modo claro: nunca se declaraba "color-scheme" en el CSS — sin eso, los controles nativos del navegador (selects como "Calificación y asesoramiento", "Pipeline General") pueden renderizarse en oscuro al pasar el mouse si el sistema operativo tiene modo oscuro activado, sin importar el CSS de la página. Agregado color-scheme:dark/light según el tema. Reportado por Cristian con 2 capturas comparando claro/oscuro.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.04.8 (Fix: los checkboxes de contacto no tenían color de texto fijo — usaban el color ambiente que cambia con el tema, a diferencia de los inputs vecinos (VENDEDOR, TELÉFONO) que siempre son fondo blanco/texto oscuro sin importar el tema. Ahora siguen el mismo patrón fijo. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
@@ -11,7 +11,7 @@
     <title>TLC — Cotizaciones</title>
     <style>
         * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',sans-serif; -webkit-tap-highlight-color:transparent; }
-        body { background:#030712; color:#f8fafc; min-height:100vh; }
+        body { background:#030712; color:#f8fafc; min-height:100vh; color-scheme: dark; }
 
         /* TOAST simple de confirmación — usado por _toast() */
         #tlc-toast-wrap { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:9999;
@@ -295,7 +295,7 @@
         /* ═══════════════════════════════════════════════════════
            TEMA CLARO — cotizaciones.html
         ═══════════════════════════════════════════════════════ */
-        body.tema-claro { background:#f0f4f8 !important; color:#1e293b !important; }
+        body.tema-claro { background:#f0f4f8 !important; color:#1e293b !important; color-scheme: light; }
         body.tema-claro .header { background:linear-gradient(135deg,#ffffff,#f1f5f9) !important; border-bottom:1px solid #cbd5e1 !important; box-shadow:0 2px 12px rgba(0,0,0,.08) !important; }
         body.tema-claro .header::after { background:linear-gradient(90deg,#1a4b8c,#0097b2,#1a4b8c) !important; }
         body.tema-claro .header-text h1 { color:#0f172a !important; }

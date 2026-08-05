@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | presupuesto-editor.html | v2026.08.04.5 (Fix complementario a selector-dispositivos.html v2026.08.04.6: acá también estaba hardcodeado cantidad:1 al recibir un ítem pendiente, ignorando lo que llegara — ahora usa la cantidad real, tanto para un ítem nuevo como para el caso "ya existe, sumar cantidad". Reportado por Cristian con captura.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.04.6 (Mismo fix de color-scheme que cotizaciones.html — causa raíz real del hover oscuro en modo claro.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.3 (El selector de Contacto pasa a ser multi-selección con checkboxes, mismo criterio que empresas.html y cotizaciones.html — antes solo dejaba elegir uno con un dropdown. Si se edita un negocio existente (?idNegocio=), se traen y se tildan solos los contactos ya guardados ahí (contacto principal + contactosAdicionales, ver FotoMap.gs v147). Persiste correctamente en el borrador al ir a "+ Agregar ítem" y volver. Pedido por Cristian: "cargar los contactos seleccionados en negocio y permitir agregar más si existen más".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.1 (BUG REAL encontrado: _irASelectorDispositivos() (el botón "+ Agregar ítem") guardaba el borrador SIN el TICKET_ID, y la URL de vuelta desde selector-dispositivos.html tampoco lo traía — así que agregar un ítem a mitad de armar un presupuesto de Servicio perdía el vínculo con el ticket, y el guardado siguiente creaba un negocio de Ventas en el Kanban en vez de quedarse en Servicio. Ahora se persiste y se restaura junto con el resto del borrador. Ver también FotoMap.gs v141 (el corte de fondo que ya no crea el negocio si el ticket SÍ llega). Reportado por Cristian con captura: "lo sigue generando en negocios, desde servicio".) -->
 <html lang="es">
@@ -15,7 +15,7 @@
     --accent-blue:#3a86ff; --accent-green:#06d6a0; --accent-orange:#f8961e; --accent-red:#f87171;
   }
   * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',sans-serif; -webkit-tap-highlight-color:transparent; }
-  body { background:var(--bg); color:var(--text-main); min-height:100vh; }
+  body { background:var(--bg); color:var(--text-main); min-height:100vh; color-scheme: dark; }
 
   .header { background:linear-gradient(135deg,#05111f,#0c1e3a); padding:0 16px; display:flex; align-items:center; gap:12px;
     border-bottom:1px solid rgba(58,134,255,0.15); position:sticky; top:0; z-index:100; height:58px; }
@@ -153,7 +153,7 @@
   body.tema-claro {
     --bg:#f0f4f8; --panel-dark:#ffffff; --panel-darker:#ffffff; --border-glow:#e2e8f0;
     --text-main:#0f172a; --text-muted:#64748b; --text-dim:#94a3b8;
-    background:var(--bg); color:var(--text-main);
+    background:var(--bg); color:var(--text-main); color-scheme: light;
   }
   body.tema-claro .header { background:linear-gradient(135deg,#ffffff,#f1f5f9); border-bottom-color:#cbd5e1; }
   body.tema-claro .header-text h1 { color:#0f172a; }
