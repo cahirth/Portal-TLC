@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.6 (Mismo fix de color-scheme que cotizaciones.html — causa raíz real del hover oscuro en modo claro.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.06.1 (Nuevo botón "+ Ítem de Servicio Técnico" — visible solo cuando el presupuesto está vinculado a un ticket (TICKET_ID) — arma un ítem con "SERVICIO — SERVICIO TECNICO DE ACUERDO A ORDEN NRO: [número real de la orden]" ya puesto, en vez de tener que tipearlo a mano cada vez con riesgo de errar el número. Pedido por Cristian, con captura de referencia.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.3 (El selector de Contacto pasa a ser multi-selección con checkboxes, mismo criterio que empresas.html y cotizaciones.html — antes solo dejaba elegir uno con un dropdown. Si se edita un negocio existente (?idNegocio=), se traen y se tildan solos los contactos ya guardados ahí (contacto principal + contactosAdicionales, ver FotoMap.gs v147). Persiste correctamente en el borrador al ir a "+ Agregar ítem" y volver. Pedido por Cristian: "cargar los contactos seleccionados en negocio y permitir agregar más si existen más".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.1 (BUG REAL encontrado: _irASelectorDispositivos() (el botón "+ Agregar ítem") guardaba el borrador SIN el TICKET_ID, y la URL de vuelta desde selector-dispositivos.html tampoco lo traía — así que agregar un ítem a mitad de armar un presupuesto de Servicio perdía el vínculo con el ticket, y el guardado siguiente creaba un negocio de Ventas en el Kanban en vez de quedarse en Servicio. Ahora se persiste y se restaura junto con el resto del borrador. Ver también FotoMap.gs v141 (el corte de fondo que ya no crea el negocio si el ticket SÍ llega). Reportado por Cristian con captura: "lo sigue generando en negocios, desde servicio".) -->
 <html lang="es">
@@ -240,6 +241,7 @@
       <div class="section-title">📦 Ítems <span class="hint" id="items-contador">1 ítem</span></div>
       <div id="lista-items"></div>
       <button class="btn-agregar-item" onclick="_irASelectorDispositivos()">+ Agregar ítem</button>
+      <button class="btn-agregar-item" id="btn-agregar-item-servicio" onclick="_agregarItemServicio()" style="display:none;background:#f8961e;border:1px solid #f8961e;color:#fff;margin-top:8px;">+ Ítem de Servicio Técnico</button>
     </div>
 
     <!-- ═══ TOTALES — inmediatamente debajo de los ítems, como en el PDF real ═══ -->
@@ -849,6 +851,21 @@ function _agregarItem() {
   ITEMS.push({ id: ++_itemSeq, foto:null, descripcion:'', precio:0, precioContado:0, cantidad:1, descuento:0, descuentoTipo:'%', descuentoContadoOriginal:0, iva:10.5, moneda:'USD' });
   _render();
 }
+
+// Ítem rápido con el número de orden REAL ya puesto — antes había que
+// tipear "SERVICIO — SERVICIO TECNICO DE ACUERDO A ORDEN NRO: ..." a
+// mano cada vez, con riesgo de tipear mal el número. Solo visible
+// cuando el presupuesto está vinculado a un ticket (TICKET_ID).
+// Pedido por Cristian, con captura de referencia.
+function _agregarItemServicio() {
+  ITEMS.push({
+    id: ++_itemSeq, foto:null,
+    descripcion: 'SERVICIO — SERVICIO TECNICO DE ACUERDO A ORDEN NRO: ' + TICKET_ID,
+    precio:0, precioContado:0, cantidad:1, descuento:0, descuentoTipo:'%', descuentoContadoOriginal:0,
+    iva:0, moneda:'ARS',
+  });
+  _render();
+}
 window._borrarItem = function(id) {
   ITEMS = ITEMS.filter(function(it){ return it.id !== id; });
   if (!ITEMS.length) _agregarItem(); else _render();
@@ -1341,6 +1358,8 @@ function _render() {
   _renderTotales();
   _actualizarDisponibilidadLeasing36();
   _renderModalidadesPago();
+  var btnItemServicio = document.getElementById('btn-agregar-item-servicio');
+  if (btnItemServicio) btnItemServicio.style.display = TICKET_ID ? 'block' : 'none';
 }
 
 // Snapshot de la modalidad de pago elegida, YA CALCULADO, para guardar
