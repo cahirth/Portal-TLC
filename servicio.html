@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.06.1 (BUG REAL encontrado: el botón interno "→ Pasar a X" de la tarjeta (_siguienteEtapa) movía directo a st_actualizarDeposito sin pasar por _resolverAsignacionYMover — a diferencia de drag&drop y el <select> del detalle, nunca chequeaba si la etapa nueva tenía 2+ técnicos configurados ni abría el popup para elegir a cuál asignar. La notificación en sí (email+push) siempre disparó bien porque vive en el backend sin importar quién llama — el problema era que terminaba avisando al técnico viejo (o a nadie) en vez del correcto. Unificados los 3 caminos (drag&drop, dropdown, botón interno) al mismo _resolverAsignacionYMover, agregando un parámetro para mantener el "volver al Kanban" que tenía el botón. Reportado por Cristian con captura.) -->
 <!-- Portal TLC | servicio.html | v2026.08.04.13 (Frontend de "Orden de Preparación de Equipos" — cuando un ticket es tipo_orden==='preparacion_equipos', el detalle muestra una sección especial: Domicilio de Envío/Fecha límite/Técnico, grilla editable de equipos (N° de Serie, checklist de calidad, estado), y firma digital por canvas (funciona con mouse y con dedo). El chat de abajo no necesitó ningún cambio — es el mismo de siempre. Botón para abrir orden-preparacion.html (versión imprimible/PDF). Ver FotoMap.gs v157.) -->
 <!-- Portal TLC | servicio.html | v2026.08.04.12 (La campanita (compartida entre módulos) ahora sabe manejar notificaciones que vienen del módulo nuevo Eventos — reacciona bien al mensaje real (id_evento + id_tarjeta, no solo un id) y navega a eventos.html?id=...&tarjeta=... en vez de mandar por error a Servicio. Ver FotoMap.gs v156 y eventos.html v2026.08.04.2.) -->
 <html lang="es">
@@ -1447,13 +1448,13 @@ window._toggleAsignadoEtapa = function(etapa, codigo, activo) {
 // No toca en absoluto la validación de _validarGate — se llama SIEMPRE
 // después de que esa validación ya haya pasado, tanto desde el drag&drop
 // como desde el select del detalle.
-function _resolverAsignacionYMover(t, nuevaCol, depositoAnterior) {
+function _resolverAsignacionYMover(t, nuevaCol, depositoAnterior, cerrarDetalleAlTerminar) {
   var candidatos = _asignadosPorEtapa[nuevaCol] || [];
   if (candidatos.length <= 1) {
-    _ejecutarMovimientoEtapa(t, nuevaCol, candidatos.length === 1 ? candidatos[0] : null, depositoAnterior);
+    _ejecutarMovimientoEtapa(t, nuevaCol, candidatos.length === 1 ? candidatos[0] : null, depositoAnterior, cerrarDetalleAlTerminar);
     return;
   }
-  _pendienteMovimientoEtapa = { t: t, nuevaCol: nuevaCol, depositoAnterior: depositoAnterior };
+  _pendienteMovimientoEtapa = { t: t, nuevaCol: nuevaCol, depositoAnterior: depositoAnterior, cerrarDetalleAlTerminar: cerrarDetalleAlTerminar };
   var colDef = COLUMNAS.find(function(c){ return c.key === nuevaCol; });
   var elNombreEtapa = document.getElementById('modal-asignar-etapa-nombre');
   if (elNombreEtapa) elNombreEtapa.textContent = 'Etapa: ' + (colDef ? colDef.label : nuevaCol);
@@ -1475,7 +1476,7 @@ window._confirmarAsignacionModal = function(codigo) {
   _pendienteMovimientoEtapa = null;
   var modal = document.getElementById('modal-asignar-etapa');
   if (modal) modal.style.display = 'none';
-  _ejecutarMovimientoEtapa(p.t, p.nuevaCol, codigo, p.depositoAnterior);
+  _ejecutarMovimientoEtapa(p.t, p.nuevaCol, codigo, p.depositoAnterior, p.cerrarDetalleAlTerminar);
 };
 
 window._cerrarModalAsignar = function() {
@@ -1488,7 +1489,7 @@ window._cerrarModalAsignar = function() {
   if (_ticketActual) _renderDetalle(_ticketActual);
 };
 
-function _ejecutarMovimientoEtapa(t, nuevaCol, asignado, depositoAnterior) {
+function _ejecutarMovimientoEtapa(t, nuevaCol, asignado, depositoAnterior, cerrarDetalleAlTerminar) {
   var tecAnterior = t.tecnico_asignado;
   t.deposito = nuevaCol;
   if (asignado) t.tecnico_asignado = asignado;
@@ -1507,7 +1508,9 @@ function _ejecutarMovimientoEtapa(t, nuevaCol, asignado, depositoAnterior) {
         _aplicarFiltros();
         if (_ticketActual && _ticketActual.id_ticket === t.id_ticket) _renderDetalle(t);
         _stMostrarError('⚠ No se pudo mover el ticket: ' + (r.error || 'error desconocido'));
+        return;
       }
+      if (cerrarDetalleAlTerminar) _cerrarDetalle(); // vuelve al Kanban — mismo comportamiento de siempre del botón "→ Pasar a X"
     })
     .catch(function(e) {
       t.deposito = depositoAnterior;
@@ -3056,22 +3059,14 @@ window._siguienteEtapa = function(id) {
     return;
   }
 
-  // Mover a siguiente columna
-  t.deposito = sig;
-  if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual.deposito = sig;
-
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'st_actualizarDeposito', id_ticket:id, deposito:sig }) })
-  .then(function(r){ return r.json(); })
-  .then(function(r){
-    if (r.ok) {
-      _aplicarFiltros();
-      _cerrarDetalle(); // volver al Kanban
-    } else {
-      _stMostrarError('Error al mover: ' + (r.error||'desconocido'));
-    }
-  })
-  .catch(function(e){ _stMostrarError('Error de conexión'); });
+  // Mismo flujo de asignación que drag & drop y el dropdown del
+  // detalle — antes este botón movía directo a st_actualizarDeposito
+  // sin pasar por acá, así que si la etapa nueva tenía 2+ técnicos
+  // configurados nunca preguntaba a quién asignar, y la notificación
+  // de cambio de etapa terminaba avisando a la persona vieja (o a
+  // nadie). Reportado por Cristian: "esto lo hace bien en drag & drop
+  // pero con los botones internos de las tarjetas no lo chequea".
+  _resolverAsignacionYMover(t, sig, dep, true);
 };
 
 // ── J: GASTOS DEL SERVICIO ───────────────────────────────────────
