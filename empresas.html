@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.06.1 (Flujo A de la integración QR Faco Extrema: botón "📷 Escanear QR" en el formulario de Nuevo Contacto, autocompleta Nombre/Email/Teléfono/DNI directo desde la credencial (html5-qrcode). Campo DNI nuevo en el contacto. Ver FotoMap.gs v159 y ficha-equipo.html v2026.08.06.1 (Flujo B).) -->
 <!-- Portal TLC | empresas.html | v2026.08.04.10 (Mismo fix de color-scheme que cotizaciones.html — causa raíz real del hover oscuro en modo claro.) -->
 <!-- Portal TLC | empresas.html | v2026.08.04.8 (Modal "Nuevo Negocio": checkboxes de contactos en vez de un dropdown de uno solo — se puede tildar varios (el primero queda como principal, el resto como adicionales, ver FotoMap.gs v146). Nueva navegación ?volverA=negocio&idNegocio=X — la flecha del header vuelve directo al negocio si se llegó desde ahí (ver cotizaciones.html v2026.08.04.7). Pedido por Cristian.) -->
 <!-- Portal TLC | empresas.html | v2026.08.03.4 (Mismo fix que cotizaciones.html: se muestra el error real en la burbuja, no solo un mensaje genérico.) -->
@@ -312,7 +313,10 @@
         <div id="lista-contactos"></div>
         <button class="btn-agregar-contacto" onclick="_toggleFormContacto()">+ Agregar contacto</button>
         <div class="form-contacto" id="form-contacto" style="display:none;">
-          <div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:10px;" id="fc-titulo">+ Agregar contacto</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-size:12px;font-weight:700;color:var(--accent-blue);" id="fc-titulo">+ Agregar contacto</div>
+            <button onclick="_escanearQRContacto()" style="background:#8b5cf6;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">📷 Escanear QR</button>
+          </div>
           <div class="det-grid">
             <div class="det-campo">
               <label>Nombre *</label>
@@ -329,6 +333,10 @@
             <div class="det-campo">
               <label>Teléfono</label>
               <input type="text" id="fc-telefono">
+            </div>
+            <div class="det-campo">
+              <label>DNI / Documento</label>
+              <input type="text" id="fc-dni">
             </div>
           </div>
           <div class="acciones-empresa">
@@ -706,7 +714,7 @@ window._toggleFormContacto = function() {
   if (abrir) {
     _contactoEditandoId = null;
     document.getElementById('fc-titulo').textContent = '+ Agregar contacto';
-    ['fc-nombre','fc-cargo','fc-email','fc-telefono'].forEach(function(id){ document.getElementById(id).value = ''; });
+    ['fc-nombre','fc-cargo','fc-email','fc-telefono','fc-dni'].forEach(function(id){ document.getElementById(id).value = ''; });
     document.getElementById('fc-nombre').focus();
   }
 };
@@ -722,9 +730,23 @@ window._editarContacto = function(contactoId) {
   document.getElementById('fc-cargo').value = c.cargo || '';
   document.getElementById('fc-email').value = c.email || '';
   document.getElementById('fc-telefono').value = c.telefono || '';
+  document.getElementById('fc-dni').value = c.dni || '';
   document.getElementById('form-contacto').style.display = 'block';
   document.getElementById('fc-nombre').focus();
   document.getElementById('form-contacto').scrollIntoView({ behavior:'smooth', block:'center' });
+};
+
+// ── Escáner QR — credenciales de Faco Extrema (Flujo A: Alta rápida
+//    de Empresa/Contacto). Autocompleta Nombre, Email, Teléfono y DNI
+//    directo desde la credencial. Pedido por Cristian. ──
+window._escanearQRContacto = function() {
+  _abrirScannerQR(function(datos) {
+    var nombreCompleto = ((datos.nombre||'') + ' ' + (datos.apellido||'')).trim();
+    if (nombreCompleto) document.getElementById('fc-nombre').value = nombreCompleto;
+    if (datos.email) document.getElementById('fc-email').value = datos.email;
+    if (datos.telefono) document.getElementById('fc-telefono').value = datos.telefono;
+    if (datos.dni) document.getElementById('fc-dni').value = datos.dni;
+  });
 };
 
 window._guardarContacto = function() {
@@ -735,7 +757,8 @@ window._guardarContacto = function() {
   var cargo = document.getElementById('fc-cargo').value.trim();
   var email = document.getElementById('fc-email').value.trim();
   var telefono = document.getElementById('fc-telefono').value.trim();
-  var payload = { accion:'guardarContacto', empresaId:e.id, nombre:nombre, cargo:cargo, email:email, telefono:telefono };
+  var dni = document.getElementById('fc-dni').value.trim();
+  var payload = { accion:'guardarContacto', empresaId:e.id, nombre:nombre, cargo:cargo, email:email, telefono:telefono, dni:dni };
   if (_contactoEditandoId) payload.id = _contactoEditandoId;
 
   var btnContacto = document.getElementById('btn-guardar-contacto');
@@ -749,12 +772,12 @@ window._guardarContacto = function() {
       if (!r.ok) { alert('Error al guardar el contacto: ' + (r.error||'desconocido')); return; }
       if (_contactoEditandoId) {
         var c = e.contactos.find(function(x){ return x.id === _contactoEditandoId; });
-        if (c) { c.nombre = nombre; c.cargo = cargo; c.email = email; c.telefono = telefono; }
+        if (c) { c.nombre = nombre; c.cargo = cargo; c.email = email; c.telefono = telefono; c.dni = dni; }
       } else {
-        e.contactos.push({ id:r.id, nombre:nombre, cargo:cargo, email:email, telefono:telefono });
+        e.contactos.push({ id:r.id, nombre:nombre, cargo:cargo, email:email, telefono:telefono, dni:dni });
       }
       _contactoEditandoId = null;
-      ['fc-nombre','fc-cargo','fc-email','fc-telefono'].forEach(function(id){ document.getElementById(id).value = ''; });
+      ['fc-nombre','fc-cargo','fc-email','fc-telefono','fc-dni'].forEach(function(id){ document.getElementById(id).value = ''; });
       document.getElementById('form-contacto').style.display = 'none';
       _renderContactos(e);
     })
@@ -1522,8 +1545,56 @@ function _iaToggleMic() {
 }
 </script>
 
+<!-- ════════════════════════════════════════════════════════════
+     ESCÁNER QR — modal de cámara compartido (html5-qrcode).
+     Mismo bloque que ficha-equipo.html. ════════════════════════ -->
+<div id="qr-scanner-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;align-items:center;justify-content:center;flex-direction:column;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:16px;max-width:360px;width:100%;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-weight:800;font-size:14px;color:#0f172a;">📷 Escanear QR</span>
+      <button onclick="_cerrarScannerQR()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#0f172a;">✕</button>
+    </div>
+    <div id="qr-reader" style="width:100%;"></div>
+    <div id="qr-scanner-status" style="font-size:11px;color:#64748b;margin-top:8px;text-align:center;">Apuntá la cámara al QR de la credencial...</div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+var _qrScannerInstance = null;
+var _qrScannerCallback = null;
 
+function _abrirScannerQR(callback) {
+  _qrScannerCallback = callback;
+  document.getElementById('qr-scanner-overlay').style.display = 'flex';
+  var status = document.getElementById('qr-scanner-status');
+  status.textContent = 'Apuntá la cámara al QR de la credencial...';
+  _qrScannerInstance = new Html5Qrcode('qr-reader');
+  _qrScannerInstance.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 240, height: 240 } },
+    function(decodedText) {
+      _cerrarScannerQR();
+      try {
+        var datos = JSON.parse(decodedText);
+        if (_qrScannerCallback) _qrScannerCallback(datos);
+      } catch(e) {
+        alert('El QR escaneado no tiene el formato esperado (no es la credencial de un visitante).');
+      }
+    },
+    function() { /* dispara seguido mientras no encuentra nada — se ignora a propósito */ }
+  ).catch(function(err) {
+    status.textContent = '⚠️ No se pudo acceder a la cámara: ' + err;
+  });
+}
 
+function _cerrarScannerQR() {
+  document.getElementById('qr-scanner-overlay').style.display = 'none';
+  if (_qrScannerInstance) {
+    _qrScannerInstance.stop().then(function(){ _qrScannerInstance.clear(); }).catch(function(){});
+    _qrScannerInstance = null;
+  }
+}
+</script>
 
 </body>
 </html>

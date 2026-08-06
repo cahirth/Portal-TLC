@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.06.1 (Flujo B — Flujo Principal de Stand: botón "📷 Escanear QR Visitante" que lee la credencial de Faco Extrema, autocompleta empresa/teléfono/contacto, y dispara el mismo flujo que ya existía de WhatsApp + Crear Negocio (_guardarSeguimientoVentas, con la regla de los 7 días que ya vivía en buscarNegocioAgrupable — no hizo falta tocar el backend) pero con el mensaje personalizado del stand. El QR no trae CUIT, así que se busca/crea la Empresa por el nombre de la persona. Ver FotoMap.gs v159 y empresas.html v2026.08.06.1 (Flujo A).) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.04.5 (Agregada la leyenda "+ IVA 10,5%" junto al Precio de Lista — antes solo la tenían las tarjetas de financiación, el precio principal no aclaraba que era sin IVA. Pedido por Cristian.) -->
 <html lang="es">
 <head>
@@ -183,6 +184,14 @@
         </div>
         <div id="fi-lead-resultado" style="font-size:12px; margin-top:-2px;"></div>
         <div style="display:flex; gap:10px; width:100%; flex-wrap:wrap;">
+            <button class="btn-wsp" onclick="_escanearQRVisitante()" style="background:#8b5cf6;color:#fff;border:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
+                    <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
+                    <rect x="7" y="7" width="4" height="4"/><rect x="13" y="7" width="4" height="4"/>
+                    <rect x="7" y="13" width="4" height="4"/><path d="M13 13h2v2h-2zM17 13h2M13 17h2M17 17h2"/>
+                </svg>
+                Escanear QR Visitante
+            </button>
             <a class="btn-wsp btn-wsp-orden" href="#" onclick="_compartirFichaWsp(event)">
                 <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
                 Enviar por WhatsApp
@@ -873,7 +882,94 @@ function _compartirFichaWsp(e) {
     if (_sesionVendedor) _guardarSeguimientoVentas('whatsapp');
 }
 
+// ══════════════════════════════════════════════════════════════════
+// ESCÁNER QR — credenciales de Faco Extrema. Reutiliza al 100% el
+// flujo ya existente de "Enviar por WhatsApp" + "Crear Negocio"
+// (_guardarSeguimientoVentas, con la regla de los 7 días que ya vive
+// en buscarNegocioAgrupable — no hizo falta tocar el backend para
+// esto). El QR no trae CUIT/razón social (es un visitante de feria,
+// no una empresa) — se crea/busca una "Empresa" con el nombre de la
+// persona, editable después. Pedido por Cristian, spec "QR de
+// credenciales de Faco Extrema".
+// ══════════════════════════════════════════════════════════════════
+function _escanearQRVisitante() {
+  _abrirScannerQR(function(datos) {
+    var nombreCompleto = ((datos.nombre||'') + ' ' + (datos.apellido||'')).trim();
+    if (!nombreCompleto) { alert('El QR escaneado no trae nombre del visitante.'); return; }
+    document.getElementById('fi-empresa-buscar').value = nombreCompleto;
+    document.getElementById('fi-telefono-destino').value = datos.telefono || '';
+    _contactoSeleccionadoFicha = { nombre: nombreCompleto, telefono: datos.telefono || '', email: datos.email || '' };
+    _empresaSeleccionadaFicha = null; // fuerza a buscar/crear por nombre — el QR no trae empresaId
+    _compartirFichaWspPersonalizado(datos.nombre || nombreCompleto);
+  });
+}
+
+// Mismo criterio que _compartirFichaWsp (abre WhatsApp primero, guarda
+// el seguimiento en Ventas después — si fuera al revés, el navegador
+// podría bloquear la ventana de WhatsApp por no ser ya un click
+// directo del usuario), pero con el mensaje personalizado del stand.
+function _compartirFichaWspPersonalizado(nombrePila) {
+  var link = 'https://ir.tlcsrl.com.ar/ficha-equipo.html?nombre=' + encodeURIComponent(_fichaNombreActual) + '&modo=cliente';
+  if (_variantesOcultas.length) link += '&ocultar=' + encodeURIComponent(_variantesOcultas.join(','));
+  var msg = encodeURIComponent('¡Hola ' + nombrePila + '! Un gusto saludarte en Faco Extrema. Te envío la ficha técnica del ' + _fichaNombreActual + ' que estuvimos viendo en el stand de TLC: ' + link);
+  var telWsp = _formatearTelefonoWsp(document.getElementById('fi-telefono-destino').value || '');
+  var url = telWsp ? ('https://wa.me/' + telWsp + '?text=' + msg) : ('https://wa.me/?text=' + msg);
+  window.open(url, '_blank');
+  if (_sesionVendedor) _guardarSeguimientoVentas('whatsapp');
+}
+
 _cargarFicha();
+</script>
+
+<!-- ════════════════════════════════════════════════════════════
+     ESCÁNER QR — modal de cámara compartido (html5-qrcode).
+     ════════════════════════════════════════════════════════════ -->
+<div id="qr-scanner-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;align-items:center;justify-content:center;flex-direction:column;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:16px;max-width:360px;width:100%;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-weight:800;font-size:14px;color:#0f172a;">📷 Escanear QR</span>
+      <button onclick="_cerrarScannerQR()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#0f172a;">✕</button>
+    </div>
+    <div id="qr-reader" style="width:100%;"></div>
+    <div id="qr-scanner-status" style="font-size:11px;color:#64748b;margin-top:8px;text-align:center;">Apuntá la cámara al QR de la credencial...</div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+var _qrScannerInstance = null;
+var _qrScannerCallback = null;
+
+function _abrirScannerQR(callback) {
+  _qrScannerCallback = callback;
+  document.getElementById('qr-scanner-overlay').style.display = 'flex';
+  var status = document.getElementById('qr-scanner-status');
+  status.textContent = 'Apuntá la cámara al QR de la credencial...';
+  _qrScannerInstance = new Html5Qrcode('qr-reader');
+  _qrScannerInstance.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 240, height: 240 } },
+    function(decodedText) {
+      _cerrarScannerQR();
+      try {
+        var datos = JSON.parse(decodedText);
+        if (_qrScannerCallback) _qrScannerCallback(datos);
+      } catch(e) {
+        alert('El QR escaneado no tiene el formato esperado (no es la credencial de un visitante).');
+      }
+    },
+    function() { /* dispara seguido mientras no encuentra nada — se ignora a propósito */ }
+  ).catch(function(err) {
+    status.textContent = '⚠️ No se pudo acceder a la cámara: ' + err;
+  });
+}
+
+function _cerrarScannerQR() {
+  document.getElementById('qr-scanner-overlay').style.display = 'none';
+  if (_qrScannerInstance) {
+    _qrScannerInstance.stop().then(function(){ _qrScannerInstance.clear(); }).catch(function(){});
+    _qrScannerInstance = null;
+  }
+}
 </script>
 <!-- ════════════════════════════════════════════════════════════
      ASISTENTE IA — widget flotante (Cloud Function + Gemini)
