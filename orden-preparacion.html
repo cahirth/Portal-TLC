@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<!-- Portal TLC | orden-preparacion.html | v2026.08.06.1 (Documento público imprimible de la Orden de Preparación de Equipos — mismo criterio que presupuesto.html: fetch directo a Firebase RTDB (lectura pública), sin login. Header con cliente/domicilio de envío/fecha límite/técnico, grilla de equipos con N° de serie y estado, firma digital si ya está cargada, botón Imprimir/Guardar PDF vía window.print(). Parte del circuito "Orden de Preparación de Equipos" pedido por Cristian.) -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Orden de Preparación — TLC</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"Times New Roman",Times,serif; background:#f1f5f9; color:#0f172a; font-size:13px; }
+  .page { max-width:780px; margin:20px auto; background:white; box-shadow:0 4px 32px rgba(0,0,0,0.12); padding:32px 36px; min-height:200px; }
+  table { border-collapse:collapse; width:100%; }
+  @media print {
+    body{background:white;}
+    .page{margin:0;box-shadow:none;padding:0 28px;}
+    .no-print{display:none!important;}
+  }
+  .op-header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #0a1424; padding-bottom:16px; margin-bottom:20px; }
+  .op-logo-txt { font-size:18px; font-weight:800; color:#0a1424; }
+  .op-logo-sub { font-size:10px; color:#64748b; }
+  .op-doc-titulo { text-align:right; }
+  .op-doc-titulo h1 { font-size:16px; font-weight:800; color:#0a1424; }
+  .op-doc-titulo p { font-size:10.5px; color:#64748b; margin-top:2px; }
+  .op-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
+  .op-info-box { border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; }
+  .op-info-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#64748b; margin-bottom:4px; }
+  .op-info-val { font-size:13px; font-weight:600; color:#0a1424; }
+  .op-tabla th { text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:#64748b; padding:8px 6px; border-bottom:2px solid #0a1424; }
+  .op-tabla td { padding:8px 6px; border-bottom:1px solid #e2e8f0; font-size:12px; }
+  .op-firma-zona { margin-top:34px; display:flex; gap:30px; }
+  .op-firma-col { flex:1; text-align:center; }
+  .op-firma-img { max-width:200px; max-height:80px; margin:0 auto 6px; display:block; }
+  .op-firma-linea { border-top:1px solid #0a1424; margin-top:50px; padding-top:6px; font-size:11px; }
+  .op-btn-imprimir { display:inline-flex; align-items:center; gap:8px; padding:12px 22px; border-radius:10px; background:#06d6a0; color:#0a1424; border:none; font-size:13px; font-weight:800; cursor:pointer; }
+  .op-toolbar { max-width:780px; margin:16px auto; display:flex; justify-content:center; }
+  .op-loading, .op-error { max-width:780px; margin:60px auto; text-align:center; color:#64748b; font-family:Arial,sans-serif; }
+</style>
+</head>
+<body>
+
+<div class="op-toolbar no-print" id="op-toolbar" style="display:none;">
+  <button class="op-btn-imprimir" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
+</div>
+
+<div class="op-loading" id="op-loading">Cargando orden de preparación...</div>
+<div class="page" id="op-page" style="display:none;"></div>
+
+<script>
+var FIREBASE_DB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+
+function _esc(s) {
+  var d = document.createElement('div');
+  d.textContent = String(s == null ? '' : s);
+  return d.innerHTML;
+}
+function _fmtFecha(f) {
+  if (!f) return '—';
+  var p = String(f).split('-');
+  return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : f;
+}
+
+function _renderOrden(t) {
+  var equipos = Array.isArray(t.equipos) ? t.equipos : [];
+  var filasHtml = equipos.map(function(eq) {
+    return '<tr>' +
+      '<td style="text-align:center;">' + (eq.cantidad||1) + '</td>' +
+      '<td>' + _esc(eq.sku||'—') + '</td>' +
+      '<td>' + _esc(eq.descripcion||'') + '</td>' +
+      '<td><strong>' + _esc(eq.nro_serie || 'Sin cargar') + '</strong></td>' +
+      '<td style="text-align:center;">' + (eq.calidad_verificada ? '✅' : '—') + '</td>' +
+      '<td>' + _esc(eq.estado||'Pendiente') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  var firmaHtml = t.firma_digital
+    ? '<img class="op-firma-img" src="' + t.firma_digital + '">' +
+      '<div class="op-firma-linea">' + _esc(t.firma_firmante||'') + '<br><span style="color:#64748b;">Firmado el ' + (t.firma_fecha ? new Date(t.firma_fecha).toLocaleDateString('es-AR') : '') + '</span></div>'
+    : '<div class="op-firma-linea">&nbsp;<br><span style="color:#64748b;">Firma pendiente</span></div>';
+
+  document.getElementById('op-page').innerHTML =
+    '<div class="op-header">' +
+      '<div><div class="op-logo-txt">TECNOLOGÍA LÁSER CORNEAL S.R.L.</div><div class="op-logo-sub">Pasaje del Carmen 716 Local PB C1019AAB · Buenos Aires, Argentina</div></div>' +
+      '<div class="op-doc-titulo"><h1>📦 ORDEN DE PREPARACIÓN</h1><p>N° ' + _esc(t.id_ticket||'') + '</p></div>' +
+    '</div>' +
+
+    '<div class="op-info-grid">' +
+      '<div class="op-info-box"><div class="op-info-label">Cliente</div><div class="op-info-val">' + _esc(t.cliente||'—') + '</div></div>' +
+      '<div class="op-info-box"><div class="op-info-label">Teléfono</div><div class="op-info-val">' + _esc(t.telefono||'—') + '</div></div>' +
+      '<div class="op-info-box" style="grid-column:1/-1;"><div class="op-info-label">Domicilio de Envío</div><div class="op-info-val">' + _esc(t.domicilio_envio||'No cargado') + '</div></div>' +
+      '<div class="op-info-box"><div class="op-info-label">Fecha límite de despacho</div><div class="op-info-val">' + _fmtFecha(t.fecha_limite_despacho) + '</div></div>' +
+      '<div class="op-info-box"><div class="op-info-label">Técnico responsable</div><div class="op-info-val">' + _esc(t.tecnico_responsable_nombre||'Sin asignar') + '</div></div>' +
+    '</div>' +
+
+    '<table class="op-tabla"><thead><tr><th>Cant.</th><th>SKU</th><th>Equipo</th><th>N° de Serie</th><th>Calidad</th><th>Estado</th></tr></thead>' +
+    '<tbody>' + (filasHtml || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px;">Sin equipos cargados.</td></tr>') + '</tbody></table>' +
+
+    '<div class="op-firma-zona">' +
+      '<div class="op-firma-col">' + firmaHtml + '</div>' +
+      '<div class="op-firma-col"><div class="op-firma-linea">&nbsp;<br><span style="color:#64748b;">Recibí conforme (Logística/Transporte)</span></div></div>' +
+    '</div>';
+
+  document.getElementById('op-loading').style.display = 'none';
+  document.getElementById('op-page').style.display = 'block';
+  document.getElementById('op-toolbar').style.display = 'flex';
+}
+
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var id = params.get('id');
+  if (!id) { document.getElementById('op-loading').textContent = 'Falta el ID de la orden en el link.'; return; }
+  fetch(FIREBASE_DB_URL + '/servicio_tecnico/' + encodeURIComponent(id) + '.json?_=' + Date.now(), { cache:'no-store' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(t) {
+      if (!t) { document.getElementById('op-loading').textContent = 'No encontramos esta orden de preparación.'; return; }
+      _renderOrden(t);
+    })
+    .catch(function() { document.getElementById('op-loading').textContent = 'Error de conexión al cargar la orden.'; });
+})();
+</script>
+</body>
+</html>
