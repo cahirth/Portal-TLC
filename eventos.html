@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.04.5 (Rediseño del detalle de tarjeta, inspirado en la referencia de Planner + el formato ya usado en negocios: Categoría/Fecha/Responsable pasan de inputs sueltos a tarjetas con borde (mismo estilo que ID NEGOCIO/VENDEDOR de Ventas); título grande arriba con línea de info ("Creada el... · En [columna] · [evento]"); checklist ahora en una caja con barra de progreso visual y contador (X/Y). Pedido por Cristian, con 2 capturas de referencia.) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.4 (2 pedidos de Cristian para uniformar con el resto de la PWA: (1) el detalle de tarjeta ahora es de dos columnas en pantallas grandes, con Mensajes internos fijo a la derecha (sticky) — mismo patrón que negocios y tickets de Servicio, en vez de todo apilado en una sola columna; (2) barra de filtros nueva arriba del tablero (Responsable, Categoría) — el filtro por columna/etapa no se agregó porque en un Kanban las columnas ya están agrupadas visualmente, sería redundante.) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.3 (Faltaba el botón de tema — el CSS de "tema-claro" ya existía pero nunca se aplicaba ni había forma de togglearlo desde acá, por eso quedaba siempre en modo oscuro. Agregado con la misma clave compartida (tlc_tema) que usa el resto del Portal. Reportado por Cristian: "tiene solo modo oscuro?".) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.1 (Módulo nuevo "Gestión Eventos / Congresos" (TLC Planner) — v1 recortado: tablero Kanban con columnas dinámicas (crear/renombrar/borrar), tarjetas con categoría/responsable/fecha límite, checklist con @menciones, chat interno con hover-zoom y reacciones (reutiliza al 100% la infraestructura de Ventas/Servicio, cero código duplicado). Selector de eventos (arranca con Faco Extrema 2026). Falta para v2: duplicar tarjeta, bitácora de cambios, reordenar columnas por drag. Pedido por Cristian, spec completa "TLC Planner".) -->
@@ -125,6 +126,27 @@ a { color:var(--accent-blue); }
 body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-claro .ev-campo textarea { background:#fff; }
 .ev-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 @media (max-width:480px) { .ev-grid2 { grid-template-columns:1fr; } }
+
+/* Tarjetas con borde para los campos — mismo lenguaje visual que las
+   tarjetas ID NEGOCIO / VENDEDOR / CONTACTO del detalle de negocio en
+   Ventas, en vez de inputs sueltos. Pedido por Cristian: "respetes
+   como es la tarjeta de negocios, quiero este mismo formato". */
+.ev-det-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+@media (max-width:480px) { .ev-det-grid { grid-template-columns:1fr; } }
+.ev-det-card { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:12px; padding:11px 12px; margin-bottom:10px; }
+.ev-det-card-label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+.ev-det-card select, .ev-det-card input:not([type=checkbox]) { width:100%; background:none; border:none; color:var(--text-main);
+  font-size:13.5px; font-weight:600; padding:0; font-family:inherit; cursor:pointer; }
+.ev-det-card input[type=date] { cursor:pointer; }
+.ev-det-card select:focus, .ev-det-card input:focus { outline:none; }
+.ev-det-header-info { font-size:11px; color:var(--text-muted); margin:2px 0 16px; }
+.ev-det-header-info b { color:var(--text-main); font-weight:600; }
+.ev-det-titulo-input { width:100%; background:none; border:none; color:var(--text-main); font-size:16px; font-weight:800;
+  padding:0; font-family:inherit; margin-bottom:2px; }
+.ev-det-titulo-input:focus { outline:none; }
+.ev-det-checklist-box { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:12px; padding:12px; }
+.ev-det-progreso-track { height:5px; border-radius:4px; background:var(--border-glow); margin-bottom:10px; overflow:hidden; }
+.ev-det-progreso-fill { height:100%; background:var(--accent-green); border-radius:4px; transition:width .2s ease; }
 
 .ev-check-item { display:flex; align-items:flex-start; gap:8px; padding:7px 0; border-bottom:1px solid var(--border-glow); }
 .ev-check-item:last-child { border-bottom:none; }
@@ -624,21 +646,33 @@ function _renderOverlayTarjeta() {
     return '<option value="' + p.email + '"' + (t.responsable_email === p.email ? ' selected' : '') + '>' + _esc(p.nombre) + '</option>';
   }).join('');
 
+  var colActual = (EVENTO_ACTUAL.columnas || []).find(function(c){ return c.id === t.columna_id; });
+  var fechaCreado = t.creado_en ? new Date(t.creado_en).toLocaleDateString('es-AR', {day:'2-digit', month:'short', year:'numeric'}) : '';
+
   document.getElementById('ev-overlay-body').innerHTML =
     '<div class="ev-overlay-col-principal">' +
-      '<div class="ev-campo"><label>Título</label><input type="text" id="ev-t-titulo" value="' + _esc(t.titulo) + '" onchange="_guardarCampoTarjeta(\'titulo\',this.value)"></div>' +
-      '<div class="ev-grid2">' +
-        '<div class="ev-campo"><label>Categoría</label><select id="ev-t-categoria" onchange="_guardarCampoTarjeta(\'categoria\',this.value)"><option value="">Sin categoría</option>' + opcionesCategoria + '</select></div>' +
-        '<div class="ev-campo"><label>Fecha límite</label><input type="date" id="ev-t-fecha" value="' + (t.fecha_limite||'') + '" onchange="_guardarCampoTarjeta(\'fecha_limite\',this.value)"></div>' +
+      '<input type="text" class="ev-det-titulo-input" id="ev-t-titulo" value="' + _esc(t.titulo) + '" onchange="_guardarCampoTarjeta(\'titulo\',this.value)" placeholder="Título de la tarjeta">' +
+      '<div class="ev-det-header-info">' +
+        (fechaCreado ? 'Creada el <b>' + fechaCreado + '</b> · ' : '') +
+        'En <b>' + _esc((colActual && colActual.nombre) || '—') + '</b>' +
+        (EVENTO_ACTUAL.nombre ? ' · ' + _esc(EVENTO_ACTUAL.nombre) : '') +
       '</div>' +
-      '<div class="ev-campo"><label>Responsable Principal</label><select id="ev-t-resp" onchange="_guardarResponsable(this.value)"><option value="">Sin asignar</option>' + opcionesResp + '</select></div>' +
 
-      '<div class="ev-section-titulo">✅ Checklist</div>' +
-      '<div id="ev-checklist-lista">' + _renderChecklist(t) + '</div>' +
-      '<div class="ev-check-add-row" style="position:relative;">' +
-        '<input type="text" id="ev-check-nuevo" placeholder="Nueva subtarea... usá @ para asignar" oninput="_onChecklistInput(event)" onkeydown="_onChecklistKeydown(event)">' +
-        '<button onclick="_agregarChecklistItem()">+</button>' +
-        '<div id="ev-check-sugerencias" class="ev-mencion-sug"></div>' +
+      '<div class="ev-det-grid">' +
+        '<div class="ev-det-card"><div class="ev-det-card-label">Categoría</div><select id="ev-t-categoria" onchange="_guardarCampoTarjeta(\'categoria\',this.value)"><option value="">Sin categoría</option>' + opcionesCategoria + '</select></div>' +
+        '<div class="ev-det-card"><div class="ev-det-card-label">Fecha límite</div><input type="date" id="ev-t-fecha" value="' + (t.fecha_limite||'') + '" onchange="_guardarCampoTarjeta(\'fecha_limite\',this.value)"></div>' +
+      '</div>' +
+      '<div class="ev-det-card"><div class="ev-det-card-label">Responsable Principal</div><select id="ev-t-resp" onchange="_guardarResponsable(this.value)"><option value="">Sin asignar</option>' + opcionesResp + '</select></div>' +
+
+      '<div class="ev-section-titulo">✅ Lista de comprobación <span id="ev-check-progreso" style="text-transform:none;font-weight:400;"></span></div>' +
+      '<div class="ev-det-checklist-box">' +
+        '<div class="ev-det-progreso-track"><div class="ev-det-progreso-fill" id="ev-check-progreso-fill" style="width:0%;"></div></div>' +
+        '<div id="ev-checklist-lista">' + _renderChecklist(t) + '</div>' +
+        '<div class="ev-check-add-row" style="position:relative;">' +
+          '<input type="text" id="ev-check-nuevo" placeholder="Nueva subtarea... usá @ para asignar" oninput="_onChecklistInput(event)" onkeydown="_onChecklistKeydown(event)">' +
+          '<button onclick="_agregarChecklistItem()">+</button>' +
+          '<div id="ev-check-sugerencias" class="ev-mencion-sug"></div>' +
+        '</div>' +
       '</div>' +
     '</div>' +
 
@@ -651,6 +685,7 @@ function _renderOverlayTarjeta() {
         '<div id="ev-msg-sugerencias" class="ev-mencion-sug"></div>' +
       '</div>' +
     '</div>';
+  _actualizarProgresoChecklist(t);
 }
 
 function _guardarCampoTarjeta(campo, valor) {
@@ -673,6 +708,15 @@ function _guardarResponsable(email) {
 }
 
 // ── Checklist ──
+function _actualizarProgresoChecklist(t) {
+  var checklist = Array.isArray(t.checklist) ? t.checklist : [];
+  var hechos = checklist.filter(function(i){ return i.hecho; }).length;
+  var pct = checklist.length ? Math.round(hechos / checklist.length * 100) : 0;
+  var elTexto = document.getElementById('ev-check-progreso');
+  var elFill = document.getElementById('ev-check-progreso-fill');
+  if (elTexto) elTexto.textContent = checklist.length ? '(' + hechos + '/' + checklist.length + ')' : '';
+  if (elFill) elFill.style.width = pct + '%';
+}
 function _renderChecklist(t) {
   var checklist = Array.isArray(t.checklist) ? t.checklist : [];
   if (!checklist.length) return '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">Sin subtareas todavía.</div>';
@@ -693,6 +737,7 @@ function _toggleChecklistItem(idItem) {
       if (!r.ok) { alert(r.error||'Error'); return; }
       t.checklist = r.checklist;
       document.getElementById('ev-checklist-lista').innerHTML = _renderChecklist(t);
+      _actualizarProgresoChecklist(t);
       _renderTablero();
     });
 }
@@ -712,6 +757,7 @@ function _agregarChecklistItem() {
       if (!r.ok) { alert(r.error||'Error'); return; }
       t.checklist = r.checklist;
       document.getElementById('ev-checklist-lista').innerHTML = _renderChecklist(t);
+      _actualizarProgresoChecklist(t);
       input.value = '';
       _renderTablero();
     });
