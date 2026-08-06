@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | orden-servicio.html | v2026.07.22.1 -->
+<!-- Portal TLC | orden-servicio.html | v2026.08.06.1 (Evidencia Fotográfica ahora muestra TODO, no solo las fotos "bloqueadas" del ingreso — se agregaron las secciones Fotos del Equipo (completas, no solo las protegidas), Antes de Reparar y Después de Reparar, mismos 3 campos que ya existen en el detalle del ticket de servicio.html (fotos, fotos_antes_reparar, fotos_despues_reparar). Reportado por Cristian con 2 capturas.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -140,7 +140,18 @@
 
         <div id="os-evidencia-wrap" style="display:none;">
             <div class="section-title"><i class="fa-solid fa-camera"></i> Evidencia Fotográfica</div>
-            <div id="os-evidencia-fotos" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;"></div>
+            <div id="os-evidencia-equipo-wrap" style="display:none;margin-bottom:12px;">
+                <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Fotos del Equipo</div>
+                <div id="os-evidencia-fotos" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+            </div>
+            <div id="os-evidencia-antes-wrap" style="display:none;margin-bottom:12px;">
+                <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Antes de Reparar</div>
+                <div id="os-evidencia-antes" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+            </div>
+            <div id="os-evidencia-despues-wrap" style="display:none;margin-bottom:14px;">
+                <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Después de Reparar</div>
+                <div id="os-evidencia-despues" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+            </div>
         </div>
 
         <div class="section-title"><i class="fa-solid fa-screwdriver-wrench"></i> Diagnóstico Técnico</div>
@@ -281,18 +292,32 @@
             document.getElementById('os-falla').value      = t.falla_reportada  || '';
             document.getElementById('os-diagnostico').value= t.diagnostico       || '';
 
-            // Evidencia fotográfica — fotos cargadas al ingresar el equipo
-            // (las protegidas, fotos_bloqueadas). Se muestran tal cual
-            // quedaron guardadas en el ticket, de solo lectura.
-            var fotos = Array.isArray(t.fotos) ? t.fotos : [];
-            var bloqueadas = t.fotos_bloqueadas || 0;
-            if (bloqueadas > 0) {
-                var wrap = document.getElementById('os-evidencia-wrap');
-                var cont = document.getElementById('os-evidencia-fotos');
-                cont.innerHTML = fotos.slice(0, bloqueadas).map(function(src) {
+            // Evidencia fotográfica — antes solo se mostraban las fotos
+            // "bloqueadas" (las cargadas al ingresar el equipo, antes de
+            // que se pudieran agregar más desde el detalle del ticket) —
+            // las fotos agregadas DESPUÉS del modal inicial, y las de
+            // Antes/Después de Reparar, quedaban afuera del reporte por
+            // completo. Ahora se muestran las 3 secciones, mismo
+            // criterio que el detalle del ticket en servicio.html.
+            // Reportado por Cristian con 2 capturas.
+            var fotosEquipo = Array.isArray(t.fotos) ? t.fotos : [];
+            var fotosAntes = Array.isArray(t.fotos_antes_reparar) ? t.fotos_antes_reparar : [];
+            var fotosDespues = Array.isArray(t.fotos_despues_reparar) ? t.fotos_despues_reparar : [];
+            var hayEvidencia = fotosEquipo.length || fotosAntes.length || fotosDespues.length;
+
+            function _renderGrupoFotosOS(fotos, contId, wrapId) {
+                if (!fotos.length) return;
+                document.getElementById(contId).innerHTML = fotos.map(function(src) {
                     return '<img src="' + src + '" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;">';
                 }).join('');
-                wrap.style.display = 'block';
+                document.getElementById(wrapId).style.display = 'block';
+            }
+
+            if (hayEvidencia) {
+                document.getElementById('os-evidencia-wrap').style.display = 'block';
+                _renderGrupoFotosOS(fotosEquipo, 'os-evidencia-fotos', 'os-evidencia-equipo-wrap');
+                _renderGrupoFotosOS(fotosAntes, 'os-evidencia-antes', 'os-evidencia-antes-wrap');
+                _renderGrupoFotosOS(fotosDespues, 'os-evidencia-despues', 'os-evidencia-despues-wrap');
             }
             document.getElementById('os-tareas').value     = t.tareas_realizadas || '';
 
