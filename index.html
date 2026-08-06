@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.08.04.9 (Mismo fix que servicio.html: reacción de campanita unificada con el mensaje real cuando la notificación viene de una mención.) -->
+<!-- Portal TLC | index.html | v2026.08.04.10 (Primer paso del módulo nuevo "Gestión Eventos / Congresos" (TLC Planner) — agregado dentro de Administración, junto a Reportes. Gateado por el permiso "eventos" (columna "Eventos" en la hoja Vendedores — si todavía no existe, queda bloqueado por defecto, mismo criterio que las demás columnas). Apunta a eventos.html, que se construye en el próximo paso. Pedido por Cristian.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -796,6 +796,11 @@ body.tema-claro .notif-texto { color:#0f172a; }
                     <div class="item-logo-container" style="background:rgba(248,150,30,0.15); border:1px solid rgba(248,150,30,0.4); color:#f8961e;"><i class="fa-solid fa-chart-bar"></i></div>
                     <div class="item-text-box"><h3>Reportes</h3><p>Resúmenes y análisis</p></div>
                 </div>
+                <div class="menu-item-row" id="menu-eventos" onclick="abrirUrlConPermiso('eventos.html', 'Gestión Eventos / Congresos', 'eventos')">
+                    <div class="item-logo-container" style="background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.4); color:#8b5cf6;"><i class="fa-solid fa-calendar-days"></i></div>
+                    <div class="item-text-box"><h3>Gestión Eventos / Congresos</h3><p>Tablero de tareas para Facoextrema y otros eventos</p></div>
+                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
             </div>
         </div>
 
@@ -1383,7 +1388,7 @@ body.tema-claro .notif-texto { color:#0f172a; }
     // Placeholder de arranque (mientras carga el Sheet) — el valor real y
     // definitivo de verComisiones viene SIEMPRE de la columna "Ver Comisiones"
     // en cargarPermisosUsuario(), independiente del rol.
-    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, tareas: true, empresas: true, verComisiones: false, rol: 'Administrador' };
+    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, tareas: true, empresas: true, eventos: true, verComisiones: false, rol: 'Administrador' };
 
     async function cargarPermisosUsuario(email) {
         try {
@@ -1402,6 +1407,7 @@ body.tema-claro .notif-texto { color:#0f172a; }
             const adminIdx   = cols.indexOf('Administracion');
             const tareasIdx  = cols.indexOf('Tareas');
             const empresasIdx= cols.indexOf('Empresas');
+            const eventosIdx = cols.indexOf('Eventos'); // ← columna nueva, "permisos.moduloEventos" — si todavía no existe en el Sheet, bool() la deja en false (bloqueado) sin romper nada
             const comisionesIdx = cols.indexOf('Ver Comisiones');
 
             const fila = rows.find(r => {
@@ -1423,11 +1429,12 @@ body.tema-claro .notif-texto { color:#0f172a; }
                     admin:         bool(adminIdx),
                     tareas:        bool(tareasIdx),
                     empresas:      bool(empresasIdx),
+                    eventos:       bool(eventosIdx),
                     verComisiones: bool(comisionesIdx),
                 };
             } else {
                 // Email no encontrado → acceso mínimo
-                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, empresas: false, verComisiones: false };
+                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, empresas: false, eventos: false, verComisiones: false };
             }
         } catch(e) {
             console.warn('Error cargando permisos:', e);
@@ -1444,6 +1451,7 @@ body.tema-claro .notif-texto { color:#0f172a; }
             { id: 'menu-comex',    permiso: userPermisos.comex },
             { id: 'menu-admin',    permiso: userPermisos.admin },
             { id: 'menu-tareas',   permiso: userPermisos.tareas },
+            { id: 'menu-eventos',  permiso: userPermisos.eventos },
         ];
         secciones.forEach(({ id, permiso }) => {
             const el = document.getElementById(id);
