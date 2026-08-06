@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.04.15 (Mismos 3 fixes que servicio.html: bug real del font-size inline en mensajes, reacciones siempre semi-visibles, tap-para-expandir en celular.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.04.16 (Mismos 2 fixes que servicio.html: reacción de campanita unificada con el mensaje real, y emojis siempre clickeables en táctil.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.04.8 (Fix: los checkboxes de contacto no tenían color de texto fijo — usaban el color ambiente que cambia con el tema, a diferencia de los inputs vecinos (VENDEDOR, TELÉFONO) que siempre son fondo blanco/texto oscuro sin importar el tema. Ahora siguen el mismo patrón fijo. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
@@ -474,6 +474,9 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
       .msg-reacciones-resumen { font-size:11px; margin-top:5px; color:#94a3b8; }
       .msg-reaccion-pill { cursor:pointer; padding:2px 6px; border-radius:10px; background:rgba(58,134,255,.1); transition:background .1s ease; }
       .msg-reaccion-pill:hover { background:rgba(58,134,255,.22); }
+      @media (hover: none) {
+        .msg-reacciones, .notif-reacciones { opacity:1 !important; }
+      }
       body.tema-claro .msg-fila:hover { background:#eef2ff !important; }
       body.tema-claro .msg-reacciones-resumen { color:#64748b; }
 </style>
@@ -1578,20 +1581,33 @@ function _renderCampanaListaCot() {
                 '</div>' +
             '</div>' +
             '<div class="notif-reacciones">' +
-                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'ok\')" title="Ok">👍</button>' +
-                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'no_ok\')" title="No ok">👎</button>' +
-                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'corazon\')" title="Me encanta">❤️</button>' +
+                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Ok">👍</button>' +
+                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="No ok">👎</button>' +
+                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Me encanta">❤️</button>' +
             '</div>' +
             (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
         '</div>';
     }).join('');
 }
 
-window._reaccionarNotifCot = function(ev, idNoti, tipo) {
+window._reaccionarNotifCot = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice) {
     if (ev) ev.stopPropagation();
     var cuenta = _leerSesionCompartida();
     var email = cuenta ? cuenta.username : '';
+    var nombre = cuenta ? cuenta.name : '';
     if (!email) return;
+    if (mensajeIndice !== '' && mensajeIndice !== undefined && ticketId) {
+        var accionMsg = origen === 'cotizacion' ? 'cot_reaccionarMensaje' : 'st_reaccionarMensaje';
+        var payloadMsg = { accion: accionMsg, indice: parseInt(mensajeIndice, 10), autor_email: email, autor_nombre: nombre, reaccion: tipo };
+        if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId; else payloadMsg.id_ticket = ticketId;
+        fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
+            .then(function(){
+                return fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+                    body: JSON.stringify({ accion:'marcarNotificacionLeida', email:email, id:idNoti }) });
+            })
+            .then(function(){ _cargarNotificaciones(true); });
+        return;
+    }
     fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ accion:'reaccionarNotificacion', email:email, id:idNoti, reaccion:tipo }) })
         .then(function(){ _cargarNotificaciones(true); });

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.08.04.10 (3 fixes reportados por Cristian: (1) BUG REAL encontrado — el texto de los mensajes internos tenía font-size fijo por estilo inline, que le ganaba a la regla de hover, por eso "no se ampliaba la letra"; corregido. (2) botones de reacción ahora siempre semi-visibles (no ocultos del todo hasta el hover) — más confiables para clickear en PC y usables en celular sin hover. (3) en celular, el primer toque en una notificación ahora expande (no navega directo) — recién el segundo toque abre el ticket/negocio; en PC sigue igual con hover. Ver FotoMap.gs v153 para el aviso al autor del mensaje cuando le reaccionan.) -->
+<!-- Portal TLC | servicio.html | v2026.08.04.11 (2 fixes más: (1) reaccionar desde la campanita ahora reacciona al MENSAJE real (unificado con FotoMap.gs v154) — antes era una reacción personal separada que no mostraba quién reaccionó; (2) en celular, los emojis de mensajes de tarjeta no funcionaban por un problema de "primer toque = hover" en algunos navegadores — se fuerza visibilidad completa siempre en dispositivos táctiles, sin depender de hover. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -331,6 +331,16 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
   .msg-reacciones-resumen { font-size:11px; margin-top:5px; color:var(--text-muted); }
   .msg-reaccion-pill { cursor:pointer; padding:2px 6px; border-radius:10px; background:rgba(58,134,255,.1); transition:background .1s ease; }
   .msg-reaccion-pill:hover { background:rgba(58,134,255,.22); }
+  /* En táctil no existe hover de verdad — algunos navegadores simulan
+     un "primer toque = hover" que hace que el primer tap solo revele
+     el botón sin registrar el click, necesitando un segundo toque
+     confuso. Se fuerza opacidad completa siempre en táctil, sin
+     depender de ningún estado de hover. Reportado por Cristian: "en
+     el celular no funcionan los emojis en los mensajes de la
+     tarjeta". */
+  @media (hover: none) {
+    .msg-reacciones, .notif-reacciones { opacity:1 !important; }
+  }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
@@ -2427,19 +2437,37 @@ function _renderCampanaLista() {
         '</div>' +
       '</div>' +
       '<div class="notif-reacciones">' +
-        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'ok\')" title="Ok">👍</button>' +
-        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'no_ok\')" title="No ok">👎</button>' +
-        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'corazon\')" title="Me encanta">❤️</button>' +
+        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Ok">👍</button>' +
+        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="No ok">👎</button>' +
+        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Me encanta">❤️</button>' +
       '</div>' +
       (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
     '</div>';
   }).join('');
 }
 
-window._reaccionarNotif = function(ev, idNoti, tipo) {
+window._reaccionarNotif = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice) {
   if (ev) ev.stopPropagation(); // reacción rápida — no abre el ticket
   var email = (_session && _session.username) || '';
+  var nombre = (_session && _session.name) || '';
   if (!email) return;
+  // Si la notificación viene de una mención en un mensaje real, se
+  // reacciona al MENSAJE (compartido, visible para todo el equipo, con
+  // "quién reaccionó") — no a una reacción personal separada que nadie
+  // más ve. Pedido por Cristian: "desde la campanita... no me dice
+  // quién lo hizo, desde los mensajes de la tarjeta sí lo hace".
+  if (mensajeIndice !== '' && mensajeIndice !== undefined && ticketId) {
+    var accionMsg = origen === 'cotizacion' ? 'cot_reaccionarMensaje' : 'st_reaccionarMensaje';
+    var payloadMsg = { accion: accionMsg, indice: parseInt(mensajeIndice, 10), autor_email: email, autor_nombre: nombre, reaccion: tipo };
+    if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId; else payloadMsg.id_ticket = ticketId;
+    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
+      .then(function(){
+        return fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+          body: JSON.stringify({ accion:'marcarNotificacionLeida', email:email, id:idNoti }) });
+      })
+      .then(function(){ _cargarNotificaciones(true); });
+    return;
+  }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'reaccionarNotificacion', email:email, id:idNoti, reaccion:tipo }) })
     .then(function(){ _cargarNotificaciones(true); });

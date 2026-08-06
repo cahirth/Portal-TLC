@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.08.04.8 (Mismo fix que servicio.html: en celular, el primer toque en una notificación expande en vez de navegar directo; reacciones siempre semi-visibles.) -->
+<!-- Portal TLC | index.html | v2026.08.04.9 (Mismo fix que servicio.html: reacción de campanita unificada con el mensaje real cuando la notificación viene de una mención.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -358,6 +358,9 @@ body.tema-claro .notif-texto { color:#0f172a; }
 .notif-reacciones button { background:none; border:none; font-size:15px; cursor:pointer; padding:3px 5px;
   border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
 .notif-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
+@media (hover: none) {
+  .notif-reacciones { opacity:1 !important; }
+}
 .notif-reaccion-guardada { font-size:12px; margin-left:4px; }
     </style>
 </head>
@@ -2260,20 +2263,33 @@ body.tema-claro .notif-texto { color:#0f172a; }
             '</div>' +
           '</div>' +
           '<div class="notif-reacciones">' +
-            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'ok\')" title="Ok">👍</button>' +
-            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'no_ok\')" title="No ok">👎</button>' +
-            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'corazon\')" title="Me encanta">❤️</button>' +
+            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Ok">👍</button>' +
+            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="No ok">👎</button>' +
+            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Me encanta">❤️</button>' +
           '</div>' +
           (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
         '</div>';
       }).join('');
     }
 
-    window._reaccionarNotifIdx = function(ev, idNoti, tipo) {
+    window._reaccionarNotifIdx = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice) {
       if (ev) ev.stopPropagation();
       var cuenta = _leerSesionIdx();
       var email = cuenta ? cuenta.username : '';
+      var nombre = cuenta ? cuenta.name : '';
       if (!email) return;
+      if (mensajeIndice !== '' && mensajeIndice !== undefined && ticketId) {
+        var accionMsg = origen === 'cotizacion' ? 'cot_reaccionarMensaje' : 'st_reaccionarMensaje';
+        var payloadMsg = { accion: accionMsg, indice: parseInt(mensajeIndice, 10), autor_email: email, autor_nombre: nombre, reaccion: tipo };
+        if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId; else payloadMsg.id_ticket = ticketId;
+        fetch(GAS_URL_PUSH_IDX, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
+          .then(function(){
+            return fetch(GAS_URL_PUSH_IDX, { method:'POST', headers:{'Content-Type':'text/plain'},
+              body: JSON.stringify({ accion:'marcarNotificacionLeida', email:email, id:idNoti }) });
+          })
+          .then(function(){ _cargarNotificaciones(true); });
+        return;
+      }
       fetch(GAS_URL_PUSH_IDX, { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ accion:'reaccionarNotificacion', email:email, id:idNoti, reaccion:tipo }) })
         .then(function(){ _cargarNotificaciones(true); });
