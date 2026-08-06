@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.04.2 (3 fixes sobre el borrador inicial: (1) reaccionar desde la campanita a un mensaje de tarjeta ahora manda id_evento e id_tarjeta correctos, no el mismo valor duplicado (bug real, ver FotoMap.gs v156); (2) agregado deep-link por URL (?id=&tarjeta=) — clickear una notificación ahora abre directo la tarjeta puntual, en vez de solo el tablero; (3) sacada una línea de código muerto que no hacía nada.) -->
+<!-- Portal TLC | eventos.html | v2026.08.04.1 (Módulo nuevo "Gestión Eventos / Congresos" (TLC Planner) — v1 recortado: tablero Kanban con columnas dinámicas (crear/renombrar/borrar), tarjetas con categoría/responsable/fecha límite, checklist con @menciones, chat interno con hover-zoom y reacciones (reutiliza al 100% la infraestructura de Ventas/Servicio, cero código duplicado). Selector de eventos (arranca con Faco Extrema 2026). Falta para v2: duplicar tarjeta, bitácora de cambios, reordenar columnas por drag. Pedido por Cristian, spec completa "TLC Planner".) -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Eventos / Congresos — Portal TLC</title>
+<script src="version.js"></script>
+<script src="permisos.js"></script>
+<style>
+:root {
+  --bg:#030712; --panel-dark:#0f172a; --panel-darker:#0a1424; --border-glow:#1e3050;
+  --text-main:#f1f5f9; --text-muted:#94a3b8; --text-dim:#64748b;
+  --accent-blue:#3a86ff; --accent-green:#06d6a0; --accent-purple:#8b5cf6; --accent-orange:#f8961e;
+}
+body.tema-claro {
+  --bg:#f0f4f8; --panel-dark:#ffffff; --panel-darker:#f8fafc; --border-glow:#e2e8f0;
+  --text-main:#0f172a; --text-muted:#64748b; --text-dim:#94a3b8;
+  color-scheme: light;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text-main); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:13px; min-height:100vh; color-scheme:dark; }
+button { font-family:inherit; }
+a { color:var(--accent-blue); }
+
+.ev-header { position:sticky; top:0; z-index:100; background:var(--panel-dark); border-bottom:1px solid var(--border-glow);
+  padding:12px 16px; display:flex; align-items:center; gap:12px; }
+.ev-btn-back { width:38px; height:38px; border-radius:50%; background:var(--accent-blue); color:#fff; border:none;
+  font-size:16px; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.ev-header-title { flex:1; min-width:0; }
+.ev-header-title h1 { font-size:15px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ev-header-title p { font-size:10.5px; color:var(--text-muted); }
+.ev-icon-btn { width:36px; height:36px; border-radius:50%; background:var(--panel-darker); border:1px solid var(--border-glow);
+  color:var(--text-main); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; position:relative; flex-shrink:0; }
+.ev-badge { position:absolute; top:-3px; right:-3px; background:#ef4444; color:#fff; font-size:9px; font-weight:800;
+  border-radius:10px; min-width:16px; height:16px; display:flex; align-items:center; justify-content:center; padding:0 3px; }
+
+.ev-body { padding:14px; max-width:1400px; margin:0 auto; }
+
+/* ── Selector de eventos ── */
+.ev-selector-card { background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:12px; padding:14px 16px;
+  margin-bottom:10px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; transition:border-color .15s; }
+.ev-selector-card:hover { border-color:var(--accent-blue); }
+.ev-selector-nombre { font-size:14px; font-weight:700; }
+.ev-selector-meta { font-size:11px; color:var(--text-muted); margin-top:2px; }
+.ev-btn-nuevo-evento { width:100%; padding:14px; border-radius:12px; border:1px dashed var(--border-glow); background:transparent;
+  color:var(--text-muted); font-size:13px; font-weight:700; cursor:pointer; margin-top:6px; }
+.ev-btn-nuevo-evento:hover { border-color:var(--accent-blue); color:var(--accent-blue); }
+
+/* ── Tablero ── */
+.ev-tablero-topbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+.ev-select-evento { flex:1; min-width:180px; background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:8px;
+  padding:9px 12px; color:var(--text-main); font-size:13px; font-weight:700; }
+.ev-btn-secundario { padding:9px 14px; border-radius:8px; border:1px solid var(--border-glow); background:var(--panel-dark);
+  color:var(--text-main); font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.ev-btn-secundario:hover { border-color:var(--accent-blue); }
+
+.ev-board { display:flex; gap:12px; overflow-x:auto; padding-bottom:16px; align-items:flex-start; }
+.ev-col { min-width:270px; max-width:270px; background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:12px;
+  padding:10px; flex-shrink:0; }
+.ev-col.drag-over { border-color:var(--accent-blue); background:rgba(58,134,255,.06); }
+.ev-col-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; padding:0 2px; }
+.ev-col-nombre { font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; }
+.ev-col-count { font-size:10px; color:var(--text-muted); background:var(--panel-dark); border-radius:10px; padding:1px 7px; margin-left:6px; }
+.ev-col-menu-btn { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:13px; padding:2px 6px; }
+.ev-col-menu-btn:hover { color:var(--text-main); }
+.ev-col-add-tarjeta { width:100%; padding:8px; border-radius:8px; border:1px dashed var(--border-glow); background:transparent;
+  color:var(--text-muted); font-size:11.5px; font-weight:700; cursor:pointer; margin-top:4px; }
+.ev-col-add-tarjeta:hover { border-color:var(--accent-blue); color:var(--accent-blue); }
+.ev-col-nueva { min-width:220px; max-width:220px; flex-shrink:0; background:transparent; border:1px dashed var(--border-glow);
+  border-radius:12px; display:flex; align-items:center; justify-content:center; cursor:pointer; min-height:60px; color:var(--text-muted); font-size:12px; font-weight:700; }
+.ev-col-nueva:hover { border-color:var(--accent-blue); color:var(--accent-blue); }
+
+.ev-card { background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:10px; padding:10px 11px;
+  margin-bottom:8px; cursor:grab; transition:border-color .15s, transform .1s; }
+.ev-card:hover { border-color:var(--accent-blue); }
+.ev-card.dragging { opacity:.4; }
+.ev-card-cat { display:inline-block; font-size:9px; font-weight:800; padding:2px 7px; border-radius:8px; margin-bottom:6px; }
+.ev-card-titulo { font-size:12.5px; font-weight:700; margin-bottom:6px; line-height:1.35; }
+.ev-card-meta { display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:10.5px; color:var(--text-muted); }
+.ev-card-fecha { display:flex; align-items:center; gap:3px; }
+.ev-card-fecha.vencida { color:#f87171; font-weight:700; }
+.ev-card-fecha.proxima { color:#f8961e; font-weight:700; }
+.ev-card-resp { background:var(--accent-blue); color:#fff; width:20px; height:20px; border-radius:50%; display:flex;
+  align-items:center; justify-content:center; font-size:9px; font-weight:800; flex-shrink:0; }
+.ev-card-progreso-wrap { height:4px; background:var(--panel-darker); border-radius:4px; margin-top:8px; overflow:hidden; }
+.ev-card-progreso-bar { height:100%; background:var(--accent-green); border-radius:4px; transition:width .2s; }
+.ev-card-progreso-txt { font-size:9.5px; color:var(--text-muted); margin-top:3px; }
+
+/* ── Overlay tarjeta ── */
+.ev-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:500; display:none; align-items:flex-end; justify-content:center; }
+.ev-overlay.open { display:flex; }
+@media (min-width:720px) { .ev-overlay { align-items:center; } }
+.ev-overlay-panel { background:var(--bg); width:100%; max-width:640px; max-height:92vh; overflow-y:auto; border-radius:16px 16px 0 0; }
+@media (min-width:720px) { .ev-overlay-panel { border-radius:16px; max-height:88vh; } }
+.ev-overlay-header { position:sticky; top:0; background:var(--panel-dark); border-bottom:1px solid var(--border-glow);
+  padding:14px 16px; display:flex; align-items:center; gap:10px; z-index:2; }
+.ev-overlay-body { padding:16px; }
+.ev-campo { margin-bottom:14px; }
+.ev-campo label { display:block; font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; }
+.ev-campo input, .ev-campo select, .ev-campo textarea { width:100%; background:var(--panel-darker); border:1px solid var(--border-glow);
+  border-radius:8px; padding:9px 11px; color:var(--text-main); font-size:12.5px; font-family:inherit; }
+body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-claro .ev-campo textarea { background:#fff; }
+.ev-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media (max-width:480px) { .ev-grid2 { grid-template-columns:1fr; } }
+
+.ev-check-item { display:flex; align-items:flex-start; gap:8px; padding:7px 0; border-bottom:1px solid var(--border-glow); }
+.ev-check-item:last-child { border-bottom:none; }
+.ev-check-item input[type=checkbox] { margin-top:2px; flex-shrink:0; width:16px; height:16px; }
+.ev-check-item.hecho .ev-check-texto { text-decoration:line-through; color:var(--text-muted); }
+.ev-check-texto { font-size:12.5px; flex:1; }
+.ev-check-mencion { font-size:10px; color:var(--accent-blue); }
+.ev-check-add-row { display:flex; gap:6px; margin-top:8px; position:relative; }
+.ev-check-add-row input { flex:1; }
+.ev-check-add-row button { padding:0 14px; border-radius:8px; border:none; background:var(--accent-blue); color:#fff; font-weight:700; cursor:pointer; }
+
+.ev-section-titulo { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin:18px 0 8px; }
+
+/* Reutilizado tal cual de Ventas/Servicio: hover-zoom + reacciones */
+.msg-fila { transition: background .12s ease, border-color .12s ease; cursor:default; padding:8px 10px; border-radius:10px;
+  background:var(--panel-dark); border:1px solid var(--border-glow); margin-bottom:8px; }
+.msg-fila:hover, .msg-fila:focus-within { background: rgba(58,134,255,.08) !important; border-color:#3a86ff55 !important; }
+.msg-texto { font-size:12px; color:var(--text-main); white-space:pre-wrap; word-break:break-word; transition:font-size .15s ease; }
+.msg-fila:hover .msg-texto { font-size:13px; }
+.msg-reacciones { display:flex; gap:2px; opacity:.5; transition:opacity .15s ease; margin-top:5px; }
+.msg-fila:hover .msg-reacciones, .msg-fila:focus-within .msg-reacciones { opacity:1; }
+.msg-reacciones button { background:none; border:none; font-size:14px; cursor:pointer; padding:2px 5px;
+  border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
+.msg-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
+.msg-reacciones-resumen { font-size:11px; margin-top:5px; color:var(--text-muted); }
+.msg-reaccion-pill { cursor:pointer; padding:2px 6px; border-radius:10px; background:rgba(58,134,255,.1); transition:background .1s ease; }
+.msg-reaccion-pill:hover { background:rgba(58,134,255,.22); }
+@media (hover: none) { .msg-reacciones { opacity:1 !important; } }
+
+.ev-mencion-sug { position:absolute; bottom:100%; left:0; right:0; margin-bottom:4px; background:var(--panel-dark);
+  border:1px solid var(--border-glow); border-radius:8px; max-height:160px; overflow-y:auto; display:none; z-index:5; }
+.ev-mencion-sug button { display:block; width:100%; text-align:left; padding:8px 10px; font-size:12px; border:none; background:none;
+  color:var(--text-main); cursor:pointer; border-bottom:1px solid var(--border-glow); }
+.ev-mencion-sug button:hover, .ev-mencion-sug button.activo { background:rgba(58,134,255,.12); }
+
+.ev-btn-primario { width:100%; padding:10px; border-radius:8px; background:var(--accent-blue); color:#fff; border:none;
+  font-size:13px; font-weight:700; cursor:pointer; }
+.ev-btn-borrar { padding:9px 14px; border-radius:8px; background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.4);
+  color:#f87171; font-size:12px; font-weight:700; cursor:pointer; }
+
+/* Campanita — copiado del mismo patrón que servicio.html */
+.notif-fila { transition: background .12s ease; padding:11px 14px; border-bottom:1px solid var(--border-glow); cursor:pointer;
+  display:flex; gap:10px; align-items:flex-start; }
+.notif-fila:hover, .notif-fila:focus-within { background: rgba(58,134,255,.10) !important; }
+.notif-texto { font-size:12px; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition: font-size .15s ease; }
+.notif-fila:hover .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
+.notif-fila.notif-expandida .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
+.notif-fila.notif-expandida .notif-reacciones { opacity:1; }
+.notif-reacciones { display:flex; gap:2px; opacity:.5; transform:translateX(0); transition:opacity .15s ease, transform .15s ease; flex-shrink:0; }
+.notif-fila:hover .notif-reacciones, .notif-fila:focus-within .notif-reacciones { opacity:1; transform:translateX(0); }
+.notif-reacciones button { background:none; border:none; font-size:15px; cursor:pointer; padding:3px 5px; border-radius:6px; line-height:1; }
+.notif-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
+.notif-reaccion-guardada { font-size:12px; margin-left:4px; }
+@media (hover: none) { .notif-reacciones { opacity:1 !important; } }
+#campana-panel { position:fixed; top:60px; right:12px; width:340px; max-width:92vw; max-height:70vh; overflow-y:auto;
+  background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:14px; box-shadow:0 12px 40px rgba(0,0,0,.4);
+  z-index:1000; display:none; }
+#campana-panel.open { display:block; }
+.campana-header { padding:14px 16px; border-bottom:1px solid var(--border-glow); display:flex; justify-content:space-between; align-items:center; }
+.spinner { width:26px; height:26px; border:3px solid var(--border-glow); border-top-color:var(--accent-blue); border-radius:50%;
+  animation:girar 0.8s linear infinite; }
+@keyframes girar { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="ev-header">
+  <button class="ev-btn-back" onclick="_volverEventos()">←</button>
+  <div class="ev-header-title">
+    <h1 id="ev-hdr-titulo">Gestión Eventos / Congresos</h1>
+    <p id="ev-hdr-sub">TLC Planner</p>
+  </div>
+  <button class="ev-icon-btn" onclick="_toggleCampanaEv(event)" title="Notificaciones">
+    🔔<span class="ev-badge" id="ev-campana-badge" style="display:none;">0</span>
+  </button>
+</div>
+
+<div class="ev-body">
+
+  <!-- ═══ VISTA: Selector de eventos ═══ -->
+  <div id="ev-vista-selector">
+    <div id="ev-lista-eventos"><div style="text-align:center;padding:30px;"><div class="spinner" style="margin:0 auto;"></div></div></div>
+    <button class="ev-btn-nuevo-evento" onclick="_abrirModalNuevoEvento()">+ Nuevo evento</button>
+  </div>
+
+  <!-- ═══ VISTA: Tablero ═══ -->
+  <div id="ev-vista-tablero" style="display:none;">
+    <div class="ev-tablero-topbar">
+      <select class="ev-select-evento" id="ev-select-evento" onchange="_cambiarEventoDesdeSelect(this.value)"></select>
+      <button class="ev-btn-secundario" onclick="_volverASelectorEventos()">📋 Todos los eventos</button>
+    </div>
+    <div class="ev-board" id="ev-board"></div>
+  </div>
+
+</div>
+
+<!-- ═══ OVERLAY: Detalle de tarjeta ═══ -->
+<div class="ev-overlay" id="ev-overlay-tarjeta">
+  <div class="ev-overlay-panel">
+    <div class="ev-overlay-header">
+      <button class="ev-btn-back" style="width:32px;height:32px;font-size:13px;" onclick="_cerrarOverlayTarjeta()">←</button>
+      <div style="flex:1;font-size:13px;font-weight:800;">Detalle de tarjeta</div>
+      <button class="ev-btn-borrar" onclick="_borrarTarjetaActual()">🗑</button>
+    </div>
+    <div class="ev-overlay-body" id="ev-overlay-body"></div>
+  </div>
+</div>
+
+<!-- ═══ CAMPANITA ═══ -->
+<div id="campana-panel">
+  <div class="campana-header">
+    <div style="font-size:13px;font-weight:800;">🔔 Actividad</div>
+    <a href="#" style="font-size:11px;font-weight:700;" onclick="_marcarTodasLeidasEv(event)">Marcar todo leído</a>
+  </div>
+  <div id="campana-lista" style="overflow-y:auto;"></div>
+</div>
+
+<script>
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+var SESSION_KEY = 'tlc_session_v1';
+var _session = null;
+var EVENTOS = [];
+var EVENTO_ACTUAL = null; // objeto completo con columnas + tarjetas
+var TARJETA_ACTUAL_ID = null;
+var _internosCacheEv = null;
+var _mencionCandidatosEv = [];
+var _mencionIndiceResaltadoEv = -1;
+var _dragTarjetaId = null;
+
+function _esc(s) {
+  return String(s||'').replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+async function _cargarSesion() {
+  try {
+    var raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) { _redirigirLoginEv(); return false; }
+    var payload = JSON.parse(raw);
+    _session = payload && payload.account ? payload.account : payload;
+    if (!_session || !_session.username) { _redirigirLoginEv(); return false; }
+    return true;
+  } catch(e) { _redirigirLoginEv(); return false; }
+}
+function _redirigirLoginEv() { window.location.href = 'index.html'; }
+
+function _volverEventos() {
+  if (document.getElementById('ev-vista-tablero').style.display !== 'none') { _volverASelectorEventos(); return; }
+  window.location.href = 'index.html';
+}
+
+(async function() {
+  var acceso = typeof validarAccesoModulo === 'function' ? await validarAccesoModulo('Eventos') : true;
+  if (!acceso) return;
+  var ok = await _cargarSesion();
+  if (!ok) return;
+  var params = new URLSearchParams(window.location.search);
+  var idUrl = params.get('id');
+  var tarjetaUrl = params.get('tarjeta');
+  await _cargarEventos();
+  if (idUrl) _abrirEvento(idUrl, tarjetaUrl);
+  _cargarNotificaciones(true);
+  setInterval(function(){ _cargarNotificaciones(true); }, 45000);
+})();
+
+// ══════════════════════════════════════════════════════════════════
+// EVENTOS — listar / crear / abrir
+// ══════════════════════════════════════════════════════════════════
+async function _cargarEventos() {
+  try {
+    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_listarEventos' }) });
+    var r = await resp.json();
+    EVENTOS = (r.ok && Array.isArray(r.eventos)) ? r.eventos : [];
+    _renderListaEventos();
+  } catch(e) {
+    document.getElementById('ev-lista-eventos').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">Error de conexión.</div>';
+  }
+}
+
+function _renderListaEventos() {
+  var cont = document.getElementById('ev-lista-eventos');
+  if (!EVENTOS.length) { cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);">Todavía no hay eventos cargados.</div>'; return; }
+  cont.innerHTML = EVENTOS.map(function(e) {
+    return '<div class="ev-selector-card" onclick="_abrirEvento(\'' + e.id + '\')">' +
+      '<div><div class="ev-selector-nombre">📅 ' + _esc(e.nombre) + '</div>' +
+        '<div class="ev-selector-meta">' + e.cantidadTarjetas + ' tarjeta' + (e.cantidadTarjetas !== 1 ? 's' : '') + '</div></div>' +
+      '<span style="color:var(--text-muted);">→</span>' +
+    '</div>';
+  }).join('');
+}
+
+function _abrirModalNuevoEvento() {
+  var nombre = prompt('Nombre del evento o congreso (ej. "Faco Extrema 2026"):');
+  if (!nombre || !nombre.trim()) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_crearEvento', nombre: nombre.trim() }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error al crear: ' + (r.error||'desconocido')); return; }
+      _abrirEvento(r.id);
+    });
+}
+
+async function _abrirEvento(id, tarjetaId) {
+  document.getElementById('ev-vista-selector').style.display = 'none';
+  document.getElementById('ev-vista-tablero').style.display = 'block';
+  document.getElementById('ev-board').innerHTML = '<div style="padding:30px;"><div class="spinner" style="margin:0 auto;"></div></div>';
+  try {
+    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_obtenerEvento', id: id }) });
+    var r = await resp.json();
+    if (!r.ok) { alert('No se pudo abrir el evento: ' + (r.error||'')); _volverASelectorEventos(); return; }
+    EVENTO_ACTUAL = r.evento;
+    document.getElementById('ev-hdr-titulo').textContent = EVENTO_ACTUAL.nombre;
+    document.getElementById('ev-hdr-sub').textContent = EVENTO_ACTUAL.tarjetas.length + ' tarjetas';
+    _renderSelectEventos();
+    _renderTablero();
+    history.replaceState(null, '', 'eventos.html?id=' + encodeURIComponent(id));
+    // Deep-link desde una notificación o un link compartido — abre
+    // directo la tarjeta puntual, sin que el usuario tenga que
+    // buscarla a mano en el tablero.
+    if (tarjetaId && EVENTO_ACTUAL.tarjetas.some(function(t){ return t.id === tarjetaId; })) {
+      _abrirTarjeta(tarjetaId);
+    }
+  } catch(e) {
+    alert('Error de conexión al abrir el evento.');
+    _volverASelectorEventos();
+  }
+}
+
+function _renderSelectEventos() {
+  var sel = document.getElementById('ev-select-evento');
+  sel.innerHTML = EVENTOS.map(function(e) {
+    return '<option value="' + e.id + '"' + (EVENTO_ACTUAL && EVENTO_ACTUAL.id === e.id ? ' selected' : '') + '>📅 ' + _esc(e.nombre) + '</option>';
+  }).join('');
+}
+function _cambiarEventoDesdeSelect(id) { if (id) _abrirEvento(id); }
+
+function _volverASelectorEventos() {
+  document.getElementById('ev-vista-tablero').style.display = 'none';
+  document.getElementById('ev-vista-selector').style.display = 'block';
+  document.getElementById('ev-hdr-titulo').textContent = 'Gestión Eventos / Congresos';
+  document.getElementById('ev-hdr-sub').textContent = 'TLC Planner';
+  EVENTO_ACTUAL = null;
+  history.replaceState(null, '', 'eventos.html');
+  _cargarEventos();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TABLERO — columnas dinámicas + tarjetas + drag & drop
+// ══════════════════════════════════════════════════════════════════
+var CATEGORIAS_EV = {
+  'Diseño':        { bg:'rgba(139,92,246,.15)', color:'#8b5cf6' },
+  'Logística':     { bg:'rgba(58,134,255,.15)', color:'#3a86ff' },
+  'Stand':         { bg:'rgba(6,214,160,.15)',  color:'#06d6a0' },
+  'Marketing':     { bg:'rgba(248,150,30,.15)', color:'#f8961e' },
+  'Seguros':       { bg:'rgba(239,68,68,.15)',  color:'#f87171' },
+  'Equipos':       { bg:'rgba(56,189,248,.15)', color:'#38bdf8' },
+  'Merchandising': { bg:'rgba(236,72,153,.15)', color:'#ec4899' },
+};
+
+function _fechaLimiteInfo(fecha) {
+  if (!fecha) return { html:'', clase:'' };
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+  var f = new Date(fecha + 'T00:00:00');
+  var diffDias = Math.round((f - hoy) / 86400000);
+  var clase = diffDias < 0 ? 'vencida' : (diffDias <= 3 ? 'proxima' : '');
+  var txt = f.toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit' });
+  return { html: '📅 ' + txt, clase: clase };
+}
+
+function _renderTablero() {
+  var board = document.getElementById('ev-board');
+  var columnas = (EVENTO_ACTUAL.columnas || []).slice().sort(function(a,b){ return (a.orden||0) - (b.orden||0); });
+  var tarjetasPorColumna = {};
+  columnas.forEach(function(c) { tarjetasPorColumna[c.id] = []; });
+  EVENTO_ACTUAL.tarjetas.forEach(function(t) {
+    if (!tarjetasPorColumna[t.columna_id]) tarjetasPorColumna[t.columna_id] = [];
+    tarjetasPorColumna[t.columna_id].push(t);
+  });
+  Object.keys(tarjetasPorColumna).forEach(function(cid) {
+    tarjetasPorColumna[cid].sort(function(a,b){ return (a.orden||0) - (b.orden||0); });
+  });
+
+  board.innerHTML = columnas.map(function(col) {
+    var tarjetas = tarjetasPorColumna[col.id] || [];
+    return '<div class="ev-col" id="ev-col-' + col.id + '" ondragover="_dragOverCol(event,\'' + col.id + '\')" ondragleave="_dragLeaveCol(event,\'' + col.id + '\')" ondrop="_dropEnCol(event,\'' + col.id + '\')">' +
+      '<div class="ev-col-header">' +
+        '<div><span class="ev-col-nombre">' + _esc(col.nombre) + '</span><span class="ev-col-count">' + tarjetas.length + '</span></div>' +
+        '<button class="ev-col-menu-btn" onclick="_menuColumna(event,\'' + col.id + '\')">⋯</button>' +
+      '</div>' +
+      tarjetas.map(_renderCard).join('') +
+      '<button class="ev-col-add-tarjeta" onclick="_abrirModalNuevaTarjeta(\'' + col.id + '\')">+ Nueva tarjeta</button>' +
+    '</div>';
+  }).join('') + '<div class="ev-col-nueva" onclick="_abrirModalNuevaColumna()">+ Nueva columna</div>';
+}
+
+function _renderCard(t) {
+  var cat = CATEGORIAS_EV[t.categoria] || { bg:'rgba(148,163,184,.15)', color:'#94a3b8' };
+  var checklist = Array.isArray(t.checklist) ? t.checklist : [];
+  var hechos = checklist.filter(function(i){ return i.hecho; }).length;
+  var pct = checklist.length ? Math.round(hechos / checklist.length * 100) : 0;
+  var fechaInfo = _fechaLimiteInfo(t.fecha_limite);
+  var inicialResp = (t.responsable_nombre || '').trim().charAt(0).toUpperCase() || '?';
+  return '<div class="ev-card" draggable="true" ondragstart="_dragStartCard(event,\'' + t.id + '\')" ondragend="_dragEndCard(event)" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
+    (t.categoria ? '<span class="ev-card-cat" style="background:' + cat.bg + ';color:' + cat.color + ';">' + _esc(t.categoria) + '</span>' : '') +
+    '<div class="ev-card-titulo">' + _esc(t.titulo) + '</div>' +
+    '<div class="ev-card-meta">' +
+      (fechaInfo.html ? '<span class="ev-card-fecha ' + fechaInfo.clase + '">' + fechaInfo.html + '</span>' : '<span></span>') +
+      (t.responsable_nombre ? '<span class="ev-card-resp" title="' + _esc(t.responsable_nombre) + '">' + inicialResp + '</span>' : '') +
+    '</div>' +
+    (checklist.length ? '<div class="ev-card-progreso-wrap"><div class="ev-card-progreso-bar" style="width:' + pct + '%;"></div></div>' +
+      '<div class="ev-card-progreso-txt">' + hechos + '/' + checklist.length + ' subtareas</div>' : '') +
+  '</div>';
+}
+
+// ── Drag & drop ──
+function _dragStartCard(ev, idTarjeta) { _dragTarjetaId = idTarjeta; ev.target.classList.add('dragging'); }
+function _dragEndCard(ev) { ev.target.classList.remove('dragging'); }
+function _dragOverCol(ev, idCol) { ev.preventDefault(); document.getElementById('ev-col-' + idCol).classList.add('drag-over'); }
+function _dragLeaveCol(ev, idCol) { document.getElementById('ev-col-' + idCol).classList.remove('drag-over'); }
+function _dropEnCol(ev, idCol) {
+  ev.preventDefault();
+  document.getElementById('ev-col-' + idCol).classList.remove('drag-over');
+  if (!_dragTarjetaId) return;
+  var tarjeta = EVENTO_ACTUAL.tarjetas.find(function(t){ return t.id === _dragTarjetaId; });
+  if (!tarjeta || tarjeta.columna_id === idCol) { _dragTarjetaId = null; return; }
+  tarjeta.columna_id = idCol;
+  tarjeta.orden = Date.now();
+  _renderTablero();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_moverTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:_dragTarjetaId, columna_id:idCol, orden:tarjeta.orden }) });
+  _dragTarjetaId = null;
+}
+
+// ── Columnas ──
+function _abrirModalNuevaColumna() {
+  var nombre = prompt('Nombre de la columna:');
+  if (!nombre || !nombre.trim()) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_crearColumna', id_evento:EVENTO_ACTUAL.id, nombre:nombre.trim() }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+      EVENTO_ACTUAL.columnas = r.columnas;
+      _renderTablero();
+    });
+}
+function _menuColumna(ev, idCol) {
+  ev.stopPropagation();
+  var col = (EVENTO_ACTUAL.columnas || []).find(function(c){ return c.id === idCol; });
+  if (!col) return;
+  var accion = prompt('Columna "' + col.nombre + '"\n\nEscribí un nuevo nombre para renombrarla, o "borrar" para eliminarla:', col.nombre);
+  if (accion === null) return;
+  if (accion.trim().toLowerCase() === 'borrar') {
+    if (!confirm('¿Borrar la columna "' + col.nombre + '"? Tiene que estar vacía.')) return;
+    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'ev_borrarColumna', id_evento:EVENTO_ACTUAL.id, id_columna:idCol }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r) {
+        if (!r.ok) { alert(r.error || 'No se pudo borrar.'); return; }
+        EVENTO_ACTUAL.columnas = r.columnas;
+        _renderTablero();
+      });
+    return;
+  }
+  if (!accion.trim() || accion.trim() === col.nombre) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_editarColumna', id_evento:EVENTO_ACTUAL.id, id_columna:idCol, nombre:accion.trim() }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+      EVENTO_ACTUAL.columnas = r.columnas;
+      _renderTablero();
+    });
+}
+
+// ── Tarjetas: crear ──
+async function _abrirModalNuevaTarjeta(idCol) {
+  var titulo = prompt('Título de la tarjeta:');
+  if (!titulo || !titulo.trim()) return;
+  var btnRes = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_crearTarjeta', id_evento:EVENTO_ACTUAL.id, titulo:titulo.trim(), columna_id:idCol }) });
+  var r = await btnRes.json();
+  if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+  EVENTO_ACTUAL.tarjetas.push(r.tarjeta);
+  _renderTablero();
+  _abrirTarjeta(r.tarjeta.id);
+}
+
+function _borrarTarjetaActual() {
+  if (!TARJETA_ACTUAL_ID) return;
+  if (!confirm('¿Borrar esta tarjeta? No se puede deshacer.')) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_borrarTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:TARJETA_ACTUAL_ID }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+      EVENTO_ACTUAL.tarjetas = EVENTO_ACTUAL.tarjetas.filter(function(t){ return t.id !== TARJETA_ACTUAL_ID; });
+      _cerrarOverlayTarjeta();
+      _renderTablero();
+    });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DETALLE DE TARJETA — edición + checklist + chat con reacciones
+// ══════════════════════════════════════════════════════════════════
+async function _abrirTarjeta(idTarjeta) {
+  TARJETA_ACTUAL_ID = idTarjeta;
+  if (!_internosCacheEv) await _cargarInternosEv();
+  _renderOverlayTarjeta();
+  document.getElementById('ev-overlay-tarjeta').classList.add('open');
+}
+function _cerrarOverlayTarjeta() {
+  document.getElementById('ev-overlay-tarjeta').classList.remove('open');
+  TARJETA_ACTUAL_ID = null;
+}
+function _tarjetaActual() { return EVENTO_ACTUAL.tarjetas.find(function(t){ return t.id === TARJETA_ACTUAL_ID; }); }
+
+async function _cargarInternosEv() {
+  try {
+    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'listarInternos' }) });
+    var r = await resp.json();
+    _internosCacheEv = (r.ok && Array.isArray(r.internos)) ? r.internos : [];
+  } catch(e) { _internosCacheEv = []; }
+}
+
+function _renderOverlayTarjeta() {
+  var t = _tarjetaActual();
+  if (!t) return;
+  var opcionesCategoria = Object.keys(CATEGORIAS_EV).map(function(c) {
+    return '<option value="' + c + '"' + (t.categoria === c ? ' selected' : '') + '>' + c + '</option>';
+  }).join('');
+  var opcionesResp = (_internosCacheEv || []).map(function(p) {
+    return '<option value="' + p.email + '"' + (t.responsable_email === p.email ? ' selected' : '') + '>' + _esc(p.nombre) + '</option>';
+  }).join('');
+
+  document.getElementById('ev-overlay-body').innerHTML =
+    '<div class="ev-campo"><label>Título</label><input type="text" id="ev-t-titulo" value="' + _esc(t.titulo) + '" onchange="_guardarCampoTarjeta(\'titulo\',this.value)"></div>' +
+    '<div class="ev-grid2">' +
+      '<div class="ev-campo"><label>Categoría</label><select id="ev-t-categoria" onchange="_guardarCampoTarjeta(\'categoria\',this.value)"><option value="">Sin categoría</option>' + opcionesCategoria + '</select></div>' +
+      '<div class="ev-campo"><label>Fecha límite</label><input type="date" id="ev-t-fecha" value="' + (t.fecha_limite||'') + '" onchange="_guardarCampoTarjeta(\'fecha_limite\',this.value)"></div>' +
+    '</div>' +
+    '<div class="ev-campo"><label>Responsable Principal</label><select id="ev-t-resp" onchange="_guardarResponsable(this.value)"><option value="">Sin asignar</option>' + opcionesResp + '</select></div>' +
+
+    '<div class="ev-section-titulo">✅ Checklist</div>' +
+    '<div id="ev-checklist-lista">' + _renderChecklist(t) + '</div>' +
+    '<div class="ev-check-add-row" style="position:relative;">' +
+      '<input type="text" id="ev-check-nuevo" placeholder="Nueva subtarea... usá @ para asignar" oninput="_onChecklistInput(event)" onkeydown="_onChecklistKeydown(event)">' +
+      '<button onclick="_agregarChecklistItem()">+</button>' +
+      '<div id="ev-check-sugerencias" class="ev-mencion-sug"></div>' +
+    '</div>' +
+
+    '<div class="ev-section-titulo">💬 Chat interno</div>' +
+    '<div id="ev-msg-lista">' + _construirHtmlListaMensajesEv(t) + '</div>' +
+    '<div class="ev-check-add-row" style="position:relative; margin-top:10px;">' +
+      '<input type="text" id="ev-msg-nuevo" placeholder="Escribí un mensaje... usá @ para mencionar" oninput="_onMsgInputEv(event)" onkeydown="_onMsgKeydownEv(event)">' +
+      '<button onclick="_enviarMensajeEv()">➤</button>' +
+      '<div id="ev-msg-sugerencias" class="ev-mencion-sug"></div>' +
+    '</div>';
+}
+
+function _guardarCampoTarjeta(campo, valor) {
+  var t = _tarjetaActual();
+  if (!t) return;
+  t[campo] = valor;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify(Object.assign({ accion:'ev_editarTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id }, (function(){ var o={}; o[campo]=valor; return o; })())) });
+  _renderTablero();
+}
+function _guardarResponsable(email) {
+  var t = _tarjetaActual();
+  if (!t) return;
+  var persona = (_internosCacheEv || []).find(function(p){ return p.email === email; });
+  t.responsable_email = email;
+  t.responsable_nombre = persona ? persona.nombre : '';
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_editarTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, responsable_email:t.responsable_email, responsable_nombre:t.responsable_nombre }) });
+  _renderTablero();
+}
+
+// ── Checklist ──
+function _renderChecklist(t) {
+  var checklist = Array.isArray(t.checklist) ? t.checklist : [];
+  if (!checklist.length) return '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">Sin subtareas todavía.</div>';
+  return checklist.map(function(item) {
+    return '<div class="ev-check-item' + (item.hecho ? ' hecho' : '') + '">' +
+      '<input type="checkbox"' + (item.hecho ? ' checked' : '') + ' onchange="_toggleChecklistItem(\'' + item.id + '\')">' +
+      '<div><div class="ev-check-texto">' + _esc(item.texto) + '</div>' +
+      ((item.menciones||[]).length ? '<div class="ev-check-mencion">👤 ' + (item.menciones||[]).join(', ') + '</div>' : '') +
+      '</div></div>';
+  }).join('');
+}
+function _toggleChecklistItem(idItem) {
+  var t = _tarjetaActual();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_toggleChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_item:idItem, autor_email:_session.username, autor_nombre:_session.name }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert(r.error||'Error'); return; }
+      t.checklist = r.checklist;
+      document.getElementById('ev-checklist-lista').innerHTML = _renderChecklist(t);
+      _renderTablero();
+    });
+}
+var _mencionChecklistSeleccionada = [];
+function _onChecklistInput(ev) { _mencionAutocompletarGenerico(ev.target, 'ev-check-sugerencias', function(nombre){ _insertarMencionEnInput('ev-check-nuevo', nombre); }); }
+function _onChecklistKeydown(ev) { _mencionKeydownGenerico(ev, 'ev-check-sugerencias', function(nombre){ _insertarMencionEnInput('ev-check-nuevo', nombre); }); }
+function _agregarChecklistItem() {
+  var input = document.getElementById('ev-check-nuevo');
+  var texto = input.value.trim();
+  if (!texto) return;
+  var menciones = _extraerMencionesDeTexto(texto);
+  var t = _tarjetaActual();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_agregarChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, texto:texto, menciones:menciones, autor_email:_session.username, autor_nombre:_session.name }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert(r.error||'Error'); return; }
+      t.checklist = r.checklist;
+      document.getElementById('ev-checklist-lista').innerHTML = _renderChecklist(t);
+      input.value = '';
+      _renderTablero();
+    });
+}
+
+// ── Chat con reacciones (mismo patrón que Ventas/Servicio) ──
+function _resumenReaccionesEv(reacciones) {
+  if (!reacciones) return '';
+  var grupos = { ok:[], no_ok:[], corazon:[] };
+  Object.keys(reacciones).forEach(function(k) {
+    var r = reacciones[k];
+    var tipo = (r && typeof r === 'object') ? r.reaccion : r;
+    var nombre = (r && typeof r === 'object') ? (r.nombre || '') : '';
+    if (grupos[tipo]) grupos[tipo].push(nombre || 'Alguien');
+  });
+  var emojis = { ok:'👍', no_ok:'👎', corazon:'❤️' };
+  var partes = [];
+  Object.keys(grupos).forEach(function(tipo) {
+    if (!grupos[tipo].length) return;
+    var nombresStr = grupos[tipo].join(', ').replace(/'/g, "\\'");
+    partes.push('<span class="msg-reaccion-pill" onclick="_mostrarQuienReaccionoEv(event,\'' + emojis[tipo] + '\',\'' + nombresStr + '\')" title="' + grupos[tipo].join(', ') + '">' + emojis[tipo] + ' ' + grupos[tipo].length + '</span>');
+  });
+  if (!partes.length) return '';
+  return '<div class="msg-reacciones-resumen">' + partes.join('&nbsp;&nbsp;') + '</div>';
+}
+window._mostrarQuienReaccionoEv = function(ev, emoji, nombresStr) {
+  if (ev) ev.stopPropagation();
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.onclick = function(e) { if (e.target === overlay) document.body.removeChild(overlay); };
+  var caja = document.createElement('div');
+  caja.style.cssText = 'background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:14px;padding:18px 20px;max-width:300px;width:100%;font-family:inherit;box-shadow:0 12px 40px rgba(0,0,0,.4);';
+  caja.innerHTML = '<div style="font-size:22px;text-align:center;margin-bottom:8px;">' + emoji + '</div>' +
+    '<div style="font-size:13px;color:var(--text-main);text-align:center;line-height:1.6;">' + nombresStr.split(', ').map(function(n){return _esc(n);}).join('<br>') + '</div>';
+  overlay.appendChild(caja);
+  document.body.appendChild(overlay);
+  setTimeout(function() { document.addEventListener('click', function cerrar(e2) {
+    if (!caja.contains(e2.target)) { if (overlay.parentNode) document.body.removeChild(overlay); document.removeEventListener('click', cerrar); }
+  }); }, 50);
+};
+
+function _construirHtmlListaMensajesEv(t) {
+  var mensajes = Array.isArray(t.mensajes) ? t.mensajes : [];
+  if (!mensajes.length) return '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:16px 0;">Todavía no hay mensajes en esta tarjeta.</div>';
+  return mensajes.map(function(m, i) {
+    var fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    return '<div class="msg-fila" tabindex="0">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
+        '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
+        '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + '</span>' +
+      '</div>' +
+      '<div class="msg-texto">' + _esc(m.texto || '') + '</div>' +
+      _resumenReaccionesEv(m.reacciones) +
+      '<div class="msg-reacciones">' +
+        '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'ok\')" title="Ok">👍</button>' +
+        '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'no_ok\')" title="No ok">👎</button>' +
+        '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'corazon\')" title="Me encanta">❤️</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+window._reaccionarMensajeEv = function(ev, indice, tipo) {
+  if (ev) ev.stopPropagation();
+  var t = _tarjetaActual();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_reaccionarMensaje', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, indice:indice, autor_email:_session.username, autor_nombre:_session.name, reaccion:tipo }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (r.ok && Array.isArray(r.mensajes)) {
+        t.mensajes = r.mensajes;
+        document.getElementById('ev-msg-lista').innerHTML = _construirHtmlListaMensajesEv(t);
+      }
+    });
+};
+
+function _onMsgInputEv(ev) { _mencionAutocompletarGenerico(ev.target, 'ev-msg-sugerencias', function(nombre){ _insertarMencionEnInput('ev-msg-nuevo', nombre); }); }
+function _onMsgKeydownEv(ev) { _mencionKeydownGenerico(ev, 'ev-msg-sugerencias', function(nombre){ _insertarMencionEnInput('ev-msg-nuevo', nombre); }); }
+function _enviarMensajeEv() {
+  var input = document.getElementById('ev-msg-nuevo');
+  var texto = input.value.trim();
+  if (!texto) return;
+  var menciones = _extraerMencionesDeTexto(texto);
+  var t = _tarjetaActual();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_agregarMensaje', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, texto:texto, menciones:menciones, autor_nombre:_session.name, autor_email:_session.username }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert(r.error||'Error'); return; }
+      t.mensajes = r.mensajes;
+      document.getElementById('ev-msg-lista').innerHTML = _construirHtmlListaMensajesEv(t);
+      input.value = '';
+    });
+}
+
+// ── @Menciones — helper genérico compartido por checklist y chat ──
+function _extraerMencionesDeTexto(texto) {
+  if (!_internosCacheEv) return [];
+  var emails = [];
+  _internosCacheEv.forEach(function(p) {
+    if (texto.indexOf('@' + p.nombre) !== -1) emails.push(p.email);
+  });
+  return emails;
+}
+function _mencionAutocompletarGenerico(inputEl, idSugerencias, onElegir) {
+  var val = inputEl.value;
+  var cursor = inputEl.selectionStart;
+  var antesDeCursor = val.slice(0, cursor);
+  var match = antesDeCursor.match(/@([^\s@]*)$/);
+  var box = document.getElementById(idSugerencias);
+  if (!match) { box.style.display = 'none'; return; }
+  var busqueda = match[1].toLowerCase();
+  _mencionCandidatosEv = (_internosCacheEv || []).filter(function(p) { return p.nombre.toLowerCase().indexOf(busqueda) !== -1; }).slice(0, 6);
+  _mencionIndiceResaltadoEv = -1;
+  if (!_mencionCandidatosEv.length) { box.style.display = 'none'; return; }
+  box.innerHTML = _mencionCandidatosEv.map(function(p, i) {
+    return '<button type="button" onmousedown="event.preventDefault();(' + onElegir.toString() + ')(\'' + p.nombre.replace(/'/g,"\\'") + '\')">👤 ' + _esc(p.nombre) + '</button>';
+  }).join('');
+  box.style.display = 'block';
+}
+function _mencionKeydownGenerico(ev, idSugerencias, onElegir) {
+  var box = document.getElementById(idSugerencias);
+  if (box.style.display !== 'block' || !_mencionCandidatosEv.length) return;
+  if (ev.key === 'ArrowDown') { ev.preventDefault(); _mencionIndiceResaltadoEv = Math.min(_mencionIndiceResaltadoEv + 1, _mencionCandidatosEv.length - 1); _resaltarMencionEv(box); }
+  else if (ev.key === 'ArrowUp') { ev.preventDefault(); _mencionIndiceResaltadoEv = Math.max(_mencionIndiceResaltadoEv - 1, 0); _resaltarMencionEv(box); }
+  else if (ev.key === 'Enter' && _mencionIndiceResaltadoEv !== -1) { ev.preventDefault(); onElegir(_mencionCandidatosEv[_mencionIndiceResaltadoEv].nombre); }
+  else if (ev.key === 'Escape') { box.style.display = 'none'; }
+}
+function _resaltarMencionEv(box) {
+  Array.from(box.children).forEach(function(el, i) { el.classList.toggle('activo', i === _mencionIndiceResaltadoEv); });
+}
+function _insertarMencionEnInput(idInput, nombre) {
+  var input = document.getElementById(idInput);
+  var cursor = input.selectionStart;
+  var val = input.value;
+  var antes = val.slice(0, cursor).replace(/@([^\s@]*)$/, '@' + nombre + ' ');
+  input.value = antes + val.slice(cursor);
+  input.focus();
+  document.querySelectorAll('.ev-mencion-sug').forEach(function(b){ b.style.display = 'none'; });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CAMPANITA — mismo patrón que servicio.html/cotizaciones.html
+// ══════════════════════════════════════════════════════════════════
+function _esTactilEv() { return window.matchMedia ? window.matchMedia('(hover: none)').matches : ('ontouchstart' in window); }
+
+async function _cargarNotificaciones(silencioso) {
+  try {
+    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'listarNotificaciones', email: _session.username }) });
+    var r = await resp.json();
+    var lista = (r.ok && Array.isArray(r.notificaciones)) ? r.notificaciones : [];
+    var noLeidas = lista.filter(function(n){ return !n.leido; }).length;
+    var badge = document.getElementById('ev-campana-badge');
+    if (noLeidas > 0) { badge.style.display = 'flex'; badge.textContent = noLeidas > 9 ? '9+' : noLeidas; }
+    else { badge.style.display = 'none'; }
+    var cont = document.getElementById('campana-lista');
+    if (!silencioso || document.getElementById('campana-panel').classList.contains('open')) {
+      cont.innerHTML = !lista.length ? '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">Sin actividad todavía.</div>' :
+        lista.map(function(n) {
+          var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.06)';
+          return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacionEv(event,\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'evento') + '\',\'' + (n.tarjeta_id||'') + '\')" style="background:' + noLeidaBg + ';">' +
+            '<span style="font-size:16px;flex-shrink:0;">' + (n.tipo === 'reaccion' ? '👍' : '💬') + '</span>' +
+            '<div style="flex:1;min-width:0;">' +
+              (n.autor_nombre ? '<div style="font-size:12px;font-weight:700;color:var(--text-main);">' + _esc(n.autor_nombre) + '</div>' : '') +
+              '<div class="notif-texto">' + _esc(n.texto || '') + '</div>' +
+              '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">' + _esc(n.ticket_titulo || '') +
+                (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : n.reaccion === 'no_ok' ? '👎' : '❤️') + '</span>' : '') +
+              '</div>' +
+            '</div>' +
+            '<div class="notif-reacciones">' +
+              '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
+              '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
+              '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+    }
+  } catch(e) {}
+}
+
+window._toggleCampanaEv = function(ev) {
+  if (ev) ev.stopPropagation();
+  document.getElementById('campana-panel').classList.toggle('open');
+  _cargarNotificaciones(false);
+};
+document.addEventListener('click', function(ev) {
+  var panel = document.getElementById('campana-panel');
+  if (panel.classList.contains('open') && !panel.contains(ev.target) && !ev.target.closest('.ev-icon-btn')) panel.classList.remove('open');
+});
+
+window._clickNotificacionEv = function(ev, idNoti, ticketId, origen, tarjetaId) {
+  var fila = ev && ev.currentTarget;
+  if (_esTactilEv() && fila && !fila.classList.contains('notif-expandida')) { fila.classList.add('notif-expandida'); return; }
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'marcarNotificacionLeida', email:_session.username, id:idNoti }) })
+    .then(function(){ _cargarNotificaciones(true); });
+  document.getElementById('campana-panel').classList.remove('open');
+  if (!ticketId) return;
+  if (origen === 'cotizacion') { window.location.href = 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(ticketId); return; }
+  if (origen === 'evento') { _abrirEvento(ticketId, tarjetaId); return; }
+  window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(ticketId);
+};
+
+window._reaccionarNotifEv = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice, tarjetaId) {
+  if (ev) ev.stopPropagation();
+  var email = _session.username, nombre = _session.name;
+  if (mensajeIndice !== '' && mensajeIndice !== undefined && ticketId) {
+    var accionMsg = origen === 'cotizacion' ? 'cot_reaccionarMensaje' : origen === 'evento' ? 'ev_reaccionarMensaje' : 'st_reaccionarMensaje';
+    var payloadMsg = { accion: accionMsg, indice: parseInt(mensajeIndice, 10), autor_email: email, autor_nombre: nombre, reaccion: tipo };
+    if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId;
+    else if (origen === 'evento') { payloadMsg.id_evento = ticketId; payloadMsg.id_tarjeta = tarjetaId; }
+    else payloadMsg.id_ticket = ticketId;
+    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
+      .then(function(){ return fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'marcarNotificacionLeida', email:email, id:idNoti }) }); })
+      .then(function(){ _cargarNotificaciones(true); });
+    return;
+  }
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'reaccionarNotificacion', email:email, id:idNoti, reaccion:tipo }) })
+    .then(function(){ _cargarNotificaciones(true); });
+};
+
+window._marcarTodasLeidasEv = function(ev) {
+  if (ev) ev.stopPropagation();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'marcarTodasLeidas', email:_session.username }) })
+    .then(function(){ _cargarNotificaciones(false); });
+};
+</script>
+</body>
+</html>

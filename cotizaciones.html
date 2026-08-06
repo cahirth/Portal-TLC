@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.04.16 (Mismos 2 fixes que servicio.html: reacción de campanita unificada con el mensaje real, y emojis siempre clickeables en táctil.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.04.17 (Mismo fix que servicio.html: la campanita ahora maneja bien las notificaciones que vienen del módulo Eventos.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.04.8 (Fix: los checkboxes de contacto no tenían color de texto fijo — usaban el color ambiente que cambia con el tema, a diferencia de los inputs vecinos (VENDEDOR, TELÉFONO) que siempre son fondo blanco/texto oscuro sin importar el tema. Ahora siguen el mismo patrón fijo. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
@@ -1570,7 +1570,7 @@ function _renderCampanaListaCot() {
     }
     cont.innerHTML = items.map(function(n) {
         var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.08)';
-        return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacionCot(event,\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'servicio') + '\')" ' +
+        return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacionCot(event,\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'servicio') + '\',\'' + (n.tarjeta_id||'') + '\')" ' +
             'style="padding:11px 14px;border-bottom:1px solid #1e3050;cursor:pointer;background:' + noLeidaBg + ';display:flex;gap:10px;align-items:flex-start;">' +
             '<span style="font-size:16px;flex-shrink:0;">' + _iconoTipoNotificacionCot(n.tipo) + '</span>' +
             '<div style="flex:1;min-width:0;">' +
@@ -1581,25 +1581,27 @@ function _renderCampanaListaCot() {
                 '</div>' +
             '</div>' +
             '<div class="notif-reacciones">' +
-                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Ok">👍</button>' +
-                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="No ok">👎</button>' +
-                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Me encanta">❤️</button>' +
+                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
+                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
+                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
             '</div>' +
             (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
         '</div>';
     }).join('');
 }
 
-window._reaccionarNotifCot = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice) {
+window._reaccionarNotifCot = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice, tarjetaId) {
     if (ev) ev.stopPropagation();
     var cuenta = _leerSesionCompartida();
     var email = cuenta ? cuenta.username : '';
     var nombre = cuenta ? cuenta.name : '';
     if (!email) return;
     if (mensajeIndice !== '' && mensajeIndice !== undefined && ticketId) {
-        var accionMsg = origen === 'cotizacion' ? 'cot_reaccionarMensaje' : 'st_reaccionarMensaje';
+        var accionMsg = origen === 'cotizacion' ? 'cot_reaccionarMensaje' : origen === 'evento' ? 'ev_reaccionarMensaje' : 'st_reaccionarMensaje';
         var payloadMsg = { accion: accionMsg, indice: parseInt(mensajeIndice, 10), autor_email: email, autor_nombre: nombre, reaccion: tipo };
-        if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId; else payloadMsg.id_ticket = ticketId;
+        if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId;
+        else if (origen === 'evento') { payloadMsg.id_evento = ticketId; payloadMsg.id_tarjeta = tarjetaId; }
+        else payloadMsg.id_ticket = ticketId;
         fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
             .then(function(){
                 return fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
@@ -1634,7 +1636,7 @@ document.addEventListener('click', function(ev) {
 function _esTactilCot() {
     return window.matchMedia ? window.matchMedia('(hover: none)').matches : ('ontouchstart' in window);
 }
-window._clickNotificacionCot = function(ev, idNoti, idOrigen, origen) {
+window._clickNotificacionCot = function(ev, idNoti, idOrigen, origen, tarjetaId) {
     var fila = ev && ev.currentTarget;
     if (_esTactilCot() && fila && !fila.classList.contains('notif-expandida')) {
         fila.classList.add('notif-expandida');
@@ -1652,6 +1654,10 @@ window._clickNotificacionCot = function(ev, idNoti, idOrigen, origen) {
 
     if (origen === 'servicio') {
         window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(idOrigen);
+        return;
+    }
+    if (origen === 'evento') {
+        window.location.href = 'https://cahirth.github.io/Portal-TLC/eventos.html?id=' + encodeURIComponent(idOrigen) + (tarjetaId ? '&tarjeta=' + encodeURIComponent(tarjetaId) : '');
         return;
     }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.08.04.11 (2 fixes más: (1) reaccionar desde la campanita ahora reacciona al MENSAJE real (unificado con FotoMap.gs v154) — antes era una reacción personal separada que no mostraba quién reaccionó; (2) en celular, los emojis de mensajes de tarjeta no funcionaban por un problema de "primer toque = hover" en algunos navegadores — se fuerza visibilidad completa siempre en dispositivos táctiles, sin depender de hover. Reportado por Cristian con captura.) -->
+<!-- Portal TLC | servicio.html | v2026.08.04.12 (La campanita (compartida entre módulos) ahora sabe manejar notificaciones que vienen del módulo nuevo Eventos — reacciona bien al mensaje real (id_evento + id_tarjeta, no solo un id) y navega a eventos.html?id=...&tarjeta=... en vez de mandar por error a Servicio. Ver FotoMap.gs v156 y eventos.html v2026.08.04.2.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2426,7 +2426,7 @@ function _renderCampanaLista() {
   }
   cont.innerHTML = items.map(function(n) {
     var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.08)';
-    return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacion(event,\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen || 'servicio') + '\')" ' +
+    return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacion(event,\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen || 'servicio') + '\',\'' + (n.tarjeta_id||'') + '\')" ' +
       'style="padding:11px 14px;border-bottom:1px solid var(--border-glow);cursor:pointer;background:' + noLeidaBg + ';display:flex;gap:10px;align-items:flex-start;">' +
       '<span style="font-size:16px;flex-shrink:0;">' + _iconoTipoNotificacion(n.tipo) + '</span>' +
       '<div style="flex:1;min-width:0;">' +
@@ -2437,16 +2437,16 @@ function _renderCampanaLista() {
         '</div>' +
       '</div>' +
       '<div class="notif-reacciones">' +
-        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Ok">👍</button>' +
-        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="No ok">👎</button>' +
-        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Me encanta">❤️</button>' +
+        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
+        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
+        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
       '</div>' +
       (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
     '</div>';
   }).join('');
 }
 
-window._reaccionarNotif = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice) {
+window._reaccionarNotif = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice, tarjetaId) {
   if (ev) ev.stopPropagation(); // reacción rápida — no abre el ticket
   var email = (_session && _session.username) || '';
   var nombre = (_session && _session.name) || '';
@@ -2455,11 +2455,16 @@ window._reaccionarNotif = function(ev, idNoti, tipo, origen, ticketId, mensajeIn
   // reacciona al MENSAJE (compartido, visible para todo el equipo, con
   // "quién reaccionó") — no a una reacción personal separada que nadie
   // más ve. Pedido por Cristian: "desde la campanita... no me dice
-  // quién lo hizo, desde los mensajes de la tarjeta sí lo hace".
+  // quién lo hizo, desde los mensajes de la tarjeta sí lo hace". La
+  // campanita es compartida entre módulos, así que esto tiene que
+  // funcionar igual para notificaciones que vienen de Eventos aunque
+  // se esté viendo la campanita desde acá.
   if (mensajeIndice !== '' && mensajeIndice !== undefined && ticketId) {
-    var accionMsg = origen === 'cotizacion' ? 'cot_reaccionarMensaje' : 'st_reaccionarMensaje';
+    var accionMsg = origen === 'cotizacion' ? 'cot_reaccionarMensaje' : origen === 'evento' ? 'ev_reaccionarMensaje' : 'st_reaccionarMensaje';
     var payloadMsg = { accion: accionMsg, indice: parseInt(mensajeIndice, 10), autor_email: email, autor_nombre: nombre, reaccion: tipo };
-    if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId; else payloadMsg.id_ticket = ticketId;
+    if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId;
+    else if (origen === 'evento') { payloadMsg.id_evento = ticketId; payloadMsg.id_tarjeta = tarjetaId; }
+    else payloadMsg.id_ticket = ticketId;
     fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
       .then(function(){
         return fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
@@ -2493,7 +2498,7 @@ document.addEventListener('click', function(ev) {
 function _esTactil() {
   return window.matchMedia ? window.matchMedia('(hover: none)').matches : ('ontouchstart' in window);
 }
-window._clickNotificacion = function(ev, idNoti, ticketId, origen) {
+window._clickNotificacion = function(ev, idNoti, ticketId, origen, tarjetaId) {
   // En celular no hay hover — sin esto, tocar una notificación
   // navegaba directo sin poder leerla completa ni tocar un emoji.
   // Primer toque expande (mismo efecto que el hover en PC); recién el
@@ -2517,6 +2522,10 @@ window._clickNotificacion = function(ev, idNoti, ticketId, origen) {
 
   if (origen === 'cotizacion') {
     window.location.href = 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(ticketId);
+    return;
+  }
+  if (origen === 'evento') {
+    window.location.href = 'https://cahirth.github.io/Portal-TLC/eventos.html?id=' + encodeURIComponent(ticketId) + (tarjetaId ? '&tarjeta=' + encodeURIComponent(tarjetaId) : '');
     return;
   }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.08.04.10 (Primer paso del módulo nuevo "Gestión Eventos / Congresos" (TLC Planner) — agregado dentro de Administración, junto a Reportes. Gateado por el permiso "eventos" (columna "Eventos" en la hoja Vendedores — si todavía no existe, queda bloqueado por defecto, mismo criterio que las demás columnas). Apunta a eventos.html, que se construye en el próximo paso. Pedido por Cristian.) -->
+<!-- Portal TLC | index.html | v2026.08.04.11 (Mismo fix que servicio.html: la campanita ahora maneja bien las notificaciones que vienen del módulo Eventos. Además, el módulo en sí (eventos.html) ya está construido — ver ese archivo.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -2260,7 +2260,7 @@ body.tema-claro .notif-texto { color:#0f172a; }
       }
       cont.innerHTML = items.map(function(n) {
         var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.08)';
-        return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacionIdx(event,\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'servicio') + '\')" ' +
+        return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacionIdx(event,\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'servicio') + '\',\'' + (n.tarjeta_id||'') + '\')" ' +
           'style="padding:11px 14px;border-bottom:1px solid #1e3050;cursor:pointer;background:' + noLeidaBg + ';display:flex;gap:10px;align-items:flex-start;">' +
           '<span style="font-size:16px;flex-shrink:0;">' + _iconoTipoNotificacionIdx(n.tipo) + '</span>' +
           '<div style="flex:1;min-width:0;">' +
@@ -2271,25 +2271,27 @@ body.tema-claro .notif-texto { color:#0f172a; }
             '</div>' +
           '</div>' +
           '<div class="notif-reacciones">' +
-            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Ok">👍</button>' +
-            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="No ok">👎</button>' +
-            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\')" title="Me encanta">❤️</button>' +
+            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
+            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
+            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
           '</div>' +
           (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
         '</div>';
       }).join('');
     }
 
-    window._reaccionarNotifIdx = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice) {
+    window._reaccionarNotifIdx = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice, tarjetaId) {
       if (ev) ev.stopPropagation();
       var cuenta = _leerSesionIdx();
       var email = cuenta ? cuenta.username : '';
       var nombre = cuenta ? cuenta.name : '';
       if (!email) return;
       if (mensajeIndice !== '' && mensajeIndice !== undefined && ticketId) {
-        var accionMsg = origen === 'cotizacion' ? 'cot_reaccionarMensaje' : 'st_reaccionarMensaje';
+        var accionMsg = origen === 'cotizacion' ? 'cot_reaccionarMensaje' : origen === 'evento' ? 'ev_reaccionarMensaje' : 'st_reaccionarMensaje';
         var payloadMsg = { accion: accionMsg, indice: parseInt(mensajeIndice, 10), autor_email: email, autor_nombre: nombre, reaccion: tipo };
-        if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId; else payloadMsg.id_ticket = ticketId;
+        if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId;
+        else if (origen === 'evento') { payloadMsg.id_evento = ticketId; payloadMsg.id_tarjeta = tarjetaId; }
+        else payloadMsg.id_ticket = ticketId;
         fetch(GAS_URL_PUSH_IDX, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
           .then(function(){
             return fetch(GAS_URL_PUSH_IDX, { method:'POST', headers:{'Content-Type':'text/plain'},
@@ -2322,7 +2324,7 @@ body.tema-claro .notif-texto { color:#0f172a; }
     function _esTactilIdx() {
       return window.matchMedia ? window.matchMedia('(hover: none)').matches : ('ontouchstart' in window);
     }
-    window._clickNotificacionIdx = function(ev, idNoti, idOrigen, origen) {
+    window._clickNotificacionIdx = function(ev, idNoti, idOrigen, origen, tarjetaId) {
       var fila = ev && ev.currentTarget;
       if (_esTactilIdx() && fila && !fila.classList.contains('notif-expandida')) {
         fila.classList.add('notif-expandida');
@@ -2338,6 +2340,8 @@ body.tema-claro .notif-texto { color:#0f172a; }
       if (!idOrigen) return;
       var destino = origen === 'cotizacion'
         ? 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(idOrigen)
+        : origen === 'evento'
+        ? 'https://cahirth.github.io/Portal-TLC/eventos.html?id=' + encodeURIComponent(idOrigen) + (tarjetaId ? '&tarjeta=' + encodeURIComponent(tarjetaId) : '')
         : 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(idOrigen);
       window.location.href = destino;
     };
