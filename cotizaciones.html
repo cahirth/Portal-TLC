@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.04.18 (Frontend de "Orden de Preparación de Equipos" — botón "📦 Enviar Orden de Preparación" visible en negocios 90%/Ganada, abre un modal para elegir fecha límite de despacho y técnico responsable, y crea la tarjeta en Servicio Técnico (llama st_crearOrdenPreparacion, FotoMap.gs v157). Ver también servicio.html v2026.08.04.13 y orden-preparacion.html.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.04.19 (Mismo rediseño de reacciones que servicio.html: ícono "🙂" que despliega los 3 emojis en vez de tenerlos siempre visibles sueltos.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.04.8 (Fix: los checkboxes de contacto no tenían color de texto fijo — usaban el color ambiente que cambia con el tema, a diferencia de los inputs vecinos (VENDEDOR, TELÉFONO) que siempre son fondo blanco/texto oscuro sin importar el tema. Ahora siguen el mismo patrón fijo. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
@@ -448,37 +448,42 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
         white-space:nowrap; transition: font-size .15s ease; }
       .notif-fila:hover .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
       .notif-fila.notif-expandida .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
-      .notif-fila.notif-expandida .notif-reacciones { opacity:1; }
       body.tema-claro .notif-texto { color:#0f172a; }
-      .notif-reacciones { display:flex; gap:2px; opacity:.5; transform:translateX(0);
-        transition:opacity .15s ease, transform .15s ease; flex-shrink:0; }
-      .notif-fila:hover .notif-reacciones, .notif-fila:focus-within .notif-reacciones { opacity:1; transform:translateX(0); }
-      .notif-reacciones button { background:none; border:none; font-size:15px; cursor:pointer; padding:3px 5px;
-        border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
-      .notif-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
       .notif-reaccion-guardada { font-size:12px; margin-left:4px; }
       /* Mensajes internos (negocio) — mismo tratamiento que las
-         notificaciones: hover agranda el texto, aparecen 3 botones de
-         reacción, y el resumen de reacciones ya puestas queda visible
-         siempre (no solo en hover) para todo el equipo. Pedido por
-         Cristian: mismo hover-zoom + emojis acá también. */
+         notificaciones: hover agranda el texto, y el resumen de
+         reacciones ya puestas queda visible siempre (no solo en
+         hover) para todo el equipo. Pedido por Cristian: mismo
+         hover-zoom + emojis acá también. */
       .msg-fila { transition: background .12s ease, border-color .12s ease; cursor:default; }
       .msg-fila:hover, .msg-fila:focus-within { background:#132540 !important; border-color:#3a86ff55 !important; }
       .msg-texto { font-size:12px; transition:font-size .15s ease; }
       .msg-fila:hover .msg-texto { font-size:13px; }
-      .msg-reacciones { display:flex; gap:2px; opacity:.5; transition:opacity .15s ease; margin-top:5px; }
-      .msg-fila:hover .msg-reacciones, .msg-fila:focus-within .msg-reacciones { opacity:1; }
-      .msg-reacciones button { background:none; border:none; font-size:14px; cursor:pointer; padding:2px 5px;
-        border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
-      .msg-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
       .msg-reacciones-resumen { font-size:11px; margin-top:5px; color:#94a3b8; }
       .msg-reaccion-pill { cursor:pointer; padding:2px 6px; border-radius:10px; background:rgba(58,134,255,.1); transition:background .1s ease; }
       .msg-reaccion-pill:hover { background:rgba(58,134,255,.22); }
-      @media (hover: none) {
-        .msg-reacciones, .notif-reacciones { opacity:1 !important; }
-      }
       body.tema-claro .msg-fila:hover { background:#eef2ff !important; }
       body.tema-claro .msg-reacciones-resumen { color:#64748b; }
+      /* Reacciones — antes los 3 emojis quedaban siempre visibles al
+         lado de cada mensaje/notificación, y se confundían con una
+         reacción YA puesta por alguien. Ahora quedan ocultos detrás de
+         un ícono chico de "reaccionar" — tocarlo despliega los 3
+         emojis. Reportado por Cristian: "los emojis siempre están
+         visibles y se confunden con una reacción real". */
+      .reaccion-trigger-wrap { position:relative; flex-shrink:0; }
+      .reaccion-trigger-btn { background:none; border:1px solid #1e3050; border-radius:50%; width:24px; height:24px;
+        font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:.55;
+        transition:opacity .15s ease, background .15s ease; padding:0; color:#f1f5f9; }
+      body.tema-claro .reaccion-trigger-btn { border-color:#cbd5e1; color:#0f172a; }
+      .reaccion-trigger-btn:hover, .reaccion-trigger-btn.activo { opacity:1; background:rgba(58,134,255,.14); }
+      .reaccion-picker { position:absolute; bottom:100%; right:0; margin-bottom:5px; background:#0f1a30;
+        border:1px solid #1e3050; border-radius:20px; padding:4px 6px; display:none; gap:2px;
+        box-shadow:0 6px 20px rgba(0,0,0,.3); z-index:80; white-space:nowrap; }
+      body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
+      .reaccion-picker.abierto { display:flex; }
+      .reaccion-picker button { background:none; border:none; font-size:17px; cursor:pointer; padding:4px 6px;
+        border-radius:10px; line-height:1; transition:background .1s ease, transform .1s ease; }
+      .reaccion-picker button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
@@ -1173,21 +1178,42 @@ window._mostrarQuienReaccionoCot = function(ev, emoji, nombresStr) {
 function _construirHtmlListaMensajesCot() {
     if (!_mensajesCotActual.length) return '<div style="font-size:12px;color:#94a3b8;text-align:center;padding:16px 0;">Todavía no hay mensajes en esta cotización.</div>';
     return _mensajesCotActual.map(function(m, i) {
+        var pickerId = 'picker-msg-cot-' + i;
         return '<div class="msg-fila" tabindex="0" style="padding:8px 10px;border-radius:10px;background:#0f1b2e;border:1px solid #1e3050;margin-bottom:8px;">' +
             '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
                 '<span style="font-size:11px;font-weight:700;color:#f1f5f9;">' + _escCot(m.autor_nombre || m.autor_email || '—') + '</span>' +
                 '<span style="font-size:10px;color:#64748b;white-space:nowrap;">' + _tiempoRelativoCot(m.fecha) + '</span>' +
             '</div>' +
             '<div class="msg-texto" style="color:#f1f5f9;white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTextoCot(_escCot(m.texto || '')) + '</div>' +
-            _resumenReaccionesCot(m.reacciones) +
-            '<div class="msg-reacciones">' +
-                '<button onclick="_reaccionarMensajeCot(event,' + i + ',\'ok\')" title="Ok">👍</button>' +
-                '<button onclick="_reaccionarMensajeCot(event,' + i + ',\'no_ok\')" title="No ok">👎</button>' +
-                '<button onclick="_reaccionarMensajeCot(event,' + i + ',\'corazon\')" title="Me encanta">❤️</button>' +
+            '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
+                _resumenReaccionesCot(m.reacciones) +
+                '<div class="reaccion-trigger-wrap">' +
+                    '<button class="reaccion-trigger-btn" onclick="_toggleReaccionPicker(event,\'' + pickerId + '\')" title="Reaccionar">🙂</button>' +
+                    '<div class="reaccion-picker" id="' + pickerId + '">' +
+                        '<button onclick="_reaccionarMensajeCot(event,' + i + ',\'ok\')" title="Ok">👍</button>' +
+                        '<button onclick="_reaccionarMensajeCot(event,' + i + ',\'no_ok\')" title="No ok">👎</button>' +
+                        '<button onclick="_reaccionarMensajeCot(event,' + i + ',\'corazon\')" title="Me encanta">❤️</button>' +
+                    '</div>' +
+                '</div>' +
             '</div>' +
         '</div>';
     }).join('');
 }
+
+// Picker de reacciones — un solo ícono chico que despliega los 3
+// emojis al tocarlo. Compartido entre mensajes y campanita. Pedido
+// por Cristian: "ocultarlos debajo de un ícono emoji".
+window._toggleReaccionPicker = function(ev, pickerId) {
+    if (ev) ev.stopPropagation();
+    document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el) {
+        if (el.id !== pickerId) el.classList.remove('abierto');
+    });
+    var picker = document.getElementById(pickerId);
+    if (picker) picker.classList.toggle('abierto');
+};
+document.addEventListener('click', function() {
+    document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el){ el.classList.remove('abierto'); });
+});
 
 window._reaccionarMensajeCot = function(ev, indice, tipo) {
     if (ev) ev.stopPropagation();
@@ -1580,10 +1606,13 @@ function _renderCampanaListaCot() {
                   (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : n.reaccion === 'no_ok' ? '👎' : '❤️') + '</span>' : '') +
                 '</div>' +
             '</div>' +
-            '<div class="notif-reacciones">' +
-                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
-                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
-                '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
+            '<div class="reaccion-trigger-wrap">' +
+                '<button class="reaccion-trigger-btn" onclick="_toggleReaccionPicker(event,\'picker-notif-cot-' + n.id + '\')" title="Reaccionar">🙂</button>' +
+                '<div class="reaccion-picker" id="picker-notif-cot-' + n.id + '">' +
+                    '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
+                    '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
+                    '<button onclick="_reaccionarNotifCot(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
+                '</div>' +
             '</div>' +
             (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
         '</div>';

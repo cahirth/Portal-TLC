@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | eventos.html | v2026.08.04.5 (Rediseño del detalle de tarjeta, inspirado en la referencia de Planner + el formato ya usado en negocios: Categoría/Fecha/Responsable pasan de inputs sueltos a tarjetas con borde (mismo estilo que ID NEGOCIO/VENDEDOR de Ventas); título grande arriba con línea de info ("Creada el... · En [columna] · [evento]"); checklist ahora en una caja con barra de progreso visual y contador (X/Y). Pedido por Cristian, con 2 capturas de referencia.) -->
+<!-- Portal TLC | eventos.html | v2026.08.04.6 (Mismo rediseño de reacciones que servicio.html: ícono "🙂" que despliega los 3 emojis en vez de tenerlos siempre visibles sueltos, en mensajes de tarjeta y campanita.) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.4 (2 pedidos de Cristian para uniformar con el resto de la PWA: (1) el detalle de tarjeta ahora es de dos columnas en pantallas grandes, con Mensajes internos fijo a la derecha (sticky) — mismo patrón que negocios y tickets de Servicio, en vez de todo apilado en una sola columna; (2) barra de filtros nueva arriba del tablero (Responsable, Categoría) — el filtro por columna/etapa no se agregó porque en un Kanban las columnas ya están agrupadas visualmente, sería redundante.) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.3 (Faltaba el botón de tema — el CSS de "tema-claro" ya existía pero nunca se aplicaba ni había forma de togglearlo desde acá, por eso quedaba siempre en modo oscuro. Agregado con la misma clave compartida (tlc_tema) que usa el resto del Portal. Reportado por Cristian: "tiene solo modo oscuro?".) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.1 (Módulo nuevo "Gestión Eventos / Congresos" (TLC Planner) — v1 recortado: tablero Kanban con columnas dinámicas (crear/renombrar/borrar), tarjetas con categoría/responsable/fecha límite, checklist con @menciones, chat interno con hover-zoom y reacciones (reutiliza al 100% la infraestructura de Ventas/Servicio, cero código duplicado). Selector de eventos (arranca con Faco Extrema 2026). Falta para v2: duplicar tarjeta, bitácora de cambios, reordenar columnas por drag. Pedido por Cristian, spec completa "TLC Planner".) -->
@@ -166,15 +166,9 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
 .msg-fila:hover, .msg-fila:focus-within { background: rgba(58,134,255,.08) !important; border-color:#3a86ff55 !important; }
 .msg-texto { font-size:12px; color:var(--text-main); white-space:pre-wrap; word-break:break-word; transition:font-size .15s ease; }
 .msg-fila:hover .msg-texto { font-size:13px; }
-.msg-reacciones { display:flex; gap:2px; opacity:.5; transition:opacity .15s ease; margin-top:5px; }
-.msg-fila:hover .msg-reacciones, .msg-fila:focus-within .msg-reacciones { opacity:1; }
-.msg-reacciones button { background:none; border:none; font-size:14px; cursor:pointer; padding:2px 5px;
-  border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
-.msg-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
 .msg-reacciones-resumen { font-size:11px; margin-top:5px; color:var(--text-muted); }
 .msg-reaccion-pill { cursor:pointer; padding:2px 6px; border-radius:10px; background:rgba(58,134,255,.1); transition:background .1s ease; }
 .msg-reaccion-pill:hover { background:rgba(58,134,255,.22); }
-@media (hover: none) { .msg-reacciones { opacity:1 !important; } }
 
 .ev-mencion-sug { position:absolute; bottom:100%; left:0; right:0; margin-bottom:4px; background:var(--panel-dark);
   border:1px solid var(--border-glow); border-radius:8px; max-height:160px; overflow-y:auto; display:none; z-index:5; }
@@ -194,13 +188,22 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
 .notif-texto { font-size:12px; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition: font-size .15s ease; }
 .notif-fila:hover .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
 .notif-fila.notif-expandida .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
-.notif-fila.notif-expandida .notif-reacciones { opacity:1; }
-.notif-reacciones { display:flex; gap:2px; opacity:.5; transform:translateX(0); transition:opacity .15s ease, transform .15s ease; flex-shrink:0; }
-.notif-fila:hover .notif-reacciones, .notif-fila:focus-within .notif-reacciones { opacity:1; transform:translateX(0); }
-.notif-reacciones button { background:none; border:none; font-size:15px; cursor:pointer; padding:3px 5px; border-radius:6px; line-height:1; }
-.notif-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
 .notif-reaccion-guardada { font-size:12px; margin-left:4px; }
-@media (hover: none) { .notif-reacciones { opacity:1 !important; } }
+/* Reacciones — ícono chico "reaccionar" que despliega los 3 emojis al
+   tocarlo, en vez de tenerlos siempre sueltos (se confundían con una
+   reacción ya puesta). Mismo patrón que el resto de la PWA. */
+.reaccion-trigger-wrap { position:relative; flex-shrink:0; }
+.reaccion-trigger-btn { background:none; border:1px solid var(--border-glow); border-radius:50%; width:24px; height:24px;
+  font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:.55;
+  transition:opacity .15s ease, background .15s ease; padding:0; color:var(--text-main); }
+.reaccion-trigger-btn:hover, .reaccion-trigger-btn.activo { opacity:1; background:rgba(58,134,255,.14); }
+.reaccion-picker { position:absolute; bottom:100%; right:0; margin-bottom:5px; background:var(--panel-dark);
+  border:1px solid var(--border-glow); border-radius:20px; padding:4px 6px; display:none; gap:2px;
+  box-shadow:0 6px 20px rgba(0,0,0,.3); z-index:80; white-space:nowrap; }
+.reaccion-picker.abierto { display:flex; }
+.reaccion-picker button { background:none; border:none; font-size:17px; cursor:pointer; padding:4px 6px;
+  border-radius:10px; line-height:1; transition:background .1s ease, transform .1s ease; }
+.reaccion-picker button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
 #campana-panel { position:fixed; top:60px; right:12px; width:340px; max-width:92vw; max-height:70vh; overflow-y:auto;
   background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:14px; box-shadow:0 12px 40px rgba(0,0,0,.4);
   z-index:1000; display:none; }
@@ -804,17 +807,23 @@ function _construirHtmlListaMensajesEv(t) {
   if (!mensajes.length) return '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:16px 0;">Todavía no hay mensajes en esta tarjeta.</div>';
   return mensajes.map(function(m, i) {
     var fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    var pickerId = 'picker-msg-ev-' + i;
     return '<div class="msg-fila" tabindex="0">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
         '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
         '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + '</span>' +
       '</div>' +
       '<div class="msg-texto">' + _esc(m.texto || '') + '</div>' +
-      _resumenReaccionesEv(m.reacciones) +
-      '<div class="msg-reacciones">' +
-        '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'ok\')" title="Ok">👍</button>' +
-        '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'no_ok\')" title="No ok">👎</button>' +
-        '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'corazon\')" title="Me encanta">❤️</button>' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
+        _resumenReaccionesEv(m.reacciones) +
+        '<div class="reaccion-trigger-wrap">' +
+          '<button class="reaccion-trigger-btn" onclick="_toggleReaccionPicker(event,\'' + pickerId + '\')" title="Reaccionar">🙂</button>' +
+          '<div class="reaccion-picker" id="' + pickerId + '">' +
+            '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'ok\')" title="Ok">👍</button>' +
+            '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'no_ok\')" title="No ok">👎</button>' +
+            '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'corazon\')" title="Me encanta">❤️</button>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -926,10 +935,13 @@ async function _cargarNotificaciones(silencioso) {
                 (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : n.reaccion === 'no_ok' ? '👎' : '❤️') + '</span>' : '') +
               '</div>' +
             '</div>' +
-            '<div class="notif-reacciones">' +
-              '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
-              '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
-              '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
+            '<div class="reaccion-trigger-wrap">' +
+              '<button class="reaccion-trigger-btn" onclick="_toggleReaccionPicker(event,\'picker-notif-ev-' + n.id + '\')" title="Reaccionar">🙂</button>' +
+              '<div class="reaccion-picker" id="picker-notif-ev-' + n.id + '">' +
+                '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
+                '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
+                '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
+              '</div>' +
             '</div>' +
           '</div>';
         }).join('');
@@ -958,6 +970,20 @@ window._clickNotificacionEv = function(ev, idNoti, ticketId, origen, tarjetaId) 
   if (origen === 'evento') { _abrirEvento(ticketId, tarjetaId); return; }
   window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(ticketId);
 };
+
+// Picker de reacciones — un solo ícono chico que despliega los 3
+// emojis al tocarlo. Compartido entre campanita y mensajes.
+window._toggleReaccionPicker = function(ev, pickerId) {
+  if (ev) ev.stopPropagation();
+  document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el) {
+    if (el.id !== pickerId) el.classList.remove('abierto');
+  });
+  var picker = document.getElementById(pickerId);
+  if (picker) picker.classList.toggle('abierto');
+};
+document.addEventListener('click', function() {
+  document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el){ el.classList.remove('abierto'); });
+});
 
 window._reaccionarNotifEv = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice, tarjetaId) {
   if (ev) ev.stopPropagation();

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.08.06.1 (BUG REAL encontrado: el botón interno "→ Pasar a X" de la tarjeta (_siguienteEtapa) movía directo a st_actualizarDeposito sin pasar por _resolverAsignacionYMover — a diferencia de drag&drop y el <select> del detalle, nunca chequeaba si la etapa nueva tenía 2+ técnicos configurados ni abría el popup para elegir a cuál asignar. La notificación en sí (email+push) siempre disparó bien porque vive en el backend sin importar quién llama — el problema era que terminaba avisando al técnico viejo (o a nadie) en vez del correcto. Unificados los 3 caminos (drag&drop, dropdown, botón interno) al mismo _resolverAsignacionYMover, agregando un parámetro para mantener el "volver al Kanban" que tenía el botón. Reportado por Cristian con captura.) -->
+<!-- Portal TLC | servicio.html | v2026.08.06.2 (Rediseño de reacciones: antes los 3 emojis quedaban siempre visibles al lado de cada mensaje/notificación (a media opacidad como mínimo) y se confundían con una reacción ya puesta por alguien. Ahora quedan ocultos detrás de un solo ícono chico "🙂" — tocarlo despliega los 3 emojis en un popover, elegís uno y se cierra solo. Mismo criterio en mensajes internos y campanita. Reportado por Cristian con 2 capturas: "los emojis siempre están visibles y se confunden con una reacción real".) -->
 <!-- Portal TLC | servicio.html | v2026.08.04.13 (Frontend de "Orden de Preparación de Equipos" — cuando un ticket es tipo_orden==='preparacion_equipos', el detalle muestra una sección especial: Domicilio de Envío/Fecha límite/Técnico, grilla editable de equipos (N° de Serie, checklist de calidad, estado), y firma digital por canvas (funciona con mouse y con dedo). El chat de abajo no necesitó ningún cambio — es el mismo de siempre. Botón para abrir orden-preparacion.html (versión imprimible/PDF). Ver FotoMap.gs v157.) -->
 <!-- Portal TLC | servicio.html | v2026.08.04.12 (La campanita (compartida entre módulos) ahora sabe manejar notificaciones que vienen del módulo nuevo Eventos — reacciona bien al mensaje real (id_evento + id_tarjeta, no solo un id) y navega a eventos.html?id=...&tarjeta=... en vez de mandar por error a Servicio. Ver FotoMap.gs v156 y eventos.html v2026.08.04.2.) -->
 <html lang="es">
@@ -328,17 +328,6 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
     white-space:nowrap; transition: font-size .15s ease; }
   .notif-fila:hover .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
   .notif-fila.notif-expandida .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
-  .notif-fila.notif-expandida .notif-reacciones { opacity:1; }
-  /* Reacción rápida (👍/👎) — aparece solo en hover, junto con el
-     agrandado del texto. Reacciona = marca leído de una. Pedido por
-     Cristian: "que se abran algunos emojis... y de paso lo marca como
-     leído". */
-  .notif-reacciones { display:flex; gap:2px; opacity:.5; transform:translateX(0);
-    transition:opacity .15s ease, transform .15s ease; flex-shrink:0; }
-  .notif-fila:hover .notif-reacciones, .notif-fila:focus-within .notif-reacciones { opacity:1; transform:translateX(0); }
-  .notif-reacciones button { background:none; border:none; font-size:15px; cursor:pointer; padding:3px 5px;
-    border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
-  .notif-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
   .notif-reaccion-guardada { font-size:12px; margin-left:4px; }
   /* Mensajes internos (ticket) — mismo tratamiento que los mensajes de
      negocio y las notificaciones. Pedido por Cristian. */
@@ -346,24 +335,29 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
   .msg-fila:hover, .msg-fila:focus-within { background: rgba(58,134,255,.08) !important; border-color:#3a86ff55 !important; }
   .msg-texto { font-size:12px; transition:font-size .15s ease; }
   .msg-fila:hover .msg-texto { font-size:13px; }
-  .msg-reacciones { display:flex; gap:2px; opacity:.5; transition:opacity .15s ease; margin-top:5px; }
-  .msg-fila:hover .msg-reacciones, .msg-fila:focus-within .msg-reacciones { opacity:1; }
-  .msg-reacciones button { background:none; border:none; font-size:14px; cursor:pointer; padding:2px 5px;
-    border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
-  .msg-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
   .msg-reacciones-resumen { font-size:11px; margin-top:5px; color:var(--text-muted); }
   .msg-reaccion-pill { cursor:pointer; padding:2px 6px; border-radius:10px; background:rgba(58,134,255,.1); transition:background .1s ease; }
   .msg-reaccion-pill:hover { background:rgba(58,134,255,.22); }
-  /* En táctil no existe hover de verdad — algunos navegadores simulan
-     un "primer toque = hover" que hace que el primer tap solo revele
-     el botón sin registrar el click, necesitando un segundo toque
-     confuso. Se fuerza opacidad completa siempre en táctil, sin
-     depender de ningún estado de hover. Reportado por Cristian: "en
-     el celular no funcionan los emojis en los mensajes de la
-     tarjeta". */
-  @media (hover: none) {
-    .msg-reacciones, .notif-reacciones { opacity:1 !important; }
-  }
+  /* Reacciones — antes los 3 emojis quedaban siempre visibles al lado
+     de cada mensaje/notificación, y se confundían con una reacción YA
+     puesta por alguien (parecía que ya habían reaccionado, cuando en
+     realidad eran solo los botones para reaccionar). Ahora quedan
+     ocultos detrás de un ícono chico de "reaccionar" — tocarlo
+     despliega los 3 emojis, elegís uno y se cierra. Reportado por
+     Cristian: "los emojis siempre están visibles y se confunden con
+     una reacción real". */
+  .reaccion-trigger-wrap { position:relative; flex-shrink:0; }
+  .reaccion-trigger-btn { background:none; border:1px solid var(--border-glow); border-radius:50%; width:24px; height:24px;
+    font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:.55;
+    transition:opacity .15s ease, background .15s ease; padding:0; color:var(--text-main); }
+  .reaccion-trigger-btn:hover, .reaccion-trigger-btn.activo { opacity:1; background:rgba(58,134,255,.14); }
+  .reaccion-picker { position:absolute; bottom:100%; right:0; margin-bottom:5px; background:var(--panel-dark);
+    border:1px solid var(--border-glow); border-radius:20px; padding:4px 6px; display:none; gap:2px;
+    box-shadow:0 6px 20px rgba(0,0,0,.3); z-index:80; white-space:nowrap; }
+  .reaccion-picker.abierto { display:flex; }
+  .reaccion-picker button { background:none; border:none; font-size:17px; cursor:pointer; padding:4px 6px;
+    border-radius:10px; line-height:1; transition:background .1s ease, transform .1s ease; }
+  .reaccion-picker button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
@@ -2131,21 +2125,44 @@ function _construirHtmlListaMensajes(t) {
   if (!mensajes.length) return '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:16px 0;">Todavía no hay mensajes en este ticket.</div>';
   return mensajes.map(function(m, i) {
     var fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    var pickerId = 'picker-msg-' + t.id_ticket + '-' + i;
     return '<div class="msg-fila" tabindex="0" style="padding:8px 10px;border-radius:10px;background:var(--panel-dark);border:1px solid var(--border-glow);margin-bottom:8px;">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
         '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
         '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + '</span>' +
       '</div>' +
       '<div class="msg-texto" style="color:var(--text-main);white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTexto(_esc(m.texto || '')) + '</div>' +
-      _resumenReacciones(m.reacciones) +
-      '<div class="msg-reacciones">' +
-        '<button onclick="_reaccionarMensajeTicket(event,\'' + t.id_ticket + '\',' + i + ',\'ok\')" title="Ok">👍</button>' +
-        '<button onclick="_reaccionarMensajeTicket(event,\'' + t.id_ticket + '\',' + i + ',\'no_ok\')" title="No ok">👎</button>' +
-        '<button onclick="_reaccionarMensajeTicket(event,\'' + t.id_ticket + '\',' + i + ',\'corazon\')" title="Me encanta">❤️</button>' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
+        _resumenReacciones(m.reacciones) +
+        '<div class="reaccion-trigger-wrap">' +
+          '<button class="reaccion-trigger-btn" onclick="_toggleReaccionPicker(event,\'' + pickerId + '\')" title="Reaccionar">🙂</button>' +
+          '<div class="reaccion-picker" id="' + pickerId + '">' +
+            '<button onclick="_reaccionarMensajeTicket(event,\'' + t.id_ticket + '\',' + i + ',\'ok\')" title="Ok">👍</button>' +
+            '<button onclick="_reaccionarMensajeTicket(event,\'' + t.id_ticket + '\',' + i + ',\'no_ok\')" title="No ok">👎</button>' +
+            '<button onclick="_reaccionarMensajeTicket(event,\'' + t.id_ticket + '\',' + i + ',\'corazon\')" title="Me encanta">❤️</button>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
     '</div>';
   }).join('');
 }
+
+// Picker de reacciones — un solo ícono chico que despliega los 3
+// emojis al tocarlo, en vez de tenerlos siempre sueltos al lado del
+// mensaje (se confundían con una reacción ya puesta). Compartido
+// entre mensajes y campanita. Pedido por Cristian: "ocultarlos debajo
+// de un ícono emoji, si lo clickeas se despliegan".
+window._toggleReaccionPicker = function(ev, pickerId) {
+  if (ev) ev.stopPropagation();
+  document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el) {
+    if (el.id !== pickerId) el.classList.remove('abierto');
+  });
+  var picker = document.getElementById(pickerId);
+  if (picker) picker.classList.toggle('abierto');
+};
+document.addEventListener('click', function() {
+  document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el){ el.classList.remove('abierto'); });
+});
 
 window._reaccionarMensajeTicket = function(ev, idTicket, indice, tipo) {
   if (ev) ev.stopPropagation();
@@ -2590,10 +2607,13 @@ function _renderCampanaLista() {
           (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : n.reaccion === 'no_ok' ? '👎' : '❤️') + '</span>' : '') +
         '</div>' +
       '</div>' +
-      '<div class="notif-reacciones">' +
-        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
-        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
-        '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
+      '<div class="reaccion-trigger-wrap">' +
+        '<button class="reaccion-trigger-btn" onclick="_toggleReaccionPicker(event,\'picker-notif-' + n.id + '\')" title="Reaccionar">🙂</button>' +
+        '<div class="reaccion-picker" id="picker-notif-' + n.id + '">' +
+          '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
+          '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
+          '<button onclick="_reaccionarNotif(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
+        '</div>' +
       '</div>' +
       (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
     '</div>';

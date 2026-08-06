@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.08.04.12 (Regulatoria y Comercio Exterior movidos del menú principal a adentro de Administración, junto a Reportes y Gestión Eventos. Pedido por Cristian.) -->
+<!-- Portal TLC | index.html | v2026.08.04.13 (Mismo rediseño de reacciones que servicio.html, en la campanita.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -350,18 +350,27 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
   white-space:nowrap; transition: font-size .15s ease; }
 .notif-fila:hover .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
 .notif-fila.notif-expandida .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
-.notif-fila.notif-expandida .notif-reacciones { opacity:1; }
 body.tema-claro .notif-texto { color:#0f172a; }
-.notif-reacciones { display:flex; gap:2px; opacity:.5; transform:translateX(0);
-  transition:opacity .15s ease, transform .15s ease; flex-shrink:0; }
-.notif-fila:hover .notif-reacciones, .notif-fila:focus-within .notif-reacciones { opacity:1; transform:translateX(0); }
-.notif-reacciones button { background:none; border:none; font-size:15px; cursor:pointer; padding:3px 5px;
-  border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
-.notif-reacciones button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
-@media (hover: none) {
-  .notif-reacciones { opacity:1 !important; }
-}
 .notif-reaccion-guardada { font-size:12px; margin-left:4px; }
+/* Reacciones — antes los 3 emojis quedaban siempre visibles al lado de
+   cada notificación, y se confundían con una reacción YA puesta.
+   Ahora quedan ocultos detrás de un ícono chico de "reaccionar" —
+   tocarlo despliega los 3 emojis. Reportado por Cristian: "los emojis
+   siempre están visibles y se confunden con una reacción real". */
+.reaccion-trigger-wrap { position:relative; flex-shrink:0; }
+.reaccion-trigger-btn { background:none; border:1px solid #1e3050; border-radius:50%; width:24px; height:24px;
+  font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:.55;
+  transition:opacity .15s ease, background .15s ease; padding:0; color:#f1f5f9; }
+body.tema-claro .reaccion-trigger-btn { border-color:#cbd5e1; color:#0f172a; }
+.reaccion-trigger-btn:hover, .reaccion-trigger-btn.activo { opacity:1; background:rgba(58,134,255,.14); }
+.reaccion-picker { position:absolute; bottom:100%; right:0; margin-bottom:5px; background:#0f1a30;
+  border:1px solid #1e3050; border-radius:20px; padding:4px 6px; display:none; gap:2px;
+  box-shadow:0 6px 20px rgba(0,0,0,.3); z-index:80; white-space:nowrap; }
+body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
+.reaccion-picker.abierto { display:flex; }
+.reaccion-picker button { background:none; border:none; font-size:17px; cursor:pointer; padding:4px 6px;
+  border-radius:10px; line-height:1; transition:background .1s ease, transform .1s ease; }
+.reaccion-picker button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
     </style>
 </head>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -2270,15 +2279,32 @@ body.tema-claro .notif-texto { color:#0f172a; }
               (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : n.reaccion === 'no_ok' ? '👎' : '❤️') + '</span>' : '') +
             '</div>' +
           '</div>' +
-          '<div class="notif-reacciones">' +
-            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
-            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
-            '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
+          '<div class="reaccion-trigger-wrap">' +
+            '<button class="reaccion-trigger-btn" onclick="_toggleReaccionPicker(event,\'picker-notif-idx-' + n.id + '\')" title="Reaccionar">🙂</button>' +
+            '<div class="reaccion-picker" id="picker-notif-idx-' + n.id + '">' +
+              '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
+              '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
+              '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
+            '</div>' +
           '</div>' +
           (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
         '</div>';
       }).join('');
     }
+
+    // Picker de reacciones — un solo ícono chico que despliega los 3
+    // emojis al tocarlo. Compartido entre campanita y mensajes.
+    window._toggleReaccionPicker = function(ev, pickerId) {
+      if (ev) ev.stopPropagation();
+      document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el) {
+        if (el.id !== pickerId) el.classList.remove('abierto');
+      });
+      var picker = document.getElementById(pickerId);
+      if (picker) picker.classList.toggle('abierto');
+    };
+    document.addEventListener('click', function() {
+      document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el){ el.classList.remove('abierto'); });
+    });
 
     window._reaccionarNotifIdx = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice, tarjetaId) {
       if (ev) ev.stopPropagation();
