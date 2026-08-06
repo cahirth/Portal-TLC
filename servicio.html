@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | servicio.html | v2026.08.04.9 (Reacciones de mensajes: tocar el resumen ("👍 2") ahora muestra quién reaccionó, no solo el número. Ver FotoMap.gs v152. Pedido por Cristian.) -->
+<!-- Portal TLC | servicio.html | v2026.08.04.10 (3 fixes reportados por Cristian: (1) BUG REAL encontrado — el texto de los mensajes internos tenía font-size fijo por estilo inline, que le ganaba a la regla de hover, por eso "no se ampliaba la letra"; corregido. (2) botones de reacción ahora siempre semi-visibles (no ocultos del todo hasta el hover) — más confiables para clickear en PC y usables en celular sin hover. (3) en celular, el primer toque en una notificación ahora expande (no navega directo) — recién el segundo toque abre el ticket/negocio; en PC sigue igual con hover. Ver FotoMap.gs v153 para el aviso al autor del mensaje cuando le reaccionan.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -304,11 +304,13 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
   .notif-texto { font-size:12px; color:var(--text-main); overflow:hidden; text-overflow:ellipsis;
     white-space:nowrap; transition: font-size .15s ease; }
   .notif-fila:hover .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
+  .notif-fila.notif-expandida .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
+  .notif-fila.notif-expandida .notif-reacciones { opacity:1; }
   /* Reacción rápida (👍/👎) — aparece solo en hover, junto con el
      agrandado del texto. Reacciona = marca leído de una. Pedido por
      Cristian: "que se abran algunos emojis... y de paso lo marca como
      leído". */
-  .notif-reacciones { display:flex; gap:2px; opacity:0; transform:translateX(4px);
+  .notif-reacciones { display:flex; gap:2px; opacity:.5; transform:translateX(0);
     transition:opacity .15s ease, transform .15s ease; flex-shrink:0; }
   .notif-fila:hover .notif-reacciones, .notif-fila:focus-within .notif-reacciones { opacity:1; transform:translateX(0); }
   .notif-reacciones button { background:none; border:none; font-size:15px; cursor:pointer; padding:3px 5px;
@@ -319,9 +321,9 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
      negocio y las notificaciones. Pedido por Cristian. */
   .msg-fila { transition: background .12s ease, border-color .12s ease; cursor:default; }
   .msg-fila:hover, .msg-fila:focus-within { background: rgba(58,134,255,.08) !important; border-color:#3a86ff55 !important; }
-  .msg-texto { transition:font-size .15s ease; }
+  .msg-texto { font-size:12px; transition:font-size .15s ease; }
   .msg-fila:hover .msg-texto { font-size:13px; }
-  .msg-reacciones { display:flex; gap:2px; opacity:0; transition:opacity .15s ease; margin-top:5px; }
+  .msg-reacciones { display:flex; gap:2px; opacity:.5; transition:opacity .15s ease; margin-top:5px; }
   .msg-fila:hover .msg-reacciones, .msg-fila:focus-within .msg-reacciones { opacity:1; }
   .msg-reacciones button { background:none; border:none; font-size:14px; cursor:pointer; padding:2px 5px;
     border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
@@ -1970,7 +1972,7 @@ function _construirHtmlListaMensajes(t) {
         '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
         '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + '</span>' +
       '</div>' +
-      '<div class="msg-texto" style="font-size:12px;color:var(--text-main);white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTexto(_esc(m.texto || '')) + '</div>' +
+      '<div class="msg-texto" style="color:var(--text-main);white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTexto(_esc(m.texto || '')) + '</div>' +
       _resumenReacciones(m.reacciones) +
       '<div class="msg-reacciones">' +
         '<button onclick="_reaccionarMensajeTicket(event,\'' + t.id_ticket + '\',' + i + ',\'ok\')" title="Ok">👍</button>' +
@@ -2324,6 +2326,7 @@ var _campanaPollingId = null;
 function _iconoTipoNotificacion(tipo) {
   if (tipo === 'mencion') return '💬';
   if (tipo === 'ticket_nuevo') return '🆕';
+  if (tipo === 'reaccion') return '👍';
   return '📋';
 }
 
@@ -2413,7 +2416,7 @@ function _renderCampanaLista() {
   }
   cont.innerHTML = items.map(function(n) {
     var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.08)';
-    return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacion(\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen || 'servicio') + '\')" ' +
+    return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacion(event,\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen || 'servicio') + '\')" ' +
       'style="padding:11px 14px;border-bottom:1px solid var(--border-glow);cursor:pointer;background:' + noLeidaBg + ';display:flex;gap:10px;align-items:flex-start;">' +
       '<span style="font-size:16px;flex-shrink:0;">' + _iconoTipoNotificacion(n.tipo) + '</span>' +
       '<div style="flex:1;min-width:0;">' +
@@ -2459,7 +2462,22 @@ document.addEventListener('click', function(ev) {
   }
 });
 
-window._clickNotificacion = function(idNoti, ticketId, origen) {
+function _esTactil() {
+  return window.matchMedia ? window.matchMedia('(hover: none)').matches : ('ontouchstart' in window);
+}
+window._clickNotificacion = function(ev, idNoti, ticketId, origen) {
+  // En celular no hay hover — sin esto, tocar una notificación
+  // navegaba directo sin poder leerla completa ni tocar un emoji.
+  // Primer toque expande (mismo efecto que el hover en PC); recién el
+  // segundo toque navega. En PC el hover ya resuelve esto, así que el
+  // click sigue navegando directo como siempre. Pedido por Cristian:
+  // "quiero que si haces click en un mensaje... se amplíe, y pueda
+  // clickear el emoji".
+  var fila = ev && ev.currentTarget;
+  if (_esTactil() && fila && !fila.classList.contains('notif-expandida')) {
+    fila.classList.add('notif-expandida');
+    return;
+  }
   var email = (_session && _session.username) || '';
   if (email) {
     fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},

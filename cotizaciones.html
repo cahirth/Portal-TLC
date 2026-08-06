@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | cotizaciones.html | v2026.08.04.14 (Mismo agregado que servicio.html: tocar el resumen de reacciones muestra quién fue.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.04.15 (Mismos 3 fixes que servicio.html: bug real del font-size inline en mensajes, reacciones siempre semi-visibles, tap-para-expandir en celular.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.04.8 (Fix: los checkboxes de contacto no tenían color de texto fijo — usaban el color ambiente que cambia con el tema, a diferencia de los inputs vecinos (VENDEDOR, TELÉFONO) que siempre son fondo blanco/texto oscuro sin importar el tema. Ahora siguen el mismo patrón fijo. Reportado por Cristian con captura.) -->
 <html lang="es">
 <head>
@@ -447,8 +447,10 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
       .notif-texto { font-size:12px; color:#f1f5f9; overflow:hidden; text-overflow:ellipsis;
         white-space:nowrap; transition: font-size .15s ease; }
       .notif-fila:hover .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
+      .notif-fila.notif-expandida .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
+      .notif-fila.notif-expandida .notif-reacciones { opacity:1; }
       body.tema-claro .notif-texto { color:#0f172a; }
-      .notif-reacciones { display:flex; gap:2px; opacity:0; transform:translateX(4px);
+      .notif-reacciones { display:flex; gap:2px; opacity:.5; transform:translateX(0);
         transition:opacity .15s ease, transform .15s ease; flex-shrink:0; }
       .notif-fila:hover .notif-reacciones, .notif-fila:focus-within .notif-reacciones { opacity:1; transform:translateX(0); }
       .notif-reacciones button { background:none; border:none; font-size:15px; cursor:pointer; padding:3px 5px;
@@ -462,9 +464,9 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
          Cristian: mismo hover-zoom + emojis acá también. */
       .msg-fila { transition: background .12s ease, border-color .12s ease; cursor:default; }
       .msg-fila:hover, .msg-fila:focus-within { background:#132540 !important; border-color:#3a86ff55 !important; }
-      .msg-texto { transition:font-size .15s ease; }
+      .msg-texto { font-size:12px; transition:font-size .15s ease; }
       .msg-fila:hover .msg-texto { font-size:13px; }
-      .msg-reacciones { display:flex; gap:2px; opacity:0; transition:opacity .15s ease; margin-top:5px; }
+      .msg-reacciones { display:flex; gap:2px; opacity:.5; transition:opacity .15s ease; margin-top:5px; }
       .msg-fila:hover .msg-reacciones, .msg-fila:focus-within .msg-reacciones { opacity:1; }
       .msg-reacciones button { background:none; border:none; font-size:14px; cursor:pointer; padding:2px 5px;
         border-radius:6px; line-height:1; transition:background .1s ease, transform .1s ease; }
@@ -1173,7 +1175,7 @@ function _construirHtmlListaMensajesCot() {
                 '<span style="font-size:11px;font-weight:700;color:#f1f5f9;">' + _escCot(m.autor_nombre || m.autor_email || '—') + '</span>' +
                 '<span style="font-size:10px;color:#64748b;white-space:nowrap;">' + _tiempoRelativoCot(m.fecha) + '</span>' +
             '</div>' +
-            '<div class="msg-texto" style="font-size:12px;color:#f1f5f9;white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTextoCot(_escCot(m.texto || '')) + '</div>' +
+            '<div class="msg-texto" style="color:#f1f5f9;white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTextoCot(_escCot(m.texto || '')) + '</div>' +
             _resumenReaccionesCot(m.reacciones) +
             '<div class="msg-reacciones">' +
                 '<button onclick="_reaccionarMensajeCot(event,' + i + ',\'ok\')" title="Ok">👍</button>' +
@@ -1190,8 +1192,10 @@ window._reaccionarMensajeCot = function(ev, indice, tipo) {
     var email = cuenta ? cuenta.username : '';
     var nombre = cuenta ? cuenta.name : '';
     if (!email || !_idCotActual) return;
+    var entradaActual = (typeof todasLasCot !== 'undefined' ? todasLasCot : []).find(function(x){ return String(x.idCot || x.id_cotizacion || x.id || '') === String(_idCotActual); });
+    var titulo = entradaActual ? (entradaActual.nombreNegocio || entradaActual.razonSocial || '') : '';
     fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({ accion:'cot_reaccionarMensaje', id_cotizacion:_idCotActual, indice:indice, autor_email:email, autor_nombre:nombre, reaccion:tipo }) })
+        body: JSON.stringify({ accion:'cot_reaccionarMensaje', id_cotizacion:_idCotActual, indice:indice, autor_email:email, autor_nombre:nombre, reaccion:tipo, titulo:titulo }) })
         .then(function(r){ return r.json(); })
         .then(function(r) {
             if (r.ok && Array.isArray(r.mensajes)) {
@@ -1478,6 +1482,7 @@ var _campanaPollingIdCot = null;
 function _iconoTipoNotificacionCot(tipo) {
     if (tipo === 'mencion') return '💬';
     if (tipo === 'ticket_nuevo') return '🆕';
+    if (tipo === 'reaccion') return '👍';
     return '📋';
 }
 
@@ -1562,7 +1567,7 @@ function _renderCampanaListaCot() {
     }
     cont.innerHTML = items.map(function(n) {
         var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.08)';
-        return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacionCot(\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'servicio') + '\')" ' +
+        return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacionCot(event,\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'servicio') + '\')" ' +
             'style="padding:11px 14px;border-bottom:1px solid #1e3050;cursor:pointer;background:' + noLeidaBg + ';display:flex;gap:10px;align-items:flex-start;">' +
             '<span style="font-size:16px;flex-shrink:0;">' + _iconoTipoNotificacionCot(n.tipo) + '</span>' +
             '<div style="flex:1;min-width:0;">' +
@@ -1610,7 +1615,15 @@ document.addEventListener('click', function(ev) {
 // Enruta el clic según el origen: si es una cotización, la abre en este
 // mismo módulo (busca el índice y llama a abrirDetalle); si es un ticket
 // de Servicio Técnico, navega a servicio.html.
-window._clickNotificacionCot = function(idNoti, idOrigen, origen) {
+function _esTactilCot() {
+    return window.matchMedia ? window.matchMedia('(hover: none)').matches : ('ontouchstart' in window);
+}
+window._clickNotificacionCot = function(ev, idNoti, idOrigen, origen) {
+    var fila = ev && ev.currentTarget;
+    if (_esTactilCot() && fila && !fila.classList.contains('notif-expandida')) {
+        fila.classList.add('notif-expandida');
+        return;
+    }
     var cuenta = _leerSesionCompartida();
     var email = cuenta ? cuenta.username : '';
     if (email) {

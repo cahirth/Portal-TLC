@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | index.html | v2026.08.04.7 (Sumado ❤️ a la reacción de la campanita, mismo criterio que servicio.html y cotizaciones.html.) -->
+<!-- Portal TLC | index.html | v2026.08.04.8 (Mismo fix que servicio.html: en celular, el primer toque en una notificación expande en vez de navegar directo; reacciones siempre semi-visibles.) -->
 <html lang="es">
 <head>
 <script src="version.js"></script>
@@ -349,8 +349,10 @@ body.tema-claro #idx-wsp-saludo { background:#f8fafc !important; border-color:#c
 .notif-texto { font-size:12px; color:#f1f5f9; overflow:hidden; text-overflow:ellipsis;
   white-space:nowrap; transition: font-size .15s ease; }
 .notif-fila:hover .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
+.notif-fila.notif-expandida .notif-texto { white-space:normal; overflow:visible; font-size:13.5px; font-weight:600; }
+.notif-fila.notif-expandida .notif-reacciones { opacity:1; }
 body.tema-claro .notif-texto { color:#0f172a; }
-.notif-reacciones { display:flex; gap:2px; opacity:0; transform:translateX(4px);
+.notif-reacciones { display:flex; gap:2px; opacity:.5; transform:translateX(0);
   transition:opacity .15s ease, transform .15s ease; flex-shrink:0; }
 .notif-fila:hover .notif-reacciones, .notif-fila:focus-within .notif-reacciones { opacity:1; transform:translateX(0); }
 .notif-reacciones button { background:none; border:none; font-size:15px; cursor:pointer; padding:3px 5px;
@@ -2158,6 +2160,7 @@ body.tema-claro .notif-texto { color:#0f172a; }
     function _iconoTipoNotificacionIdx(tipo) {
       if (tipo === 'mencion') return '💬';
       if (tipo === 'ticket_nuevo') return '🆕';
+      if (tipo === 'reaccion') return '👍';
       return '📋';
     }
     function _tiempoRelativoCampanaIdx(fechaIso) {
@@ -2246,7 +2249,7 @@ body.tema-claro .notif-texto { color:#0f172a; }
       }
       cont.innerHTML = items.map(function(n) {
         var noLeidaBg = n.leido ? 'transparent' : 'rgba(58,134,255,.08)';
-        return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacionIdx(\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'servicio') + '\')" ' +
+        return '<div class="notif-fila" tabindex="0" onclick="_clickNotificacionIdx(event,\'' + n.id + '\',\'' + n.ticket_id + '\',\'' + (n.origen||'servicio') + '\')" ' +
           'style="padding:11px 14px;border-bottom:1px solid #1e3050;cursor:pointer;background:' + noLeidaBg + ';display:flex;gap:10px;align-items:flex-start;">' +
           '<span style="font-size:16px;flex-shrink:0;">' + _iconoTipoNotificacionIdx(n.tipo) + '</span>' +
           '<div style="flex:1;min-width:0;">' +
@@ -2292,7 +2295,15 @@ body.tema-claro .notif-texto { color:#0f172a; }
     });
 
     // Siempre navega a otro módulo — index.html no tiene vista de detalle propia
-    window._clickNotificacionIdx = function(idNoti, idOrigen, origen) {
+    function _esTactilIdx() {
+      return window.matchMedia ? window.matchMedia('(hover: none)').matches : ('ontouchstart' in window);
+    }
+    window._clickNotificacionIdx = function(ev, idNoti, idOrigen, origen) {
+      var fila = ev && ev.currentTarget;
+      if (_esTactilIdx() && fila && !fila.classList.contains('notif-expandida')) {
+        fila.classList.add('notif-expandida');
+        return;
+      }
       var cuenta = _leerSesionIdx();
       var email = cuenta ? cuenta.username : '';
       if (email) {
