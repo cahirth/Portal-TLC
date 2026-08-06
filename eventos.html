@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- Portal TLC | eventos.html | v2026.08.04.2 (3 fixes sobre el borrador inicial: (1) reaccionar desde la campanita a un mensaje de tarjeta ahora manda id_evento e id_tarjeta correctos, no el mismo valor duplicado (bug real, ver FotoMap.gs v156); (2) agregado deep-link por URL (?id=&tarjeta=) — clickear una notificación ahora abre directo la tarjeta puntual, en vez de solo el tablero; (3) sacada una línea de código muerto que no hacía nada.) -->
+<!-- Portal TLC | eventos.html | v2026.08.04.4 (2 pedidos de Cristian para uniformar con el resto de la PWA: (1) el detalle de tarjeta ahora es de dos columnas en pantallas grandes, con Mensajes internos fijo a la derecha (sticky) — mismo patrón que negocios y tickets de Servicio, en vez de todo apilado en una sola columna; (2) barra de filtros nueva arriba del tablero (Responsable, Categoría) — el filtro por columna/etapa no se agregó porque en un Kanban las columnas ya están agrupadas visualmente, sería redundante.) -->
+<!-- Portal TLC | eventos.html | v2026.08.04.3 (Faltaba el botón de tema — el CSS de "tema-claro" ya existía pero nunca se aplicaba ni había forma de togglearlo desde acá, por eso quedaba siempre en modo oscuro. Agregado con la misma clave compartida (tlc_tema) que usa el resto del Portal. Reportado por Cristian: "tiene solo modo oscuro?".) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.1 (Módulo nuevo "Gestión Eventos / Congresos" (TLC Planner) — v1 recortado: tablero Kanban con columnas dinámicas (crear/renombrar/borrar), tarjetas con categoría/responsable/fecha límite, checklist con @menciones, chat interno con hover-zoom y reacciones (reutiliza al 100% la infraestructura de Ventas/Servicio, cero código duplicado). Selector de eventos (arranca con Faco Extrema 2026). Falta para v2: duplicar tarjeta, bitácora de cambios, reordenar columnas por drag. Pedido por Cristian, spec completa "TLC Planner".) -->
 <html lang="es">
 <head>
@@ -56,6 +57,20 @@ a { color:var(--accent-blue); }
   color:var(--text-main); font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
 .ev-btn-secundario:hover { border-color:var(--accent-blue); }
 
+/* ── Filtros — mismo criterio visual que Ventas/Servicio: barra
+   compacta con selects, para no tener que buscar tarjetas a mano en
+   eventos con muchas tareas. Pedido por Cristian: "Filtros Eventos,
+   responsable, etapa, etc.". La "etapa" acá es la categoría (Diseño,
+   Logística, etc.) — el filtro por columna/etapa real no aporta tanto
+   en un Kanban, ya que las columnas están agrupadas visualmente una
+   al lado de la otra. ── */
+.ev-filtros { display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+.ev-filtros select { background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:8px;
+  padding:7px 10px; color:var(--text-main); font-size:12px; font-weight:600; cursor:pointer; min-width:140px; }
+.ev-filtros select:focus { border-color:var(--accent-blue); }
+.ev-filtros .ev-filtro-limpiar { background:none; border:none; color:var(--accent-blue); font-size:11.5px; font-weight:700; cursor:pointer; padding:4px 6px; }
+.ev-card.ev-filtrada-fuera { display:none; }
+
 .ev-board { display:flex; gap:12px; overflow-x:auto; padding-bottom:16px; align-items:flex-start; }
 .ev-col { min-width:270px; max-width:270px; background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:12px;
   padding:10px; flex-shrink:0; }
@@ -94,9 +109,15 @@ a { color:var(--accent-blue); }
 @media (min-width:720px) { .ev-overlay { align-items:center; } }
 .ev-overlay-panel { background:var(--bg); width:100%; max-width:640px; max-height:92vh; overflow-y:auto; border-radius:16px 16px 0 0; }
 @media (min-width:720px) { .ev-overlay-panel { border-radius:16px; max-height:88vh; } }
+@media (min-width:960px) { .ev-overlay-panel { max-width:1040px; } }
 .ev-overlay-header { position:sticky; top:0; background:var(--panel-dark); border-bottom:1px solid var(--border-glow);
   padding:14px 16px; display:flex; align-items:center; gap:10px; z-index:2; }
 .ev-overlay-body { padding:16px; }
+@media (min-width:960px) {
+  .ev-overlay-body { display:flex; gap:16px; align-items:flex-start; }
+  .ev-overlay-col-principal { flex:1; min-width:0; }
+  .ev-overlay-col-mensajes { width:320px; flex-shrink:0; position:sticky; top:0; }
+}
 .ev-campo { margin-bottom:14px; }
 .ev-campo label { display:block; font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; }
 .ev-campo input, .ev-campo select, .ev-campo textarea { width:100%; background:var(--panel-darker); border:1px solid var(--border-glow);
@@ -176,6 +197,7 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
     <h1 id="ev-hdr-titulo">Gestión Eventos / Congresos</h1>
     <p id="ev-hdr-sub">TLC Planner</p>
   </div>
+  <button class="ev-icon-btn" onclick="_toggleTemaEv()" id="ev-btn-tema" title="Tema">🌙</button>
   <button class="ev-icon-btn" onclick="_toggleCampanaEv(event)" title="Notificaciones">
     🔔<span class="ev-badge" id="ev-campana-badge" style="display:none;">0</span>
   </button>
@@ -194,6 +216,11 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
     <div class="ev-tablero-topbar">
       <select class="ev-select-evento" id="ev-select-evento" onchange="_cambiarEventoDesdeSelect(this.value)"></select>
       <button class="ev-btn-secundario" onclick="_volverASelectorEventos()">📋 Todos los eventos</button>
+    </div>
+    <div class="ev-filtros" id="ev-filtros">
+      <select id="ev-filtro-responsable" onchange="_aplicarFiltrosEv()"><option value="">Responsable: todos</option></select>
+      <select id="ev-filtro-categoria" onchange="_aplicarFiltrosEv()"><option value="">Categoría: todas</option></select>
+      <button class="ev-filtro-limpiar" id="ev-filtro-limpiar" onclick="_limpiarFiltrosEv()" style="display:none;">✕ Limpiar filtros</button>
     </div>
     <div class="ev-board" id="ev-board"></div>
   </div>
@@ -224,6 +251,7 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
 <script>
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 var SESSION_KEY = 'tlc_session_v1';
+var TEMA_KEY = 'tlc_tema';
 var _session = null;
 var EVENTOS = [];
 var EVENTO_ACTUAL = null; // objeto completo con columnas + tarjetas
@@ -238,6 +266,21 @@ function _esc(s) {
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
   });
 }
+
+// ── Tema (misma clave compartida que el resto del Portal — cambiarlo
+//    acá también se refleja en index.html/servicio.html/etc.) ──
+function _aplicarTemaEv() {
+  var t = localStorage.getItem(TEMA_KEY) || 'dark';
+  document.body.classList.toggle('tema-claro', t === 'light');
+  var btn = document.getElementById('ev-btn-tema');
+  if (btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
+}
+window._toggleTemaEv = function() {
+  var actual = localStorage.getItem(TEMA_KEY) || 'dark';
+  localStorage.setItem(TEMA_KEY, actual === 'light' ? 'dark' : 'light');
+  _aplicarTemaEv();
+};
+_aplicarTemaEv();
 
 async function _cargarSesion() {
   try {
@@ -318,7 +361,9 @@ async function _abrirEvento(id, tarjetaId) {
     EVENTO_ACTUAL = r.evento;
     document.getElementById('ev-hdr-titulo').textContent = EVENTO_ACTUAL.nombre;
     document.getElementById('ev-hdr-sub').textContent = EVENTO_ACTUAL.tarjetas.length + ' tarjetas';
+    if (!_internosCacheEv) await _cargarInternosEv();
     _renderSelectEventos();
+    _renderFiltrosEv();
     _renderTablero();
     history.replaceState(null, '', 'eventos.html?id=' + encodeURIComponent(id));
     // Deep-link desde una notificación o un link compartido — abre
@@ -398,7 +443,46 @@ function _renderTablero() {
       '<button class="ev-col-add-tarjeta" onclick="_abrirModalNuevaTarjeta(\'' + col.id + '\')">+ Nueva tarjeta</button>' +
     '</div>';
   }).join('') + '<div class="ev-col-nueva" onclick="_abrirModalNuevaColumna()">+ Nueva columna</div>';
+  _aplicarFiltrosEv();
 }
+
+// ── Filtros — Responsable y Categoría, mismo criterio visual que
+//    Ventas/Servicio. Se aplican ocultando tarjetas con CSS, no
+//    volviendo a pedir datos al servidor — es instantáneo y no rompe
+//    el drag & drop de las que sí quedan visibles.
+function _renderFiltrosEv() {
+  var selResp = document.getElementById('ev-filtro-responsable');
+  var valorPrevioResp = selResp.value;
+  var nombresUnicos = {};
+  (EVENTO_ACTUAL.tarjetas || []).forEach(function(t) { if (t.responsable_email) nombresUnicos[t.responsable_email] = t.responsable_nombre || t.responsable_email; });
+  selResp.innerHTML = '<option value="">Responsable: todos</option>' +
+    (_internosCacheEv || []).map(function(p) { return '<option value="' + _esc(p.email) + '">' + _esc(p.nombre) + '</option>'; }).join('');
+  selResp.value = valorPrevioResp;
+
+  var selCat = document.getElementById('ev-filtro-categoria');
+  var valorPrevioCat = selCat.value;
+  selCat.innerHTML = '<option value="">Categoría: todas</option>' +
+    Object.keys(CATEGORIAS_EV).map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('');
+  selCat.value = valorPrevioCat;
+}
+
+window._aplicarFiltrosEv = function() {
+  var resp = (document.getElementById('ev-filtro-responsable') || {}).value || '';
+  var cat = (document.getElementById('ev-filtro-categoria') || {}).value || '';
+  document.querySelectorAll('.ev-card').forEach(function(card) {
+    var coincideResp = !resp || card.dataset.responsable === resp;
+    var coincideCat = !cat || card.dataset.categoria === cat;
+    card.classList.toggle('ev-filtrada-fuera', !(coincideResp && coincideCat));
+  });
+  var btnLimpiar = document.getElementById('ev-filtro-limpiar');
+  if (btnLimpiar) btnLimpiar.style.display = (resp || cat) ? 'inline-block' : 'none';
+};
+
+window._limpiarFiltrosEv = function() {
+  document.getElementById('ev-filtro-responsable').value = '';
+  document.getElementById('ev-filtro-categoria').value = '';
+  _aplicarFiltrosEv();
+};
 
 function _renderCard(t) {
   var cat = CATEGORIAS_EV[t.categoria] || { bg:'rgba(148,163,184,.15)', color:'#94a3b8' };
@@ -407,7 +491,7 @@ function _renderCard(t) {
   var pct = checklist.length ? Math.round(hechos / checklist.length * 100) : 0;
   var fechaInfo = _fechaLimiteInfo(t.fecha_limite);
   var inicialResp = (t.responsable_nombre || '').trim().charAt(0).toUpperCase() || '?';
-  return '<div class="ev-card" draggable="true" ondragstart="_dragStartCard(event,\'' + t.id + '\')" ondragend="_dragEndCard(event)" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
+  return '<div class="ev-card" data-responsable="' + _esc(t.responsable_email||'') + '" data-categoria="' + _esc(t.categoria||'') + '" draggable="true" ondragstart="_dragStartCard(event,\'' + t.id + '\')" ondragend="_dragEndCard(event)" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
     (t.categoria ? '<span class="ev-card-cat" style="background:' + cat.bg + ';color:' + cat.color + ';">' + _esc(t.categoria) + '</span>' : '') +
     '<div class="ev-card-titulo">' + _esc(t.titulo) + '</div>' +
     '<div class="ev-card-meta">' +
@@ -541,27 +625,31 @@ function _renderOverlayTarjeta() {
   }).join('');
 
   document.getElementById('ev-overlay-body').innerHTML =
-    '<div class="ev-campo"><label>Título</label><input type="text" id="ev-t-titulo" value="' + _esc(t.titulo) + '" onchange="_guardarCampoTarjeta(\'titulo\',this.value)"></div>' +
-    '<div class="ev-grid2">' +
-      '<div class="ev-campo"><label>Categoría</label><select id="ev-t-categoria" onchange="_guardarCampoTarjeta(\'categoria\',this.value)"><option value="">Sin categoría</option>' + opcionesCategoria + '</select></div>' +
-      '<div class="ev-campo"><label>Fecha límite</label><input type="date" id="ev-t-fecha" value="' + (t.fecha_limite||'') + '" onchange="_guardarCampoTarjeta(\'fecha_limite\',this.value)"></div>' +
-    '</div>' +
-    '<div class="ev-campo"><label>Responsable Principal</label><select id="ev-t-resp" onchange="_guardarResponsable(this.value)"><option value="">Sin asignar</option>' + opcionesResp + '</select></div>' +
+    '<div class="ev-overlay-col-principal">' +
+      '<div class="ev-campo"><label>Título</label><input type="text" id="ev-t-titulo" value="' + _esc(t.titulo) + '" onchange="_guardarCampoTarjeta(\'titulo\',this.value)"></div>' +
+      '<div class="ev-grid2">' +
+        '<div class="ev-campo"><label>Categoría</label><select id="ev-t-categoria" onchange="_guardarCampoTarjeta(\'categoria\',this.value)"><option value="">Sin categoría</option>' + opcionesCategoria + '</select></div>' +
+        '<div class="ev-campo"><label>Fecha límite</label><input type="date" id="ev-t-fecha" value="' + (t.fecha_limite||'') + '" onchange="_guardarCampoTarjeta(\'fecha_limite\',this.value)"></div>' +
+      '</div>' +
+      '<div class="ev-campo"><label>Responsable Principal</label><select id="ev-t-resp" onchange="_guardarResponsable(this.value)"><option value="">Sin asignar</option>' + opcionesResp + '</select></div>' +
 
-    '<div class="ev-section-titulo">✅ Checklist</div>' +
-    '<div id="ev-checklist-lista">' + _renderChecklist(t) + '</div>' +
-    '<div class="ev-check-add-row" style="position:relative;">' +
-      '<input type="text" id="ev-check-nuevo" placeholder="Nueva subtarea... usá @ para asignar" oninput="_onChecklistInput(event)" onkeydown="_onChecklistKeydown(event)">' +
-      '<button onclick="_agregarChecklistItem()">+</button>' +
-      '<div id="ev-check-sugerencias" class="ev-mencion-sug"></div>' +
+      '<div class="ev-section-titulo">✅ Checklist</div>' +
+      '<div id="ev-checklist-lista">' + _renderChecklist(t) + '</div>' +
+      '<div class="ev-check-add-row" style="position:relative;">' +
+        '<input type="text" id="ev-check-nuevo" placeholder="Nueva subtarea... usá @ para asignar" oninput="_onChecklistInput(event)" onkeydown="_onChecklistKeydown(event)">' +
+        '<button onclick="_agregarChecklistItem()">+</button>' +
+        '<div id="ev-check-sugerencias" class="ev-mencion-sug"></div>' +
+      '</div>' +
     '</div>' +
 
-    '<div class="ev-section-titulo">💬 Chat interno</div>' +
-    '<div id="ev-msg-lista">' + _construirHtmlListaMensajesEv(t) + '</div>' +
-    '<div class="ev-check-add-row" style="position:relative; margin-top:10px;">' +
-      '<input type="text" id="ev-msg-nuevo" placeholder="Escribí un mensaje... usá @ para mencionar" oninput="_onMsgInputEv(event)" onkeydown="_onMsgKeydownEv(event)">' +
-      '<button onclick="_enviarMensajeEv()">➤</button>' +
-      '<div id="ev-msg-sugerencias" class="ev-mencion-sug"></div>' +
+    '<div class="ev-overlay-col-mensajes">' +
+      '<div class="ev-section-titulo" style="margin-top:0;">💬 Mensajes internos</div>' +
+      '<div id="ev-msg-lista">' + _construirHtmlListaMensajesEv(t) + '</div>' +
+      '<div class="ev-check-add-row" style="position:relative; margin-top:10px;">' +
+        '<input type="text" id="ev-msg-nuevo" placeholder="Escribí un mensaje... usá @ para mencionar" oninput="_onMsgInputEv(event)" onkeydown="_onMsgKeydownEv(event)">' +
+        '<button onclick="_enviarMensajeEv()">➤</button>' +
+        '<div id="ev-msg-sugerencias" class="ev-mencion-sug"></div>' +
+      '</div>' +
     '</div>';
 }
 
