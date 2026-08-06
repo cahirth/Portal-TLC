@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.06.1 (Fix robusto del picker de reacciones: ver detalle completo en servicio.html v2026.08.06.3 — mismo mecanismo (_abrirReaccionPicker), un solo picker global con position:fixed en vez de uno por mensaje que quedaba cortado por el overflow-y:auto del contenedor.) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.6 (Mismo rediseño de reacciones que servicio.html: ícono "🙂" que despliega los 3 emojis en vez de tenerlos siempre visibles sueltos, en mensajes de tarjeta y campanita.) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.4 (2 pedidos de Cristian para uniformar con el resto de la PWA: (1) el detalle de tarjeta ahora es de dos columnas en pantallas grandes, con Mensajes internos fijo a la derecha (sticky) — mismo patrón que negocios y tickets de Servicio, en vez de todo apilado en una sola columna; (2) barra de filtros nueva arriba del tablero (Responsable, Categoría) — el filtro por columna/etapa no se agregó porque en un Kanban las columnas ya están agrupadas visualmente, sería redundante.) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.3 (Faltaba el botón de tema — el CSS de "tema-claro" ya existía pero nunca se aplicaba ni había forma de togglearlo desde acá, por eso quedaba siempre en modo oscuro. Agregado con la misma clave compartida (tlc_tema) que usa el resto del Portal. Reportado por Cristian: "tiene solo modo oscuro?".) -->
@@ -807,7 +808,6 @@ function _construirHtmlListaMensajesEv(t) {
   if (!mensajes.length) return '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:16px 0;">Todavía no hay mensajes en esta tarjeta.</div>';
   return mensajes.map(function(m, i) {
     var fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
-    var pickerId = 'picker-msg-ev-' + i;
     return '<div class="msg-fila" tabindex="0">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
         '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
@@ -817,12 +817,7 @@ function _construirHtmlListaMensajesEv(t) {
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
         _resumenReaccionesEv(m.reacciones) +
         '<div class="reaccion-trigger-wrap">' +
-          '<button class="reaccion-trigger-btn" onclick="_toggleReaccionPicker(event,\'' + pickerId + '\')" title="Reaccionar">🙂</button>' +
-          '<div class="reaccion-picker" id="' + pickerId + '">' +
-            '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'ok\')" title="Ok">👍</button>' +
-            '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'no_ok\')" title="No ok">👎</button>' +
-            '<button onclick="_reaccionarMensajeEv(event,' + i + ',\'corazon\')" title="Me encanta">❤️</button>' +
-          '</div>' +
+          '<button class="reaccion-trigger-btn" onclick="_abrirReaccionPicker(event,this,\'msg\',' + i + ')" title="Reaccionar">🙂</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -936,12 +931,7 @@ async function _cargarNotificaciones(silencioso) {
               '</div>' +
             '</div>' +
             '<div class="reaccion-trigger-wrap">' +
-              '<button class="reaccion-trigger-btn" onclick="_toggleReaccionPicker(event,\'picker-notif-ev-' + n.id + '\')" title="Reaccionar">🙂</button>' +
-              '<div class="reaccion-picker" id="picker-notif-ev-' + n.id + '">' +
-                '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
-                '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
-                '<button onclick="_reaccionarNotifEv(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
-              '</div>' +
+              '<button class="reaccion-trigger-btn" onclick="_abrirReaccionPicker(event,this,\'notif\',\'' + n.id + '\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Reaccionar">🙂</button>' +
             '</div>' +
           '</div>';
         }).join('');
@@ -971,19 +961,84 @@ window._clickNotificacionEv = function(ev, idNoti, ticketId, origen, tarjetaId) 
   window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(ticketId);
 };
 
-// Picker de reacciones — un solo ícono chico que despliega los 3
-// emojis al tocarlo. Compartido entre campanita y mensajes.
-window._toggleReaccionPicker = function(ev, pickerId) {
-  if (ev) ev.stopPropagation();
-  document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el) {
-    if (el.id !== pickerId) el.classList.remove('abierto');
+// ============================================================
+// Picker de reacciones — v ROBUSTO: un solo picker GLOBAL, con
+// position:fixed calculado por JS según getBoundingClientRect()
+// del botón que lo abrió. Antes cada mensaje/notificación tenía su
+// propio picker con position:absolute anclado a su fila (bottom:
+// 100%), y quedaba cortado/tapado por el overflow-y:auto del
+// contenedor que lo rodea cuando el mensaje estaba cerca del
+// borde — a veces no se veía completo, a veces no dejaba clickear.
+// Ahora hay un solo picker compartido en <body>, se reposiciona en
+// cada apertura eligiendo abrir arriba o abajo del botón según el
+// espacio libre en pantalla, y nunca depende de qué contenedor lo
+// rodea. Reportado por Cristian con captura: "a veces aparece solo
+// el corazón, a veces te deja clickear y a veces no".
+// ============================================================
+var _reaccionPickerCtx = null;
+
+function _crearPickerGlobalReacciones() {
+  var el = document.getElementById('reaccion-picker-global');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'reaccion-picker-global';
+  el.className = 'reaccion-picker';
+  el.style.position = 'fixed';
+  el.style.zIndex = '9500';
+  el.innerHTML =
+    '<button data-tipo="ok" title="Ok">👍</button>' +
+    '<button data-tipo="no_ok" title="No ok">👎</button>' +
+    '<button data-tipo="corazon" title="Me encanta">❤️</button>';
+  el.addEventListener('click', function(ev) {
+    var btn = ev.target.closest('button[data-tipo]');
+    if (!btn || !_reaccionPickerCtx) return;
+    ev.stopPropagation();
+    var ctx = _reaccionPickerCtx;
+    var tipo = btn.getAttribute('data-tipo');
+    _cerrarPickerGlobalReacciones();
+    _despacharReaccion(ctx, tipo);
   });
-  var picker = document.getElementById(pickerId);
-  if (picker) picker.classList.toggle('abierto');
+  document.body.appendChild(el);
+  return el;
+}
+
+function _cerrarPickerGlobalReacciones() {
+  var el = document.getElementById('reaccion-picker-global');
+  if (el) { el.classList.remove('abierto'); el._btnActual = null; }
+  _reaccionPickerCtx = null;
+}
+
+function _despacharReaccion(ctx, tipo) {
+  if (ctx.tipo === 'msg') {
+    window._reaccionarMensajeEv(null, ctx.a1, tipo);
+  } else if (ctx.tipo === 'notif') {
+    window._reaccionarNotifEv(null, ctx.a1, tipo, ctx.a2, ctx.a3, ctx.a4, ctx.a5);
+  }
+}
+
+window._abrirReaccionPicker = function(ev, btnEl, tipoCtx, a1, a2, a3, a4, a5) {
+  if (ev) ev.stopPropagation();
+  var el = _crearPickerGlobalReacciones();
+  if (el.classList.contains('abierto') && el._btnActual === btnEl) { _cerrarPickerGlobalReacciones(); return; }
+  _reaccionPickerCtx = { tipo: tipoCtx, a1:a1, a2:a2, a3:a3, a4:a4, a5:a5 };
+  el._btnActual = btnEl;
+  el.classList.add('abierto');
+  var rect = btnEl.getBoundingClientRect();
+  var pw = el.offsetWidth || 100, ph = el.offsetHeight || 36;
+  var top = (rect.top - ph - 6 > 4) ? (rect.top - ph - 6) : (rect.bottom + 6);
+  if (top + ph > window.innerHeight - 4) top = Math.max(4, window.innerHeight - ph - 4);
+  var left = rect.right - pw;
+  if (left < 4) left = 4;
+  if (left + pw > window.innerWidth - 4) left = window.innerWidth - pw - 4;
+  el.style.top = top + 'px';
+  el.style.left = left + 'px';
+  el.style.right = 'auto';
+  el.style.bottom = 'auto';
+  el.style.margin = '0';
 };
-document.addEventListener('click', function() {
-  document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el){ el.classList.remove('abierto'); });
-});
+
+document.addEventListener('click', _cerrarPickerGlobalReacciones);
+document.addEventListener('scroll', _cerrarPickerGlobalReacciones, true);
 
 window._reaccionarNotifEv = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice, tarjetaId) {
   if (ev) ev.stopPropagation();

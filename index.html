@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.06.1 (Fix robusto del picker de reacciones: ver detalle completo en servicio.html v2026.08.06.3 — mismo mecanismo (_abrirReaccionPicker), un solo picker global con position:fixed en vez de uno por mensaje que quedaba cortado por el overflow-y:auto del contenedor.) -->
 <!-- Portal TLC | index.html | v2026.08.04.13 (Mismo rediseño de reacciones que servicio.html, en la campanita.) -->
 <html lang="es">
 <head>
@@ -2280,31 +2281,90 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
             '</div>' +
           '</div>' +
           '<div class="reaccion-trigger-wrap">' +
-            '<button class="reaccion-trigger-btn" onclick="_toggleReaccionPicker(event,\'picker-notif-idx-' + n.id + '\')" title="Reaccionar">🙂</button>' +
-            '<div class="reaccion-picker" id="picker-notif-idx-' + n.id + '">' +
-              '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Ok">👍</button>' +
-              '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'no_ok\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="No ok">👎</button>' +
-              '<button onclick="_reaccionarNotifIdx(event,\'' + n.id + '\',\'corazon\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Me encanta">❤️</button>' +
-            '</div>' +
+            '<button class="reaccion-trigger-btn" onclick="_abrirReaccionPicker(event,this,\'notif\',\'' + n.id + '\',\'' + (n.origen||'') + '\',\'' + (n.ticket_id||'') + '\',\'' + (n.mensaje_indice!==undefined?n.mensaje_indice:'') + '\',\'' + (n.tarjeta_id||'') + '\')" title="Reaccionar">🙂</button>' +
           '</div>' +
           (n.leido ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#3a86ff;flex-shrink:0;margin-top:5px;"></span>') +
         '</div>';
       }).join('');
     }
 
-    // Picker de reacciones — un solo ícono chico que despliega los 3
-    // emojis al tocarlo. Compartido entre campanita y mensajes.
-    window._toggleReaccionPicker = function(ev, pickerId) {
-      if (ev) ev.stopPropagation();
-      document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el) {
-        if (el.id !== pickerId) el.classList.remove('abierto');
+    // ============================================================
+    // Picker de reacciones — v ROBUSTO: un solo picker GLOBAL, con
+    // position:fixed calculado por JS según getBoundingClientRect()
+    // del botón que lo abrió. Antes cada notificación tenía su
+    // propio picker con position:absolute anclado a su fila (bottom:
+    // 100%), y quedaba cortado/tapado por el overflow-y:auto del
+    // contenedor que lo rodea cuando estaba cerca del borde — a
+    // veces no se veía completo, a veces no dejaba clickear. Ahora
+    // hay un solo picker compartido en <body>, se reposiciona en
+    // cada apertura eligiendo abrir arriba o abajo del botón según
+    // el espacio libre en pantalla, y nunca depende de qué
+    // contenedor lo rodea. Reportado por Cristian con captura: "a
+    // veces aparece solo el corazón, a veces te deja clickear y a
+    // veces no".
+    // ============================================================
+    var _reaccionPickerCtx = null;
+
+    function _crearPickerGlobalReacciones() {
+      var el = document.getElementById('reaccion-picker-global');
+      if (el) return el;
+      el = document.createElement('div');
+      el.id = 'reaccion-picker-global';
+      el.className = 'reaccion-picker';
+      el.style.position = 'fixed';
+      el.style.zIndex = '9500';
+      el.innerHTML =
+        '<button data-tipo="ok" title="Ok">👍</button>' +
+        '<button data-tipo="no_ok" title="No ok">👎</button>' +
+        '<button data-tipo="corazon" title="Me encanta">❤️</button>';
+      el.addEventListener('click', function(ev) {
+        var btn = ev.target.closest('button[data-tipo]');
+        if (!btn || !_reaccionPickerCtx) return;
+        ev.stopPropagation();
+        var ctx = _reaccionPickerCtx;
+        var tipo = btn.getAttribute('data-tipo');
+        _cerrarPickerGlobalReacciones();
+        _despacharReaccion(ctx, tipo);
       });
-      var picker = document.getElementById(pickerId);
-      if (picker) picker.classList.toggle('abierto');
+      document.body.appendChild(el);
+      return el;
+    }
+
+    function _cerrarPickerGlobalReacciones() {
+      var el = document.getElementById('reaccion-picker-global');
+      if (el) { el.classList.remove('abierto'); el._btnActual = null; }
+      _reaccionPickerCtx = null;
+    }
+
+    function _despacharReaccion(ctx, tipo) {
+      if (ctx.tipo === 'notif') {
+        window._reaccionarNotifIdx(null, ctx.a1, tipo, ctx.a2, ctx.a3, ctx.a4, ctx.a5);
+      }
+    }
+
+    window._abrirReaccionPicker = function(ev, btnEl, tipoCtx, a1, a2, a3, a4, a5) {
+      if (ev) ev.stopPropagation();
+      var el = _crearPickerGlobalReacciones();
+      if (el.classList.contains('abierto') && el._btnActual === btnEl) { _cerrarPickerGlobalReacciones(); return; }
+      _reaccionPickerCtx = { tipo: tipoCtx, a1:a1, a2:a2, a3:a3, a4:a4, a5:a5 };
+      el._btnActual = btnEl;
+      el.classList.add('abierto');
+      var rect = btnEl.getBoundingClientRect();
+      var pw = el.offsetWidth || 100, ph = el.offsetHeight || 36;
+      var top = (rect.top - ph - 6 > 4) ? (rect.top - ph - 6) : (rect.bottom + 6);
+      if (top + ph > window.innerHeight - 4) top = Math.max(4, window.innerHeight - ph - 4);
+      var left = rect.right - pw;
+      if (left < 4) left = 4;
+      if (left + pw > window.innerWidth - 4) left = window.innerWidth - pw - 4;
+      el.style.top = top + 'px';
+      el.style.left = left + 'px';
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+      el.style.margin = '0';
     };
-    document.addEventListener('click', function() {
-      document.querySelectorAll('.reaccion-picker.abierto').forEach(function(el){ el.classList.remove('abierto'); });
-    });
+
+    document.addEventListener('click', _cerrarPickerGlobalReacciones);
+    document.addEventListener('scroll', _cerrarPickerGlobalReacciones, true);
 
     window._reaccionarNotifIdx = function(ev, idNoti, tipo, origen, ticketId, mensajeIndice, tarjetaId) {
       if (ev) ev.stopPropagation();
