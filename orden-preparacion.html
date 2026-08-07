@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | orden-preparacion.html | v2026.08.06.3 (Corrección sobre la v2026.08.06.2: "Dirección de envío" vuelve a ser un campo PROPIO, separado del Domicilio del contacto — puede ser un depósito/transportista distinto del domicilio del médico/clínica. Si no está cargada, cae al Domicilio general en vez de mostrar "No cargado". Confirmado junto con servicio.html v2026.08.06.5.) -->
+<!-- Portal TLC | orden-preparacion.html | v2026.08.06.2 (Consistencia con el rediseño de servicio.html: (1) se agregó Nombre del médico y se unificó "Domicilio de Envío" con el Domicilio del ticket (mismo campo que usa el resto del Portal, ya no un campo aparte); (2) se sacó la firma digital por completo — ahora son 2 líneas en blanco para firmar EN PAPEL: "Técnico (TLC)" (con el nombre del técnico responsable ya impreso como aclaración) y "Recibí conforme (Logística/Transporte)". Pedido por Cristian: "se firmará holográficamente por el técnico y por el transporte".) -->
 <!-- Portal TLC | orden-preparacion.html | v2026.08.06.1 (Documento público imprimible de la Orden de Preparación de Equipos — mismo criterio que presupuesto.html: fetch directo a Firebase RTDB (lectura pública), sin login. Header con cliente/domicilio de envío/fecha límite/técnico, grilla de equipos con N° de serie y estado, firma digital si ya está cargada, botón Imprimir/Guardar PDF vía window.print(). Parte del circuito "Orden de Preparación de Equipos" pedido por Cristian.) -->
 <html lang="es">
 <head>
@@ -29,7 +31,6 @@
   .op-tabla td { padding:8px 6px; border-bottom:1px solid #e2e8f0; font-size:12px; }
   .op-firma-zona { margin-top:34px; display:flex; gap:30px; }
   .op-firma-col { flex:1; text-align:center; }
-  .op-firma-img { max-width:200px; max-height:80px; margin:0 auto 6px; display:block; }
   .op-firma-linea { border-top:1px solid #0a1424; margin-top:50px; padding-top:6px; font-size:11px; }
   .op-btn-imprimir { display:inline-flex; align-items:center; gap:8px; padding:12px 22px; border-radius:10px; background:#06d6a0; color:#0a1424; border:none; font-size:13px; font-weight:800; cursor:pointer; }
   .op-toolbar { max-width:780px; margin:16px auto; display:flex; justify-content:center; }
@@ -72,11 +73,6 @@ function _renderOrden(t) {
     '</tr>';
   }).join('');
 
-  var firmaHtml = t.firma_digital
-    ? '<img class="op-firma-img" src="' + t.firma_digital + '">' +
-      '<div class="op-firma-linea">' + _esc(t.firma_firmante||'') + '<br><span style="color:#64748b;">Firmado el ' + (t.firma_fecha ? new Date(t.firma_fecha).toLocaleDateString('es-AR') : '') + '</span></div>'
-    : '<div class="op-firma-linea">&nbsp;<br><span style="color:#64748b;">Firma pendiente</span></div>';
-
   document.getElementById('op-page').innerHTML =
     '<div class="op-header">' +
       '<div><div class="op-logo-txt">TECNOLOGÍA LÁSER CORNEAL S.R.L.</div><div class="op-logo-sub">Pasaje del Carmen 716 Local PB C1019AAB · Buenos Aires, Argentina</div></div>' +
@@ -84,9 +80,11 @@ function _renderOrden(t) {
     '</div>' +
 
     '<div class="op-info-grid">' +
-      '<div class="op-info-box"><div class="op-info-label">Cliente</div><div class="op-info-val">' + _esc(t.cliente||'—') + '</div></div>' +
+      '<div class="op-info-box"><div class="op-info-label">Cliente / Clínica</div><div class="op-info-val">' + _esc(t.cliente||'—') + '</div></div>' +
+      '<div class="op-info-box"><div class="op-info-label">Nombre del médico</div><div class="op-info-val">' + _esc(t.nombre_medico||'—') + '</div></div>' +
+      '<div class="op-info-box"><div class="op-info-label">Domicilio</div><div class="op-info-val">' + _esc(t.domicilio||'—') + '</div></div>' +
       '<div class="op-info-box"><div class="op-info-label">Teléfono</div><div class="op-info-val">' + _esc(t.telefono||'—') + '</div></div>' +
-      '<div class="op-info-box" style="grid-column:1/-1;"><div class="op-info-label">Domicilio de Envío</div><div class="op-info-val">' + _esc(t.domicilio_envio||'No cargado') + '</div></div>' +
+      '<div class="op-info-box" style="grid-column:1/-1;"><div class="op-info-label">Dirección de envío</div><div class="op-info-val">' + _esc(t.domicilio_envio || t.domicilio || 'No cargado') + '</div></div>' +
       '<div class="op-info-box"><div class="op-info-label">Fecha límite de despacho</div><div class="op-info-val">' + _fmtFecha(t.fecha_limite_despacho) + '</div></div>' +
       '<div class="op-info-box"><div class="op-info-label">Técnico responsable</div><div class="op-info-val">' + _esc(t.tecnico_responsable_nombre||'Sin asignar') + '</div></div>' +
     '</div>' +
@@ -95,7 +93,7 @@ function _renderOrden(t) {
     '<tbody>' + (filasHtml || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px;">Sin equipos cargados.</td></tr>') + '</tbody></table>' +
 
     '<div class="op-firma-zona">' +
-      '<div class="op-firma-col">' + firmaHtml + '</div>' +
+      '<div class="op-firma-col"><div class="op-firma-linea">' + _esc(t.tecnico_responsable_nombre||'') + '<br><span style="color:#64748b;">Técnico (TLC)</span></div></div>' +
       '<div class="op-firma-col"><div class="op-firma-linea">&nbsp;<br><span style="color:#64748b;">Recibí conforme (Logística/Transporte)</span></div></div>' +
     '</div>';
 

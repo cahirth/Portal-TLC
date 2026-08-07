@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.06.5 (Circuito propio para Orden de Preparación de Equipos — CONFIRMADO tras probar con servicio_DEMO.html: reemplaza el bloque completo de reparación (Información del equipo duplicada, Fotos, Asignación de 12 etapas, Trabajo técnico) por un mini-stepper de 3 pasos "Estado del pedido" — Preparación → Facturación → Expedición y Seguimiento — reusando 3 etapas de Kanban que YA EXISTÍAN (preparacion_control_calidad/para_facturar/finalizado), cero columnas nuevas, cero backend nuevo. Se agregó "Dirección de envío" como campo propio (distinto del Domicilio del contacto — puede ser un depósito/transportista distinto). Se sacó el botón "Generar/Modificar Presupuesto" de accesos rápidos (no aplica a este tipo de ticket) y el ícono 📄 duplicado del header (ya está "Ver Orden" en accesos rápidos). "Gastos del servicio" pasa a llamarse "Gastos asociados" para este tipo de ticket. Circuito iterado en varias rondas con Cristian sobre servicio_PREVIEW.html/servicio_DEMO.html antes de confirmar.) -->
+<!-- Portal TLC | servicio.html | v2026.08.06.4 (3 pedidos sobre Orden de Preparación de Equipos, con captura anotada: (1) los campos Domicilio de Envío/Fecha límite/Técnico responsable eran solo texto — ahora son editables (mismo patrón _guardarCampoSiCambio del resto del ticket); (2) se agregaron Cliente/Clínica, Nombre del médico, Domicilio y Teléfono a esa misma tarjeta (editables) para tener el contacto completo sin depender de la sección "Información del equipo" de más abajo; (3) grilla de equipos ahora responsiva — en pantallas angostas cada fila se convierte en tarjeta apilada con etiquetas por campo, en vez de una tabla con scroll horizontal forzado; (4) se quitó por completo la Firma Digital por canvas — la orden se firma en papel, holográficamente, por el técnico y por el transporte al despacho (queda pendiente de definición el punto 5: qué hacer con el resto de la sección "Información del equipo" / "Trabajo técnico" para este tipo de ticket).) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.3 (Fix robusto del picker de reacciones: cada mensaje/notificación tenía su propio popover con position:absolute anclado a su fila, y quedaba cortado/tapado por el overflow-y:auto del contenedor de mensajes cuando estaba cerca del borde — a veces no se veía completo, a veces no dejaba clickear. Reemplazado por UN SOLO picker global (en <body>), reposicionado con JS en cada apertura vía getBoundingClientRect() del botón — abre arriba o abajo según el espacio libre en pantalla, con position:fixed, así nunca depende de qué contenedor lo rodea. Mismo mecanismo (_abrirReaccionPicker) para mensajes internos y campanita. Reportado por Cristian con captura: "a veces aparece solo el corazón, a veces te deja clickear y a veces no, en la campanita lo mismo".) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.2 (Rediseño de reacciones: antes los 3 emojis quedaban siempre visibles al lado de cada mensaje/notificación (a media opacidad como mínimo) y se confundían con una reacción ya puesta por alguien. Ahora quedan ocultos detrás de un solo ícono chico "🙂" — tocarlo despliega los 3 emojis en un popover, elegís uno y se cierra solo. Mismo criterio en mensajes internos y campanita. Reportado por Cristian con 2 capturas: "los emojis siempre están visibles y se confunden con una reacción real".) -->
 <!-- Portal TLC | servicio.html | v2026.08.04.13 (Frontend de "Orden de Preparación de Equipos" — cuando un ticket es tipo_orden==='preparacion_equipos', el detalle muestra una sección especial: Domicilio de Envío/Fecha límite/Técnico, grilla editable de equipos (N° de Serie, checklist de calidad, estado), y firma digital por canvas (funciona con mouse y con dedo). El chat de abajo no necesitó ningún cambio — es el mismo de siempre. Botón para abrir orden-preparacion.html (versión imprimible/PDF). Ver FotoMap.gs v157.) -->
@@ -184,12 +186,42 @@ body.tema-claro .btn-icon:hover{background:#cbd5e1;border-color:#3a86ff;}
 .op-grid-tabla select{background:var(--bg);border:1px solid var(--border-glow);border-radius:6px;
   padding:5px 6px;color:var(--text-main);font-size:11px;font-family:inherit;}
 .op-grid-tabla input[type=checkbox]{width:16px;height:16px;cursor:pointer;}
-.op-firma-canvas{border:1px dashed var(--border-glow);border-radius:10px;background:#fff;width:100%;height:150px;touch-action:none;cursor:crosshair;}
-.op-firma-img{max-width:220px;border:1px solid var(--border-glow);border-radius:8px;background:#fff;padding:6px;}
 .op-btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border-glow);background:var(--panel-dark);
   color:var(--text-main);font-size:11.5px;font-weight:700;cursor:pointer;}
 .op-btn.primario{background:#06d6a0;border-color:#06d6a0;color:#0a1424;}
 .op-btn:disabled{opacity:.5;cursor:not-allowed;}
+/* Mini-stepper de 3 pasos — circuito propio de la Orden de Preparación
+   (Preparación → Facturación → Expedición y Seguimiento), en vez del
+   dropdown de 12 etapas de reparación que no le aplican a este tipo de
+   ticket. Pedido por Cristian: "cuando viene de Ventas y no fue una
+   reparación, necesita mucha menos información". */
+.op-pasos-wrap{display:flex;align-items:flex-start;}
+.op-paso{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;width:74px;}
+.op-paso-punto{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800;border:2px solid var(--border-glow);color:var(--text-muted);background:var(--bg);flex-shrink:0;}
+.op-paso-label{font-size:10px;text-align:center;color:var(--text-muted);line-height:1.25;}
+.op-paso-actual .op-paso-punto{border-color:#3a86ff;color:#3a86ff;background:rgba(58,134,255,.1);}
+.op-paso-actual .op-paso-label{color:var(--text-main);font-weight:700;}
+.op-paso-hecho .op-paso-punto{border-color:#06d6a0;background:#06d6a0;color:#0a1424;}
+.op-paso-hecho .op-paso-label{color:#06d6a0;}
+.op-paso-linea{flex:1;height:2px;background:var(--border-glow);margin-top:13px;min-width:10px;}
+.op-paso-linea-hecho{background:#06d6a0;}
+/* Responsivo: en pantallas angostas la tabla deja de ser tabla (nada de
+   scroll horizontal forzado) y cada fila se convierte en una tarjeta con
+   los campos apilados — cada celda muestra su etiqueta con ::before según
+   el atributo data-th. Mismo criterio que el resto de la PWA en mobile.
+   Pedido por Cristian: "campos responsivos" (captura de la grilla). */
+@media (max-width:640px){
+  .op-grid-tabla{border:none;}
+  .op-grid-tabla thead{display:none;}
+  .op-grid-tabla, .op-grid-tabla tbody, .op-grid-tabla tr, .op-grid-tabla td{display:block;width:100%;}
+  .op-grid-tabla tr{border:1px solid var(--border-glow);border-radius:10px;padding:8px 10px;margin-bottom:10px;background:var(--bg);}
+  .op-grid-tabla tr:last-child{margin-bottom:0;}
+  .op-grid-tabla td{border-bottom:none;padding:5px 0;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .op-grid-tabla td[data-th]::before{content:attr(data-th);font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;
+    color:var(--text-muted);font-weight:700;flex-shrink:0;}
+  .op-grid-tabla td input[type=text],.op-grid-tabla td select{width:auto;flex:1;min-width:0;text-align:right;}
+}
 .det-field-input:focus,.det-field-select:focus{border-color:var(--accent-blue);}
 .nota-item{padding:10px 0;border-bottom:1px solid var(--border-glow);}
 .nota-item:last-child{border-bottom:none;}
@@ -712,7 +744,6 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
       <div style="font-size:19px;font-weight:800;line-height:1.25;" id="det-titulo">—</div>
       <div style="font-size:10px;color:var(--text-muted);" id="det-id">—</div>
     </div>
-    <a id="btn-orden-header" href="#" target="_blank" class="btn-icon" title="Ver orden de servicio">📄</a>
   </div>
   <div class="detalle-body-wrap" id="det-body-wrap">
     <div id="det-body"></div>
@@ -1624,9 +1655,9 @@ window._cerrarDetalle = function() {
 function _renderDetalle(t) {
   document.getElementById('det-titulo').textContent = _nombreTarjetaTicket(t);
   document.getElementById('det-id').textContent     = t.id_ticket;
-  document.getElementById('btn-orden-header').href  = ORDEN_URL + encodeURIComponent(t.id_ticket);
 
   var puedeEditar = _permisos.servicio;
+  var esOrdenPrep = t.tipo_orden === 'preparacion_equipos';
 
   var notasHtml = '';
   if (t.notas_comentarios && t.notas_comentarios.length) {
@@ -1669,11 +1700,13 @@ function _renderDetalle(t) {
         ? '<a class="btn-orden" href="https://cahirth.github.io/Portal-TLC/remito-ingreso.html?id=' + encodeURIComponent(t.id_ticket) + '" target="_blank">' +
             '<i class="fa-solid fa-file-import"></i> Remito de Ingreso</a>'
         : '') +
-      (_permisos.admin
-        ? '<button class="btn-orden presupuesto" onclick="_generarPresupuestoTecnico(\'' + t.id_ticket + '\')">' +
-            '<i class="fa-solid fa-file-invoice-dollar"></i> ' + (t.presupuesto_link ? 'Modificar Presupuesto' : 'Generar Presupuesto') + '</button>'
-        : '<button class="btn-orden presupuesto" disabled title="Solo Administrador" style="opacity:.4;cursor:not-allowed;">' +
-            '<i class="fa-solid fa-file-invoice-dollar"></i> Presupuesto</button>') +
+      (esOrdenPrep ? '' :
+        (_permisos.admin
+          ? '<button class="btn-orden presupuesto" onclick="_generarPresupuestoTecnico(\'' + t.id_ticket + '\')">' +
+              '<i class="fa-solid fa-file-invoice-dollar"></i> ' + (t.presupuesto_link ? 'Modificar Presupuesto' : 'Generar Presupuesto') + '</button>'
+          : '<button class="btn-orden presupuesto" disabled title="Solo Administrador" style="opacity:.4;cursor:not-allowed;">' +
+              '<i class="fa-solid fa-file-invoice-dollar"></i> Presupuesto</button>')
+      ) +
     '</div>' +
     '</div>' +
 
@@ -1696,6 +1729,12 @@ function _renderDetalle(t) {
       '</div>';
     })() +
 
+    // INFO PRINCIPAL / TRABAJO TÉCNICO — bloque completo SOLO para
+    // tickets de reparación normales. Los de Orden de Preparación
+    // (vienen de un negocio ganado en Ventas, sin diagnóstico/partes/
+    // reparado) usan en cambio el mini-circuito de 3 pasos de más
+    // abajo (_renderEstadoPedidoPrep).
+    (esOrdenPrep ? '' :
     // INFO PRINCIPAL
     '<div class="det-section">Información del equipo</div>' +
     '<div class="det-card">' +
@@ -1817,7 +1856,11 @@ function _renderDetalle(t) {
     '</div>' +
 
     // BOTÓN SIGUIENTE ETAPA
-    _renderBtnSiguiente(t, puedeEditar) +
+    _renderBtnSiguiente(t, puedeEditar)
+    ) +
+
+    // ESTADO DEL PEDIDO — solo Orden de Preparación (mini-circuito de 3 pasos)
+    (esOrdenPrep ? _renderEstadoPedidoPrep(t, puedeEditar) : '') +
 
     // NOTAS
     '<div class="det-section">Notas de seguimiento</div>' +
@@ -1831,8 +1874,8 @@ function _renderDetalle(t) {
     '<div class="det-section">📎 Adjuntos</div>' +
     '<div class="det-card" id="det-adjuntos-card"></div>' +
 
-    // J: GASTOS DEL SERVICIO
-    '<div class="det-section">Gastos del servicio</div>' +
+    // J: GASTOS DEL SERVICIO (para Orden de Preparación: "Gastos asociados")
+    '<div class="det-section">' + (esOrdenPrep ? 'Gastos asociados' : 'Gastos del servicio') + '</div>' +
     '<div class="det-card" id="det-gastos-card">' +
       _renderGastos(t) +
     '</div>' +
@@ -1843,7 +1886,6 @@ function _renderDetalle(t) {
   _actualizarEstadoChecklistCard(t.id_ticket);
   _renderPanelMensajes(t);
   adjuntosRenderSeccion('det-adjuntos-card', GAS_URL, 'servicio', t.id_ticket, t.adjuntos, (_session && _session.name) || '');
-  if (t.tipo_orden === 'preparacion_equipos' && !t.firma_digital) _initFirmaCanvas();
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1858,12 +1900,12 @@ function _renderSeccionOrdenPreparacion(t) {
   var equipos = Array.isArray(t.equipos) ? t.equipos : [];
   var filas = equipos.map(function(eq, i) {
     return '<tr>' +
-      '<td style="text-align:center;">' + (eq.cantidad || 1) + '</td>' +
-      '<td><input type="text" value="' + _esc(eq.sku||'') + '" placeholder="—" onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'sku\',this.value)"></td>' +
-      '<td style="min-width:140px;">' + _esc(eq.descripcion||'') + '</td>' +
-      '<td><input type="text" value="' + _esc(eq.nro_serie||'') + '" placeholder="Escanear/tipear..." onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'nro_serie\',this.value)"></td>' +
-      '<td style="text-align:center;"><input type="checkbox" ' + (eq.calidad_verificada?'checked':'') + ' onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'calidad_verificada\',this.checked)"></td>' +
-      '<td><select onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'estado\',this.value)">' +
+      '<td data-th="Cant.">' + (eq.cantidad || 1) + '</td>' +
+      '<td data-th="SKU"><input type="text" value="' + _esc(eq.sku||'') + '" placeholder="—" onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'sku\',this.value)"></td>' +
+      '<td data-th="Equipo" style="min-width:140px;">' + _esc(eq.descripcion||'') + '</td>' +
+      '<td data-th="N° de Serie"><input type="text" value="' + _esc(eq.nro_serie||'') + '" placeholder="Escanear/tipear..." onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'nro_serie\',this.value)"></td>' +
+      '<td data-th="Calidad"><input type="checkbox" ' + (eq.calidad_verificada?'checked':'') + ' onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'calidad_verificada\',this.checked)"></td>' +
+      '<td data-th="Estado"><select onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'estado\',this.value)">' +
         ['Pendiente','Retirado del depósito','Verificado','Listo para despacho'].map(function(op) {
           return '<option ' + (eq.estado===op?'selected':'') + '>' + op + '</option>';
         }).join('') +
@@ -1871,33 +1913,110 @@ function _renderSeccionOrdenPreparacion(t) {
     '</tr>';
   }).join('');
 
-  var firmaHtml = t.firma_digital
-    ? '<img class="op-firma-img" src="' + t.firma_digital + '"><div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Firmado por <b>' + _esc(t.firma_firmante||'—') + '</b> · ' + _formatFechaISO(t.firma_fecha) + '</div>'
-    : '<canvas class="op-firma-canvas" id="op-firma-canvas"></canvas>' +
-      '<div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">' +
-        '<input type="text" id="op-firmante" placeholder="Nombre de quien firma" style="flex:1;min-width:140px;padding:7px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border-glow);color:var(--text-main);font-size:12px;font-family:inherit;">' +
-        '<button class="op-btn" onclick="_limpiarFirmaCanvas()">Borrar</button>' +
-        '<button class="op-btn primario" onclick="_guardarFirmaOrden(\'' + t.id_ticket + '\')">✓ Guardar firma</button>' +
-      '</div>';
-
   return '<div style="padding:0 16px 10px;">' +
     '<div class="op-banner">📦 <b>Orden de Preparación de Equipos</b></div>' +
     '<div class="det-card">' +
-      '<div class="det-field"><div class="det-field-label">Domicilio de Envío</div><div class="det-field-val">' + _esc(t.domicilio_envio||'No cargado') + '</div></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
-        '<div class="det-field"><div class="det-field-label">Fecha límite de despacho</div><div class="det-field-val">' + (t.fecha_limite_despacho ? _fmtFechaDDMMYYYY(t.fecha_limite_despacho) : '—') + '</div></div>' +
-        '<div class="det-field"><div class="det-field-label">Técnico responsable</div><div class="det-field-val">' + _esc(t.tecnico_responsable_nombre||'Sin asignar') + '</div></div>' +
+      '<div class="det-field">' +
+        '<div class="det-field-label">Cliente / Clínica</div>' +
+        '<input class="det-field-input" value="' + _esc(t.cliente||'') + '" onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'cliente\',this.value,\'' + _esc(t.cliente||'') + '\')">' +
+      '</div>' +
+      '<div class="det-field">' +
+        '<div class="det-field-label">Nombre del médico</div>' +
+        '<input class="det-field-input" value="' + _esc(t.nombre_medico||'') + '" placeholder="Ej: Dr. Juan Pérez" onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'nombre_medico\',this.value,\'' + _esc(t.nombre_medico||'') + '\')">' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Domicilio</div>' +
+          '<input class="det-field-input" value="' + _esc(t.domicilio||'') + '" placeholder="Domicilio..." onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'domicilio\',this.value,\'' + _esc(t.domicilio||'') + '\')">' +
+        '</div>' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Teléfono</div>' +
+          '<input class="det-field-input" value="' + _esc(t.telefono||'') + '" placeholder="Teléfono..." onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'telefono\',this.value,\'' + _esc(t.telefono||'') + '\')">' +
+        '</div>' +
+      '</div>' +
+      '<div class="det-field">' +
+        '<div class="det-field-label">Dirección de envío <span style="color:#64748b;font-size:10px;">(si es distinta del domicilio de arriba)</span></div>' +
+        '<input class="det-field-input" value="' + _esc(t.domicilio_envio||'') + '" placeholder="Dirección de envío..." onblur="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'domicilio_envio\',this.value,\'' + _esc(t.domicilio_envio||'') + '\')">' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Fecha límite de despacho</div>' +
+          '<input type="date" class="det-field-input" value="' + _esc(t.fecha_limite_despacho||'') + '" onchange="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'fecha_limite_despacho\',this.value,\'' + _esc(t.fecha_limite_despacho||'') + '\')">' +
+        '</div>' +
+        '<div class="det-field">' +
+          '<div class="det-field-label">Técnico responsable</div>' +
+          '<select class="det-field-select" onchange="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'tecnico_responsable_nombre\',this.value,\'' + _esc(t.tecnico_responsable_nombre||'') + '\')">' + _optsTecnicoResponsableNombre(t.tecnico_responsable_nombre) + '</select>' +
+        '</div>' +
       '</div>' +
     '</div>' +
     '<div class="det-card" style="overflow-x:auto;">' +
       '<table class="op-grid-tabla"><thead><tr><th>Cant.</th><th>SKU</th><th>Equipo</th><th>N° de Serie</th><th>Calidad</th><th>Estado</th></tr></thead>' +
       '<tbody>' + (filas || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:14px;">Sin equipos cargados.</td></tr>') + '</tbody></table>' +
     '</div>' +
-    '<div class="det-section">Firma Digital</div>' +
-    '<div class="det-card">' + firmaHtml + '</div>' +
     '<div style="margin-bottom:10px;"><button class="op-btn" onclick="window.open(\'https://cahirth.github.io/Portal-TLC/orden-preparacion.html?id=' + t.id_ticket + '\',\'_blank\')" style="width:100%;">🖨 Imprimir / Exportar Orden de Preparación</button></div>' +
   '</div>';
 }
+
+// Igual criterio que _optsTecnico (misma gente), pero guarda el NOMBRE
+// como texto plano en vez del id — el campo tecnico_responsable_nombre
+// de la Orden de Preparación siempre fue un string de display, no un id
+// referenciado en otro lado.
+function _optsTecnicoResponsableNombre(sel) {
+  return ['Sin asignar','Juan Garro','Damián Sosa','Fernando Del Campo','Cristian Hirth','Verónica Ribaita','Lourdes Dávalos','Lucio Raineri']
+    .map(function(nom){ return '<option' + (nom===sel?' selected':'') + '>' + nom + '</option>'; }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ESTADO DEL PEDIDO — circuito propio de 3 pasos para tickets de
+// Orden de Preparación (vienen de un negocio ganado en Ventas, no de
+// una reparación: no necesitan diagnóstico/partes/reparado ni el
+// dropdown de 12 etapas). Reusa 3 etapas que YA EXISTEN como columnas
+// reales del Kanban (preparacion_control_calidad → para_facturar →
+// finalizado) — cero columnas nuevas, cero lógica nueva de backend.
+// El gate de reparación (_validarGate) ya las ignora solo porque no
+// pertenecen a FLUJO_ETAPAS, así que el avance reusa tal cual
+// _resolverAsignacionYMover (misma asignación automática/modal que
+// drag&drop). Propuesta de Cristian: "necesita mucha menos
+// información, a lo sumo se va a mover a facturación y a expedición
+// y seguimiento".
+// ══════════════════════════════════════════════════════════════════
+var PASOS_PREP = [
+  { key:'preparacion_control_calidad', label:'📦 Preparación',              corto:'Preparación' },
+  { key:'para_facturar',               label:'🧾 Facturación',              corto:'Facturación' },
+  { key:'finalizado',                  label:'🚚 Expedición y Seguimiento', corto:'Expedición y Seguimiento' }
+];
+
+function _renderEstadoPedidoPrep(t, puedeEditar) {
+  var idxActual = PASOS_PREP.map(function(p){return p.key;}).indexOf(t.deposito);
+  if (idxActual < 0) idxActual = 0; // etapa fuera de este mini-circuito (caso raro) → lo tratamos como paso 1
+
+  var chips = PASOS_PREP.map(function(p, i) {
+    var estado = i < idxActual ? 'hecho' : (i === idxActual ? 'actual' : 'pendiente');
+    var punto = '<div class="op-paso op-paso-' + estado + '">' +
+      '<div class="op-paso-punto">' + (estado === 'hecho' ? '✓' : (i + 1)) + '</div>' +
+      '<div class="op-paso-label">' + p.corto + '</div>' +
+    '</div>';
+    var linea = i < PASOS_PREP.length - 1 ? '<div class="op-paso-linea ' + (i < idxActual ? 'op-paso-linea-hecho' : '') + '"></div>' : '';
+    return punto + linea;
+  }).join('');
+
+  var siguiente = PASOS_PREP[idxActual + 1];
+  var accionSiguiente = (puedeEditar && siguiente)
+    ? '<button class="op-btn primario" style="width:100%;margin-top:14px;" onclick="_avanzarPasoPrep(\'' + t.id_ticket + '\',\'' + siguiente.key + '\')">' + siguiente.label + ' →</button>'
+    : (!siguiente ? '<div style="text-align:center;color:#06d6a0;font-weight:700;font-size:12px;margin-top:12px;">✓ Circuito completo</div>' : '');
+
+  return '<div class="det-section">Estado del pedido</div>' +
+    '<div class="det-card">' +
+      '<div class="op-pasos-wrap">' + chips + '</div>' +
+      accionSiguiente +
+    '</div>';
+}
+
+window._avanzarPasoPrep = function(idTicket, nuevaEtapa) {
+  var t = _tickets.find(function(x){ return x.id_ticket === idTicket; });
+  if (!t) return;
+  _resolverAsignacionYMover(t, nuevaEtapa, t.deposito);
+};
 
 window._actualizarFilaOrden = function(idTicket, indice, campo, valor) {
   var payload = { accion:'st_actualizarEquipoOrden', id_ticket:idTicket, indice:indice };
@@ -1912,62 +2031,12 @@ window._actualizarFilaOrden = function(idTicket, indice, campo, valor) {
     .catch(function(){ alert('Error de conexión al guardar.'); });
 };
 
-// ── Firma digital — canvas simple, funciona con mouse y con dedo ──
-var _firmaCtx = null, _firmaDibujando = false, _firmaTieneTrazo = false;
-function _initFirmaCanvas() {
-  var canvas = document.getElementById('op-firma-canvas');
-  if (!canvas) return;
-  var ratio = window.devicePixelRatio || 1;
-  canvas.width = canvas.clientWidth * ratio;
-  canvas.height = canvas.clientHeight * ratio;
-  _firmaCtx = canvas.getContext('2d');
-  _firmaCtx.scale(ratio, ratio);
-  _firmaCtx.strokeStyle = '#0f172a';
-  _firmaCtx.lineWidth = 2.2;
-  _firmaCtx.lineCap = 'round';
-  _firmaTieneTrazo = false;
-
-  function posDesdeEvento(ev) {
-    var rect = canvas.getBoundingClientRect();
-    var p = ev.touches ? ev.touches[0] : ev;
-    return { x: p.clientX - rect.left, y: p.clientY - rect.top };
-  }
-  function empezar(ev) { ev.preventDefault(); _firmaDibujando = true; _firmaTieneTrazo = true; var p = posDesdeEvento(ev); _firmaCtx.beginPath(); _firmaCtx.moveTo(p.x, p.y); }
-  function mover(ev) { if (!_firmaDibujando) return; ev.preventDefault(); var p = posDesdeEvento(ev); _firmaCtx.lineTo(p.x, p.y); _firmaCtx.stroke(); }
-  function terminar() { _firmaDibujando = false; }
-
-  canvas.onmousedown = empezar; canvas.onmousemove = mover; canvas.onmouseup = terminar; canvas.onmouseleave = terminar;
-  canvas.ontouchstart = empezar; canvas.ontouchmove = mover; canvas.ontouchend = terminar;
-}
-
-window._limpiarFirmaCanvas = function() {
-  var canvas = document.getElementById('op-firma-canvas');
-  if (!canvas || !_firmaCtx) return;
-  _firmaCtx.clearRect(0, 0, canvas.width, canvas.height);
-  _firmaTieneTrazo = false;
-};
-
-window._guardarFirmaOrden = function(idTicket) {
-  var canvas = document.getElementById('op-firma-canvas');
-  if (!canvas || !_firmaTieneTrazo) { alert('Dibujá la firma antes de guardar.'); return; }
-  var firmante = (document.getElementById('op-firmante') || {}).value || '';
-  if (!firmante.trim()) { alert('Escribí el nombre de quien firma.'); return; }
-  var firmaBase64 = canvas.toDataURL('image/png');
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'st_guardarFirmaOrden', id_ticket:idTicket, firma_base64:firmaBase64, firmante:firmante.trim() }) })
-    .then(function(r){ return r.json(); })
-    .then(function(r) {
-      if (!r.ok) { alert('No se pudo guardar la firma: ' + (r.error||'')); return; }
-      if (_ticketActual && _ticketActual.id_ticket === idTicket) {
-        _ticketActual.firma_digital = firmaBase64;
-        _ticketActual.firma_firmante = firmante.trim();
-        _ticketActual.firma_fecha = new Date().toISOString();
-        _renderDetalle(_ticketActual);
-      }
-      _toastServicio('✅ Firma guardada');
-    })
-    .catch(function(){ alert('Error de conexión al guardar la firma.'); });
-};
+// (Firma Digital por canvas — removida: la Orden de Preparación se
+// firma en papel, holográficamente, por el técnico y por el
+// transporte al momento del despacho. Pedido por Cristian: "quitar
+// firma digital, se firmará holográficamente por el técnico y por
+// el transporte". Ver también orden-preparacion.html (versión
+// imprimible), que ya tenía espacio para firma en papel.)
 
 
 
