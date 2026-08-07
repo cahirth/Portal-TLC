@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.06.5 (Al convertir % → USD en el toggle de Anticipo, el monto queda redondeado a un múltiplo de 100 (sin centavos) en vez del valor exacto — ej. 45% de USD 52.300 daba USD 23.535,41, ahora da USD 23.500. La conversión USD → % no se tocó, sigue con 2 decimales. Pedido por Cristian con captura: "redondear más, sin centavos y en el orden de 100".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.4 (Anticipo y cuota de TLC 6/12 ahora muestran entre paréntesis el monto CON IVA incluido al lado de "+ IVA" — usa la proporción real IVA/Neto de todo el presupuesto (los ítems pueden tener distinta alícuota: 0/10.5/21/27%), no una alícuota fija, para ser consistente con el Total de arriba. Pedido por Cristian con captura.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.3 (Al cambiar el toggle %/USD del Anticipo (TLC 6/12) ahora CONVIERTE el valor automáticamente en vez de resetearlo — ej. USD 23.500 sobre una base de USD 52.300 pasa a 44,93% al tocar el toggle, y viceversa. Pedido por Cristian con captura y ejemplo numérico exacto.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.2 (Toggle %/USD para el Anticipo de TLC 6/TLC 12 — mismo funcionamiento y mismo componente visual (moneda-switch) que el toggle de Descuento por ítem. Internamente sigue guardándose en el campo anticipoPct por compatibilidad, pero ahora puede contener un monto fijo en USD en vez de un porcentaje según anticipoTipo — con clamp defensivo para que nunca deje el saldo en negativo. Se agregó anticipoTipo al snapshot que se guarda con el presupuesto (modalidadPago) — OJO: presupuesto.html (el documento público) todavía no lee este campo nuevo, solo anticipoPct/anticipo como antes; si se usa el modo USD, hay que actualizar también presupuesto.html para que muestre bien la etiqueta (si no, puede mostrar "USD 500%" en vez de "USD 500"). Pedido por Cristian con captura: "agregar toggle %/USD, mismo funcionamiento que en descuento item".) -->
@@ -1224,8 +1225,13 @@ window._toggleAnticipoTipoTLC = function(clave) {
       // Venía de USD → convertir monto a %
       p.anticipoPct = Math.max(0, Math.min(100, Math.round((p.anticipoPct || 0) / netoUSD * 10000) / 100));
     } else {
-      // Venía de % → convertir % a monto USD
-      p.anticipoPct = Math.max(0, Math.min(netoUSD, Math.round(netoUSD * (p.anticipoPct || 0) / 100 * 100) / 100));
+      // Venía de % → convertir % a monto USD, redondeado a un múltiplo
+      // de 100 (sin centavos) — un anticipo "USD 23.535,41" es un
+      // número raro para negociar con el cliente; "USD 23.500" es
+      // manejable. Pedido por Cristian con captura: "redondear más,
+      // sin centavos y en el orden de 100".
+      var montoExacto = netoUSD * (p.anticipoPct || 0) / 100;
+      p.anticipoPct = Math.max(0, Math.min(Math.round(netoUSD / 100) * 100, Math.round(montoExacto / 100) * 100));
     }
   } else {
     // Sin ítems cargados todavía no hay base para convertir — recién

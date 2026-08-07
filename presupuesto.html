@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto.html | v2026.08.06.1 (BUG REAL: el Anticipo de TLC 6/12 mostraba "Anticipo 23500%" cuando el vendedor cargaba el anticipo en USD desde el toggle nuevo del editor (presupuesto-editor.html v2026.08.06.2+) — el texto pegaba mp.anticipoPct crudo con "%", y ese campo puede contener un MONTO en USD en vez de un porcentaje según mp.anticipoTipo. Corregido calculando el % real a partir de los montos (anticipo / (anticipo + saldo en cuotas)) en vez de leer el campo crudo — funciona para presupuestos viejos y nuevos por igual, sin depender de que exista mp.anticipoTipo. Reportado por Cristian con captura del PDF real: "Anticipo 23500%, está mal, debes poner 44,xx%, calculalo".) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.10 (Botón "Enviar por WhatsApp": si el negocio tiene más de un contacto con teléfono, ahora abre un selector preguntando a quién enviárselo, en vez de mandar siempre al contacto "principal" nomás. Lee los contactos de la raíz del negocio (contacto + contactosAdicionales, ver FotoMap.gs v146 y cotizaciones.html v2026.08.04.7). Pedido por Cristian.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.7 (Corte definitivo del problema: se sacó el position:fixed del header repetido — esa técnica depende de calcular bien su altura real contra el margen de @page, y con captura del preview real de Chrome (Márgenes: Predeterminados confirmado) quedó demostrado que ni 175px ni 225px alcanzaban, sin forma de saber a ciegas cuánto hace falta. Ahora el header es contenido normal, aparece una sola vez arriba de la página 1, margen vuelto a un valor chico normal (40px). Se pierde el logo repetido en cada página, pero se termina la categoría entera de bugs de superposición. Pedido por Cristian: "no quiero perder más tiempo con esto".) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.6 (CAUSA RAÍZ REAL encontrada, con 2 capturas de Cristian: no era un problema de saltos de página — el header fijo (position:fixed, se repite en cada página) mide más de los 175px reservados en @page margin-top, así que se pinta ENCIMA de lo que arranca justo debajo: en página 1 tapaba los datos del cliente (Señores/CUIT/Domicilio), en página 2 tapaba Atentamente + Datos Bancarios — por eso "desaparecían" en vez de solo cortarse. Subido el margen a 225px, con aire de sobra contra el contenido real del header (título+subtítulo+N°+disclaimer de 3 líneas+fecha+validez). Los fixes anteriores (page-break-inside:avoid) quedan igual, no hacen daño, pero la causa real era esta.) -->
@@ -195,8 +196,18 @@
       var fmtTlcPdf = mp.moneda === 'ARS'
         ? function(n) { return '$' + Math.round(n).toLocaleString('es-AR'); }
         : function(n) { return 'USD ' + Math.round(n).toLocaleString('es-AR'); };
+      // % real del anticipo, calculado a partir de los montos (anticipo
+      // / (anticipo + saldo en cuotas)) en vez de mostrar mp.anticipoPct
+      // crudo — ese campo puede contener un monto en USD en vez de un
+      // porcentaje cuando el anticipo se cargó con el toggle USD del
+      // editor (mp.anticipoTipo === 'USD'), y mostraba cosas como
+      // "Anticipo 23500%". Calculándolo desde los montos funciona
+      // siempre, sea cual sea el tipo con el que se cargó. Reportado
+      // por Cristian con captura del PDF real.
+      var baseModalidad = mp.anticipo + (mp.cuota * mp.cuotas);
+      var anticipoPctReal = baseModalidad > 0 ? Math.round(mp.anticipo / baseModalidad * 10000) / 100 : 0;
       desgloseModalidad = '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin:6px 0 10px;font-size:12px;">' +
-        'Anticipo ' + mp.anticipoPct + '%: <strong>' + fmtTlcPdf(mp.anticipo) + ' + IVA</strong><br>' +
+        'Anticipo ' + anticipoPctReal + '%: <strong>' + fmtTlcPdf(mp.anticipo) + ' + IVA</strong><br>' +
         mp.cuotas + ' cuotas fijas de: <strong>' + fmtTlcPdf(mp.cuota) + ' + IVA c/u</strong>' +
       '</div>';
     } else if (mp && mp.tipo === 'leasing36') {
