@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.06.3 (Al cambiar el toggle %/USD del Anticipo (TLC 6/12) ahora CONVIERTE el valor automáticamente en vez de resetearlo — ej. USD 23.500 sobre una base de USD 52.300 pasa a 44,93% al tocar el toggle, y viceversa. Pedido por Cristian con captura y ejemplo numérico exacto.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.2 (Toggle %/USD para el Anticipo de TLC 6/TLC 12 — mismo funcionamiento y mismo componente visual (moneda-switch) que el toggle de Descuento por ítem. Internamente sigue guardándose en el campo anticipoPct por compatibilidad, pero ahora puede contener un monto fijo en USD en vez de un porcentaje según anticipoTipo — con clamp defensivo para que nunca deje el saldo en negativo. Se agregó anticipoTipo al snapshot que se guarda con el presupuesto (modalidadPago) — OJO: presupuesto.html (el documento público) todavía no lee este campo nuevo, solo anticipoPct/anticipo como antes; si se usa el modo USD, hay que actualizar también presupuesto.html para que muestre bien la etiqueta (si no, puede mostrar "USD 500%" en vez de "USD 500"). Pedido por Cristian con captura: "agregar toggle %/USD, mismo funcionamiento que en descuento item".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.6 (Mismo fix de color-scheme que cotizaciones.html — causa raíz real del hover oscuro en modo claro.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.1 (Nuevo botón "+ Ítem de Servicio Técnico" — visible solo cuando el presupuesto está vinculado a un ticket (TICKET_ID) — arma un ítem con "SERVICIO — SERVICIO TECNICO DE ACUERDO A ORDEN NRO: [número real de la orden]" ya puesto, en vez de tener que tipearlo a mano cada vez con riesgo de errar el número. Pedido por Cristian, con captura de referencia.) -->
@@ -1210,13 +1211,27 @@ function _calcularTLC(baseUSD, params) {
 window._toggleAnticipoTipoTLC = function(clave) {
   var p = PARAMS_PAGO[clave];
   if (!p) return;
-  p.anticipoTipo = ((p.anticipoTipo || '%') === 'USD') ? '%' : 'USD';
-  // Al cambiar de tipo, el número tipeado en el otro tipo ya no tiene
-  // sentido (35 en % no es lo mismo que 35 en USD) — se resetea al
-  // default de esa modalidad para no dejar un anticipo fantasma
-  // aplicado sin que el vendedor se dé cuenta. Mismo criterio que
-  // _toggleDescuentoTipoItem.
-  p.anticipoPct = p.anticipoTipo === '%' ? (clave === 'tlc6' ? 35 : 50) : 0;
+  var tipoNuevo = ((p.anticipoTipo || '%') === 'USD') ? '%' : 'USD';
+  // Convertir el valor tipeado al nuevo tipo en vez de resetearlo —
+  // pedido por Cristian con ejemplo: "si paso de USD a % que convierta
+  // el % automático, ej 23500 a 23500/52300*100 = 44.93%". Se usa la
+  // misma base (Subtotal con descuentos en USD) que el resto del
+  // cálculo de esta modalidad.
+  var netoUSD = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).descontado; }, 0);
+  if (netoUSD > 0) {
+    if (tipoNuevo === '%') {
+      // Venía de USD → convertir monto a %
+      p.anticipoPct = Math.max(0, Math.min(100, Math.round((p.anticipoPct || 0) / netoUSD * 10000) / 100));
+    } else {
+      // Venía de % → convertir % a monto USD
+      p.anticipoPct = Math.max(0, Math.min(netoUSD, Math.round(netoUSD * (p.anticipoPct || 0) / 100 * 100) / 100));
+    }
+  } else {
+    // Sin ítems cargados todavía no hay base para convertir — recién
+    // ahí se usa el default, para no dividir por cero.
+    p.anticipoPct = tipoNuevo === '%' ? (clave === 'tlc6' ? 35 : 50) : 0;
+  }
+  p.anticipoTipo = tipoNuevo;
   _renderModalidadesPago();
 };
 
