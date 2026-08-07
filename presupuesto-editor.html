@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.06.4 (Anticipo y cuota de TLC 6/12 ahora muestran entre paréntesis el monto CON IVA incluido al lado de "+ IVA" — usa la proporción real IVA/Neto de todo el presupuesto (los ítems pueden tener distinta alícuota: 0/10.5/21/27%), no una alícuota fija, para ser consistente con el Total de arriba. Pedido por Cristian con captura.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.3 (Al cambiar el toggle %/USD del Anticipo (TLC 6/12) ahora CONVIERTE el valor automáticamente en vez de resetearlo — ej. USD 23.500 sobre una base de USD 52.300 pasa a 44,93% al tocar el toggle, y viceversa. Pedido por Cristian con captura y ejemplo numérico exacto.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.2 (Toggle %/USD para el Anticipo de TLC 6/TLC 12 — mismo funcionamiento y mismo componente visual (moneda-switch) que el toggle de Descuento por ítem. Internamente sigue guardándose en el campo anticipoPct por compatibilidad, pero ahora puede contener un monto fijo en USD en vez de un porcentaje según anticipoTipo — con clamp defensivo para que nunca deje el saldo en negativo. Se agregó anticipoTipo al snapshot que se guarda con el presupuesto (modalidadPago) — OJO: presupuesto.html (el documento público) todavía no lee este campo nuevo, solo anticipoPct/anticipo como antes; si se usa el modo USD, hay que actualizar también presupuesto.html para que muestre bien la etiqueta (si no, puede mostrar "USD 500%" en vez de "USD 500"). Pedido por Cristian con captura: "agregar toggle %/USD, mismo funcionamiento que en descuento item".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.6 (Mismo fix de color-scheme que cotizaciones.html — causa raíz real del hover oscuro en modo claro.) -->
@@ -1291,6 +1292,14 @@ function _renderModalidadesPago() {
     // se muestra en la moneda que esté elegida en el selector general
     // de Totales arriba (USD tal cual, o AR$ multiplicando por el TC).
     var netoUSD = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).descontado; }, 0);
+    var ivaUSD = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).iva; }, 0);
+    // Factor de IVA ponderado: los ítems pueden tener distintas
+    // alícuotas (0/10.5/21/27%), así que se usa la proporción real
+    // IVA/Neto de TODO el presupuesto — no una alícuota fija — para
+    // que el "(con IVA)" de acá sea consistente con el Total de
+    // arriba. Pedido por Cristian con captura: mostrar entre
+    // paréntesis el precio con IVA incluido, al lado de "+ IVA".
+    var factorIva = netoUSD > 0 ? (netoUSD + ivaUSD) / netoUSD : 1;
     var p = PARAMS_PAGO[clave];
     var r = _calcularTLC(netoUSD, p);
     var monedaGeneral = (document.getElementById('moneda-presupuesto') || {}).value || 'USD';
@@ -1309,9 +1318,9 @@ function _renderModalidadesPago() {
           '<span class="' + ((p.anticipoTipo||'%') === 'USD' ? 'activo' : '') + '">USD</span>' +
         '</div>' +
       '</div>' +
-      '<div style="font-size:13px;font-weight:700;">' + fmtTlc(anticipoMostrado) + ' + IVA</div>' +
+      '<div style="font-size:13px;font-weight:700;">' + fmtTlc(anticipoMostrado) + ' + IVA <span style="font-weight:400;color:var(--text-dim);">(' + fmtTlc(anticipoMostrado * factorIva) + ' con IVA)</span></div>' +
       '<div style="font-size:10px;color:var(--text-dim);margin-top:6px;">' + r.cuotas + ' cuotas fijas de</div>' +
-      '<div style="font-size:13px;font-weight:700;">' + fmtTlc(cuotaMostrada) + ' + IVA c/u</div>' +
+      '<div style="font-size:13px;font-weight:700;">' + fmtTlc(cuotaMostrada) + ' + IVA c/u <span style="font-weight:400;color:var(--text-dim);">(' + fmtTlc(cuotaMostrada * factorIva) + ' con IVA)</span></div>' +
     '</div>';
   };
 
