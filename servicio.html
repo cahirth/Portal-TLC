@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.06.6 (Link al POE-8 "Registro de Instalación" (POE8_Instalacion.html, ya existía en el repo) agregado como columna nueva en la grilla de equipos de la Orden de Preparación — un link por equipo, se abre ya completado vía query params (?tecnico=&cliente=&domicilio=&telefono=&modelo=&serie=) tomados del ticket, para que el técnico no tenga que retipear nada al llegar a instalar. El POE-8 no tiene marca/modelo separados en la grilla (solo SKU+descripción libre), así que van juntos en "modelo" sin inventar un split. Pedido por Cristian: "llevar el POE completo... ya completado con los datos del cliente hacia la tarjeta de servicio en preparación".) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.5 (Circuito propio para Orden de Preparación de Equipos — CONFIRMADO tras probar con servicio_DEMO.html: reemplaza el bloque completo de reparación (Información del equipo duplicada, Fotos, Asignación de 12 etapas, Trabajo técnico) por un mini-stepper de 3 pasos "Estado del pedido" — Preparación → Facturación → Expedición y Seguimiento — reusando 3 etapas de Kanban que YA EXISTÍAN (preparacion_control_calidad/para_facturar/finalizado), cero columnas nuevas, cero backend nuevo. Se agregó "Dirección de envío" como campo propio (distinto del Domicilio del contacto — puede ser un depósito/transportista distinto). Se sacó el botón "Generar/Modificar Presupuesto" de accesos rápidos (no aplica a este tipo de ticket) y el ícono 📄 duplicado del header (ya está "Ver Orden" en accesos rápidos). "Gastos del servicio" pasa a llamarse "Gastos asociados" para este tipo de ticket. Circuito iterado en varias rondas con Cristian sobre servicio_PREVIEW.html/servicio_DEMO.html antes de confirmar.) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.4 (3 pedidos sobre Orden de Preparación de Equipos, con captura anotada: (1) los campos Domicilio de Envío/Fecha límite/Técnico responsable eran solo texto — ahora son editables (mismo patrón _guardarCampoSiCambio del resto del ticket); (2) se agregaron Cliente/Clínica, Nombre del médico, Domicilio y Teléfono a esa misma tarjeta (editables) para tener el contacto completo sin depender de la sección "Información del equipo" de más abajo; (3) grilla de equipos ahora responsiva — en pantallas angostas cada fila se convierte en tarjeta apilada con etiquetas por campo, en vez de una tabla con scroll horizontal forzado; (4) se quitó por completo la Firma Digital por canvas — la orden se firma en papel, holográficamente, por el técnico y por el transporte al despacho (queda pendiente de definición el punto 5: qué hacer con el resto de la sección "Información del equipo" / "Trabajo técnico" para este tipo de ticket).) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.3 (Fix robusto del picker de reacciones: cada mensaje/notificación tenía su propio popover con position:absolute anclado a su fila, y quedaba cortado/tapado por el overflow-y:auto del contenedor de mensajes cuando estaba cerca del borde — a veces no se veía completo, a veces no dejaba clickear. Reemplazado por UN SOLO picker global (en <body>), reposicionado con JS en cada apertura vía getBoundingClientRect() del botón — abre arriba o abajo según el espacio libre en pantalla, con position:fixed, así nunca depende de qué contenedor lo rodea. Mismo mecanismo (_abrirReaccionPicker) para mensajes internos y campanita. Reportado por Cristian con captura: "a veces aparece solo el corazón, a veces te deja clickear y a veces no, en la campanita lo mismo".) -->
@@ -1896,6 +1897,30 @@ function _renderDetalle(t) {
 // necesita ningún cambio — es el mismo de siempre. Pedido por
 // Cristian, spec "Orden de Preparación de Equipos".
 // ══════════════════════════════════════════════════════════════════
+// URL del POE-8 (Registro de Instalación) ya completado con los datos
+// del ticket y del equipo puntual — lo lee vía ?parámetros=, mismo
+// criterio que el resto de documentos públicos del repo. El POE-8 no
+// tiene campos separados de "marca"/"modelo" en la grilla de la Orden
+// de Preparación (solo SKU + descripción libre), así que se manda
+// todo junto en "modelo" para no inventar un split que puede salir
+// mal — el técnico lo ajusta a mano en el momento si hace falta.
+// Pedido por Cristian: "llevar el POE completo, ya completado con
+// los datos del cliente, hacia la tarjeta de servicio en preparación".
+function _urlPOE8(t, eq) {
+  var base = 'https://cahirth.github.io/Portal-TLC/POE8_Instalacion.html';
+  var params = [];
+  var add = function(clave, valor) { if (valor) params.push(clave + '=' + encodeURIComponent(valor)); };
+  add('tecnico', t.tecnico_responsable_nombre);
+  add('cliente', t.cliente);
+  add('domicilio', t.domicilio_envio || t.domicilio || '');
+  add('telefono', t.telefono);
+  if (eq) {
+    add('modelo', [eq.sku, eq.descripcion].filter(Boolean).join(' — '));
+    add('serie', eq.nro_serie);
+  }
+  return base + (params.length ? '?' + params.join('&') : '');
+}
+
 function _renderSeccionOrdenPreparacion(t) {
   var equipos = Array.isArray(t.equipos) ? t.equipos : [];
   var filas = equipos.map(function(eq, i) {
@@ -1910,6 +1935,7 @@ function _renderSeccionOrdenPreparacion(t) {
           return '<option ' + (eq.estado===op?'selected':'') + '>' + op + '</option>';
         }).join('') +
       '</select></td>' +
+      '<td data-th="POE-8"><a href="' + _urlPOE8(t, eq) + '" target="_blank" class="op-btn" style="padding:4px 9px;font-size:10.5px;text-decoration:none;display:inline-block;white-space:nowrap;">📋 Instalación</a></td>' +
     '</tr>';
   }).join('');
 
@@ -1950,8 +1976,8 @@ function _renderSeccionOrdenPreparacion(t) {
       '</div>' +
     '</div>' +
     '<div class="det-card" style="overflow-x:auto;">' +
-      '<table class="op-grid-tabla"><thead><tr><th>Cant.</th><th>SKU</th><th>Equipo</th><th>N° de Serie</th><th>Calidad</th><th>Estado</th></tr></thead>' +
-      '<tbody>' + (filas || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:14px;">Sin equipos cargados.</td></tr>') + '</tbody></table>' +
+      '<table class="op-grid-tabla"><thead><tr><th>Cant.</th><th>SKU</th><th>Equipo</th><th>N° de Serie</th><th>Calidad</th><th>Estado</th><th>POE-8</th></tr></thead>' +
+      '<tbody>' + (filas || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:14px;">Sin equipos cargados.</td></tr>') + '</tbody></table>' +
     '</div>' +
     '<div style="margin-bottom:10px;"><button class="op-btn" onclick="window.open(\'https://cahirth.github.io/Portal-TLC/orden-preparacion.html?id=' + t.id_ticket + '\',\'_blank\')" style="width:100%;">🖨 Imprimir / Exportar Orden de Preparación</button></div>' +
   '</div>';
