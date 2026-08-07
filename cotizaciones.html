@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.06.2 (Modal "Enviar Orden de Preparación", con captura de Cristian: label "Fecha límite de despacho" → "Fecha límite de envío"; Fecha límite y Técnico responsable ahora son obligatorios para crear la orden (antes se podía crear sin cargar ninguno de los dos) — asterisco visual + validación con aviso antes de pegarle al backend.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.06.1 (Fix robusto del picker de reacciones: ver detalle completo en servicio.html v2026.08.06.3 — mismo mecanismo (_abrirReaccionPicker), un solo picker global con position:fixed en vez de uno por mensaje que quedaba cortado por el overflow-y:auto del contenedor.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.04.19 (Mismo rediseño de reacciones que servicio.html: ícono "🙂" que despliega los 3 emojis en vez de tenerlos siempre visibles sueltos.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.04.8 (Fix: los checkboxes de contacto no tenían color de texto fijo — usaban el color ambiente que cambia con el tema, a diferencia de los inputs vecinos (VENDEDOR, TELÉFONO) que siempre son fondo blanco/texto oscuro sin importar el tema. Ahora siguen el mismo patrón fijo. Reportado por Cristian con captura.) -->
@@ -4539,6 +4540,16 @@ window._confirmarOrdenPreparacion = async function() {
   var tecnicoEmail = selTecnico.value;
   var tecnicoNombre = tecnicoEmail ? (selTecnico.options[selTecnico.selectedIndex].dataset.nombre || '') : '';
 
+  // Fecha límite y técnico responsable son obligatorios para crear la
+  // orden — pedido por Cristian con captura del modal.
+  var errores = [];
+  if (!fecha) errores.push('la fecha límite de envío');
+  if (!tecnicoEmail) errores.push('el técnico responsable');
+  if (errores.length) {
+    alert('Completá ' + errores.join(' y ') + ' antes de crear la orden.');
+    return;
+  }
+
   var btn = document.getElementById('op-btn-confirmar');
   var textoOriginal = btn.textContent;
   btn.disabled = true;
@@ -4565,11 +4576,11 @@ window._confirmarOrdenPreparacion = async function() {
     <div style="font-size:15px;font-weight:800;color:#f1f5f9;margin-bottom:16px;">📦 Enviar Orden de Preparación</div>
     <div style="font-size:11.5px;color:#94a3b8;margin-bottom:16px;">Se va a crear una tarjeta en Servicio Técnico (Preparación / CC) con todos los equipos de este negocio.</div>
     <div style="margin-bottom:14px;">
-      <label style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Fecha límite de despacho</label>
+      <label style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Fecha límite de envío <span style="color:#ef4444;">*</span></label>
       <input type="date" id="op-fecha" style="width:100%;background:#0a1424;border:1px solid #1e3050;border-radius:8px;padding:9px 11px;color:#f1f5f9;font-size:12.5px;font-family:inherit;">
     </div>
     <div style="margin-bottom:18px;">
-      <label style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Técnico responsable</label>
+      <label style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;display:block;margin-bottom:5px;">Técnico responsable <span style="color:#ef4444;">*</span></label>
       <select id="op-tecnico" style="width:100%;background:#0a1424;border:1px solid #1e3050;border-radius:8px;padding:9px 11px;color:#f1f5f9;font-size:12.5px;font-family:inherit;"><option value="">Sin asignar</option></select>
     </div>
     <div style="display:flex;gap:8px;">
