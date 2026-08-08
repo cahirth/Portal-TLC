@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.06.3 (Modal QR: los 5 campos leídos (Nombre, Apellido, Email, Teléfono, DNI, Categoría) ahora son editables — antes eran texto fijo, sin forma de corregir un dato mal leído. Teléfono: se agregó mapeo a nombres de campo alternativos (tel/phone/celular/movil) por si el QR real usa otra clave, más un console.log del JSON crudo para diagnosticar en la consola del navegador qué trae exactamente el QR cuando un campo no aparece. Pedido por Cristian con captura de su propio QR de prueba: "el teléfono no me lo lee, chequealo". La acción de backend guardarEmpresaContactoQR ya existe en FotoMap.gs v160 — el guardado real ya funciona.) -->
 <!-- Portal TLC | index.html | v2026.08.06.2 (FAB de QR de FacoExtrema — nuevo, centrado abajo elevado sobre la bottom-nav. Modal centrado en pantalla con tipografía grande (pedido explícito por legibilidad). Escanea credencial (JSON: id/nombre/apellido/dni/email/telefono/vip/categoria) vía html5-qrcode, muestra tilde verde de confirmación 1s, después los datos leídos con 3 botones: Cancelar / Guardar (Empresa+Contacto, sin negocio) / Enviar por WhatsApp y Guardar (ídem + redirige a selector-dispositivos.html?modo=qr_ficha para elegir equipo — de ahí el circuito sigue en ficha-equipo.html v2026.08.06.2, que ya tenía la lógica de Negocio con la regla de 7 días). PENDIENTE DE BACKEND: la acción 'guardarEmpresaContactoQR' que llama el botón Guardar TODAVÍA NO EXISTE en FotoMap.gs — hay que agregarla antes de que el guardado funcione de verdad; mientras tanto el escaneo y la UI andan completos. Iterado primero como demo/mockup (index_DEMO_QR.html) y confirmado por Cristian antes de integrarlo acá.) -->
 <!-- Portal TLC | index.html | v2026.08.06.1 (Fix robusto del picker de reacciones: ver detalle completo en servicio.html v2026.08.06.3 — mismo mecanismo (_abrirReaccionPicker), un solo picker global con position:fixed en vez de uno por mensaje que quedaba cortado por el overflow-y:auto del contenedor.) -->
 <!-- Portal TLC | index.html | v2026.08.04.13 (Mismo rediseño de reacciones que servicio.html, en la campanita.) -->
@@ -419,8 +420,11 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
 .qr-dato-fila { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 0;
   border-bottom:1px solid var(--border-glow); font-size:15.5px; color:var(--text-main); }
 .qr-dato-fila:last-child { border-bottom:none; }
-.qr-dato-fila .qr-lbl { color:var(--text-muted); font-size:13.5px; }
+.qr-dato-fila .qr-lbl { color:var(--text-muted); font-size:13.5px; flex-shrink:0; }
 .qr-dato-fila .qr-val { font-weight:700; text-align:right; }
+.qr-dato-input { flex:1; min-width:0; text-align:right; font-weight:700; font-size:15px; color:var(--text-main);
+  background:transparent; border:none; border-bottom:1px dashed var(--border-glow); padding:2px 0; font-family:inherit; }
+.qr-dato-input:focus { outline:none; border-bottom-color:var(--accent-blue); }
 .qr-badge-vip { background:var(--accent-orange); color:#0a1424; font-size:10.5px; font-weight:800; padding:3px 9px;
   border-radius:20px; text-transform:uppercase; }
 
@@ -3483,15 +3487,25 @@ function _procesarQRFac(textoLeido) {
   try { datos = JSON.parse(textoLeido); }
   catch(e) { _mostrarToastQRFac('❌ El QR no tiene un JSON válido'); return; }
 
-  _datosQrFacActuales = datos;
-  var nombreCompleto = [datos.nombre, datos.apellido].filter(Boolean).join(' ');
+  // Diagnóstico: log del JSON crudo tal cual vino del QR — para poder
+  // ver en la consola del navegador (F12) exactamente qué claves trae
+  // si algún campo no aparece (ej. si el teléfono viene bajo otro
+  // nombre de campo distinto a "telefono"). Pedido por Cristian: "el
+  // teléfono no me lo lee, en mi QR, chequealo".
+  console.log('[QR FacoExtrema] JSON crudo leído:', datos);
 
-  document.getElementById('qr-fac-datos-render').innerHTML =
-    '<div class="qr-dato-fila"><span class="qr-lbl">Nombre</span><span class="qr-val">' + _esc(nombreCompleto) + (datos.vip ? ' <span class="qr-badge-vip">VIP</span>' : '') + '</span></div>' +
-    '<div class="qr-dato-fila"><span class="qr-lbl">Email</span><span class="qr-val">' + _esc(datos.email || '—') + '</span></div>' +
-    '<div class="qr-dato-fila"><span class="qr-lbl">Teléfono</span><span class="qr-val">' + _esc(datos.telefono || '—') + '</span></div>' +
-    '<div class="qr-dato-fila"><span class="qr-lbl">DNI</span><span class="qr-val">' + _esc(datos.dni || '—') + '</span></div>' +
-    '<div class="qr-dato-fila"><span class="qr-lbl">Categoría</span><span class="qr-val">' + _esc(datos.categoria || '—') + '</span></div>';
+  // Mapeo a nombres de campo alternativos, por si el QR real usa otra
+  // clave — no se pierde el dato si viene como "tel"/"phone"/"celular"
+  // en vez de "telefono".
+  var telefonoDetectado = datos.telefono || datos.tel || datos.phone || datos.celular || datos.movil || '';
+
+  _datosQrFacActuales = {
+    id: datos.id, nombre: datos.nombre || '', apellido: datos.apellido || '',
+    dni: datos.dni || '', email: datos.email || '', telefono: telefonoDetectado,
+    vip: !!datos.vip, categoria: datos.categoria || '',
+  };
+
+  _renderDatosQrFac();
 
   // Confirmación visual: tilde verde grande 1 segundo, después pasa a
   // mostrar los datos leídos.
@@ -3501,6 +3515,31 @@ function _procesarQRFac(textoLeido) {
     document.getElementById('qr-fac-paso-ok').style.display = 'none';
     document.getElementById('qr-fac-paso-datos').style.display = 'block';
   }, 1000);
+}
+
+// Todos los campos son editables — por si el QR leyó algo mal (ej. el
+// teléfono, que a veces no viene o viene con otra clave). Cada input
+// actualiza _datosQrFacActuales directo al perder foco, así "Guardar"
+// y "Enviar por WhatsApp" siempre usan el valor final, editado o no.
+// Pedido por Cristian: "hacer todos los campos editables, para
+// modificar algún dato si fue mal leído".
+function _renderDatosQrFac() {
+  var d = _datosQrFacActuales;
+  var campo = function(etiqueta, clave, tipo) {
+    return '<div class="qr-dato-fila">' +
+      '<span class="qr-lbl">' + etiqueta + '</span>' +
+      '<input type="' + (tipo || 'text') + '" class="qr-dato-input" value="' + _esc(d[clave] || '') + '" ' +
+        'oninput="_datosQrFacActuales[\'' + clave + '\']=this.value">' +
+    '</div>';
+  };
+  document.getElementById('qr-fac-datos-render').innerHTML =
+    campo('Nombre', 'nombre') +
+    campo('Apellido', 'apellido') +
+    campo('Email', 'email', 'email') +
+    campo('Teléfono', 'telefono', 'tel') +
+    campo('DNI', 'dni') +
+    campo('Categoría', 'categoria') +
+    (d.vip ? '<div style="text-align:right;margin-top:6px;"><span class="qr-badge-vip">VIP</span></div>' : '');
 }
 
 window._guardarContactoQR = function(conWhatsapp) {
