@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.06.2 (abrirDetalle ahora saltea la pantalla de detalle del equipo (foto/precio/Folleto/Ver stock/Ver ficha) cuando venimos del flujo de QR de FacoExtrema (?modo=qr_ficha en la URL) — va directo a _verFichaEquipo() al elegir un equipo, sin el paso intermedio. Cubre tanto abrirDetalle(idx) como _abrirDetalleDesdeResultado (que ya terminaba llamando a abrirDetalle). El comportamiento normal (sin ese param) no cambia. Pedido por Cristian con captura: "debería ir de una a la ficha técnica, salteando esta pantalla".) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.06.1 (_verFichaEquipo ahora reenvía el contacto escaneado por QR de FacoExtrema (?modo=qr_ficha&telefono=&nombre=, viene desde el flujo nuevo del FAB en index.html) hacia ficha-equipo.html como ?qr_telefono=&qr_nombre= — así llega precargado sin volver a tipear nada. No cambia el comportamiento normal (sin esos params, el link a ficha-equipo.html queda igual que siempre).) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.04.7 (Mismo fix de color-scheme que cotizaciones.html — causa raíz real del hover oscuro en modo claro.) -->
 
@@ -3062,6 +3063,17 @@ function abrirDetalle(idx) {
     dispositivoActual = filtrados[idx];
     if (!dispositivoActual) return;
     const d = dispositivoActual;
+
+    // Si llegamos acá desde el flujo de QR de FacoExtrema (home →
+    // escanear → elegir equipo), no tiene sentido pararse en esta
+    // pantalla de detalle — directo a la ficha técnica, que es donde
+    // realmente se manda el WhatsApp. Pedido por Cristian: "debería ir
+    // de una a la ficha técnica, salteando esta pantalla".
+    const paramsPropQR = new URLSearchParams(window.location.search);
+    if (paramsPropQR.get('modo') === 'qr_ficha') {
+        _verFichaEquipo();
+        return;
+    }
 
     const nombre  = d['Nombre de Dispositivo'] || '';
     const desc    = d['Descripcion'] || '';
