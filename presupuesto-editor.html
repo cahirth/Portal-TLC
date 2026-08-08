@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.06.7 (Ajuste al pedido anterior: el redondeo hacia arriba de las 4 cifras de "Modalidades de Pago" pasa de múltiplos de 100 a múltiplos de 10 — ej. USD 26.150,00 → USD 26.150 en vez de 26.200. Pedido por Cristian: "andá perfecto pero hacelo en el orden de los 10".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.6 (Las 4 cifras que se ven en la tarjeta "Modalidades de Pago" — Anticipo, Anticipo con IVA, Cuota, Cuota con IVA — ahora se muestran redondeadas hacia ARRIBA al múltiplo de 100 más cercano, sin centavos (ej. USD 26.150,00 → USD 26.200; USD 2.179,17 → USD 2.200). Esto es SOLO display en esta tarjeta — el cálculo interno (saldo, cuotas, lo que se guarda en modalidadPago para el PDF) sigue exacto sin redondear, no se tocó. Pedido por Cristian con captura: "sin centavos y redondees para arriba en el orden de los 100".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.5 (Al convertir % → USD en el toggle de Anticipo, el monto queda redondeado a un múltiplo de 100 (sin centavos) en vez del valor exacto — ej. 45% de USD 52.300 daba USD 23.535,41, ahora da USD 23.500. La conversión USD → % no se tocó, sigue con 2 decimales. Pedido por Cristian con captura: "redondear más, sin centavos y en el orden de 100".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.4 (Anticipo y cuota de TLC 6/12 ahora muestran entre paréntesis el monto CON IVA incluido al lado de "+ IVA" — usa la proporción real IVA/Neto de todo el presupuesto (los ítems pueden tener distinta alícuota: 0/10.5/21/27%), no una alícuota fija, para ser consistente con el Total de arriba. Pedido por Cristian con captura.) -->
@@ -1319,7 +1320,7 @@ function _renderModalidadesPago() {
     // cercano, sin centavos — pedido por Cristian con captura: "sin
     // centavos y redondees para arriba en el orden de los 100".
     var fmtTlcRedondeado = function(n) {
-      var redondeado = Math.ceil(n / 100) * 100;
+      var redondeado = Math.ceil(n / 10) * 10;
       var pref = mostrarEnArs ? '$' : 'USD ';
       return pref + redondeado.toLocaleString('es-AR');
     };
