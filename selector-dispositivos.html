@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.06.1 (_verFichaEquipo ahora reenvía el contacto escaneado por QR de FacoExtrema (?modo=qr_ficha&telefono=&nombre=, viene desde el flujo nuevo del FAB en index.html) hacia ficha-equipo.html como ?qr_telefono=&qr_nombre= — así llega precargado sin volver a tipear nada. No cambia el comportamiento normal (sin esos params, el link a ficha-equipo.html queda igual que siempre).) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.04.7 (Mismo fix de color-scheme que cotizaciones.html — causa raíz real del hover oscuro en modo claro.) -->
 
 <html lang="es">
@@ -3489,7 +3490,20 @@ function _verFichaEquipo() {
   var d = dispositivoActual;
   if (!d) return;
   var nombre = d['Nombre de Dispositivo'] || '';
-  window.location.href = 'https://cahirth.github.io/Portal-TLC/ficha-equipo.html?nombre=' + encodeURIComponent(nombre);
+  var url = 'https://cahirth.github.io/Portal-TLC/ficha-equipo.html?nombre=' + encodeURIComponent(nombre);
+  // Si llegamos acá desde el flujo de QR de FacoExtrema (home →
+  // escanear → elegir equipo), el contacto escaneado viaja en la URL
+  // propia de esta página (?modo=qr_ficha&telefono=&nombre=) — se
+  // reenvía tal cual a ficha-equipo.html para que llegue precargado
+  // y no haya que volver a tipear nada. Pedido por Cristian: circuito
+  // completo del QR de FacoExtrema.
+  var paramsProp = new URLSearchParams(window.location.search);
+  if (paramsProp.get('modo') === 'qr_ficha') {
+    var telQr = paramsProp.get('telefono') || '';
+    var nombreQr = paramsProp.get('nombre') || '';
+    url += '&qr_telefono=' + encodeURIComponent(telQr) + '&qr_nombre=' + encodeURIComponent(nombreQr);
+  }
+  window.location.href = url;
 }
 
 function agregarAlCarrito() {

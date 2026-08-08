@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.06.2 (Recibe ?qr_telefono=&qr_nombre= cuando se llega desde el flujo nuevo del FAB de QR en index.html (home → escanear → elegir equipo en selector-dispositivos.html) — precarga teléfono/contacto y resalta el botón "Enviar por WhatsApp" (retargeteado al mensaje personalizado del stand, _compartirFichaWspPersonalizado) para que sea un solo toque más. NO dispara WhatsApp solo al cargar — el navegador bloquearía la ventana por no ser ya un click directo del usuario en esta página nueva. _guardarSeguimientoVentas (regla de 7 días) sigue intacto, se dispara igual que siempre al tocar el botón.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.06.1 (Flujo B — Flujo Principal de Stand: botón "📷 Escanear QR Visitante" que lee la credencial de Faco Extrema, autocompleta empresa/teléfono/contacto, y dispara el mismo flujo que ya existía de WhatsApp + Crear Negocio (_guardarSeguimientoVentas, con la regla de los 7 días que ya vivía en buscarNegocioAgrupable — no hizo falta tocar el backend) pero con el mensaje personalizado del stand. El QR no trae CUIT, así que se busca/crea la Empresa por el nombre de la persona. Ver FotoMap.gs v159 y empresas.html v2026.08.06.1 (Flujo A).) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.04.5 (Agregada la leyenda "+ IVA 10,5%" junto al Precio de Lista — antes solo la tenían las tarjetas de financiación, el precio principal no aclaraba que era sin IVA. Pedido por Cristian.) -->
 <html lang="es">
@@ -192,7 +193,7 @@
                 </svg>
                 Escanear QR Visitante
             </button>
-            <a class="btn-wsp btn-wsp-orden" href="#" onclick="_compartirFichaWsp(event)">
+            <a class="btn-wsp btn-wsp-orden" id="fi-btn-wsp-normal" href="#" onclick="_compartirFichaWsp(event)">
                 <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
                 Enviar por WhatsApp
             </a>
@@ -384,6 +385,42 @@ window._toggleVarianteFinanciacion = function(key, mostrar) {
     if (!mostrar && idx === -1) _variantesOcultas.push(key);
 };
 
+// Contacto que llega precargado desde el flujo del QR de FacoExtrema
+// iniciado en el HOME (index.html) — el vendedor escaneó ahí, eligió
+// este equipo en selector-dispositivos.html, y llega acá con
+// ?qr_telefono=&qr_nombre= ya en la URL. Mismo criterio que
+// _escanearQRVisitante (empresa/contacto por nombre, sin CUIT), pero
+// SIN disparar WhatsApp solo — el navegador bloquearía la ventana por
+// no ser ya un click directo del usuario en esta página nueva. Se dea
+// todo listo y se resalta el botón para que sea un solo toque más.
+function _precargarContactoQR(params) {
+  var telQr = params.get('qr_telefono') || '';
+  var nombreQr = params.get('qr_nombre') || '';
+  if (!telQr && !nombreQr) return;
+
+  var elTel = document.getElementById('fi-telefono-destino');
+  var elBuscar = document.getElementById('fi-empresa-buscar');
+  if (elTel) elTel.value = telQr;
+  if (elBuscar) elBuscar.value = nombreQr;
+  _contactoSeleccionadoFicha = { nombre: nombreQr, telefono: telQr, email: '' };
+  _empresaSeleccionadaFicha = null; // fuerza a buscar/crear por nombre — el QR no trae empresaId
+
+  var primerNombre = nombreQr.split(' ')[0] || nombreQr;
+  var btnWsp = document.getElementById('fi-btn-wsp-normal');
+  if (btnWsp) {
+    btnWsp.onclick = function(ev) { ev.preventDefault(); _compartirFichaWspPersonalizado(primerNombre); };
+    btnWsp.innerHTML = btnWsp.innerHTML.replace('Enviar por WhatsApp', 'Enviar WhatsApp a ' + _esc(primerNombre));
+    btnWsp.style.boxShadow = '0 0 0 3px rgba(37,211,102,.35)';
+    btnWsp.style.transform = 'scale(1.03)';
+  }
+
+  var elBanner = document.createElement('div');
+  elBanner.style.cssText = 'background:#ecfdf5;border:1px solid #06d6a0;border-radius:10px;padding:10px 14px;font-size:12.5px;color:#065f46;';
+  elBanner.textContent = '📇 Contacto de FacoExtrema precargado: ' + nombreQr + ' — tocá "Enviar WhatsApp" para mandarle esta ficha.';
+  var elLead = document.getElementById('fi-lead-resultado');
+  if (elLead && elLead.parentNode) elLead.parentNode.insertBefore(elBanner, elLead);
+}
+
 async function _cargarFicha() {
     var params = new URLSearchParams(window.location.search);
     var nombre = params.get('nombre');
@@ -420,6 +457,7 @@ async function _cargarFicha() {
         if (elBtnCrearNegocio) elBtnCrearNegocio.style.display = 'none';
     } else {
         _cargarPipelinesFicha();
+        _precargarContactoQR(params);
     }
 
     // El fotoMap (Apps Script) es mucho más lento que precios.json (RTDB

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.06.2 (FAB de QR de FacoExtrema — nuevo, centrado abajo elevado sobre la bottom-nav. Modal centrado en pantalla con tipografía grande (pedido explícito por legibilidad). Escanea credencial (JSON: id/nombre/apellido/dni/email/telefono/vip/categoria) vía html5-qrcode, muestra tilde verde de confirmación 1s, después los datos leídos con 3 botones: Cancelar / Guardar (Empresa+Contacto, sin negocio) / Enviar por WhatsApp y Guardar (ídem + redirige a selector-dispositivos.html?modo=qr_ficha para elegir equipo — de ahí el circuito sigue en ficha-equipo.html v2026.08.06.2, que ya tenía la lógica de Negocio con la regla de 7 días). PENDIENTE DE BACKEND: la acción 'guardarEmpresaContactoQR' que llama el botón Guardar TODAVÍA NO EXISTE en FotoMap.gs — hay que agregarla antes de que el guardado funcione de verdad; mientras tanto el escaneo y la UI andan completos. Iterado primero como demo/mockup (index_DEMO_QR.html) y confirmado por Cristian antes de integrarlo acá.) -->
 <!-- Portal TLC | index.html | v2026.08.06.1 (Fix robusto del picker de reacciones: ver detalle completo en servicio.html v2026.08.06.3 — mismo mecanismo (_abrirReaccionPicker), un solo picker global con position:fixed en vez de uno por mensaje que quedaba cortado por el overflow-y:auto del contenedor.) -->
 <!-- Portal TLC | index.html | v2026.08.04.13 (Mismo rediseño de reacciones que servicio.html, en la campanita.) -->
 <html lang="es">
@@ -372,10 +373,75 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
 .reaccion-picker button { background:none; border:none; font-size:17px; cursor:pointer; padding:4px 6px;
   border-radius:10px; line-height:1; transition:background .1s ease, transform .1s ease; }
 .reaccion-picker button:hover { background:rgba(58,134,255,.15); transform:scale(1.2); }
-    </style>
+
+/* ══════════════════════════════════════════════════════════════
+   QR FacoExtrema — FAB + modal de escaneo. Botón flotante centrado
+   abajo (elevado sobre la bottom-nav), modal centrado en pantalla
+   con tipografía grande. Pedido por Cristian, probado primero como
+   demo/mockup y confirmado antes de integrarlo acá.
+   ══════════════════════════════════════════════════════════════ */
+.fab-qr { position:fixed; bottom:38px; left:50%; transform:translateX(-50%); width:60px; height:60px;
+  border-radius:50%; background:linear-gradient(135deg,var(--accent-blue),var(--accent-purple)); border:4px solid #030712;
+  display:flex; align-items:center; justify-content:center; font-size:24px; color:#fff; cursor:pointer; z-index:410;
+  box-shadow:0 6px 20px rgba(58,134,255,.45); transition:transform .15s; }
+.fab-qr:active { transform:translateX(-50%) scale(.92); }
+.fab-qr-label { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); font-size:9px; color:var(--text-muted);
+  font-weight:700; z-index:410; text-transform:uppercase; letter-spacing:.4px; pointer-events:none; }
+@media (min-width:600px) { .fab-qr, .fab-qr-label { bottom:24px; } }
+
+.qr-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); display:none; align-items:center;
+  justify-content:center; z-index:9500; padding:16px; }
+.qr-modal-overlay.abierto { display:flex; }
+.qr-modal-card { background:var(--panel-dark); width:100%; max-width:440px; border-radius:20px; padding:24px 20px 26px;
+  max-height:88vh; overflow-y:auto; animation:qrAparecer .22s ease; }
+@keyframes qrAparecer { from{transform:scale(.94);opacity:0;} to{transform:scale(1);opacity:1;} }
+body.tema-claro .qr-modal-card { background:#ffffff; }
+
+.qr-modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.qr-modal-header h2 { font-size:19px; margin:0; display:flex; align-items:center; gap:8px; color:var(--text-main); }
+.qr-modal-close { width:36px; height:36px; border-radius:50%; background:var(--bg-dark); border:none;
+  color:var(--text-muted); font-size:19px; cursor:pointer; flex-shrink:0; }
+
+.qr-scan-box { border:2px dashed var(--border-glow); border-radius:14px; padding:26px 18px; text-align:center; margin-bottom:14px; }
+#qr-fac-reader { width:100%; border-radius:12px; overflow:hidden; }
+.qr-scan-icon { font-size:38px; margin-bottom:10px; }
+.qr-scan-txt { font-size:15px; color:var(--text-muted); margin-bottom:16px; line-height:1.55; }
+.qr-btn-simular { margin-top:10px; background:none; border:none; color:var(--accent-blue); font-size:14px; cursor:pointer; text-decoration:underline; }
+
+.qr-ok-circulo { width:96px; height:96px; border-radius:50%; background:var(--accent-green); margin:0 auto;
+  display:flex; align-items:center; justify-content:center; animation:qrOkPop .4s cubic-bezier(.34,1.56,.64,1);
+  box-shadow:0 0 0 10px rgba(6,214,160,.15); }
+.qr-ok-tilde { font-size:52px; font-weight:900; color:#062015; line-height:1; animation:qrOkTildeIn .35s ease .1s both; }
+@keyframes qrOkPop { 0%{transform:scale(0);opacity:0;} 60%{transform:scale(1.08);opacity:1;} 100%{transform:scale(1);} }
+@keyframes qrOkTildeIn { from{opacity:0;transform:scale(.4);} to{opacity:1;transform:scale(1);} }
+
+.qr-datos-leidos { background:var(--bg-dark); border:1px solid var(--border-glow); border-radius:12px; padding:16px 18px; margin-bottom:18px; }
+.qr-dato-fila { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 0;
+  border-bottom:1px solid var(--border-glow); font-size:15.5px; color:var(--text-main); }
+.qr-dato-fila:last-child { border-bottom:none; }
+.qr-dato-fila .qr-lbl { color:var(--text-muted); font-size:13.5px; }
+.qr-dato-fila .qr-val { font-weight:700; text-align:right; }
+.qr-badge-vip { background:var(--accent-orange); color:#0a1424; font-size:10.5px; font-weight:800; padding:3px 9px;
+  border-radius:20px; text-transform:uppercase; }
+
+.qr-botonera { display:flex; gap:10px; }
+.qr-botonera button { flex:1; padding:15px; border-radius:12px; border:1px solid var(--border-glow); background:var(--bg-dark);
+  color:var(--text-main); font-size:15px; font-weight:700; cursor:pointer; }
+.qr-btn-guardar { border-color:var(--accent-green) !important; color:var(--accent-green) !important; }
+.qr-botonera-principal { margin-top:10px; }
+.qr-btn-whatsapp { width:100%; padding:16px; border-radius:12px; border:none; background:#25d366; color:#062015;
+  font-size:16px; font-weight:800; cursor:pointer; }
+
+.qr-toast { position:fixed; bottom:110px; left:50%; transform:translateX(-50%); background:var(--panel-dark);
+  border:1px solid var(--accent-green); color:var(--text-main); padding:13px 22px; border-radius:30px; font-size:14.5px;
+  font-weight:700; z-index:9600; max-width:88vw; text-align:center; box-shadow:0 6px 20px rgba(0,0,0,.4);
+  opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; }
+.qr-toast.mostrar { opacity:1; transform:translateX(-50%) translateY(-6px); }
+</style>
 </head>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <body>
 
 <!-- Instrucciones de instalación en iPhone (PWA) -->
@@ -3265,6 +3331,222 @@ function _iaToggleMic() {
 
 
 
+
+<!-- ══════════════════════════════════════════════════════════════
+     QR FacoExtrema — FAB + modal. Ver JS al final del archivo.
+     ══════════════════════════════════════════════════════════════ -->
+<div class="fab-qr" onclick="_abrirModalQR()" title="Escanear QR"><i class="fa-solid fa-qrcode"></i></div>
+<div class="fab-qr-label">Escanear QR</div>
+
+<div class="qr-modal-overlay" id="qr-modal">
+  <div class="qr-modal-card">
+
+    <div class="qr-modal-header">
+      <h2>📷 Escanear QR — FacoExtrema</h2>
+      <button class="qr-modal-close" onclick="_cerrarModalQR()">✕</button>
+    </div>
+
+    <!-- PASO 1: escaneo -->
+    <div id="qr-fac-paso-scan">
+      <div class="qr-scan-box">
+        <div id="qr-fac-reader"></div>
+        <div id="qr-fac-reader-vacio">
+          <div class="qr-scan-icon">🎫</div>
+          <div class="qr-scan-txt">Apuntá la cámara al código QR de la credencial<br>para cargar los datos del contacto.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASO 1.5: confirmación visual (tilde verde) -->
+    <div id="qr-fac-paso-ok" style="display:none;text-align:center;padding:34px 0;">
+      <div class="qr-ok-circulo"><div class="qr-ok-tilde">✓</div></div>
+      <div style="font-size:15px;color:var(--accent-green);font-weight:800;margin-top:14px;">¡Escaneado!</div>
+    </div>
+
+    <!-- PASO 2: datos leídos -->
+    <div id="qr-fac-paso-datos" style="display:none;">
+      <div class="qr-datos-leidos" id="qr-fac-datos-render"></div>
+
+      <div class="qr-botonera">
+        <button onclick="_cerrarModalQR()">Cancelar</button>
+        <button class="qr-btn-guardar" onclick="_guardarContactoQR(false)">💾 Guardar</button>
+      </div>
+      <div class="qr-botonera-principal">
+        <button class="qr-btn-whatsapp" onclick="_guardarContactoQR(true)">💬 Enviar por WhatsApp y Guardar</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="qr-toast" id="qr-fac-toast"></div>
+
+<script>
+// GAS_URL_QR: mismo deployment fijo de siempre (nunca cambia). Se
+// declara acá aparte porque FOTO_MAP_URL de más arriba está con
+// const dentro de OTRO <script> — los const/let no cruzan entre
+// tags <script> distintos (a diferencia de var), así que no es
+// visible desde acá.
+var GAS_URL_QR = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+
+// ══════════════════════════════════════════════════════════════════
+// QR FacoExtrema — FAB + modal, home. Reusa el mismo mecanismo
+// html5-qrcode que ya usa ficha-equipo.html (_abrirScannerQR). El QR
+// trae JSON: {id,nombre,apellido,dni,email,telefono,vip,categoria}.
+//
+// "Guardar": crea/verifica la Empresa (nombre = contacto escaneado) +
+// el Contacto dentro de ella — SIN negocio todavía (un negocio
+// necesita al menos un equipo, y acá no se eligió ninguno).
+//
+// "Enviar por WhatsApp y Guardar": hace lo mismo, y además abre
+// selector-dispositivos.html?modo=qr_ficha&telefono=&nombre= para
+// elegir un equipo. El Negocio se crea recién ahí, al llegar a
+// ficha-equipo.html con el contacto precargado (esa página ya tiene
+// _guardarSeguimientoVentas con la regla de 7 días — no se tocó).
+//
+// PENDIENTE DE BACKEND: la acción 'guardarEmpresaContactoQR' que se
+// llama acá abajo NO EXISTE TODAVÍA en FotoMap.gs — hay que agregarla
+// (recibe id/nombre/apellido/dni/email/telefono/vip/categoria, crea
+// la Empresa si no existe por nombre+apellido, y el Contacto con
+// todos los campos). Mientras tanto el botón funciona para escanear
+// y ver los datos, pero el guardado real va a fallar con un aviso
+// hasta que se agregue esa acción.
+// ══════════════════════════════════════════════════════════════════
+var _datosQrFacActuales = null;
+var _qrFacScanner = null;
+
+window._abrirModalQR = function() {
+  document.getElementById('qr-modal').classList.add('abierto');
+  document.getElementById('qr-fac-paso-scan').style.display = 'block';
+  document.getElementById('qr-fac-paso-ok').style.display = 'none';
+  document.getElementById('qr-fac-paso-datos').style.display = 'none';
+  _datosQrFacActuales = null;
+  _iniciarCamaraQRFac();
+};
+
+window._cerrarModalQR = function() {
+  document.getElementById('qr-modal').classList.remove('abierto');
+  _detenerCamaraQRFac();
+};
+
+function _iniciarCamaraQRFac() {
+  if (typeof Html5Qrcode === 'undefined') {
+    document.getElementById('qr-fac-reader-vacio').innerHTML =
+      '<div class="qr-scan-icon">⚠️</div><div class="qr-scan-txt">No se pudo cargar el lector de QR (revisá la conexión a internet).</div>';
+    return;
+  }
+  try {
+    _qrFacScanner = new Html5Qrcode('qr-fac-reader');
+    _qrFacScanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: 230 },
+      function(textoLeido) {
+        _detenerCamaraQRFac();
+        _procesarQRFac(textoLeido);
+      },
+      function() { /* frame sin QR, normal — se ignora a propósito */ }
+    ).then(function() {
+      document.getElementById('qr-fac-reader-vacio').style.display = 'none';
+    }).catch(function(err) {
+      document.getElementById('qr-fac-reader-vacio').innerHTML =
+        '<div class="qr-scan-icon">⚠️</div><div class="qr-scan-txt">No se pudo acceder a la cámara.<br>' + _esc(String(err)) + '</div>' +
+        '<button class="qr-btn-simular" onclick="_simularEscaneoQRFac()">🧪 Simular escaneo con datos de prueba</button>';
+    });
+  } catch(e) {
+    document.getElementById('qr-fac-reader-vacio').innerHTML =
+      '<div class="qr-scan-icon">⚠️</div><div class="qr-scan-txt">Lector de QR no disponible acá.</div>' +
+      '<button class="qr-btn-simular" onclick="_simularEscaneoQRFac()">🧪 Simular escaneo con datos de prueba</button>';
+  }
+}
+
+function _detenerCamaraQRFac() {
+  if (_qrFacScanner) {
+    try { _qrFacScanner.stop().then(function(){ _qrFacScanner.clear(); }).catch(function(){}); } catch(e) {}
+    _qrFacScanner = null;
+  }
+}
+
+// Fallback de prueba — sin cámara disponible (ej. probando en PC sin
+// HTTPS/localhost) para poder seguir probando el resto del flujo.
+window._simularEscaneoQRFac = function() {
+  _procesarQRFac(JSON.stringify({
+    id: 55, nombre: 'Cristian', apellido: 'Hirth', dni: '23060035',
+    email: 'cristian@tlcsrl.com.ar', telefono: '1141830932',
+    vip: false, categoria: 'Industria'
+  }));
+};
+
+function _esc(s) { var d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
+
+function _procesarQRFac(textoLeido) {
+  var datos;
+  try { datos = JSON.parse(textoLeido); }
+  catch(e) { _mostrarToastQRFac('❌ El QR no tiene un JSON válido'); return; }
+
+  _datosQrFacActuales = datos;
+  var nombreCompleto = [datos.nombre, datos.apellido].filter(Boolean).join(' ');
+
+  document.getElementById('qr-fac-datos-render').innerHTML =
+    '<div class="qr-dato-fila"><span class="qr-lbl">Nombre</span><span class="qr-val">' + _esc(nombreCompleto) + (datos.vip ? ' <span class="qr-badge-vip">VIP</span>' : '') + '</span></div>' +
+    '<div class="qr-dato-fila"><span class="qr-lbl">Email</span><span class="qr-val">' + _esc(datos.email || '—') + '</span></div>' +
+    '<div class="qr-dato-fila"><span class="qr-lbl">Teléfono</span><span class="qr-val">' + _esc(datos.telefono || '—') + '</span></div>' +
+    '<div class="qr-dato-fila"><span class="qr-lbl">DNI</span><span class="qr-val">' + _esc(datos.dni || '—') + '</span></div>' +
+    '<div class="qr-dato-fila"><span class="qr-lbl">Categoría</span><span class="qr-val">' + _esc(datos.categoria || '—') + '</span></div>';
+
+  // Confirmación visual: tilde verde grande 1 segundo, después pasa a
+  // mostrar los datos leídos.
+  document.getElementById('qr-fac-paso-scan').style.display = 'none';
+  document.getElementById('qr-fac-paso-ok').style.display = 'block';
+  setTimeout(function() {
+    document.getElementById('qr-fac-paso-ok').style.display = 'none';
+    document.getElementById('qr-fac-paso-datos').style.display = 'block';
+  }, 1000);
+}
+
+window._guardarContactoQR = function(conWhatsapp) {
+  var d = _datosQrFacActuales;
+  if (!d) return;
+  var nombreCompleto = [d.nombre, d.apellido].filter(Boolean).join(' ');
+
+  fetch(GAS_URL_QR, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      accion: 'guardarEmpresaContactoQR',
+      id: d.id || '', nombre: d.nombre || '', apellido: d.apellido || '',
+      dni: d.dni || '', email: d.email || '', telefono: d.telefono || '',
+      vip: !!d.vip, categoria: d.categoria || ''
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(r) {
+    if (!r.ok) {
+      _mostrarToastQRFac('⚠️ ' + (r.error || 'No se pudo guardar — falta la acción en el backend'));
+      return;
+    }
+    _mostrarToastQRFac('✅ ' + (r.empresaCreada ? 'Empresa creada' : 'Empresa ya existía') + ' + contacto guardado');
+  })
+  .catch(function() {
+    _mostrarToastQRFac('⚠️ Error de conexión al guardar');
+  });
+
+  if (conWhatsapp) {
+    var url = 'https://cahirth.github.io/Portal-TLC/selector-dispositivos.html?modo=qr_ficha' +
+      '&telefono=' + encodeURIComponent(d.telefono || '') +
+      '&nombre=' + encodeURIComponent(nombreCompleto);
+    setTimeout(function() { window.location.href = url; }, 350);
+  } else {
+    setTimeout(_cerrarModalQR, 900);
+  }
+};
+
+function _mostrarToastQRFac(texto) {
+  var el = document.getElementById('qr-fac-toast');
+  el.textContent = texto;
+  el.classList.add('mostrar');
+  setTimeout(function(){ el.classList.remove('mostrar'); }, 3200);
+}
+</script>
 
 </body>
 </html>
