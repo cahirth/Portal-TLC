@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.09.1 (4 correcciones a la Orden de Preparación con captura anotada: (1) título del ticket mostraba "Sin equipo" aunque la grilla tuviera equipos cargados — _nombreTarjetaTicket usaba equipo_marca/equipo_modelo (campos de un ticket de UN equipo), pero la Orden de Preparación tiene una LISTA (t.equipos[]); ahora usa el primer equipo de esa lista (+cuántos más haya). (2) Se sacó el botón "Ver Orden" de accesos rápidos para este tipo de ticket — ya tiene su propio "🖨 Imprimir/Exportar Orden de Preparación", era redundante y apuntaba a un documento que no le correspondía (orden-servicio.html, pensado para tickets de reparación normales). (3) Se sacó por completo el mini-stepper "Estado del pedido" (Preparación → Facturación → Expedición) y su botón de avanzar — Cristian lo marcó con X sobre el paso de Facturación y el botón. La función queda definida pero sin llamar. (4) Columna "Checklist" nueva en la grilla de equipos — cada fila matchea su propio SKU+descripción contra CHECKLIST_POR_MODELO (mismo mapeo y misma función _archivoChecklistParaModelo que ya existían para tickets normales, que nunca se disparaban acá porque dependían de equipo_modelo). El link del POE-8 ya estaba bien armado y confirmado por test aislado — llega precargado con tecnico/cliente/domicilio/teléfono/modelo/serie, y POE8_Instalacion.html ya sabía leer esos query params.) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.6 (Link al POE-8 "Registro de Instalación" (POE8_Instalacion.html, ya existía en el repo) agregado como columna nueva en la grilla de equipos de la Orden de Preparación — un link por equipo, se abre ya completado vía query params (?tecnico=&cliente=&domicilio=&telefono=&modelo=&serie=) tomados del ticket, para que el técnico no tenga que retipear nada al llegar a instalar. El POE-8 no tiene marca/modelo separados en la grilla (solo SKU+descripción libre), así que van juntos en "modelo" sin inventar un split. Pedido por Cristian: "llevar el POE completo... ya completado con los datos del cliente hacia la tarjeta de servicio en preparación".) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.5 (Circuito propio para Orden de Preparación de Equipos — CONFIRMADO tras probar con servicio_DEMO.html: reemplaza el bloque completo de reparación (Información del equipo duplicada, Fotos, Asignación de 12 etapas, Trabajo técnico) por un mini-stepper de 3 pasos "Estado del pedido" — Preparación → Facturación → Expedición y Seguimiento — reusando 3 etapas de Kanban que YA EXISTÍAN (preparacion_control_calidad/para_facturar/finalizado), cero columnas nuevas, cero backend nuevo. Se agregó "Dirección de envío" como campo propio (distinto del Domicilio del contacto — puede ser un depósito/transportista distinto). Se sacó el botón "Generar/Modificar Presupuesto" de accesos rápidos (no aplica a este tipo de ticket) y el ícono 📄 duplicado del header (ya está "Ver Orden" en accesos rápidos). "Gastos del servicio" pasa a llamarse "Gastos asociados" para este tipo de ticket. Circuito iterado en varias rondas con Cristian sobre servicio_PREVIEW.html/servicio_DEMO.html antes de confirmar.) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.4 (3 pedidos sobre Orden de Preparación de Equipos, con captura anotada: (1) los campos Domicilio de Envío/Fecha límite/Técnico responsable eran solo texto — ahora son editables (mismo patrón _guardarCampoSiCambio del resto del ticket); (2) se agregaron Cliente/Clínica, Nombre del médico, Domicilio y Teléfono a esa misma tarjeta (editables) para tener el contacto completo sin depender de la sección "Información del equipo" de más abajo; (3) grilla de equipos ahora responsiva — en pantallas angostas cada fila se convierte en tarjeta apilada con etiquetas por campo, en vez de una tabla con scroll horizontal forzado; (4) se quitó por completo la Firma Digital por canvas — la orden se firma en papel, holográficamente, por el técnico y por el transporte al despacho (queda pendiente de definición el punto 5: qué hacer con el resto de la sección "Información del equipo" / "Trabajo técnico" para este tipo de ticket).) -->
@@ -1426,10 +1427,35 @@ function _esc(s) {
 var MESES_TICKET = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 function _nombreTarjetaTicket(t) {
   var cliente = (t.cliente || t.nombre_medico || '').trim() || 'Sin cliente';
-  var marca = (t.equipo_marca || '').trim();
-  var modelo = (t.equipo_modelo || '').trim();
-  var yaIncluida = marca && modelo && modelo.toLowerCase().indexOf(marca.toLowerCase()) === 0;
-  var equipo = (yaIncluida ? modelo : [marca, modelo].filter(Boolean).join(' ').trim()) || 'Sin equipo';
+  var equipo;
+  if (t.tipo_orden === 'preparacion_equipos') {
+    // La Orden de Preparación no tiene equipo_marca/equipo_modelo
+    // (esos campos son de un ticket normal, de UN equipo) — tiene una
+    // LISTA de equipos en t.equipos[]. Antes esto siempre caía en
+    // "Sin equipo" aunque la lista tuviera equipos cargados. Se usa
+    // el primero de la lista (+cuántos más haya), mismo criterio que
+    // el nombre de negocio en Ventas. Reportado por Cristian con
+    // captura: "agregar equipo, aunque sea el primero, al nombre
+    // arriba".
+    var equiposOrden = Array.isArray(t.equipos) ? t.equipos : [];
+    if (equiposOrden.length) {
+      var primero = (equiposOrden[0].descripcion || equiposOrden[0].sku || '').trim();
+      var extras = equiposOrden.length - 1;
+      equipo = extras > 0 ? (primero + ' (+' + extras + ')') : primero;
+    }
+    equipo = equipo || 'Sin equipo';
+  } else {
+    var marca = (t.equipo_marca || '').trim();
+    var modelo = (t.equipo_modelo || '').trim();
+    // fecha actual, para que el nombre no cambie cada vez que se
+    // recalcula. Ojo: si equipo_modelo ya arranca con la marca cargada por
+    // separado (ej. marca="HUVITZ", modelo="HUVITZ HBM-1"), NO se
+    // concatenan las dos o queda duplicado ("HUVITZ HUVITZ HBM-1") —
+    // reportado por Cristian con captura. Pedido por Cristian: "hacer el
+    // mismo razonamiento de negocios".
+    var yaIncluida = marca && modelo && modelo.toLowerCase().indexOf(marca.toLowerCase()) === 0;
+    equipo = (yaIncluida ? modelo : [marca, modelo].filter(Boolean).join(' ').trim()) || 'Sin equipo';
+  }
   var fechaBase = t.creado_en ? new Date(t.creado_en) : new Date();
   var mesAno = isNaN(fechaBase.getTime()) ? '' : (MESES_TICKET[fechaBase.getMonth()] + ' ' + fechaBase.getFullYear());
   return cliente + ' - ' + equipo + (mesAno ? ' - ' + mesAno : '');
@@ -1695,8 +1721,9 @@ function _renderDetalle(t) {
     // ACCESO RÁPIDO
     '<div style="padding:0 16px 10px;">' +
     '<div class="btn-orden-row">' +
-      '<a class="btn-orden" href="' + ORDEN_URL + encodeURIComponent(t.id_ticket) + '" target="_blank">' +
-        '<i class="fa-solid fa-file-lines"></i> Ver Orden</a>' +
+      (esOrdenPrep ? '' :
+        '<a class="btn-orden" href="' + ORDEN_URL + encodeURIComponent(t.id_ticket) + '" target="_blank">' +
+          '<i class="fa-solid fa-file-lines"></i> Ver Orden</a>') +
       ((t.deposito || 'recepcion') === 'recepcion'
         ? '<a class="btn-orden" href="https://cahirth.github.io/Portal-TLC/remito-ingreso.html?id=' + encodeURIComponent(t.id_ticket) + '" target="_blank">' +
             '<i class="fa-solid fa-file-import"></i> Remito de Ingreso</a>'
@@ -1861,7 +1888,13 @@ function _renderDetalle(t) {
     ) +
 
     // ESTADO DEL PEDIDO — solo Orden de Preparación (mini-circuito de 3 pasos)
-    (esOrdenPrep ? _renderEstadoPedidoPrep(t, puedeEditar) : '') +
+    // "Estado del pedido" (mini-stepper Preparación → Facturación →
+    // Expedición) se sacó por completo — Cristian con captura anotada
+    // (X sobre el paso de Facturación y su botón de avanzar): "eliminar
+    // time line de facturacion y el boton". La función
+    // _renderEstadoPedidoPrep queda definida pero sin llamar, por si
+    // se retoma más adelante con otro criterio.
+    '' +
 
     // NOTAS
     '<div class="det-section">Notas de seguimiento</div>' +
@@ -1924,6 +1957,16 @@ function _urlPOE8(t, eq) {
 function _renderSeccionOrdenPreparacion(t) {
   var equipos = Array.isArray(t.equipos) ? t.equipos : [];
   var filas = equipos.map(function(eq, i) {
+    // Checklist técnico por equipo — el ticket-level "Checklist técnico
+    // disponible" de más abajo usa t.equipo_modelo, campo que la Orden
+    // de Preparación no tiene (tiene una LISTA de equipos, no uno
+    // solo), así que nunca aparecía acá. Se matchea cada fila contra
+    // su propio SKU+descripción. Pedido por Cristian: "enviar los
+    // links de los checklists de los equipos de la lista de la orden
+    // de preparación".
+    var textoModeloFila = [eq.sku, eq.descripcion].filter(Boolean).join(' ');
+    var archivoChecklistFila = _archivoChecklistParaModelo(textoModeloFila);
+    var urlChecklistFila = archivoChecklistFila ? (CHECKLIST_URL_BASE + archivoChecklistFila + '?ticket=' + encodeURIComponent(t.id_ticket)) : '';
     return '<tr>' +
       '<td data-th="Cant.">' + (eq.cantidad || 1) + '</td>' +
       '<td data-th="SKU"><input type="text" value="' + _esc(eq.sku||'') + '" placeholder="—" onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'sku\',this.value)"></td>' +
@@ -1936,6 +1979,9 @@ function _renderSeccionOrdenPreparacion(t) {
         }).join('') +
       '</select></td>' +
       '<td data-th="POE-8"><a href="' + _urlPOE8(t, eq) + '" target="_blank" class="op-btn" style="padding:4px 9px;font-size:10.5px;text-decoration:none;display:inline-block;white-space:nowrap;">📋 Instalación</a></td>' +
+      '<td data-th="Checklist">' + (urlChecklistFila
+        ? '<a href="' + urlChecklistFila + '" target="_blank" class="op-btn" style="padding:4px 9px;font-size:10.5px;text-decoration:none;display:inline-block;white-space:nowrap;background:#3a86ff;">✅ Checklist</a>'
+        : '<span style="color:var(--text-muted);font-size:10.5px;">—</span>') + '</td>' +
     '</tr>';
   }).join('');
 
@@ -1976,8 +2022,8 @@ function _renderSeccionOrdenPreparacion(t) {
       '</div>' +
     '</div>' +
     '<div class="det-card" style="overflow-x:auto;">' +
-      '<table class="op-grid-tabla"><thead><tr><th>Cant.</th><th>SKU</th><th>Equipo</th><th>N° de Serie</th><th>Calidad</th><th>Estado</th><th>POE-8</th></tr></thead>' +
-      '<tbody>' + (filas || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:14px;">Sin equipos cargados.</td></tr>') + '</tbody></table>' +
+      '<table class="op-grid-tabla"><thead><tr><th>Cant.</th><th>SKU</th><th>Equipo</th><th>N° de Serie</th><th>Calidad</th><th>Estado</th><th>POE-8</th><th>Checklist</th></tr></thead>' +
+      '<tbody>' + (filas || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:14px;">Sin equipos cargados.</td></tr>') + '</tbody></table>' +
     '</div>' +
     '<div style="margin-bottom:10px;"><button class="op-btn" onclick="window.open(\'https://cahirth.github.io/Portal-TLC/orden-preparacion.html?id=' + t.id_ticket + '\',\'_blank\')" style="width:100%;">🖨 Imprimir / Exportar Orden de Preparación</button></div>' +
   '</div>';
