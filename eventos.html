@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.09.1 (REDISEÑO GRANDE — módulo Eventos v2, conectado a FotoMap.gs v161. Reusa TODO lo que ya funcionaba en producción (sesión, tema, campanita, picker de reacciones, drag&drop entre columnas, sistema de menciones) y suma: (1) Checklists múltiples agrupados con título editable — reemplaza el checklist único plano; (2) Descripción/Propósito de la tarjeta; (3) Notas Generales con historial (autor+fecha); (4) Archivos Adjuntos (máx 10MB, PDF/PNG/JPG/XLSX) con portada — banner arriba del modal y arriba de la tarjeta cerrada en el tablero; (5) Buscador de texto libre (título, descripción, responsable, categoría, checklists, notas, adjuntos); (6) Filtros nuevos de Vencimiento y Progreso, sumados a los de Responsable/Categoría que ya existían; (7) Vista Lista además del Tablero; (8) Menú mobile real (antes no existía, header colapsaba sin forma de cambiar vista/tema/evento en pantallas chicas); (9) Columnas con color propio; (10) Permisos — crear/borrar EVENTOS y COLUMNAS enteras ahora exige Administrador (mismo criterio que borrar empresas), renombrar/recolorear columna queda abierto a cualquier interno. FIX de bug real encontrado y confirmado con test (jsdom): el picker de @menciones no resaltaba el primer candidato por defecto (arrancaba en índice -1, Enter no hacía nada hasta apretar una flecha) y, con checklists múltiples, dos pickers de menciones podían quedar abiertos a la vez sin cerrarse entre sí — ahora resalta el primero al abrir y cierra cualquier otro picker abierto antes de mostrar uno nuevo. Todo validado con jsdom simulando login, apertura de evento, checklists, notas, y la mezcla de menciones entre chat y checklist — no solo leído a ojo. Pedido por Cristian: "quiero reformular por completo eventos.html... usa todo lo que puedas de la nueva UX eventos-v5, pero ajustado a toda nuestra pwa".) -->
 <!-- Portal TLC | eventos.html | v2026.08.06.1 (Fix robusto del picker de reacciones: ver detalle completo en servicio.html v2026.08.06.3 — mismo mecanismo (_abrirReaccionPicker), un solo picker global con position:fixed en vez de uno por mensaje que quedaba cortado por el overflow-y:auto del contenedor.) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.6 (Mismo rediseño de reacciones que servicio.html: ícono "🙂" que despliega los 3 emojis en vez de tenerlos siempre visibles sueltos, en mensajes de tarjeta y campanita.) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.4 (2 pedidos de Cristian para uniformar con el resto de la PWA: (1) el detalle de tarjeta ahora es de dos columnas en pantallas grandes, con Mensajes internos fijo a la derecha (sticky) — mismo patrón que negocios y tickets de Servicio, en vez de todo apilado en una sola columna; (2) barra de filtros nueva arriba del tablero (Responsable, Categoría) — el filtro por columna/etapa no se agregó porque en un Kanban las columnas ya están agrupadas visualmente, sería redundante.) -->
@@ -213,11 +214,95 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
 .spinner { width:26px; height:26px; border:3px solid var(--border-glow); border-top-color:var(--accent-blue); border-radius:50%;
   animation:girar 0.8s linear infinite; }
 @keyframes girar { to { transform:rotate(360deg); } }
+
+/* ── v2 — buscador + vista Lista + menú mobile (pedido de Cristian:
+   "usa todo lo que puedas de la nueva UX eventos-v5") ── */
+.ev-search-input { background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:8px; padding:7px 12px;
+  color:var(--text-main); font-size:12px; font-family:inherit; flex:1; min-width:160px; max-width:260px; }
+.ev-view-switch { display:flex; background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:8px; padding:2px; gap:2px; flex-shrink:0; }
+.ev-view-switch button { border:none; background:none; color:var(--text-muted); font-size:11.5px; font-weight:700; padding:6px 11px; border-radius:6px; cursor:pointer; }
+.ev-view-switch button.activo { background:var(--accent-blue); color:#fff; }
+.ev-list-wrap { display:none; }
+.ev-list-wrap.activo { display:block; }
+.ev-board.oculto { display:none; }
+.ev-list-fila { display:flex; align-items:center; gap:10px; background:var(--panel-dark); border:1px solid var(--border-glow);
+  border-radius:10px; padding:10px 13px; margin-bottom:7px; cursor:pointer; }
+.ev-list-fila:hover { border-color:var(--accent-blue); }
+.ev-list-fila .ev-list-titulo { flex:1; font-size:12.5px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ev-list-fila .ev-list-meta { display:flex; align-items:center; gap:9px; flex-shrink:0; font-size:11px; color:var(--text-muted); }
+
+.ev-hamburger { display:none; }
+@media (max-width:760px) { .ev-hamburger { display:flex; } }
+.ev-mobile-menu-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:700; display:none; }
+.ev-mobile-menu-overlay.abierto { display:block; }
+.ev-mobile-menu-panel { position:absolute; top:0; left:0; bottom:0; width:82%; max-width:300px; background:var(--panel-dark);
+  padding:18px; overflow-y:auto; box-shadow:4px 0 24px rgba(0,0,0,.4); }
+.ev-mobile-menu-panel h3 { font-size:13px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; }
+
+/* Columnas con color propio — punto + barra superior */
+.ev-col-dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:6px; flex-shrink:0; }
+
+/* ── Descripción ── */
+.ev-descripcion-input { width:100%; background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:8px;
+  padding:9px 11px; color:var(--text-main); font-size:12.5px; font-family:inherit; resize:vertical; min-height:60px; }
+
+/* ── Checklists múltiples agrupados ── */
+.ev-checklist-grupo { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:11px; padding:12px; margin-bottom:10px; }
+.ev-checklist-grupo-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.ev-checklist-titulo-input { flex:1; background:none; border:none; font-size:12.5px; font-weight:800; color:var(--text-main);
+  font-family:inherit; padding:3px 0; border-bottom:1px dashed transparent; }
+.ev-checklist-titulo-input:focus { outline:none; border-bottom-color:var(--accent-blue); }
+.ev-checklist-progreso-chico { font-size:10px; color:var(--accent-green); font-weight:700; flex-shrink:0; white-space:nowrap; }
+.ev-btn-borrar-checklist { background:none; border:none; color:var(--text-muted); font-size:13px; cursor:pointer; padding:2px 6px; flex-shrink:0; }
+.ev-btn-borrar-checklist:hover { color:#ef4444; }
+.ev-check-item-fila { display:flex; align-items:center; gap:8px; padding:5px 0; }
+.ev-check-item-fila input[type=checkbox] { width:16px; height:16px; cursor:pointer; flex-shrink:0; }
+.ev-check-item-texto-fija { flex:1; font-size:12.5px; }
+.ev-check-item-fila.hecho .ev-check-item-texto-fija { text-decoration:line-through; color:var(--text-muted); }
+.ev-btn-borrar-item { background:none; border:none; color:var(--text-dim); font-size:11px; cursor:pointer; flex-shrink:0; padding:2px 5px; }
+.ev-btn-borrar-item:hover { color:#ef4444; }
+.ev-check-add-row-chico { display:flex; gap:6px; margin-top:6px; position:relative; }
+.ev-check-add-row-chico input { flex:1; background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:7px;
+  padding:6px 9px; font-size:12px; color:var(--text-main); font-family:inherit; }
+.ev-check-add-row-chico button { background:var(--accent-green); color:#062015; border:none; border-radius:7px; padding:6px 11px;
+  font-weight:800; font-size:11.5px; cursor:pointer; }
+.ev-btn-crear-checklist { background:var(--panel-darker); border:1px dashed var(--border-glow); color:var(--accent-green);
+  font-size:11.5px; font-weight:800; padding:8px 12px; border-radius:8px; cursor:pointer; width:100%; margin-bottom:4px; }
+.ev-mencion-aviso { font-size:10px; color:var(--text-dim); margin-top:6px; }
+
+/* ── Notas Generales ── */
+.ev-nota-item { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+.ev-nota-item .txt { font-size:12.5px; line-height:1.4; margin-bottom:5px; white-space:pre-wrap; }
+.ev-nota-item .ft { font-size:10px; color:var(--text-dim); }
+.ev-textarea-nota { width:100%; background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:9px;
+  padding:10px 12px; color:var(--text-main); font-size:12.5px; font-family:inherit; resize:vertical; min-height:70px; }
+.ev-textarea-nota:focus { outline:none; border-color:var(--accent-green); }
+
+/* ── Adjuntos + portada ── */
+.ev-dropzone { border:2px dashed var(--border-glow); border-radius:11px; padding:14px; text-align:center; cursor:pointer; }
+.ev-dropzone:hover { border-color:var(--accent-blue); }
+.ev-dropzone .l { font-size:12px; font-weight:700; }
+.ev-dropzone .s { font-size:10.5px; color:var(--text-dim); margin-top:3px; }
+.ev-adjunto-fila { display:flex; align-items:center; gap:9px; background:var(--panel-darker); border:1px solid var(--border-glow);
+  border-radius:10px; padding:8px 10px; margin-top:7px; }
+.ev-adjunto-fila .ic { font-size:17px; flex-shrink:0; }
+.ev-adjunto-fila .info { flex:1; min-width:0; }
+.ev-adjunto-fila .n { font-size:11.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ev-adjunto-fila .s { font-size:9.5px; color:var(--text-dim); }
+.ev-btn-portada { background:var(--panel-dark); border:1px solid var(--border-glow); color:var(--text-muted); font-size:10px;
+  font-weight:800; padding:4px 8px; border-radius:7px; cursor:pointer; flex-shrink:0; white-space:nowrap; }
+.ev-btn-portada.activo { background:var(--accent-orange); border-color:var(--accent-orange); color:#0a1424; }
+.ev-portada-banner { display:flex; align-items:center; gap:10px; background:var(--panel-darker); border:1px solid var(--border-glow);
+  border-radius:11px; padding:9px 11px; margin-bottom:14px; }
+.ev-portada-banner img { width:48px; height:48px; border-radius:8px; object-fit:cover; flex-shrink:0; }
+.ev-card-portada { width:100%; height:64px; border-radius:9px 9px 0 0; margin:-10px -11px 8px; overflow:hidden; }
+.ev-card-portada img { width:100%; height:100%; object-fit:cover; display:block; }
 </style>
 </head>
 <body>
 
 <div class="ev-header">
+  <button class="ev-hamburger ev-icon-btn" onclick="_abrirMenuMobileEv()">☰</button>
   <button class="ev-btn-back" onclick="_volverEventos()">←</button>
   <div class="ev-header-title">
     <h1 id="ev-hdr-titulo">Gestión Eventos / Congresos</h1>
@@ -229,26 +314,67 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
   </button>
 </div>
 
+<!-- Menú mobile — evento actual + tema + vista, colapsado para pantallas chicas -->
+<div class="ev-mobile-menu-overlay" id="ev-mobile-menu-overlay" onclick="if(event.target===this)_cerrarMenuMobileEv()">
+  <div class="ev-mobile-menu-panel">
+    <h3>Menú <button class="ev-icon-btn" style="width:28px;height:28px;" onclick="_cerrarMenuMobileEv()">✕</button></h3>
+    <div class="ev-campo">
+      <label>Evento</label>
+      <select class="ev-select-evento" id="ev-select-evento-mobile" style="width:100%;" onchange="_cambiarEventoDesdeSelect(this.value)"></select>
+    </div>
+    <div class="ev-campo">
+      <label>Vista</label>
+      <div class="ev-view-switch" style="width:100%;">
+        <button data-vista="board" onclick="_cambiarVistaEv('board');_cerrarMenuMobileEv();" style="flex:1;">▦ Tablero</button>
+        <button data-vista="list" onclick="_cambiarVistaEv('list');_cerrarMenuMobileEv();" style="flex:1;">☰ Lista</button>
+      </div>
+    </div>
+    <button class="ev-btn-secundario" style="width:100%;padding:10px;margin-bottom:8px;" onclick="_toggleTemaEv()">🌙 Cambiar tema</button>
+    <button class="ev-btn-secundario" style="width:100%;padding:10px;" onclick="_volverASelectorEventos();_cerrarMenuMobileEv();">📋 Todos los eventos</button>
+  </div>
+</div>
+
 <div class="ev-body">
 
   <!-- ═══ VISTA: Selector de eventos ═══ -->
   <div id="ev-vista-selector">
     <div id="ev-lista-eventos"><div style="text-align:center;padding:30px;"><div class="spinner" style="margin:0 auto;"></div></div></div>
-    <button class="ev-btn-nuevo-evento" onclick="_abrirModalNuevoEvento()">+ Nuevo evento</button>
+    <button class="ev-btn-nuevo-evento" id="ev-btn-nuevo-evento" onclick="_abrirModalNuevoEvento()" style="display:none;">+ Nuevo evento</button>
   </div>
 
   <!-- ═══ VISTA: Tablero ═══ -->
   <div id="ev-vista-tablero" style="display:none;">
     <div class="ev-tablero-topbar">
       <select class="ev-select-evento" id="ev-select-evento" onchange="_cambiarEventoDesdeSelect(this.value)"></select>
+      <div class="ev-view-switch" id="ev-view-switch">
+        <button data-vista="board" class="activo" onclick="_cambiarVistaEv('board')">▦ Tablero</button>
+        <button data-vista="list" onclick="_cambiarVistaEv('list')">☰ Lista</button>
+      </div>
+      <button class="ev-btn-secundario" id="ev-btn-borrar-evento" onclick="_borrarEventoActual()" style="display:none;color:#f87171;">🗑 Borrar evento</button>
       <button class="ev-btn-secundario" onclick="_volverASelectorEventos()">📋 Todos los eventos</button>
     </div>
     <div class="ev-filtros" id="ev-filtros">
+      <input type="search" class="ev-search-input" id="ev-search-input" placeholder="Buscar tareas, responsables o checklists..." autocomplete="off" oninput="_aplicarFiltrosEv()">
       <select id="ev-filtro-responsable" onchange="_aplicarFiltrosEv()"><option value="">Responsable: todos</option></select>
       <select id="ev-filtro-categoria" onchange="_aplicarFiltrosEv()"><option value="">Categoría: todas</option></select>
+      <select id="ev-filtro-vencimiento" onchange="_aplicarFiltrosEv()">
+        <option value="">Vencimiento: todas</option>
+        <option value="overdue">Vencidas</option>
+        <option value="today">Hoy</option>
+        <option value="next-7">Próximos 7 días</option>
+        <option value="no-date">Sin fecha</option>
+      </select>
+      <select id="ev-filtro-progreso" onchange="_aplicarFiltrosEv()">
+        <option value="">Progreso: todos</option>
+        <option value="no-checklist">Sin checklist</option>
+        <option value="not-started">Sin empezar</option>
+        <option value="in-progress">En curso</option>
+        <option value="complete">Completo</option>
+      </select>
       <button class="ev-filtro-limpiar" id="ev-filtro-limpiar" onclick="_limpiarFiltrosEv()" style="display:none;">✕ Limpiar filtros</button>
     </div>
     <div class="ev-board" id="ev-board"></div>
+    <div class="ev-list-wrap" id="ev-list-wrap"></div>
   </div>
 
 </div>
@@ -330,6 +456,14 @@ function _volverEventos() {
   if (!acceso) return;
   var ok = await _cargarSesion();
   if (!ok) return;
+  // Botones que requieren Administrador (crear/borrar EVENTOS y
+  // COLUMNAS enteras) — ocultos por defecto en el HTML, se muestran
+  // solo si corresponde. Pedido por Cristian: "Solo Administrador
+  // (mismo criterio que borrar empresas)".
+  if (_session.rol === 'Administrador') {
+    var btnNuevoEv = document.getElementById('ev-btn-nuevo-evento');
+    if (btnNuevoEv) btnNuevoEv.style.display = 'block';
+  }
   var params = new URLSearchParams(window.location.search);
   var idUrl = params.get('id');
   var tarjetaUrl = params.get('tarjeta');
@@ -338,6 +472,10 @@ function _volverEventos() {
   _cargarNotificaciones(true);
   setInterval(function(){ _cargarNotificaciones(true); }, 45000);
 })();
+
+function _esAdministradorEv() { return _session && _session.rol === 'Administrador'; }
+function _abrirMenuMobileEv() { document.getElementById('ev-mobile-menu-overlay').classList.add('abierto'); }
+function _cerrarMenuMobileEv() { document.getElementById('ev-mobile-menu-overlay').classList.remove('abierto'); }
 
 // ══════════════════════════════════════════════════════════════════
 // EVENTOS — listar / crear / abrir
@@ -368,7 +506,7 @@ function _renderListaEventos() {
 function _abrirModalNuevoEvento() {
   var nombre = prompt('Nombre del evento o congreso (ej. "Faco Extrema 2026"):');
   if (!nombre || !nombre.trim()) return;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_crearEvento', nombre: nombre.trim() }) })
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_crearEvento', nombre: nombre.trim(), vendedorRol: _session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert('Error al crear: ' + (r.error||'desconocido')); return; }
@@ -376,10 +514,23 @@ function _abrirModalNuevoEvento() {
     });
 }
 
+function _borrarEventoActual() {
+  if (!EVENTO_ACTUAL) return;
+  if (!confirm('¿Borrar el evento "' + EVENTO_ACTUAL.nombre + '" con TODAS sus tarjetas, checklists y adjuntos? No se puede deshacer.')) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_borrarEvento', id: EVENTO_ACTUAL.id, vendedorRol: _session.rol }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+      _volverASelectorEventos();
+    });
+}
+
 async function _abrirEvento(id, tarjetaId) {
   document.getElementById('ev-vista-selector').style.display = 'none';
   document.getElementById('ev-vista-tablero').style.display = 'block';
   document.getElementById('ev-board').innerHTML = '<div style="padding:30px;"><div class="spinner" style="margin:0 auto;"></div></div>';
+  VISTA_ACTUAL_EV = 'board';
   try {
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_obtenerEvento', id: id }) });
     var r = await resp.json();
@@ -387,6 +538,8 @@ async function _abrirEvento(id, tarjetaId) {
     EVENTO_ACTUAL = r.evento;
     document.getElementById('ev-hdr-titulo').textContent = EVENTO_ACTUAL.nombre;
     document.getElementById('ev-hdr-sub').textContent = EVENTO_ACTUAL.tarjetas.length + ' tarjetas';
+    var btnBorrarEv = document.getElementById('ev-btn-borrar-evento');
+    if (btnBorrarEv) btnBorrarEv.style.display = _esAdministradorEv() ? 'inline-block' : 'none';
     if (!_internosCacheEv) await _cargarInternosEv();
     _renderSelectEventos();
     _renderFiltrosEv();
@@ -405,12 +558,24 @@ async function _abrirEvento(id, tarjetaId) {
 }
 
 function _renderSelectEventos() {
-  var sel = document.getElementById('ev-select-evento');
-  sel.innerHTML = EVENTOS.map(function(e) {
+  var opciones = EVENTOS.map(function(e) {
     return '<option value="' + e.id + '"' + (EVENTO_ACTUAL && EVENTO_ACTUAL.id === e.id ? ' selected' : '') + '>📅 ' + _esc(e.nombre) + '</option>';
   }).join('');
+  document.getElementById('ev-select-evento').innerHTML = opciones;
+  var selMobile = document.getElementById('ev-select-evento-mobile');
+  if (selMobile) selMobile.innerHTML = opciones;
 }
 function _cambiarEventoDesdeSelect(id) { if (id) _abrirEvento(id); }
+
+// ── Vista Tablero / Lista ──
+var VISTA_ACTUAL_EV = 'board';
+function _cambiarVistaEv(v) {
+  VISTA_ACTUAL_EV = v;
+  document.querySelectorAll('#ev-view-switch button').forEach(function(b){ b.classList.toggle('activo', b.dataset.vista === v); });
+  document.getElementById('ev-board').classList.toggle('oculto', v !== 'board');
+  document.getElementById('ev-list-wrap').classList.toggle('activo', v === 'list');
+  if (v === 'list') _renderListaTarjetasEv();
+}
 
 function _volverASelectorEventos() {
   document.getElementById('ev-vista-tablero').style.display = 'none';
@@ -462,13 +627,13 @@ function _renderTablero() {
     var tarjetas = tarjetasPorColumna[col.id] || [];
     return '<div class="ev-col" id="ev-col-' + col.id + '" ondragover="_dragOverCol(event,\'' + col.id + '\')" ondragleave="_dragLeaveCol(event,\'' + col.id + '\')" ondrop="_dropEnCol(event,\'' + col.id + '\')">' +
       '<div class="ev-col-header">' +
-        '<div><span class="ev-col-nombre">' + _esc(col.nombre) + '</span><span class="ev-col-count">' + tarjetas.length + '</span></div>' +
+        '<div><span class="ev-col-dot" style="background:' + (col.color||'#3a86ff') + ';"></span><span class="ev-col-nombre">' + _esc(col.nombre) + '</span><span class="ev-col-count">' + tarjetas.length + '</span></div>' +
         '<button class="ev-col-menu-btn" onclick="_menuColumna(event,\'' + col.id + '\')">⋯</button>' +
       '</div>' +
       tarjetas.map(_renderCard).join('') +
       '<button class="ev-col-add-tarjeta" onclick="_abrirModalNuevaTarjeta(\'' + col.id + '\')">+ Nueva tarjeta</button>' +
     '</div>';
-  }).join('') + '<div class="ev-col-nueva" onclick="_abrirModalNuevaColumna()">+ Nueva columna</div>';
+  }).join('') + (_esAdministradorEv() ? '<div class="ev-col-nueva" onclick="_abrirModalNuevaColumna()">+ Nueva columna</div>' : '');
   _aplicarFiltrosEv();
 }
 
@@ -476,11 +641,24 @@ function _renderTablero() {
 //    Ventas/Servicio. Se aplican ocultando tarjetas con CSS, no
 //    volviendo a pedir datos al servidor — es instantáneo y no rompe
 //    el drag & drop de las que sí quedan visibles.
+function _progresoAgregado(t) {
+  var checklists = Array.isArray(t.checklists) ? t.checklists : [];
+  var total = 0, hechos = 0;
+  checklists.forEach(function(g) { (g.items||[]).forEach(function(i){ total++; if (i.hecho) hechos++; }); });
+  return { total: total, hechos: hechos, pct: total ? Math.round(hechos/total*100) : 0 };
+}
+function _hoyISOev() { return new Date().toISOString().slice(0,10); }
+
+function _textoBusquedaTarjetaEv(t) {
+  var checklistTxt = (t.checklists||[]).map(function(g) { return g.titulo + ' ' + (g.items||[]).map(function(i){return i.texto;}).join(' '); }).join(' ');
+  var notasTxt = (t.notas||[]).map(function(n){ return n.texto; }).join(' ');
+  var archivosTxt = (t.adjuntos||[]).map(function(a){ return a.nombre; }).join(' ');
+  return [t.titulo, t.descripcion, t.categoria, t.responsable_nombre, checklistTxt, notasTxt, archivosTxt].join(' ').toLocaleLowerCase('es');
+}
+
 function _renderFiltrosEv() {
   var selResp = document.getElementById('ev-filtro-responsable');
   var valorPrevioResp = selResp.value;
-  var nombresUnicos = {};
-  (EVENTO_ACTUAL.tarjetas || []).forEach(function(t) { if (t.responsable_email) nombresUnicos[t.responsable_email] = t.responsable_nombre || t.responsable_email; });
   selResp.innerHTML = '<option value="">Responsable: todos</option>' +
     (_internosCacheEv || []).map(function(p) { return '<option value="' + _esc(p.email) + '">' + _esc(p.nombre) + '</option>'; }).join('');
   selResp.value = valorPrevioResp;
@@ -492,40 +670,109 @@ function _renderFiltrosEv() {
   selCat.value = valorPrevioCat;
 }
 
-window._aplicarFiltrosEv = function() {
+function _tarjetaPasaFiltrosEv(t) {
+  var busqueda = (document.getElementById('ev-search-input') || {}).value || '';
+  busqueda = busqueda.trim().toLocaleLowerCase('es');
   var resp = (document.getElementById('ev-filtro-responsable') || {}).value || '';
   var cat = (document.getElementById('ev-filtro-categoria') || {}).value || '';
+  var venc = (document.getElementById('ev-filtro-vencimiento') || {}).value || '';
+  var prog = (document.getElementById('ev-filtro-progreso') || {}).value || '';
+
+  if (busqueda && _textoBusquedaTarjetaEv(t).indexOf(busqueda) === -1) return false;
+  if (resp && t.responsable_email !== resp) return false;
+  if (cat && t.categoria !== cat) return false;
+
+  if (venc) {
+    var hoy = _hoyISOev();
+    if (venc === 'no-date' && t.fecha_limite) return false;
+    if (venc !== 'no-date' && !t.fecha_limite) return false;
+    if (venc === 'overdue' && !(t.fecha_limite < hoy)) return false;
+    if (venc === 'today' && t.fecha_limite !== hoy) return false;
+    if (venc === 'next-7') {
+      var en7 = new Date(); en7.setDate(en7.getDate()+7);
+      var en7iso = en7.toISOString().slice(0,10);
+      if (!(t.fecha_limite >= hoy && t.fecha_limite <= en7iso)) return false;
+    }
+  }
+
+  if (prog) {
+    var p = _progresoAgregado(t);
+    if (prog === 'no-checklist' && p.total !== 0) return false;
+    if (prog === 'not-started' && !(p.total > 0 && p.hechos === 0)) return false;
+    if (prog === 'in-progress' && !(p.total > 0 && p.hechos > 0 && p.hechos < p.total)) return false;
+    if (prog === 'complete' && !(p.total > 0 && p.hechos === p.total)) return false;
+  }
+
+  return true;
+}
+
+window._aplicarFiltrosEv = function() {
   document.querySelectorAll('.ev-card').forEach(function(card) {
-    var coincideResp = !resp || card.dataset.responsable === resp;
-    var coincideCat = !cat || card.dataset.categoria === cat;
-    card.classList.toggle('ev-filtrada-fuera', !(coincideResp && coincideCat));
+    var t = EVENTO_ACTUAL.tarjetas.find(function(x){ return x.id === card.dataset.idTarjeta; });
+    card.classList.toggle('ev-filtrada-fuera', !(t && _tarjetaPasaFiltrosEv(t)));
   });
+  var busqueda = (document.getElementById('ev-search-input') || {}).value || '';
+  var resp = (document.getElementById('ev-filtro-responsable') || {}).value || '';
+  var cat = (document.getElementById('ev-filtro-categoria') || {}).value || '';
+  var venc = (document.getElementById('ev-filtro-vencimiento') || {}).value || '';
+  var prog = (document.getElementById('ev-filtro-progreso') || {}).value || '';
   var btnLimpiar = document.getElementById('ev-filtro-limpiar');
-  if (btnLimpiar) btnLimpiar.style.display = (resp || cat) ? 'inline-block' : 'none';
+  if (btnLimpiar) btnLimpiar.style.display = (busqueda || resp || cat || venc || prog) ? 'inline-block' : 'none';
+  if (VISTA_ACTUAL_EV === 'list') _renderListaTarjetasEv();
 };
 
 window._limpiarFiltrosEv = function() {
+  document.getElementById('ev-search-input').value = '';
   document.getElementById('ev-filtro-responsable').value = '';
   document.getElementById('ev-filtro-categoria').value = '';
+  document.getElementById('ev-filtro-vencimiento').value = '';
+  document.getElementById('ev-filtro-progreso').value = '';
   _aplicarFiltrosEv();
 };
 
+// ── Vista Lista — todas las tarjetas del evento, sin agrupar por
+// columna, con la misma info que la tarjeta del tablero. Pedido por
+// Cristian: "usa todo lo que puedas de la nueva UX eventos-v5".
+function _renderListaTarjetasEv() {
+  var cont = document.getElementById('ev-list-wrap');
+  if (!cont || !EVENTO_ACTUAL) return;
+  var visibles = EVENTO_ACTUAL.tarjetas.filter(_tarjetaPasaFiltrosEv);
+  if (!visibles.length) { cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);">Sin tarjetas para estos filtros.</div>'; return; }
+  cont.innerHTML = visibles.map(function(t) {
+    var col = (EVENTO_ACTUAL.columnas || []).find(function(c){ return c.id === t.columna_id; });
+    var cat = CATEGORIAS_EV[t.categoria] || { bg:'rgba(148,163,184,.15)', color:'#94a3b8' };
+    var p = _progresoAgregado(t);
+    var fechaInfo = _fechaLimiteInfo(t.fecha_limite);
+    var inicialResp = (t.responsable_nombre || '').trim().charAt(0).toUpperCase() || '?';
+    return '<div class="ev-list-fila" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
+      '<span class="ev-col-dot" style="background:' + (col ? col.color : '#94a3b8') + ';" title="' + _esc(col ? col.nombre : '') + '"></span>' +
+      '<span class="ev-list-titulo">' + _esc(t.titulo) + '</span>' +
+      '<div class="ev-list-meta">' +
+        (t.categoria ? '<span class="ev-card-cat" style="background:' + cat.bg + ';color:' + cat.color + ';">' + _esc(t.categoria) + '</span>' : '') +
+        (fechaInfo.html ? '<span class="ev-card-fecha ' + fechaInfo.clase + '">' + fechaInfo.html + '</span>' : '') +
+        (p.total ? '<span>' + p.hechos + '/' + p.total + '</span>' : '') +
+        (t.responsable_nombre ? '<span class="ev-card-resp" title="' + _esc(t.responsable_nombre) + '">' + inicialResp + '</span>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
 function _renderCard(t) {
   var cat = CATEGORIAS_EV[t.categoria] || { bg:'rgba(148,163,184,.15)', color:'#94a3b8' };
-  var checklist = Array.isArray(t.checklist) ? t.checklist : [];
-  var hechos = checklist.filter(function(i){ return i.hecho; }).length;
-  var pct = checklist.length ? Math.round(hechos / checklist.length * 100) : 0;
+  var p = _progresoAgregado(t);
   var fechaInfo = _fechaLimiteInfo(t.fecha_limite);
   var inicialResp = (t.responsable_nombre || '').trim().charAt(0).toUpperCase() || '?';
-  return '<div class="ev-card" data-responsable="' + _esc(t.responsable_email||'') + '" data-categoria="' + _esc(t.categoria||'') + '" draggable="true" ondragstart="_dragStartCard(event,\'' + t.id + '\')" ondragend="_dragEndCard(event)" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
+  var portada = (t.adjuntos || []).find(function(a){ return a.esPortada; });
+  return '<div class="ev-card" data-id-tarjeta="' + t.id + '" data-responsable="' + _esc(t.responsable_email||'') + '" data-categoria="' + _esc(t.categoria||'') + '" draggable="true" ondragstart="_dragStartCard(event,\'' + t.id + '\')" ondragend="_dragEndCard(event)" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
+    (portada ? '<div class="ev-card-portada"><img src="' + portada.url + '" alt=""></div>' : '') +
     (t.categoria ? '<span class="ev-card-cat" style="background:' + cat.bg + ';color:' + cat.color + ';">' + _esc(t.categoria) + '</span>' : '') +
     '<div class="ev-card-titulo">' + _esc(t.titulo) + '</div>' +
     '<div class="ev-card-meta">' +
       (fechaInfo.html ? '<span class="ev-card-fecha ' + fechaInfo.clase + '">' + fechaInfo.html + '</span>' : '<span></span>') +
       (t.responsable_nombre ? '<span class="ev-card-resp" title="' + _esc(t.responsable_nombre) + '">' + inicialResp + '</span>' : '') +
     '</div>' +
-    (checklist.length ? '<div class="ev-card-progreso-wrap"><div class="ev-card-progreso-bar" style="width:' + pct + '%;"></div></div>' +
-      '<div class="ev-card-progreso-txt">' + hechos + '/' + checklist.length + ' subtareas</div>' : '') +
+    (p.total ? '<div class="ev-card-progreso-wrap"><div class="ev-card-progreso-bar" style="width:' + p.pct + '%;"></div></div>' +
+      '<div class="ev-card-progreso-txt">' + p.hechos + '/' + p.total + ' subtareas</div>' : '') +
   '</div>';
 }
 
@@ -548,12 +795,16 @@ function _dropEnCol(ev, idCol) {
   _dragTarjetaId = null;
 }
 
-// ── Columnas ──
+// ── Columnas — crear/borrar solo Administrador (backend ya lo exige;
+// acá además no se ofrece el botón "+ Nueva columna" a quien no lo
+// es). Renombrar/recolorear queda abierto a cualquier interno. ──
+var COLORES_COLUMNA_EV = ['#3a86ff', '#f8961e', '#06d6a0', '#8b5cf6', '#ef4444', '#38bdf8', '#ec4899'];
 function _abrirModalNuevaColumna() {
   var nombre = prompt('Nombre de la columna:');
   if (!nombre || !nombre.trim()) return;
+  var color = COLORES_COLUMNA_EV[(EVENTO_ACTUAL.columnas || []).length % COLORES_COLUMNA_EV.length];
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'ev_crearColumna', id_evento:EVENTO_ACTUAL.id, nombre:nombre.trim() }) })
+    body: JSON.stringify({ accion:'ev_crearColumna', id_evento:EVENTO_ACTUAL.id, nombre:nombre.trim(), color:color, vendedorRol:_session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
@@ -565,12 +816,12 @@ function _menuColumna(ev, idCol) {
   ev.stopPropagation();
   var col = (EVENTO_ACTUAL.columnas || []).find(function(c){ return c.id === idCol; });
   if (!col) return;
-  var accion = prompt('Columna "' + col.nombre + '"\n\nEscribí un nuevo nombre para renombrarla, o "borrar" para eliminarla:', col.nombre);
+  var accion = prompt('Columna "' + col.nombre + '"\n\nEscribí un nuevo nombre para renombrarla, o "borrar" para eliminarla' + (_esAdministradorEv() ? '' : ' (solo Administrador puede borrar)') + ':', col.nombre);
   if (accion === null) return;
   if (accion.trim().toLowerCase() === 'borrar') {
     if (!confirm('¿Borrar la columna "' + col.nombre + '"? Tiene que estar vacía.')) return;
     fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({ accion:'ev_borrarColumna', id_evento:EVENTO_ACTUAL.id, id_columna:idCol }) })
+      body: JSON.stringify({ accion:'ev_borrarColumna', id_evento:EVENTO_ACTUAL.id, id_columna:idCol, vendedorRol:_session.rol }) })
       .then(function(r){ return r.json(); })
       .then(function(r) {
         if (!r.ok) { alert(r.error || 'No se pudo borrar.'); return; }
@@ -652,14 +903,20 @@ function _renderOverlayTarjeta() {
 
   var colActual = (EVENTO_ACTUAL.columnas || []).find(function(c){ return c.id === t.columna_id; });
   var fechaCreado = t.creado_en ? new Date(t.creado_en).toLocaleDateString('es-AR', {day:'2-digit', month:'short', year:'numeric'}) : '';
+  var portada = (t.adjuntos || []).find(function(a){ return a.esPortada; });
 
   document.getElementById('ev-overlay-body').innerHTML =
     '<div class="ev-overlay-col-principal">' +
+      (portada ? '<div class="ev-portada-banner"><img src="' + portada.url + '" alt=""><div><div style="font-size:11.5px;font-weight:700;">' + _esc(portada.nombre) + '</div><div style="font-size:10px;color:var(--text-muted);">Portada de la tarjeta</div></div></div>' : '') +
       '<input type="text" class="ev-det-titulo-input" id="ev-t-titulo" value="' + _esc(t.titulo) + '" onchange="_guardarCampoTarjeta(\'titulo\',this.value)" placeholder="Título de la tarjeta">' +
       '<div class="ev-det-header-info">' +
         (fechaCreado ? 'Creada el <b>' + fechaCreado + '</b> · ' : '') +
         'En <b>' + _esc((colActual && colActual.nombre) || '—') + '</b>' +
         (EVENTO_ACTUAL.nombre ? ' · ' + _esc(EVENTO_ACTUAL.nombre) : '') +
+      '</div>' +
+
+      '<div class="ev-campo"><label>Descripción / Propósito</label>' +
+        '<textarea class="ev-descripcion-input" id="ev-t-descripcion" rows="3" placeholder="Explicá brevemente de qué trata esta tarjeta y para qué sirve..." onchange="_guardarCampoTarjeta(\'descripcion\',this.value)">' + _esc(t.descripcion||'') + '</textarea>' +
       '</div>' +
 
       '<div class="ev-det-grid">' +
@@ -668,16 +925,22 @@ function _renderOverlayTarjeta() {
       '</div>' +
       '<div class="ev-det-card"><div class="ev-det-card-label">Responsable Principal</div><select id="ev-t-resp" onchange="_guardarResponsable(this.value)"><option value="">Sin asignar</option>' + opcionesResp + '</select></div>' +
 
-      '<div class="ev-section-titulo">✅ Lista de comprobación <span id="ev-check-progreso" style="text-transform:none;font-weight:400;"></span></div>' +
-      '<div class="ev-det-checklist-box">' +
-        '<div class="ev-det-progreso-track"><div class="ev-det-progreso-fill" id="ev-check-progreso-fill" style="width:0%;"></div></div>' +
-        '<div id="ev-checklist-lista">' + _renderChecklist(t) + '</div>' +
-        '<div class="ev-check-add-row" style="position:relative;">' +
-          '<input type="text" id="ev-check-nuevo" placeholder="Nueva subtarea... usá @ para asignar" oninput="_onChecklistInput(event)" onkeydown="_onChecklistKeydown(event)">' +
-          '<button onclick="_agregarChecklistItem()">+</button>' +
-          '<div id="ev-check-sugerencias" class="ev-mencion-sug"></div>' +
-        '</div>' +
+      '<div class="ev-section-titulo">✅ Checklists</div>' +
+      '<button class="ev-btn-crear-checklist" onclick="_crearChecklistGrupoEv()">+ Crear nuevo Checklist</button>' +
+      '<div id="ev-checklists-cont">' + _renderChecklistsGrupos(t) + '</div>' +
+
+      '<div class="ev-section-titulo">📌 Notas Generales</div>' +
+      '<textarea class="ev-textarea-nota" id="ev-t-nueva-nota" rows="3" placeholder="Escribí una nota de seguimiento..."></textarea>' +
+      '<button class="ev-btn-secundario" style="margin-top:8px;" onclick="_agregarNotaEv()">+ Agregar Nota</button>' +
+      '<div id="ev-notas-cont" style="margin-top:10px;">' + _renderNotasGenerales(t) + '</div>' +
+
+      '<div class="ev-section-titulo">📎 Archivos Adjuntos</div>' +
+      '<div class="ev-dropzone" onclick="document.getElementById(\'ev-input-archivo\').click()">' +
+        '<div class="l">📁 Seleccionar archivo (Máx 10 MB por archivo)</div>' +
+        '<div class="s">Formatos permitidos: PDF, PNG, JPG, XLSX</div>' +
       '</div>' +
+      '<input type="file" id="ev-input-archivo" accept=".pdf,.png,.jpg,.jpeg,.xlsx" style="display:none;" onchange="_subirAdjuntoEv(event)">' +
+      '<div id="ev-adjuntos-cont">' + _renderAdjuntos(t) + '</div>' +
     '</div>' +
 
     '<div class="ev-overlay-col-mensajes">' +
@@ -689,7 +952,6 @@ function _renderOverlayTarjeta() {
         '<div id="ev-msg-sugerencias" class="ev-mencion-sug"></div>' +
       '</div>' +
     '</div>';
-  _actualizarProgresoChecklist(t);
 }
 
 function _guardarCampoTarjeta(campo, valor) {
@@ -711,58 +973,210 @@ function _guardarResponsable(email) {
   _renderTablero();
 }
 
-// ── Checklist ──
-function _actualizarProgresoChecklist(t) {
-  var checklist = Array.isArray(t.checklist) ? t.checklist : [];
-  var hechos = checklist.filter(function(i){ return i.hecho; }).length;
-  var pct = checklist.length ? Math.round(hechos / checklist.length * 100) : 0;
-  var elTexto = document.getElementById('ev-check-progreso');
-  var elFill = document.getElementById('ev-check-progreso-fill');
-  if (elTexto) elTexto.textContent = checklist.length ? '(' + hechos + '/' + checklist.length + ')' : '';
-  if (elFill) elFill.style.width = pct + '%';
-}
-function _renderChecklist(t) {
-  var checklist = Array.isArray(t.checklist) ? t.checklist : [];
-  if (!checklist.length) return '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">Sin subtareas todavía.</div>';
-  return checklist.map(function(item) {
-    return '<div class="ev-check-item' + (item.hecho ? ' hecho' : '') + '">' +
-      '<input type="checkbox"' + (item.hecho ? ' checked' : '') + ' onchange="_toggleChecklistItem(\'' + item.id + '\')">' +
-      '<div><div class="ev-check-texto">' + _esc(item.texto) + '</div>' +
-      ((item.menciones||[]).length ? '<div class="ev-check-mencion">👤 ' + (item.menciones||[]).join(', ') + '</div>' : '') +
-      '</div></div>';
-  }).join('');
-}
-function _toggleChecklistItem(idItem) {
+// ── Checklists agrupados (v161 — reemplaza el checklist único) ──
+function _crearChecklistGrupoEv() {
   var t = _tarjetaActual();
+  if (!t) return;
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'ev_toggleChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_item:idItem, autor_email:_session.username, autor_nombre:_session.name }) })
+    body: JSON.stringify({ accion:'ev_crearChecklistGrupo', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, titulo:'Nuevo Checklist' }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); return; }
-      t.checklist = r.checklist;
-      document.getElementById('ev-checklist-lista').innerHTML = _renderChecklist(t);
-      _actualizarProgresoChecklist(t);
+      t.checklists = r.checklists;
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
+      _renderTablero();
+    });
+}
+function _renombrarChecklistGrupoEv(idGrupo, nuevoTitulo) {
+  var t = _tarjetaActual();
+  if (!t || !nuevoTitulo || !nuevoTitulo.trim()) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_editarChecklistGrupo', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, titulo:nuevoTitulo.trim() }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) { if (r.ok) t.checklists = r.checklists; });
+}
+function _borrarChecklistGrupoEv(idGrupo) {
+  var t = _tarjetaActual();
+  if (!t) return;
+  if (!confirm('¿Borrar este checklist completo con todos sus ítems?')) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_borrarChecklistGrupo', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert(r.error||'Error'); return; }
+      t.checklists = r.checklists;
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
+      _renderTablero();
+    });
+}
+function _renderChecklistsGrupos(t) {
+  var grupos = Array.isArray(t.checklists) ? t.checklists : [];
+  if (!grupos.length) return '<div style="font-size:12px;color:var(--text-muted);padding:6px 0 4px;">Todavía no hay checklists en esta tarjeta.</div>';
+  return grupos.map(function(g) {
+    var items = g.items || [];
+    var hechos = items.filter(function(i){ return i.hecho; }).length;
+    return '<div class="ev-checklist-grupo" id="ev-cl-grupo-' + g.id + '">' +
+      '<div class="ev-checklist-grupo-header">' +
+        '<input class="ev-checklist-titulo-input" value="' + _esc(g.titulo) + '" onchange="_renombrarChecklistGrupoEv(\'' + g.id + '\', this.value)">' +
+        (items.length ? '<span class="ev-checklist-progreso-chico">' + hechos + '/' + items.length + '</span>' : '') +
+        '<button class="ev-btn-borrar-checklist" onclick="_borrarChecklistGrupoEv(\'' + g.id + '\')" title="Borrar checklist">🗑</button>' +
+      '</div>' +
+      '<div>' + items.map(function(item) {
+        return '<div class="ev-check-item-fila' + (item.hecho?' hecho':'') + '">' +
+          '<input type="checkbox"' + (item.hecho?' checked':'') + ' onchange="_toggleChecklistItem(\'' + g.id + '\',\'' + item.id + '\')">' +
+          '<span class="ev-check-item-texto-fija">' + _esc(item.texto) + '</span>' +
+          '<button class="ev-btn-borrar-item" onclick="_eliminarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\')" title="Eliminar ítem">✕</button>' +
+        '</div>';
+      }).join('') + '</div>' +
+      '<div class="ev-check-add-row-chico">' +
+        '<div id="ev-cl-sug-' + g.id + '" class="ev-mencion-sug"></div>' +
+        '<input type="text" id="ev-cl-nuevo-' + g.id + '" placeholder="Agregar ítem... @ para mencionar" ' +
+          'oninput="_onChecklistInput(event,\'' + g.id + '\')" onkeydown="_onChecklistKeydown(event,\'' + g.id + '\')">' +
+        '<button onclick="_agregarChecklistItem(\'' + g.id + '\')">+ Agregar</button>' +
+      '</div>' +
+      '<div class="ev-mencion-aviso">Al mencionar con @ a un colaborador en un ítem, se le enviará un correo y una notificación Push.</div>' +
+    '</div>';
+  }).join('');
+}
+function _toggleChecklistItem(idGrupo, idItem) {
+  var t = _tarjetaActual();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_toggleChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, id_item:idItem, autor_email:_session.username, autor_nombre:_session.name }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert(r.error||'Error'); return; }
+      t.checklists = r.checklists;
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
+      _renderTablero();
+    });
+}
+function _eliminarChecklistItemEv(idGrupo, idItem) {
+  var t = _tarjetaActual();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_eliminarChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, id_item:idItem }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert(r.error||'Error'); return; }
+      t.checklists = r.checklists;
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
       _renderTablero();
     });
 }
 var _mencionChecklistSeleccionada = [];
-function _onChecklistInput(ev) { _mencionAutocompletarGenerico(ev.target, 'ev-check-sugerencias', function(nombre){ _insertarMencionEnInput('ev-check-nuevo', nombre); }); }
-function _onChecklistKeydown(ev) { _mencionKeydownGenerico(ev, 'ev-check-sugerencias', function(nombre){ _insertarMencionEnInput('ev-check-nuevo', nombre); }); }
-function _agregarChecklistItem() {
-  var input = document.getElementById('ev-check-nuevo');
+function _onChecklistInput(ev, idGrupo) { _mencionAutocompletarGenerico(ev.target, 'ev-cl-sug-'+idGrupo, function(nombre){ _insertarMencionEnInput('ev-cl-nuevo-'+idGrupo, nombre); }); }
+function _onChecklistKeydown(ev, idGrupo) { _mencionKeydownGenerico(ev, 'ev-cl-sug-'+idGrupo, function(nombre){ _insertarMencionEnInput('ev-cl-nuevo-'+idGrupo, nombre); }); }
+function _agregarChecklistItem(idGrupo) {
+  var input = document.getElementById('ev-cl-nuevo-' + idGrupo);
   var texto = input.value.trim();
   if (!texto) return;
   var menciones = _extraerMencionesDeTexto(texto);
   var t = _tarjetaActual();
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'ev_agregarChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, texto:texto, menciones:menciones, autor_email:_session.username, autor_nombre:_session.name }) })
+    body: JSON.stringify({ accion:'ev_agregarChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, texto:texto, menciones:menciones, autor_email:_session.username, autor_nombre:_session.name }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); return; }
-      t.checklist = r.checklist;
-      document.getElementById('ev-checklist-lista').innerHTML = _renderChecklist(t);
-      _actualizarProgresoChecklist(t);
+      t.checklists = r.checklists;
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
       input.value = '';
+      _renderTablero();
+    });
+}
+
+// ── Notas Generales ──
+function _renderNotasGenerales(t) {
+  var notas = Array.isArray(t.notas) ? t.notas : [];
+  if (!notas.length) return '<div style="font-size:12px;color:var(--text-muted);">Sin notas todavía.</div>';
+  return notas.map(function(n) {
+    var fecha = n.fecha ? new Date(n.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    return '<div class="ev-nota-item"><div class="txt">' + _esc(n.texto) + '</div><div class="ft">Por: ' + _esc(n.autor||'—') + ' — ' + fecha + ' hs</div></div>';
+  }).join('');
+}
+function _agregarNotaEv() {
+  var input = document.getElementById('ev-t-nueva-nota');
+  var texto = input.value.trim();
+  if (!texto) return;
+  var t = _tarjetaActual();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_agregarNota', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, texto:texto, autor_nombre:_session.name }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert(r.error||'Error'); return; }
+      t.notas = r.notas;
+      document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t);
+      input.value = '';
+    });
+}
+
+// ── Adjuntos + portada ──
+var ADJUNTOS_ICONOS_EV = { pdf:'📄', png:'🖼️', jpg:'🖼️', jpeg:'🖼️', xlsx:'📊' };
+function _renderAdjuntos(t) {
+  var adjuntos = Array.isArray(t.adjuntos) ? t.adjuntos : [];
+  if (!adjuntos.length) return '';
+  return adjuntos.map(function(a) {
+    var ext = (a.nombre.split('.').pop() || '').toLowerCase();
+    var kb = Math.round((a.tamano||0) / 1024);
+    return '<div class="ev-adjunto-fila">' +
+      '<span class="ic">' + (ADJUNTOS_ICONOS_EV[ext] || '📎') + '</span>' +
+      '<a class="info" href="' + a.url + '" target="_blank" style="text-decoration:none;color:inherit;">' +
+        '<div class="n">' + _esc(a.nombre) + '</div><div class="s">' + kb + ' KB</div>' +
+      '</a>' +
+      '<button class="ev-btn-portada' + (a.esPortada?' activo':'') + '" onclick="_marcarPortadaEv(\'' + a.id + '\')">📌 ' + (a.esPortada?'Portada':'Usar como portada') + '</button>' +
+      '<button class="ev-btn-borrar-item" onclick="_eliminarAdjuntoEv(\'' + a.id + '\')" title="Eliminar">✕</button>' +
+    '</div>';
+  }).join('');
+}
+function _subirAdjuntoEv(ev) {
+  var file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { alert('El archivo pesa más de 10MB — no se puede subir.'); return; }
+  var extPermitidas = ['pdf','png','jpg','jpeg','xlsx'];
+  var ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (extPermitidas.indexOf(ext) === -1) { alert('Formato no permitido — solo PDF, PNG, JPG, XLSX.'); return; }
+  var t = _tarjetaActual();
+  var reader = new FileReader();
+  reader.onload = function() {
+    var base64 = reader.result.split(',')[1];
+    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+      accion:'subirAdjunto', modulo:'eventos', idRegistro: EVENTO_ACTUAL.id + '/tarjetas/' + t.id,
+      nombre:file.name, tipoMime:file.type, base64:base64, subidoPorNombre:_session.name,
+    }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r) {
+        if (!r.ok) { alert('Error al subir: ' + (r.error||'')); return; }
+        if (!Array.isArray(t.adjuntos)) t.adjuntos = [];
+        var adj = r.adjunto; adj.id = r.adjId;
+        t.adjuntos.push(adj);
+        document.getElementById('ev-adjuntos-cont').innerHTML = _renderAdjuntos(t);
+      });
+  };
+  reader.readAsDataURL(file);
+}
+function _eliminarAdjuntoEv(adjId) {
+  var t = _tarjetaActual();
+  if (!confirm('¿Eliminar este archivo?')) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+    accion:'eliminarAdjunto', modulo:'eventos', idRegistro: EVENTO_ACTUAL.id + '/tarjetas/' + t.id, adjId:adjId,
+  }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+      t.adjuntos = (t.adjuntos||[]).filter(function(a){ return a.id !== adjId; });
+      document.getElementById('ev-adjuntos-cont').innerHTML = _renderAdjuntos(t);
+      _renderTablero();
+    });
+}
+function _marcarPortadaEv(adjId) {
+  var t = _tarjetaActual();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+    accion:'ev_marcarPortada', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, adjId:adjId,
+  }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+      (t.adjuntos||[]).forEach(function(a){ a.esPortada = (a.id === adjId); });
+      _renderOverlayTarjeta();
       _renderTablero();
     });
 }
@@ -874,10 +1288,20 @@ function _mencionAutocompletarGenerico(inputEl, idSugerencias, onElegir) {
   if (!match) { box.style.display = 'none'; return; }
   var busqueda = match[1].toLowerCase();
   _mencionCandidatosEv = (_internosCacheEv || []).filter(function(p) { return p.nombre.toLowerCase().indexOf(busqueda) !== -1; }).slice(0, 6);
-  _mencionIndiceResaltadoEv = -1;
   if (!_mencionCandidatosEv.length) { box.style.display = 'none'; return; }
+  // Resalta el PRIMER candidato apenas se despliega la lista (antes
+  // arrancaba en -1, así que Enter no hacía nada hasta apretar una
+  // flecha) y cierra cualquier OTRO picker que hubiera quedado
+  // abierto (de otro ítem de checklist o del chat) — si no, dos
+  // listas podían quedar visibles a la vez y un click en la vieja
+  // terminaba disparando la selección sobre el input nuevo. Pedido y
+  // bug reportado por Cristian: "cuando arrobo se despliega la lista
+  // e ilumina al primero... chequear que no mezcles los mencionados
+  // de mensajes internos y listas de comprobación".
+  document.querySelectorAll('.ev-mencion-sug').forEach(function(b) { if (b !== box) b.style.display = 'none'; });
+  _mencionIndiceResaltadoEv = 0;
   box.innerHTML = _mencionCandidatosEv.map(function(p, i) {
-    return '<button type="button" onmousedown="event.preventDefault();(' + onElegir.toString() + ')(\'' + p.nombre.replace(/'/g,"\\'") + '\')">👤 ' + _esc(p.nombre) + '</button>';
+    return '<button type="button" class="' + (i===0?'activo':'') + '" onmousedown="event.preventDefault();(' + onElegir.toString() + ')(\'' + p.nombre.replace(/'/g,"\\'") + '\')" onmouseenter="_mencionIndiceResaltadoEv=' + i + ';_resaltarMencionEv(this.parentNode);">👤 ' + _esc(p.nombre) + '</button>';
   }).join('');
   box.style.display = 'block';
 }
@@ -886,11 +1310,13 @@ function _mencionKeydownGenerico(ev, idSugerencias, onElegir) {
   if (box.style.display !== 'block' || !_mencionCandidatosEv.length) return;
   if (ev.key === 'ArrowDown') { ev.preventDefault(); _mencionIndiceResaltadoEv = Math.min(_mencionIndiceResaltadoEv + 1, _mencionCandidatosEv.length - 1); _resaltarMencionEv(box); }
   else if (ev.key === 'ArrowUp') { ev.preventDefault(); _mencionIndiceResaltadoEv = Math.max(_mencionIndiceResaltadoEv - 1, 0); _resaltarMencionEv(box); }
-  else if (ev.key === 'Enter' && _mencionIndiceResaltadoEv !== -1) { ev.preventDefault(); onElegir(_mencionCandidatosEv[_mencionIndiceResaltadoEv].nombre); }
+  else if ((ev.key === 'Enter' || ev.key === 'Tab') && _mencionIndiceResaltadoEv !== -1) { ev.preventDefault(); box.style.display = 'none'; onElegir(_mencionCandidatosEv[_mencionIndiceResaltadoEv].nombre); }
   else if (ev.key === 'Escape') { box.style.display = 'none'; }
 }
 function _resaltarMencionEv(box) {
   Array.from(box.children).forEach(function(el, i) { el.classList.toggle('activo', i === _mencionIndiceResaltadoEv); });
+  var activo = box.querySelector('.activo');
+  if (activo && activo.scrollIntoView) activo.scrollIntoView({ block: 'nearest' });
 }
 function _insertarMencionEnInput(idInput, nombre) {
   var input = document.getElementById(idInput);
