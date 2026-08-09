@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.09.6 (Ítems de checklist ahora son responsivos — pasan de <input> de una sola línea (cortaba el texto largo) a <textarea rows="1"> que crece solo con el contenido (mismo patrón auto-resize que otros campos del Portal). Se dispara al tipear (oninput) y también al abrir la tarjeta / repintar el checklist, para que los ítems ya guardados con texto largo se vean expandidos desde el primer render, no recién al tocarlos. Pedido por Cristian con captura resaltando el corte de texto: "fijate que los campos de ítems sean responsivos".) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.5 (3 pedidos de Cristian con captura: (1) el campo "Agregar ítem" se veía gigante — bug relacionado al anterior pero distinto: el picker de menciones (.ev-mencion-sug) quedaba DENTRO de la fila flex .ev-check-add-row-chico junto al input y el botón, y como esa fila no tenía align-items definido (default: stretch), cuando el picker se poblaba con varios candidatos y crecía en alto, TODO el input y el botón se estiraban para igualar esa altura. Fix: el picker sale de la fila flex y pasa a ser un hermano debajo (mismo patrón que ya usa el chat) — así solo el picker crece, sin arrastrar al resto. (2) La portada de la tarjeta ahora es clickeable — abre en grande con un lightbox (tocar afuera o en la imagen la cierra), tanto desde el modal como desde la tarjeta cerrada en el tablero. (3) Sobre "no aparecen los 10 destinatarios": confirmado con test que si listarInternos devuelve 10, el picker efectivamente pinta los 10 — no hay ningún límite ni filtro adicional en el código de Eventos. El picker tiene scroll interno (max-height:160px, igual que Negocios) — si Cristian los ve incompletos incluso scrolleando, el problema estaría en la hoja Vendedores, no en el código.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.4 (BUG REAL encontrado tras descartar caché — Cristian confirmó con captura que solo pasaba en Listas de comprobación, no en Mensajes internos, lo cual apuntaba a código y no a versión vieja. Causa: el picker de menciones (.ev-mencion-sug) queda anidado DENTRO de .ev-check-add-row-chico (la fila del input "Agregar ítem" + botón "+ Agregar"), y la regla ".ev-check-add-row-chico button" (pensada solo para el botón verde "+ Agregar") tiene la MISMA especificidad CSS que ".ev-mencion-sug button" pero está definida más abajo en la hoja de estilos — por cascada, le ganaba y pintaba TODOS los botones de sugerencias de verde (menos el resaltado, que sí ganaba por tener 2 clases ".activo"). En el chat no pasaba porque ahí el picker no está anidado dentro de ningún contenedor con esa regla. Fix: los selectores pasan a usar combinador de hijo directo (".ev-check-add-row-chico > button/input"), así solo afectan al input y botón que son hijos directos, sin filtrarse a los botones del picker anidado más adentro. Confirmado con getComputedStyle real vía jsdom: los botones no-activos ahora dan rgba(0,0,0,0) en vez de verde.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.3 (Chat "Mensajes internos" ahora usa EXACTAMENTE el mismo formato que Negocios (cotizaciones.html): lista de mensajes envuelta en su propia caja con borde y scroll interno (max-height:340px) — antes era un <div> suelto sin caja, por eso el contenido se mezclaba con el resto de la página en vez de quedar contenido; esto también resuelve de raíz el problema de que el título se perdía de scroll (se sacó el parche sticky, ya no hace falta). Título "Mensajes internos" pasa a texto plano bold 13px, igual que Negocios (antes tenía tratamiento de section-titulo). Pedido por Cristian con capturas comparando ambos módulos: "así ya está hecho en Negocios y funciona... usa misma tipografía y mismo formato que en negocios". Confirmado con jsdom: caja con clase ev-msg-lista-box, picker de menciones position:static (no absolute), resaltado del primero con clase .activo — todo calcado del comportamiento real de cotizaciones.html.) -->
@@ -265,13 +266,14 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 .ev-checklist-progreso-chico { font-size:10px; color:var(--accent-green); font-weight:700; flex-shrink:0; white-space:nowrap; }
 .ev-btn-borrar-checklist { background:none; border:none; color:var(--text-muted); font-size:13px; cursor:pointer; padding:2px 6px; flex-shrink:0; }
 .ev-btn-borrar-checklist:hover { color:#ef4444; }
-.ev-check-item-fila { display:flex; align-items:center; gap:8px; padding:5px 0; }
-.ev-check-item-fila input[type=checkbox] { width:16px; height:16px; cursor:pointer; flex-shrink:0; }
+.ev-check-item-fila { display:flex; align-items:flex-start; gap:8px; padding:5px 0; }
+.ev-check-item-fila input[type=checkbox] { width:16px; height:16px; cursor:pointer; flex-shrink:0; margin-top:3px; }
 .ev-check-item-texto-fija { flex:1; min-width:0; font-size:12.5px; font-family:inherit; background:none; border:none;
-  color:var(--text-main); padding:2px 0; border-bottom:1px dashed transparent; }
+  color:var(--text-main); padding:2px 0; border-bottom:1px dashed transparent; resize:none; overflow:hidden;
+  white-space:pre-wrap; word-break:break-word; line-height:1.4; display:block; }
 .ev-check-item-texto-fija:focus { outline:none; border-bottom-color:var(--accent-blue); }
 .ev-check-item-fila.hecho .ev-check-item-texto-fija { text-decoration:line-through; color:var(--text-muted); }
-.ev-btn-borrar-item { background:none; border:none; color:var(--text-dim); font-size:11px; cursor:pointer; flex-shrink:0; padding:2px 5px; }
+.ev-btn-borrar-item { background:none; border:none; color:var(--text-dim); font-size:11px; cursor:pointer; flex-shrink:0; padding:2px 5px; margin-top:2px; }
 .ev-btn-borrar-item:hover { color:#ef4444; }
 .ev-check-add-row-chico { display:flex; gap:6px; margin-top:6px; position:relative; }
 .ev-check-add-row-chico > input { flex:1; background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:7px;
@@ -887,6 +889,7 @@ async function _abrirTarjeta(idTarjeta) {
   TARJETA_ACTUAL_ID = idTarjeta;
   if (!_internosCacheEv) await _cargarInternosEv();
   _renderOverlayTarjeta();
+  _autoResizeTodosItemsChecklistEv();
   document.getElementById('ev-overlay-tarjeta').classList.add('open');
 }
 function _cerrarOverlayTarjeta() {
@@ -988,6 +991,19 @@ function _guardarResponsable(email) {
 }
 
 // ── Checklists agrupados (v161 — reemplaza el checklist único) ──
+// Los ítems de checklist son <textarea rows="1"> que crecen solos
+// según el contenido — antes eran <input> de una sola línea y el
+// texto largo quedaba cortado en vez de wrappear a varias líneas.
+// Pedido por Cristian con captura: "fijate que los campos de ítems
+// sean responsivos, resalté cómo se corta el texto".
+function _autoResizeTextareaEv(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+function _autoResizeTodosItemsChecklistEv() {
+  document.querySelectorAll('.ev-check-item-texto-fija').forEach(_autoResizeTextareaEv);
+}
+
 function _crearChecklistGrupoEv() {
   var t = _tarjetaActual();
   if (!t) return;
@@ -997,7 +1013,7 @@ function _crearChecklistGrupoEv() {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); return; }
       t.checklists = r.checklists;
-      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
       _renderTablero();
     });
 }
@@ -1019,7 +1035,7 @@ function _borrarChecklistGrupoEv(idGrupo) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); return; }
       t.checklists = r.checklists;
-      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
       _renderTablero();
     });
 }
@@ -1038,7 +1054,7 @@ function _renderChecklistsGrupos(t) {
       '<div>' + items.map(function(item) {
         return '<div class="ev-check-item-fila' + (item.hecho?' hecho':'') + '">' +
           '<input type="checkbox"' + (item.hecho?' checked':'') + ' onchange="_toggleChecklistItem(\'' + g.id + '\',\'' + item.id + '\')">' +
-          '<input type="text" class="ev-check-item-texto-fija" value="' + _esc(item.texto) + '" onchange="_editarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\',this.value)">' +
+          '<textarea rows="1" class="ev-check-item-texto-fija" oninput="_autoResizeTextareaEv(this)" onchange="_editarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\',this.value)">' + _esc(item.texto) + '</textarea>' +
           '<button class="ev-btn-borrar-item" onclick="_eliminarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\')" title="Eliminar ítem">✕</button>' +
         '</div>';
       }).join('') + '</div>' +
@@ -1060,7 +1076,7 @@ function _toggleChecklistItem(idGrupo, idItem) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); return; }
       t.checklists = r.checklists;
-      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
       _renderTablero();
     });
 }
@@ -1072,19 +1088,19 @@ function _eliminarChecklistItemEv(idGrupo, idItem) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); return; }
       t.checklists = r.checklists;
-      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
       _renderTablero();
     });
 }
 function _editarChecklistItemEv(idGrupo, idItem, nuevoTexto) {
   var t = _tarjetaActual();
   nuevoTexto = (nuevoTexto || '').trim();
-  if (!nuevoTexto) { document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); return; }
+  if (!nuevoTexto) { document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); return; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_editarChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, id_item:idItem, texto:nuevoTexto }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert(r.error||'Error'); document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); return; }
+      if (!r.ok) { alert(r.error||'Error'); document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); return; }
       t.checklists = r.checklists;
     });
 }
@@ -1103,7 +1119,7 @@ function _agregarChecklistItem(idGrupo) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); return; }
       t.checklists = r.checklists;
-      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
       input.value = '';
       _renderTablero();
     });
