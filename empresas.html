@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.09.1 (Se sacó el campo "Domicilio" plano del formulario (Nueva Empresa y Editar empresa) — quedaba redundante con Domicilio Fiscal/Comercial/Envío. El link de "Nuevo Ticket" precargado ahora usa Domicilio Comercial (con fallback a Fiscal, y al campo viejo como último recurso) en vez del campo plano. La importación masiva desde Excel se dejó intacta — sigue mandando "domicilio" para empresas nuevas sin los 3 campos granulares, es una fuente legítima de datos que no tiene esa distinción. Ver FotoMap.gs v168: guardarEmpresa ya no pisa el campo viejo con vacío si el formulario no lo manda más — protege los datos ya cargados de empresas existentes. Pedido por Cristian: "Domicilio está de más, ya hay demasiados domicilios... solamente dejar Domicilio Comercial, Domicilio Fiscal, Domicilio de Envío... que no redunde información sin romper nada". Confirmado con jsdom: los campos ya no existen en el HTML, el detalle abre sin crashear, y guardar cambios no manda "domicilio" en el payload.) -->
 <!-- Portal TLC | empresas.html | v2026.08.06.1 (Flujo A de la integración QR Faco Extrema: botón "📷 Escanear QR" en el formulario de Nuevo Contacto, autocompleta Nombre/Email/Teléfono/DNI directo desde la credencial (html5-qrcode). Campo DNI nuevo en el contacto. Ver FotoMap.gs v159 y ficha-equipo.html v2026.08.06.1 (Flujo B).) -->
 <!-- Portal TLC | empresas.html | v2026.08.04.10 (Mismo fix de color-scheme que cotizaciones.html — causa raíz real del hover oscuro en modo claro.) -->
 <!-- Portal TLC | empresas.html | v2026.08.04.8 (Modal "Nuevo Negocio": checkboxes de contactos en vez de un dropdown de uno solo — se puede tildar varios (el primero queda como principal, el resto como adicionales, ver FotoMap.gs v146). Nueva navegación ?volverA=negocio&idNegocio=X — la flecha del header vuelve directo al negocio si se llegó desde ahí (ver cotizaciones.html v2026.08.04.7). Pedido por Cristian.) -->
@@ -226,10 +227,6 @@
             <label>Razón Social *</label>
             <input type="text" id="ne-razon" placeholder="Nombre de la empresa">
           </div>
-          <div class="det-campo full">
-            <label>Domicilio</label>
-            <input type="text" id="ne-domicilio" placeholder="Dirección de la empresa">
-          </div>
           <div class="det-campo">
             <label>Domicilio Fiscal</label>
             <input type="text" id="ne-domicilio-fiscal">
@@ -273,10 +270,6 @@
           <div class="det-campo">
             <label>Teléfono</label>
             <input type="text" id="det-telefono">
-          </div>
-          <div class="det-campo full">
-            <label>Domicilio</label>
-            <input type="text" id="det-domicilio">
           </div>
           <div class="det-campo">
             <label>Domicilio Fiscal</label>
@@ -575,7 +568,6 @@ window._crearNuevaEmpresa = function() {
   if (!razon) { alert('Falta la Razón Social — se completa sola con el CUIT, o cargala vos.'); return; }
   var cuit = document.getElementById('ne-cuit').value.trim();
   var telefono = document.getElementById('ne-telefono').value.trim();
-  var domicilio = document.getElementById('ne-domicilio').value.trim();
   var domicilioFiscal = document.getElementById('ne-domicilio-fiscal').value.trim();
   var domicilioComercial = document.getElementById('ne-domicilio-comercial').value.trim();
   var domicilioEnvio = document.getElementById('ne-domicilio-envio').value.trim();
@@ -594,7 +586,7 @@ window._crearNuevaEmpresa = function() {
   if (btnCrearEmp) { btnCrearEmp.disabled = true; btnCrearEmp.textContent = 'Guardando...'; }
 
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:razon, cuit:cuit, telefono:telefono, domicilio:domicilio,
+    body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:razon, cuit:cuit, telefono:telefono,
       domicilioFiscal:domicilioFiscal, domicilioComercial:domicilioComercial, domicilioEnvio:domicilioEnvio, comentariosGenerales:comentariosGenerales }) })
     .then(function(r){ return r.json(); })
     .then(async function(r) {
@@ -619,7 +611,6 @@ window._abrirDetalleEmpresa = function(id) {
   document.getElementById('det-razon').value = e.razonSocial;
   document.getElementById('det-cuit').value = e.cuit;
   document.getElementById('det-telefono').value = e.telefono;
-  document.getElementById('det-domicilio').value = e.domicilio;
   document.getElementById('det-domicilio-fiscal').value = e.domicilioFiscal || '';
   document.getElementById('det-domicilio-comercial').value = e.domicilioComercial || '';
   document.getElementById('det-domicilio-envio').value = e.domicilioEnvio || '';
@@ -647,7 +638,6 @@ window._guardarCambiosEmpresa = function() {
   var razon = document.getElementById('det-razon').value.trim() || e.razonSocial;
   var cuit = document.getElementById('det-cuit').value.trim();
   var telefono = document.getElementById('det-telefono').value.trim();
-  var domicilio = document.getElementById('det-domicilio').value.trim();
   var domicilioFiscal = document.getElementById('det-domicilio-fiscal').value.trim();
   var domicilioComercial = document.getElementById('det-domicilio-comercial').value.trim();
   var domicilioEnvio = document.getElementById('det-domicilio-envio').value.trim();
@@ -656,12 +646,12 @@ window._guardarCambiosEmpresa = function() {
   var textoOriginal = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'guardarEmpresa', id:e.id, razonSocial:razon, cuit:cuit, telefono:telefono, domicilio:domicilio,
+    body: JSON.stringify({ accion:'guardarEmpresa', id:e.id, razonSocial:razon, cuit:cuit, telefono:telefono,
       domicilioFiscal:domicilioFiscal, domicilioComercial:domicilioComercial, domicilioEnvio:domicilioEnvio, comentariosGenerales:comentariosGenerales }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert('Error al guardar: ' + (r.error||'desconocido')); return; }
-      e.razonSocial = razon; e.cuit = cuit; e.telefono = telefono; e.domicilio = domicilio;
+      e.razonSocial = razon; e.cuit = cuit; e.telefono = telefono;
       e.domicilioFiscal = domicilioFiscal; e.domicilioComercial = domicilioComercial; e.domicilioEnvio = domicilioEnvio; e.comentariosGenerales = comentariosGenerales;
       document.getElementById('hdr-titulo').textContent = razon;
     })
@@ -870,7 +860,7 @@ window._nuevoNegocio = function(tipo) {
   params.set('nuevoTicket', '1');
   params.set('empresaId', e.id || '');
   params.set('cliente', e.razonSocial || '');
-  params.set('domicilio', e.domicilio || '');
+  params.set('domicilio', e.domicilioComercial || e.domicilioFiscal || e.domicilio || '');
   params.set('telefono', e.telefono || '');
   if (e.contactos && e.contactos.length) {
     params.set('contactos', e.contactos.map(function(c){
