@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.09.9 (BUG REAL encontrado y confirmado con click simulado (mousedown+mouseup+click, no solo Enter): el picker de menciones de los ítems de checklist tiraba "ReferenceError: idGrupo is not defined" en cada click, silenciosamente (no se veía en pantalla, solo en la consola del navegador). Causa: la función "qué hacer al elegir una mención" se pasaba como closure y se convertía a TEXTO con .toString() para meterla en el onclick="..." del botón — eso pierde CUALQUIER variable externa que el closure use (acá, idGrupo, el ID del checklist), porque el texto se vuelve a ejecutar en el scope global, donde esa variable no existe. El chat no tenía este problema porque su closure usaba un string fijo ('ev-msg-nuevo'), no una variable — por eso "andaba solo en negocios/chat" y no en checklist. Por eso también Enter SÍ funcionaba (llama a la función real en memoria, con su closure intacto) pero el click no. Fix de raíz: se saca el patrón de función-a-texto por completo — ahora se pasa el ID del input destino como STRING PLANO (inmune a este problema) y una sola función global (_seleccionarMencionEv) hace la inserción. También: ítems de checklist con texto vacío ahora muestran un placeholder explicando qué pasó, en vez de quedar invisibles (probable causa del reporte de "no se ven los ítems" — un ítem creado sin texto durante pruebas anteriores, ahora al menos es visible/editable/borrable). Confirmado con jsdom: click real ya inserta la mención sin error, tanto en checklist como en chat. Pedido por Cristian con 3 capturas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.8 (El botón de borrar suelto en el header del detalle de tarjeta (🗑) quedaba muy expuesto y fácil de confundir con la ✕ de cerrar — se reemplaza por un menú de tres puntos (⋯) con dropdown: 🔗 Copiar link a esta tarjeta (nuevo), 📋 Duplicar tarjeta (nuevo — usa ev_duplicarTarjeta de FotoMap.gs v164, quedaba pendiente desde el v1 del módulo), y 🗑️ Borrar tarjeta al final en rojo (misma confirmación de siempre, ahora un paso más adentro para evitar el toque accidental). El dropdown se cierra solo al clickear afuera. Pedido por Cristian con captura: "modificá ese acceso, ej. 3 puntos con acciones varias ahí adentro además de borrar tarjeta". Confirmado con jsdom: el menú abre/cierra bien, y duplicar tarjeta crea la copia, repinta el tablero y abre su detalle.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.7 (Fix — crear una tarjeta nueva no se veía en el tablero hasta salir y volver a entrar. Causa: ev_crearTarjeta devolvía adjuntos:{} (objeto), pero _renderCard/filtros/búsqueda esperan array — pintar la tarjeta recién creada tiraba "{}.find is not a function", cortando en seco el resto del renderTablero() sin avisar. Fix acá (normalizar r.tarjeta.adjuntos=[] antes de pushearla) + fix de raíz en FotoMap.gs v163 (ev_crearTarjeta ya devuelve adjuntos:[] directamente). Confirmado con jsdom simulando la respuesta vieja del backend: la tarjeta ahora aparece al instante sin salir/entrar. Reportado por Cristian.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.6 (Ítems de checklist ahora son responsivos — pasan de <input> de una sola línea (cortaba el texto largo) a <textarea rows="1"> que crece solo con el contenido (mismo patrón auto-resize que otros campos del Portal). Se dispara al tipear (oninput) y también al abrir la tarjeta / repintar el checklist, para que los ítems ya guardados con texto largo se vean expandidos desde el primer render, no recién al tocarlos. Pedido por Cristian con captura resaltando el corte de texto: "fijate que los campos de ítems sean responsivos".) -->
@@ -1130,7 +1131,7 @@ function _renderChecklistsGrupos(t) {
       '<div>' + items.map(function(item) {
         return '<div class="ev-check-item-fila' + (item.hecho?' hecho':'') + '">' +
           '<input type="checkbox"' + (item.hecho?' checked':'') + ' onchange="_toggleChecklistItem(\'' + g.id + '\',\'' + item.id + '\')">' +
-          '<textarea rows="1" class="ev-check-item-texto-fija" oninput="_autoResizeTextareaEv(this)" onchange="_editarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\',this.value)">' + _esc(item.texto) + '</textarea>' +
+          '<textarea rows="1" class="ev-check-item-texto-fija" placeholder="(sin texto — tocá para escribir o el ✕ para borrarlo)" oninput="_autoResizeTextareaEv(this)" onchange="_editarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\',this.value)">' + _esc(item.texto) + '</textarea>' +
           '<button class="ev-btn-borrar-item" onclick="_eliminarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\')" title="Eliminar ítem">✕</button>' +
         '</div>';
       }).join('') + '</div>' +
@@ -1181,8 +1182,16 @@ function _editarChecklistItemEv(idGrupo, idItem, nuevoTexto) {
     });
 }
 var _mencionChecklistSeleccionada = [];
-function _onChecklistInput(ev, idGrupo) { _mencionAutocompletarGenerico(ev.target, 'ev-cl-sug-'+idGrupo, function(nombre){ _insertarMencionEnInput('ev-cl-nuevo-'+idGrupo, nombre); }); }
-function _onChecklistKeydown(ev, idGrupo) { _mencionKeydownGenerico(ev, 'ev-cl-sug-'+idGrupo, function(nombre){ _insertarMencionEnInput('ev-cl-nuevo-'+idGrupo, nombre); }); }
+function _onChecklistInput(ev, idGrupo) { _mencionAutocompletarGenerico(ev.target, 'ev-cl-sug-'+idGrupo, 'ev-cl-nuevo-'+idGrupo); }
+function _onChecklistKeydown(ev, idGrupo) {
+  var boxAbierto = _mencionKeydownGenerico(ev, 'ev-cl-sug-'+idGrupo, 'ev-cl-nuevo-'+idGrupo);
+  // Si el picker de menciones NO estaba abierto (o la tecla no era
+  // ninguna de las suyas), Enter dispara "+ Agregar" — antes no hacía
+  // nada, el usuario tenía que ir a tocar el botón a mano. Pedido por
+  // Cristian con captura: "al apretar enter qué acciona el botón
+  // agregar ítem" (nada, hasta ahora).
+  if (!boxAbierto && ev.key === 'Enter') { ev.preventDefault(); _agregarChecklistItem(idGrupo); }
+}
 function _agregarChecklistItem(idGrupo) {
   var input = document.getElementById('ev-cl-nuevo-' + idGrupo);
   var texto = input.value.trim();
@@ -1385,12 +1394,12 @@ window._reaccionarMensajeEv = function(ev, indice, tipo) {
     });
 };
 
-function _onMsgInputEv(ev) { _mencionAutocompletarGenerico(ev.target, 'ev-msg-sugerencias', function(nombre){ _insertarMencionEnInput('ev-msg-nuevo', nombre); }); }
+function _onMsgInputEv(ev) { _mencionAutocompletarGenerico(ev.target, 'ev-msg-sugerencias', 'ev-msg-nuevo'); }
 function _onMsgKeydownEv(ev) {
   // Mismo criterio que Negocios (cotizaciones.html): Enter NO envía el
   // mensaje — solo el botón "Enviar". Si el picker de menciones está
   // abierto, Enter selecciona al resaltado (eso sí se mantiene).
-  _mencionKeydownGenerico(ev, 'ev-msg-sugerencias', function(nombre){ _insertarMencionEnInput('ev-msg-nuevo', nombre); });
+  _mencionKeydownGenerico(ev, 'ev-msg-sugerencias', 'ev-msg-nuevo');
 }
 function _enviarMensajeEv() {
   var input = document.getElementById('ev-msg-nuevo');
@@ -1410,22 +1419,34 @@ function _enviarMensajeEv() {
 }
 
 // ── @Menciones — helper genérico compartido por checklist y chat.
-// Mismo formato visual y comportamiento EXACTO que Negocios
-// (cotizaciones.html): la lista aparece en flujo normal (empuja el
-// botón "Enviar" hacia abajo, no flota encima con position:absolute
-// tapando contenido), y cada selección pasa por un guard de 400ms
-// anti-doble-toque — en algunos Android, mousedown/touchend Y click
-// pueden dispararse los dos para el mismo toque, insertando la
-// mención dos veces. Pedido por Cristian con captura: "así ya está
-// hecho en Negocios y funciona... usa misma tipografía y mismo
-// formato que en negocios". ──
+// Mismo formato visual y comportamiento que Negocios (cotizaciones.html).
+//
+// BUG REAL encontrado y confirmado con test (jsdom + click simulado):
+// antes, el "qué hacer al elegir una mención" se pasaba como una
+// función JS (closure) que se convertía a TEXTO con .toString() para
+// poder meterla adentro del atributo onclick="..." del botón. Eso
+// funciona SOLO si esa función no depende de ninguna variable externa
+// — el closure del CHAT usaba 'ev-msg-nuevo' (string fijo, sobrevive
+// perfecto), pero el closure del CHECKLIST usaba 'ev-cl-nuevo-'+idGrupo
+// (variable local del scope original) — al convertir esa función a
+// texto y volver a ejecutarla en el scope global (así funcionan los
+// atributos onclick), "idGrupo" ya no existe en ningún lado →
+// ReferenceError silencioso, el click no hacía nada. Por eso Enter sí
+// funcionaba (llama a la función real, con su closure intacto) pero
+// el click no. Fix: se saca el patrón de función-a-texto por completo
+// — ahora se pasa el ID del input destino como un STRING PLANO (nunca
+// se pierde al convertir a texto), y una única función global
+// (_seleccionarMencionEv) hace la inserción. Reportado por Cristian:
+// "al hacer click en el mencionado que lo seleccione, actualmente
+// solo deja hacerlo con enter".
 var _mencionUltimoCursorEv = 0;
 var _ultimaMencionElegidaEnEv = 0;
-function _elegirMencionUnaVezEv(insertarFn, nombre) {
+
+function _seleccionarMencionEv(idInputDestino, nombre) {
   var ahora = Date.now();
-  if (ahora - _ultimaMencionElegidaEnEv < 400) return;
+  if (ahora - _ultimaMencionElegidaEnEv < 400) return; // anti doble-toque (mousedown+click en algunos Android)
   _ultimaMencionElegidaEnEv = ahora;
-  insertarFn(nombre);
+  _insertarMencionEnInput(idInputDestino, nombre);
 }
 
 function _extraerMencionesDeTexto(texto) {
@@ -1436,7 +1457,7 @@ function _extraerMencionesDeTexto(texto) {
   });
   return emails;
 }
-function _mencionAutocompletarGenerico(inputEl, idSugerencias, onElegir) {
+function _mencionAutocompletarGenerico(inputEl, idSugerencias, idInputDestino) {
   var val = inputEl.value;
   var cursor = inputEl.selectionStart;
   _mencionUltimoCursorEv = cursor;
@@ -1447,38 +1468,34 @@ function _mencionAutocompletarGenerico(inputEl, idSugerencias, onElegir) {
   var busqueda = match[1].toLowerCase();
   _mencionCandidatosEv = (_internosCacheEv || []).filter(function(p) { return p.nombre.toLowerCase().indexOf(busqueda) !== -1; }).slice(0, 20);
   if (!_mencionCandidatosEv.length) { box.style.display = 'none'; return; }
-  // Resalta el PRIMER candidato apenas se despliega la lista (antes
-  // arrancaba en -1, así que Enter no hacía nada hasta apretar una
-  // flecha) y cierra cualquier OTRO picker que hubiera quedado
-  // abierto (de otro ítem de checklist o del chat) — si no, dos
-  // listas podían quedar visibles a la vez y un click en la vieja
-  // terminaba disparando la selección sobre el input nuevo. Pedido y
-  // bug reportado por Cristian: "cuando arrobo se despliega la lista
-  // e ilumina al primero... chequear que no mezcles los mencionados
-  // de mensajes internos y listas de comprobación".
+  // Resalta el PRIMER candidato apenas se despliega la lista, y cierra
+  // cualquier OTRO picker que hubiera quedado abierto (de otro ítem de
+  // checklist o del chat) — si no, dos listas podían quedar visibles a
+  // la vez y un click en la vieja terminaba disparando la selección
+  // sobre el input nuevo.
   document.querySelectorAll('.ev-mencion-sug').forEach(function(b) { if (b !== box) b.style.display = 'none'; });
   _mencionIndiceResaltadoEv = 0;
-  _renderSugerenciasMencionEv(box, onElegir);
+  _renderSugerenciasMencionEv(box, idInputDestino);
   box.style.display = 'block';
 }
-function _renderSugerenciasMencionEv(box, onElegir) {
+function _renderSugerenciasMencionEv(box, idInputDestino) {
   box.innerHTML = _mencionCandidatosEv.map(function(p, i) {
     var nombreEsc = p.nombre.replace(/'/g,"\\'");
     return '<button type="button" class="' + (i===_mencionIndiceResaltadoEv?'activo':'') + '" ' +
-      'onmousedown="event.preventDefault(); _elegirMencionUnaVezEv(' + onElegir.toString() + ', \'' + nombreEsc + '\');" ' +
-      'onclick="_elegirMencionUnaVezEv(' + onElegir.toString() + ', \'' + nombreEsc + '\')" ' +
+      'onclick="_seleccionarMencionEv(\'' + idInputDestino + '\', \'' + nombreEsc + '\')" ' +
       'onmouseenter="_mencionIndiceResaltadoEv=' + i + ';_resaltarMencionEv(this.parentNode);">👤 ' + _esc(p.nombre) + '</button>';
   }).join('');
   var activo = box.querySelector('.activo');
   if (activo && activo.scrollIntoView) activo.scrollIntoView({ block: 'nearest' });
 }
-function _mencionKeydownGenerico(ev, idSugerencias, onElegir) {
+function _mencionKeydownGenerico(ev, idSugerencias, idInputDestino) {
   var box = document.getElementById(idSugerencias);
-  if (box.style.display !== 'block' || !_mencionCandidatosEv.length) return;
-  if (ev.key === 'ArrowDown') { ev.preventDefault(); _mencionIndiceResaltadoEv = (_mencionIndiceResaltadoEv + 1) % _mencionCandidatosEv.length; _resaltarMencionEv(box); }
-  else if (ev.key === 'ArrowUp') { ev.preventDefault(); _mencionIndiceResaltadoEv = (_mencionIndiceResaltadoEv - 1 + _mencionCandidatosEv.length) % _mencionCandidatosEv.length; _resaltarMencionEv(box); }
-  else if ((ev.key === 'Enter' || ev.key === 'Tab') && _mencionIndiceResaltadoEv !== -1) { ev.preventDefault(); box.style.display = 'none'; onElegir(_mencionCandidatosEv[_mencionIndiceResaltadoEv].nombre); }
-  else if (ev.key === 'Escape') { box.style.display = 'none'; }
+  if (box.style.display !== 'block' || !_mencionCandidatosEv.length) return false;
+  if (ev.key === 'ArrowDown') { ev.preventDefault(); _mencionIndiceResaltadoEv = (_mencionIndiceResaltadoEv + 1) % _mencionCandidatosEv.length; _resaltarMencionEv(box); return true; }
+  if (ev.key === 'ArrowUp') { ev.preventDefault(); _mencionIndiceResaltadoEv = (_mencionIndiceResaltadoEv - 1 + _mencionCandidatosEv.length) % _mencionCandidatosEv.length; _resaltarMencionEv(box); return true; }
+  if ((ev.key === 'Enter' || ev.key === 'Tab') && _mencionIndiceResaltadoEv !== -1) { ev.preventDefault(); box.style.display = 'none'; _insertarMencionEnInput(idInputDestino, _mencionCandidatosEv[_mencionIndiceResaltadoEv].nombre); return true; }
+  if (ev.key === 'Escape') { box.style.display = 'none'; return true; }
+  return false;
 }
 function _resaltarMencionEv(box) {
   Array.from(box.children).forEach(function(el, i) { el.classList.toggle('activo', i === _mencionIndiceResaltadoEv); });
@@ -1487,6 +1504,7 @@ function _resaltarMencionEv(box) {
 }
 function _insertarMencionEnInput(idInput, nombre) {
   var input = document.getElementById(idInput);
+  if (!input) return;
   var cursor = (idInput === 'ev-msg-nuevo' ? _mencionUltimoCursorEv : null) || input.selectionStart || input.value.length;
   var val = input.value;
   var antes = val.slice(0, cursor).replace(/@([^\s@]*)$/, '@' + nombre + ' ');
