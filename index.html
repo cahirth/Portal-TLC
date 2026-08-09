@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.09.2 (2 pedidos de Cristian: (1) "Regulatoria" y "Reportes" eran los ÚNICOS dos ítems del menú de Administración que no pasaban por NINGÚN chequeo de permiso — ni columna en el Sheet, ni bloqueo visual (opacidad/candado), ni el wrapper abrirModuloConPermiso/abrirUrlConPermiso — a diferencia de absolutamente todos los demás módulos. Se agregaron las columnas "Regulatoria" y "Reportes" a la lectura de permisos (mismo patrón que "Eventos"), se sumaron a aplicarPermisosMenu() para que se vean grises+candado si el usuario no tiene el permiso, y sus onclick pasan a usar abrirModuloConPermiso / la nueva abrirProximamenteConPermiso (para Regulatoria, que todavía no tiene vista real, solo un toast "próximamente" — antes ni siquiera ESE toast respetaba el permiso). (2) "Gestión Eventos / Congresos" pasa a ser el primer ítem del menú de Administración (antes estaba segundo, después de Reportes).) -->
 <!-- Portal TLC | index.html | v2026.08.09.1 (Modal del escáner QR de FacoExtrema: agregada instrucción fija visible MIENTRAS la cámara está activa escaneando — antes solo existía el texto de "antes de arrancar la cámara" (#qr-fac-reader-vacio: "Apuntá la cámara..."), que se ocultaba apenas el video en vivo arrancaba, dejando la pantalla de escaneo real sin ninguna guía visible (confirmado con captura de Cristian, cámara activa sin texto). Nueva instrucción ("📷 Centrá el QR de la credencial en el recuadro... no hace falta tocar nada, se lee solo") se muestra recién cuando la cámara arranca de verdad, y se oculta en los 3 casos de error (sin librería, sin permiso de cámara, excepción al iniciar) para no confundir cuando no hay video. Pedido por Cristian: "ponele instrucciones de uso para que el usuario sepa qué hacer".) -->
 <!-- Portal TLC | index.html | v2026.08.06.3 (Modal QR: los 5 campos leídos (Nombre, Apellido, Email, Teléfono, DNI, Categoría) ahora son editables — antes eran texto fijo, sin forma de corregir un dato mal leído. Teléfono: se agregó mapeo a nombres de campo alternativos (tel/phone/celular/movil) por si el QR real usa otra clave, más un console.log del JSON crudo para diagnosticar en la consola del navegador qué trae exactamente el QR cuando un campo no aparece. Pedido por Cristian con captura de su propio QR de prueba: "el teléfono no me lo lee, chequealo". La acción de backend guardarEmpresaContactoQR ya existe en FotoMap.gs v160 — el guardado real ya funciona.) -->
 <!-- Portal TLC | index.html | v2026.08.06.2 (FAB de QR de FacoExtrema — nuevo, centrado abajo elevado sobre la bottom-nav. Modal centrado en pantalla con tipografía grande (pedido explícito por legibilidad). Escanea credencial (JSON: id/nombre/apellido/dni/email/telefono/vip/categoria) vía html5-qrcode, muestra tilde verde de confirmación 1s, después los datos leídos con 3 botones: Cancelar / Guardar (Empresa+Contacto, sin negocio) / Enviar por WhatsApp y Guardar (ídem + redirige a selector-dispositivos.html?modo=qr_ficha para elegir equipo — de ahí el circuito sigue en ficha-equipo.html v2026.08.06.2, que ya tenía la lógica de Negocio con la regla de 7 días). PENDIENTE DE BACKEND: la acción 'guardarEmpresaContactoQR' que llama el botón Guardar TODAVÍA NO EXISTE en FotoMap.gs — hay que agregarla antes de que el guardado funcione de verdad; mientras tanto el escaneo y la UI andan completos. Iterado primero como demo/mockup (index_DEMO_QR.html) y confirmado por Cristian antes de integrarlo acá.) -->
@@ -862,16 +863,17 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
         <!-- ================= ADMINISTRACIÓN ================= -->
         <div class="app-view" id="view-admin-menu">
             <div class="menu-list-stack">
-                <div class="menu-item-row" onclick="openModule('view-placeholder', 'Reportes', 'Resúmenes y análisis')">
-                    <div class="item-logo-container" style="background:rgba(248,150,30,0.15); border:1px solid rgba(248,150,30,0.4); color:#f8961e;"><i class="fa-solid fa-chart-bar"></i></div>
-                    <div class="item-text-box"><h3>Reportes</h3><p>Resúmenes y análisis</p></div>
-                </div>
                 <div class="menu-item-row" id="menu-eventos" onclick="abrirUrlConPermiso('eventos.html', 'Gestión Eventos / Congresos', 'eventos')">
                     <div class="item-logo-container" style="background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.4); color:#8b5cf6;"><i class="fa-solid fa-calendar-days"></i></div>
                     <div class="item-text-box"><h3>Gestión Eventos / Congresos</h3><p>Tablero de tareas para Facoextrema y otros eventos</p></div>
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
-                <div class="menu-item-row" id="menu-regulatoria" onclick="mostrarToast('📋 Regulatoria — próximamente')">
+                <div class="menu-item-row" id="menu-reportes" onclick="abrirModuloConPermiso('view-placeholder', 'Reportes', 'Resúmenes y análisis', 'reportes')">
+                    <div class="item-logo-container" style="background:rgba(248,150,30,0.15); border:1px solid rgba(248,150,30,0.4); color:#f8961e;"><i class="fa-solid fa-chart-bar"></i></div>
+                    <div class="item-text-box"><h3>Reportes</h3><p>Resúmenes y análisis</p></div>
+                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
+                <div class="menu-item-row" id="menu-regulatoria" onclick="abrirProximamenteConPermiso('📋 Regulatoria — próximamente', 'regulatoria')">
                     <div class="item-logo-container" style="background:rgba(248,150,30,0.15); border:1px solid rgba(248,150,30,0.35);">
                         <i class="fa-solid fa-file-shield" style="color:#f8961e; font-size:20px;"></i>
                     </div>
@@ -1492,6 +1494,8 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
             const tareasIdx  = cols.indexOf('Tareas');
             const empresasIdx= cols.indexOf('Empresas');
             const eventosIdx = cols.indexOf('Eventos'); // ← columna nueva, "permisos.moduloEventos" — si todavía no existe en el Sheet, bool() la deja en false (bloqueado) sin romper nada
+            const regulatoriaIdx = cols.indexOf('Regulatoria');
+            const reportesIdx = cols.indexOf('Reportes');
             const comisionesIdx = cols.indexOf('Ver Comisiones');
 
             const fila = rows.find(r => {
@@ -1514,11 +1518,13 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
                     tareas:        bool(tareasIdx),
                     empresas:      bool(empresasIdx),
                     eventos:       bool(eventosIdx),
+                    regulatoria:   bool(regulatoriaIdx),
+                    reportes:      bool(reportesIdx),
                     verComisiones: bool(comisionesIdx),
                 };
             } else {
                 // Email no encontrado → acceso mínimo
-                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, empresas: false, eventos: false, verComisiones: false };
+                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, empresas: false, eventos: false, regulatoria: false, reportes: false, verComisiones: false };
             }
         } catch(e) {
             console.warn('Error cargando permisos:', e);
@@ -1536,6 +1542,8 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
             { id: 'menu-admin',    permiso: userPermisos.admin },
             { id: 'menu-tareas',   permiso: userPermisos.tareas },
             { id: 'menu-eventos',  permiso: userPermisos.eventos },
+            { id: 'menu-regulatoria', permiso: userPermisos.regulatoria },
+            { id: 'menu-reportes',    permiso: userPermisos.reportes },
         ];
         secciones.forEach(({ id, permiso }) => {
             const el = document.getElementById(id);
@@ -1857,6 +1865,21 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
             return;
         }
         openModule(viewId, title, subtitle);
+    }
+
+    // Para módulos que todavía no tienen vista real (ej. Regulatoria,
+    // "próximamente") — antes mostraban el toast de "próximamente"
+    // directo, SIN pasar por ningún chequeo de permiso, a diferencia
+    // de absolutamente todos los demás ítems del menú. Pedido por
+    // Cristian: "prestar atención a los permisos de Regulatoria y
+    // Reportes".
+    function abrirProximamenteConPermiso(mensaje, seccion) {
+        const el = document.getElementById('menu-' + seccion);
+        if (el && el.dataset.bloqueado === 'true') {
+            mostrarToast('🔒 No tienes permiso para acceder a este módulo');
+            return;
+        }
+        mostrarToast(mensaje);
     }
 
     // Igual que abrirModuloConPermiso, pero para módulos que navegan a un

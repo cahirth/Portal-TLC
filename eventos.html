@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.09.11 (3 pedidos de Cristian: (1) Menú de 3 puntos en el topbar del evento (mismo patrón que el de la tarjeta) — reemplaza los botones sueltos "Borrar evento"/"Todos los eventos" por: 🔗 Copiar link de este evento (nuevo), 📋 Duplicar evento (nuevo — usa ev_duplicarEvento de FotoMap.gs v166, solo Administrador), 🗑️ Borrar evento (Administrador) y 📋 Todos los eventos. (2) Nombre de pila completo del responsable ahora visible junto al avatar en la tarjeta cerrada del tablero Y en la vista Lista — antes solo se veía la inicial en un círculo, había que pasar el mouse para saber quién era. Confirmado con jsdom: se ve "Lucio" completo, no solo "L". Ambos pedidos con captura de Cristian.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.10 (BUG REAL #2 sobre "no se ven los ítems" — no era dato vacío puntual como pensé la primera vez (pasaba con TODOS los ítems de TODOS los checklists por igual, ver captura de Cristian con 7 ítems en 2 listas distintas, todos invisibles). Causa: _abrirTarjeta() llamaba a _autoResizeTodosItemsChecklistEv() (que mide scrollHeight de cada textarea para ajustarle el alto) ANTES de agregar la clase "open" al overlay — y el overlay arranca con display:none. Medir scrollHeight de un elemento adentro de algo con display:none SIEMPRE da 0 en cualquier navegador (no hay layout que medir), así que TODOS los textareas de ítems quedaban con height:0px clavado por JS — colapsados visualmente a la nada, aunque el texto siempre estuvo ahí y guardado bien (confirmado con jsdom: el value de cada textarea nunca estuvo vacío). Fix: se invierte el orden — primero .open (visible), recién ahí se mide y ajusta la altura. Esta parte específica no se puede confirmar con un test automático (jsdom no calcula layout real, scrollHeight siempre da 0 ahí sea cual sea el display) — el razonamiento es sólido (comportamiento de navegador bien conocido) pero necesita confirmación real de Cristian en el navegador.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.9 (BUG REAL encontrado y confirmado con click simulado (mousedown+mouseup+click, no solo Enter): el picker de menciones de los ítems de checklist tiraba "ReferenceError: idGrupo is not defined" en cada click, silenciosamente (no se veía en pantalla, solo en la consola del navegador). Causa: la función "qué hacer al elegir una mención" se pasaba como closure y se convertía a TEXTO con .toString() para meterla en el onclick="..." del botón — eso pierde CUALQUIER variable externa que el closure use (acá, idGrupo, el ID del checklist), porque el texto se vuelve a ejecutar en el scope global, donde esa variable no existe. El chat no tenía este problema porque su closure usaba un string fijo ('ev-msg-nuevo'), no una variable — por eso "andaba solo en negocios/chat" y no en checklist. Por eso también Enter SÍ funcionaba (llama a la función real en memoria, con su closure intacto) pero el click no. Fix de raíz: se saca el patrón de función-a-texto por completo — ahora se pasa el ID del input destino como STRING PLANO (inmune a este problema) y una sola función global (_seleccionarMencionEv) hace la inserción. También: ítems de checklist con texto vacío ahora muestran un placeholder explicando qué pasó, en vez de quedar invisibles (probable causa del reporte de "no se ven los ítems" — un ítem creado sin texto durante pruebas anteriores, ahora al menos es visible/editable/borrable). Confirmado con jsdom: click real ya inserta la mención sin error, tanto en checklist como en chat. Pedido por Cristian con 3 capturas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.8 (El botón de borrar suelto en el header del detalle de tarjeta (🗑) quedaba muy expuesto y fácil de confundir con la ✕ de cerrar — se reemplaza por un menú de tres puntos (⋯) con dropdown: 🔗 Copiar link a esta tarjeta (nuevo), 📋 Duplicar tarjeta (nuevo — usa ev_duplicarTarjeta de FotoMap.gs v164, quedaba pendiente desde el v1 del módulo), y 🗑️ Borrar tarjeta al final en rojo (misma confirmación de siempre, ahora un paso más adentro para evitar el toque accidental). El dropdown se cierra solo al clickear afuera. Pedido por Cristian con captura: "modificá ese acceso, ej. 3 puntos con acciones varias ahí adentro además de borrar tarjeta". Confirmado con jsdom: el menú abre/cierra bien, y duplicar tarjeta crea la copia, repinta el tablero y abre su detalle.) -->
@@ -111,6 +112,8 @@ a { color:var(--accent-blue); }
 .ev-card-fecha.proxima { color:#f8961e; font-weight:700; }
 .ev-card-resp { background:var(--accent-blue); color:#fff; width:20px; height:20px; border-radius:50%; display:flex;
   align-items:center; justify-content:center; font-size:9px; font-weight:800; flex-shrink:0; }
+.ev-card-resp-chip { display:flex; align-items:center; gap:5px; min-width:0; }
+.ev-card-resp-nombre { font-size:10px; font-weight:700; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:88px; }
 .ev-card-progreso-wrap { height:4px; background:var(--panel-darker); border-radius:4px; margin-top:8px; overflow:hidden; }
 .ev-card-progreso-bar { height:100%; background:var(--accent-green); border-radius:4px; transition:width .2s; }
 .ev-card-progreso-txt { font-size:9.5px; color:var(--text-muted); margin-top:3px; }
@@ -302,7 +305,12 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 /* ── Notas Generales ── */
 .ev-nota-item { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:10px; padding:10px 12px; margin-bottom:8px; }
 .ev-nota-item .txt { font-size:12.5px; line-height:1.4; margin-bottom:5px; white-space:pre-wrap; }
+.ev-nota-item .ft-fila { display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .ev-nota-item .ft { font-size:10px; color:var(--text-dim); }
+.ev-nota-item .acciones { display:flex; gap:8px; flex-shrink:0; }
+.ev-nota-item .acciones button { background:none; border:none; color:var(--text-dim); font-size:10.5px; cursor:pointer; padding:0; font-family:inherit; }
+.ev-nota-item .acciones button:hover { color:var(--accent-blue); }
+.ev-nota-item .acciones button.rojo:hover { color:#ef4444; }
 .ev-textarea-nota { width:100%; background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:9px;
   padding:10px 12px; color:var(--text-main); font-size:12.5px; font-family:inherit; resize:vertical; min-height:70px; }
 .ev-textarea-nota:focus { outline:none; border-color:var(--accent-green); }
@@ -379,8 +387,15 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
         <button data-vista="board" class="activo" onclick="_cambiarVistaEv('board')">▦ Tablero</button>
         <button data-vista="list" onclick="_cambiarVistaEv('list')">☰ Lista</button>
       </div>
-      <button class="ev-btn-secundario" id="ev-btn-borrar-evento" onclick="_borrarEventoActual()" style="display:none;color:#f87171;">🗑 Borrar evento</button>
-      <button class="ev-btn-secundario" onclick="_volverASelectorEventos()">📋 Todos los eventos</button>
+      <div style="position:relative;flex-shrink:0;">
+        <button class="ev-btn-menu-tarjeta" onclick="_toggleMenuEvento(event)" title="Más acciones del evento">⋯</button>
+        <div class="ev-menu-tarjeta-dropdown" id="ev-menu-evento-dropdown">
+          <button onclick="_copiarLinkEvento()">🔗 Copiar link de este evento</button>
+          <button id="ev-menu-duplicar-evento" onclick="_duplicarEventoActual()" style="display:none;">📋 Duplicar evento</button>
+          <button id="ev-menu-borrar-evento" class="rojo" onclick="_confirmarBorrarEvento()" style="display:none;">🗑️ Borrar evento</button>
+          <button onclick="_volverASelectorEventos()">📋 Todos los eventos</button>
+        </div>
+      </div>
     </div>
     <div class="ev-filtros" id="ev-filtros">
       <input type="search" class="ev-search-input" id="ev-search-input" placeholder="Buscar tareas, responsables o checklists..." autocomplete="off" oninput="_aplicarFiltrosEv()">
@@ -550,6 +565,50 @@ function _abrirModalNuevoEvento() {
     });
 }
 
+// ── Menú de acciones del evento (⋯) — mismo patrón que el de la
+// tarjeta. Pedido por Cristian: "en el evento mismo efecto con 3
+// puntitos, copiar este link del evento, duplicar, borrar, todos los
+// eventos, etc".
+window._toggleMenuEvento = function(ev) {
+  ev.stopPropagation();
+  document.getElementById('ev-menu-evento-dropdown').classList.toggle('abierto');
+};
+document.addEventListener('click', function(ev) {
+  var dd = document.getElementById('ev-menu-evento-dropdown');
+  if (dd && dd.classList.contains('abierto') && !dd.contains(ev.target) && !ev.target.closest('.ev-btn-menu-tarjeta')) {
+    dd.classList.remove('abierto');
+  }
+});
+
+function _copiarLinkEvento() {
+  document.getElementById('ev-menu-evento-dropdown').classList.remove('abierto');
+  if (!EVENTO_ACTUAL) return;
+  var link = 'https://ir.tlcsrl.com.ar/eventos.html?id=' + encodeURIComponent(EVENTO_ACTUAL.id);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(function(){ alert('✅ Link copiado.'); }).catch(function(){ prompt('Copiá este link:', link); });
+  } else {
+    prompt('Copiá este link:', link);
+  }
+}
+
+function _duplicarEventoActual() {
+  document.getElementById('ev-menu-evento-dropdown').classList.remove('abierto');
+  if (!EVENTO_ACTUAL) return;
+  if (!confirm('¿Duplicar el evento "' + EVENTO_ACTUAL.nombre + '" con todas sus tarjetas y checklists (sin tildar)? Las notas, adjuntos y mensajes NO se copian.')) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_duplicarEvento', id: EVENTO_ACTUAL.id, vendedorRol: _session.rol }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+      _cargarEventos().then(function() { _abrirEvento(r.id); });
+    });
+}
+
+function _confirmarBorrarEvento() {
+  document.getElementById('ev-menu-evento-dropdown').classList.remove('abierto');
+  _borrarEventoActual();
+}
+
 function _borrarEventoActual() {
   if (!EVENTO_ACTUAL) return;
   if (!confirm('¿Borrar el evento "' + EVENTO_ACTUAL.nombre + '" con TODAS sus tarjetas, checklists y adjuntos? No se puede deshacer.')) return;
@@ -574,8 +633,15 @@ async function _abrirEvento(id, tarjetaId) {
     EVENTO_ACTUAL = r.evento;
     document.getElementById('ev-hdr-titulo').textContent = EVENTO_ACTUAL.nombre;
     document.getElementById('ev-hdr-sub').textContent = EVENTO_ACTUAL.tarjetas.length + ' tarjetas';
-    var btnBorrarEv = document.getElementById('ev-btn-borrar-evento');
-    if (btnBorrarEv) btnBorrarEv.style.display = _esAdministradorEv() ? 'inline-block' : 'none';
+    // "Duplicar evento" y "Borrar evento" — solo Administrador (mismo
+    // criterio que crear/borrar evento, ya que duplicar TAMBIÉN crea
+    // uno nuevo). "Copiar link" y "Todos los eventos" quedan abiertos
+    // a cualquier interno, sin restricción.
+    var esAdmin = _esAdministradorEv();
+    var btnDuplicarEv = document.getElementById('ev-menu-duplicar-evento');
+    var btnBorrarEv = document.getElementById('ev-menu-borrar-evento');
+    if (btnDuplicarEv) btnDuplicarEv.style.display = esAdmin ? 'block' : 'none';
+    if (btnBorrarEv) btnBorrarEv.style.display = esAdmin ? 'block' : 'none';
     if (!_internosCacheEv) await _cargarInternosEv();
     _renderSelectEventos();
     _renderFiltrosEv();
@@ -779,7 +845,8 @@ function _renderListaTarjetasEv() {
     var cat = CATEGORIAS_EV[t.categoria] || { bg:'rgba(148,163,184,.15)', color:'#94a3b8' };
     var p = _progresoAgregado(t);
     var fechaInfo = _fechaLimiteInfo(t.fecha_limite);
-    var inicialResp = (t.responsable_nombre || '').trim().charAt(0).toUpperCase() || '?';
+    var nombrePila = (t.responsable_nombre || '').trim().split(' ')[0] || '';
+    var inicialResp = nombrePila.charAt(0).toUpperCase() || '?';
     return '<div class="ev-list-fila" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
       '<span class="ev-col-dot" style="background:' + (col ? col.color : '#94a3b8') + ';" title="' + _esc(col ? col.nombre : '') + '"></span>' +
       '<span class="ev-list-titulo">' + _esc(t.titulo) + '</span>' +
@@ -787,7 +854,7 @@ function _renderListaTarjetasEv() {
         (t.categoria ? '<span class="ev-card-cat" style="background:' + cat.bg + ';color:' + cat.color + ';">' + _esc(t.categoria) + '</span>' : '') +
         (fechaInfo.html ? '<span class="ev-card-fecha ' + fechaInfo.clase + '">' + fechaInfo.html + '</span>' : '') +
         (p.total ? '<span>' + p.hechos + '/' + p.total + '</span>' : '') +
-        (t.responsable_nombre ? '<span class="ev-card-resp" title="' + _esc(t.responsable_nombre) + '">' + inicialResp + '</span>' : '') +
+        (t.responsable_nombre ? '<span class="ev-card-resp-chip" title="' + _esc(t.responsable_nombre) + '"><span class="ev-card-resp">' + inicialResp + '</span><span class="ev-card-resp-nombre">' + _esc(nombrePila) + '</span></span>' : '') +
       '</div>' +
     '</div>';
   }).join('');
@@ -797,7 +864,12 @@ function _renderCard(t) {
   var cat = CATEGORIAS_EV[t.categoria] || { bg:'rgba(148,163,184,.15)', color:'#94a3b8' };
   var p = _progresoAgregado(t);
   var fechaInfo = _fechaLimiteInfo(t.fecha_limite);
-  var inicialResp = (t.responsable_nombre || '').trim().charAt(0).toUpperCase() || '?';
+  // Nombre de pila completo (no solo la inicial) — el círculo de
+  // color solo no dejaba claro quién era el responsable a simple
+  // vista, había que pasar el mouse por arriba. Pedido por Cristian:
+  // "ponele el nombre de pila completo al menos, así queda bien claro".
+  var nombrePila = (t.responsable_nombre || '').trim().split(' ')[0] || '';
+  var inicialResp = nombrePila.charAt(0).toUpperCase() || '?';
   var portada = (t.adjuntos || []).find(function(a){ return a.esPortada; });
   return '<div class="ev-card" data-id-tarjeta="' + t.id + '" data-responsable="' + _esc(t.responsable_email||'') + '" data-categoria="' + _esc(t.categoria||'') + '" draggable="true" ondragstart="_dragStartCard(event,\'' + t.id + '\')" ondragend="_dragEndCard(event)" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
     (portada ? '<div class="ev-card-portada"><img src="' + portada.url + '" alt="" style="cursor:pointer;" onclick="event.stopPropagation(); _ampliarPortadaEv(\'' + portada.url.replace(/'/g,"\\'") + '\')"></div>' : '') +
@@ -805,7 +877,7 @@ function _renderCard(t) {
     '<div class="ev-card-titulo">' + _esc(t.titulo) + '</div>' +
     '<div class="ev-card-meta">' +
       (fechaInfo.html ? '<span class="ev-card-fecha ' + fechaInfo.clase + '">' + fechaInfo.html + '</span>' : '<span></span>') +
-      (t.responsable_nombre ? '<span class="ev-card-resp" title="' + _esc(t.responsable_nombre) + '">' + inicialResp + '</span>' : '') +
+      (t.responsable_nombre ? '<span class="ev-card-resp-chip" title="' + _esc(t.responsable_nombre) + '"><span class="ev-card-resp">' + inicialResp + '</span><span class="ev-card-resp-nombre">' + _esc(nombrePila) + '</span></span>' : '') +
     '</div>' +
     (p.total ? '<div class="ev-card-progreso-wrap"><div class="ev-card-progreso-bar" style="width:' + p.pct + '%;"></div></div>' +
       '<div class="ev-card-progreso-txt">' + p.hechos + '/' + p.total + ' subtareas</div>' : '') +
@@ -1225,9 +1297,16 @@ function _agregarChecklistItem(idGrupo) {
 function _renderNotasGenerales(t) {
   var notas = Array.isArray(t.notas) ? t.notas : [];
   if (!notas.length) return '<div style="font-size:12px;color:var(--text-muted);">Sin notas todavía.</div>';
+  var esAdmin = _esAdministradorEv();
   return notas.map(function(n) {
     var fecha = n.fecha ? new Date(n.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-    return '<div class="ev-nota-item"><div class="txt">' + _esc(n.texto) + '</div><div class="ft">Por: ' + _esc(n.autor||'—') + ' — ' + fecha + ' hs</div></div>';
+    return '<div class="ev-nota-item">' +
+      '<div class="txt">' + _esc(n.texto) + '</div>' +
+      '<div class="ft-fila">' +
+        '<div class="ft">Por: ' + _esc(n.autor||'—') + ' — ' + fecha + ' hs' + (n.editada_en ? ' (editada)' : '') + '</div>' +
+        (esAdmin ? '<div class="acciones"><button onclick="_editarNotaEv(\'' + n.id + '\')">✎ Editar</button><button class="rojo" onclick="_eliminarNotaEv(\'' + n.id + '\')">🗑 Borrar</button></div>' : '') +
+      '</div>' +
+    '</div>';
   }).join('');
 }
 function _agregarNotaEv() {
@@ -1243,6 +1322,38 @@ function _agregarNotaEv() {
       t.notas = r.notas;
       document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t);
       input.value = '';
+    });
+}
+
+// Editar/borrar notas — solo Administrador (el backend también lo
+// exige, esto es solo para no mostrar el botón a quien no puede
+// usarlo). Pedido por Cristian: "solo para administradores permiso
+// para borrar o modificar notas generales".
+function _editarNotaEv(idNota) {
+  var t = _tarjetaActual();
+  var nota = (t.notas || []).find(function(n) { return n.id === idNota; });
+  if (!nota) return;
+  var nuevoTexto = prompt('Editar nota:', nota.texto);
+  if (nuevoTexto === null || !nuevoTexto.trim() || nuevoTexto.trim() === nota.texto) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_editarNota', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_nota:idNota, texto:nuevoTexto.trim(), vendedorRol:_session.rol }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert(r.error||'Error'); return; }
+      t.notas = r.notas;
+      document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t);
+    });
+}
+function _eliminarNotaEv(idNota) {
+  if (!confirm('¿Borrar esta nota? No se puede deshacer.')) return;
+  var t = _tarjetaActual();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_eliminarNota', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_nota:idNota, vendedorRol:_session.rol }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert(r.error||'Error'); return; }
+      t.notas = r.notas;
+      document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t);
     });
 }
 
