@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.09.13 (Logo del evento — nuevo. Se ve como una miniatura de 30px junto al nombre en el header, y también en cada tarjeta del selector "Todos los eventos". Se agrega/cambia/quita desde el menú de tres puntos (⋯) del topbar: "🖼️ Agregar/Cambiar logo del evento" y "🚫 Quitar logo del evento" (este último solo visible si ya hay uno puesto) — ambos Administrador, usan ev_subirLogoEvento/ev_quitarLogoEvento de FotoMap.gs v167. Pedido por Cristian: "dame la posibilidad de agregar logo al nombre del evento". Confirmado con jsdom de punta a punta: subir actualiza el header y los textos del menú, quitar los revierte.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.12 (Progreso de checklists visible en la vista Lista — antes solo mostraba el texto "x/y" sin barra, a diferencia del Kanban que ya tenía barra visual. Se agregó la misma barra compacta (42px) + texto a cada fila de la lista, y se sumó el porcentaje al texto del Kanban también ("2/4 subtareas · 50%") para más claridad en los dos lados por igual. Pedido por Cristian: "podemos mostrar el progreso de las tarjetas en la miniatura, de kanban y listas?". Confirmado con jsdom con un checklist de 4 ítems (2 tildados): barra al 50% en ambas vistas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.11 (3 pedidos de Cristian: (1) Menú de 3 puntos en el topbar del evento (mismo patrón que el de la tarjeta) — reemplaza los botones sueltos "Borrar evento"/"Todos los eventos" por: 🔗 Copiar link de este evento (nuevo), 📋 Duplicar evento (nuevo — usa ev_duplicarEvento de FotoMap.gs v166, solo Administrador), 🗑️ Borrar evento (Administrador) y 📋 Todos los eventos. (2) Nombre de pila completo del responsable ahora visible junto al avatar en la tarjeta cerrada del tablero Y en la vista Lista — antes solo se veía la inicial en un círculo, había que pasar el mouse para saber quién era. Confirmado con jsdom: se ve "Lucio" completo, no solo "L". Ambos pedidos con captura de Cristian.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.10 (BUG REAL #2 sobre "no se ven los ítems" — no era dato vacío puntual como pensé la primera vez (pasaba con TODOS los ítems de TODOS los checklists por igual, ver captura de Cristian con 7 ítems en 2 listas distintas, todos invisibles). Causa: _abrirTarjeta() llamaba a _autoResizeTodosItemsChecklistEv() (que mide scrollHeight de cada textarea para ajustarle el alto) ANTES de agregar la clase "open" al overlay — y el overlay arranca con display:none. Medir scrollHeight de un elemento adentro de algo con display:none SIEMPRE da 0 en cualquier navegador (no hay layout que medir), así que TODOS los textareas de ítems quedaban con height:0px clavado por JS — colapsados visualmente a la nada, aunque el texto siempre estuvo ahí y guardado bien (confirmado con jsdom: el value de cada textarea nunca estuvo vacío). Fix: se invierte el orden — primero .open (visible), recién ahí se mide y ajusta la altura. Esta parte específica no se puede confirmar con un test automático (jsdom no calcula layout real, scrollHeight siempre da 0 ahí sea cual sea el display) — el razonamiento es sólido (comportamiento de navegador bien conocido) pero necesita confirmación real de Cristian en el navegador.) -->
@@ -43,7 +44,10 @@ a { color:var(--accent-blue); }
   padding:12px 16px; display:flex; align-items:center; gap:12px; }
 .ev-btn-back { width:38px; height:38px; border-radius:50%; background:var(--accent-blue); color:#fff; border:none;
   font-size:16px; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
-.ev-header-title { flex:1; min-width:0; }
+.ev-header-title { flex:1; min-width:0; display:flex; align-items:center; gap:9px; }
+.ev-header-title .ev-hdr-textos { min-width:0; }
+.ev-hdr-logo { width:30px; height:30px; border-radius:8px; object-fit:cover; flex-shrink:0; background:var(--panel-darker); border:1px solid var(--border-glow); }
+.ev-selector-logo { width:34px; height:34px; border-radius:8px; object-fit:cover; flex-shrink:0; background:var(--panel-darker); border:1px solid var(--border-glow); margin-right:4px; }
 .ev-header-title h1 { font-size:15px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ev-header-title p { font-size:10.5px; color:var(--text-muted); }
 .ev-icon-btn { width:36px; height:36px; border-radius:50%; background:var(--panel-darker); border:1px solid var(--border-glow);
@@ -347,8 +351,11 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
   <button class="ev-hamburger ev-icon-btn" onclick="_abrirMenuMobileEv()">☰</button>
   <button class="ev-btn-back" onclick="_volverEventos()">←</button>
   <div class="ev-header-title">
-    <h1 id="ev-hdr-titulo">Gestión Eventos / Congresos</h1>
-    <p id="ev-hdr-sub">TLC Planner</p>
+    <img id="ev-hdr-logo" class="ev-hdr-logo" style="display:none;" alt="">
+    <div class="ev-hdr-textos">
+      <h1 id="ev-hdr-titulo">Gestión Eventos / Congresos</h1>
+      <p id="ev-hdr-sub">TLC Planner</p>
+    </div>
   </div>
   <button class="ev-icon-btn" onclick="_toggleTemaEv()" id="ev-btn-tema" title="Tema">🌙</button>
   <button class="ev-icon-btn" onclick="_toggleCampanaEv(event)" title="Notificaciones">
@@ -396,10 +403,13 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
         <button class="ev-btn-menu-tarjeta" onclick="_toggleMenuEvento(event)" title="Más acciones del evento">⋯</button>
         <div class="ev-menu-tarjeta-dropdown" id="ev-menu-evento-dropdown">
           <button onclick="_copiarLinkEvento()">🔗 Copiar link de este evento</button>
+          <button id="ev-menu-logo-evento" onclick="document.getElementById('ev-menu-evento-dropdown').classList.remove('abierto'); document.getElementById('ev-input-logo-evento').click();" style="display:none;">🖼️ Agregar logo al evento</button>
+          <button id="ev-menu-quitar-logo-evento" onclick="_quitarLogoEventoJs()" style="display:none;">🚫 Quitar logo del evento</button>
           <button id="ev-menu-duplicar-evento" onclick="_duplicarEventoActual()" style="display:none;">📋 Duplicar evento</button>
           <button id="ev-menu-borrar-evento" class="rojo" onclick="_confirmarBorrarEvento()" style="display:none;">🗑️ Borrar evento</button>
           <button onclick="_volverASelectorEventos()">📋 Todos los eventos</button>
         </div>
+        <input type="file" id="ev-input-logo-evento" accept=".png,.jpg,.jpeg,.webp,.svg" style="display:none;" onchange="_subirLogoEventoJs(event)">
       </div>
     </div>
     <div class="ev-filtros" id="ev-filtros">
@@ -551,9 +561,10 @@ function _renderListaEventos() {
   var cont = document.getElementById('ev-lista-eventos');
   if (!EVENTOS.length) { cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);">Todavía no hay eventos cargados.</div>'; return; }
   cont.innerHTML = EVENTOS.map(function(e) {
+    var logoImg = (e.logo && e.logo.url) ? '<img class="ev-selector-logo" src="' + e.logo.url + '" alt="">' : '';
     return '<div class="ev-selector-card" onclick="_abrirEvento(\'' + e.id + '\')">' +
-      '<div><div class="ev-selector-nombre">📅 ' + _esc(e.nombre) + '</div>' +
-        '<div class="ev-selector-meta">' + e.cantidadTarjetas + ' tarjeta' + (e.cantidadTarjetas !== 1 ? 's' : '') + '</div></div>' +
+      '<div style="display:flex;align-items:center;">' + logoImg + '<div><div class="ev-selector-nombre">' + (logoImg ? '' : '📅 ') + _esc(e.nombre) + '</div>' +
+        '<div class="ev-selector-meta">' + e.cantidadTarjetas + ' tarjeta' + (e.cantidadTarjetas !== 1 ? 's' : '') + '</div></div></div>' +
       '<span style="color:var(--text-muted);">→</span>' +
     '</div>';
   }).join('');
@@ -609,6 +620,65 @@ function _duplicarEventoActual() {
     });
 }
 
+// ── Logo del evento ──
+function _actualizarLogoHeaderEv() {
+  var img = document.getElementById('ev-hdr-logo');
+  if (EVENTO_ACTUAL && EVENTO_ACTUAL.logo && EVENTO_ACTUAL.logo.url) {
+    img.src = EVENTO_ACTUAL.logo.url;
+    img.style.display = 'block';
+  } else {
+    img.style.display = 'none';
+  }
+}
+function _subirLogoEventoJs(ev) {
+  var file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file || !EVENTO_ACTUAL) return;
+  if (file.size > 3 * 1024 * 1024) { alert('El logo pesa más de 3MB — subí uno más liviano.'); return; }
+  var extPermitidas = ['png','jpg','jpeg','webp','svg'];
+  var ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (extPermitidas.indexOf(ext) === -1) { alert('Formato no permitido — usá PNG, JPG, WEBP o SVG.'); return; }
+  var reader = new FileReader();
+  reader.onload = function() {
+    var base64 = reader.result.split(',')[1];
+    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+      accion:'ev_subirLogoEvento', id: EVENTO_ACTUAL.id, nombre: file.name, tipoMime: file.type, base64: base64, vendedorRol: _session.rol,
+    }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r) {
+        if (!r.ok) { alert('Error al subir el logo: ' + (r.error||'')); return; }
+        EVENTO_ACTUAL.logo = r.logo;
+        _actualizarLogoHeaderEv();
+        var ev2 = EVENTOS.find(function(e){ return e.id === EVENTO_ACTUAL.id; });
+        if (ev2) ev2.logo = r.logo;
+        var btnLogoEv = document.getElementById('ev-menu-logo-evento');
+        var btnQuitarLogoEv = document.getElementById('ev-menu-quitar-logo-evento');
+        if (btnLogoEv) btnLogoEv.textContent = '🖼️ Cambiar logo del evento';
+        if (btnQuitarLogoEv) btnQuitarLogoEv.style.display = 'block';
+      });
+  };
+  reader.readAsDataURL(file);
+}
+function _quitarLogoEventoJs() {
+  document.getElementById('ev-menu-evento-dropdown').classList.remove('abierto');
+  if (!EVENTO_ACTUAL || !confirm('¿Quitar el logo de este evento?')) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+    accion:'ev_quitarLogoEvento', id: EVENTO_ACTUAL.id, vendedorRol: _session.rol,
+  }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+      EVENTO_ACTUAL.logo = null;
+      _actualizarLogoHeaderEv();
+      var ev2 = EVENTOS.find(function(e){ return e.id === EVENTO_ACTUAL.id; });
+      if (ev2) ev2.logo = null;
+      var btnLogoEv = document.getElementById('ev-menu-logo-evento');
+      var btnQuitarLogoEv = document.getElementById('ev-menu-quitar-logo-evento');
+      if (btnLogoEv) btnLogoEv.textContent = '🖼️ Agregar logo al evento';
+      if (btnQuitarLogoEv) btnQuitarLogoEv.style.display = 'none';
+    });
+}
+
 function _confirmarBorrarEvento() {
   document.getElementById('ev-menu-evento-dropdown').classList.remove('abierto');
   _borrarEventoActual();
@@ -638,6 +708,7 @@ async function _abrirEvento(id, tarjetaId) {
     EVENTO_ACTUAL = r.evento;
     document.getElementById('ev-hdr-titulo').textContent = EVENTO_ACTUAL.nombre;
     document.getElementById('ev-hdr-sub').textContent = EVENTO_ACTUAL.tarjetas.length + ' tarjetas';
+    _actualizarLogoHeaderEv();
     // "Duplicar evento" y "Borrar evento" — solo Administrador (mismo
     // criterio que crear/borrar evento, ya que duplicar TAMBIÉN crea
     // uno nuevo). "Copiar link" y "Todos los eventos" quedan abiertos
@@ -645,8 +716,15 @@ async function _abrirEvento(id, tarjetaId) {
     var esAdmin = _esAdministradorEv();
     var btnDuplicarEv = document.getElementById('ev-menu-duplicar-evento');
     var btnBorrarEv = document.getElementById('ev-menu-borrar-evento');
+    var btnLogoEv = document.getElementById('ev-menu-logo-evento');
+    var btnQuitarLogoEv = document.getElementById('ev-menu-quitar-logo-evento');
     if (btnDuplicarEv) btnDuplicarEv.style.display = esAdmin ? 'block' : 'none';
     if (btnBorrarEv) btnBorrarEv.style.display = esAdmin ? 'block' : 'none';
+    if (btnLogoEv) {
+      btnLogoEv.style.display = esAdmin ? 'block' : 'none';
+      btnLogoEv.textContent = (EVENTO_ACTUAL.logo && EVENTO_ACTUAL.logo.url) ? '🖼️ Cambiar logo del evento' : '🖼️ Agregar logo al evento';
+    }
+    if (btnQuitarLogoEv) btnQuitarLogoEv.style.display = (esAdmin && EVENTO_ACTUAL.logo && EVENTO_ACTUAL.logo.url) ? 'block' : 'none';
     if (!_internosCacheEv) await _cargarInternosEv();
     _renderSelectEventos();
     _renderFiltrosEv();
@@ -689,6 +767,7 @@ function _volverASelectorEventos() {
   document.getElementById('ev-vista-selector').style.display = 'block';
   document.getElementById('ev-hdr-titulo').textContent = 'Gestión Eventos / Congresos';
   document.getElementById('ev-hdr-sub').textContent = 'TLC Planner';
+  document.getElementById('ev-hdr-logo').style.display = 'none';
   EVENTO_ACTUAL = null;
   history.replaceState(null, '', 'eventos.html');
   _cargarEventos();
