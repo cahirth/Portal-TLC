@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.09.2 (2 fixes con captura de Cristian: (1) el input del chat de "Mensajes internos" se iba de pantalla en mobile — bug clásico de flexbox, el <input flex:1> se negaba a encogerse por debajo de su ancho intrínseco sin min-width:0, agregado ahí y en los otros 2 lugares con el mismo patrón (fila de agregar ítem de checklist, título de checklist). De paso, título de "Mensajes internos" ahora sticky y más grande, para que nunca se pierda de vista al hacer scroll, y overflow-x:hidden defensivo en el panel del modal. (2) Los ítems de checklist ahora son editables (antes solo se podían tildar o borrar) — usa la nueva acción ev_editarChecklistItem de FotoMap.gs v162.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.1 (REDISEÑO GRANDE — módulo Eventos v2, conectado a FotoMap.gs v161. Reusa TODO lo que ya funcionaba en producción (sesión, tema, campanita, picker de reacciones, drag&drop entre columnas, sistema de menciones) y suma: (1) Checklists múltiples agrupados con título editable — reemplaza el checklist único plano; (2) Descripción/Propósito de la tarjeta; (3) Notas Generales con historial (autor+fecha); (4) Archivos Adjuntos (máx 10MB, PDF/PNG/JPG/XLSX) con portada — banner arriba del modal y arriba de la tarjeta cerrada en el tablero; (5) Buscador de texto libre (título, descripción, responsable, categoría, checklists, notas, adjuntos); (6) Filtros nuevos de Vencimiento y Progreso, sumados a los de Responsable/Categoría que ya existían; (7) Vista Lista además del Tablero; (8) Menú mobile real (antes no existía, header colapsaba sin forma de cambiar vista/tema/evento en pantallas chicas); (9) Columnas con color propio; (10) Permisos — crear/borrar EVENTOS y COLUMNAS enteras ahora exige Administrador (mismo criterio que borrar empresas), renombrar/recolorear columna queda abierto a cualquier interno. FIX de bug real encontrado y confirmado con test (jsdom): el picker de @menciones no resaltaba el primer candidato por defecto (arrancaba en índice -1, Enter no hacía nada hasta apretar una flecha) y, con checklists múltiples, dos pickers de menciones podían quedar abiertos a la vez sin cerrarse entre sí — ahora resalta el primero al abrir y cierra cualquier otro picker abierto antes de mostrar uno nuevo. Todo validado con jsdom simulando login, apertura de evento, checklists, notas, y la mezcla de menciones entre chat y checklist — no solo leído a ojo. Pedido por Cristian: "quiero reformular por completo eventos.html... usa todo lo que puedas de la nueva UX eventos-v5, pero ajustado a toda nuestra pwa".) -->
 <!-- Portal TLC | eventos.html | v2026.08.06.1 (Fix robusto del picker de reacciones: ver detalle completo en servicio.html v2026.08.06.3 — mismo mecanismo (_abrirReaccionPicker), un solo picker global con position:fixed en vez de uno por mensaje que quedaba cortado por el overflow-y:auto del contenedor.) -->
 <!-- Portal TLC | eventos.html | v2026.08.04.6 (Mismo rediseño de reacciones que servicio.html: ícono "🙂" que despliega los 3 emojis en vez de tenerlos siempre visibles sueltos, en mensajes de tarjeta y campanita.) -->
@@ -110,7 +111,7 @@ a { color:var(--accent-blue); }
 .ev-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:500; display:none; align-items:flex-end; justify-content:center; }
 .ev-overlay.open { display:flex; }
 @media (min-width:720px) { .ev-overlay { align-items:center; } }
-.ev-overlay-panel { background:var(--bg); width:100%; max-width:640px; max-height:92vh; overflow-y:auto; border-radius:16px 16px 0 0; }
+.ev-overlay-panel { background:var(--bg); width:100%; max-width:640px; max-height:92vh; overflow-y:auto; overflow-x:hidden; border-radius:16px 16px 0 0; }
 @media (min-width:720px) { .ev-overlay-panel { border-radius:16px; max-height:88vh; } }
 @media (min-width:960px) { .ev-overlay-panel { max-width:1040px; } }
 .ev-overlay-header { position:sticky; top:0; background:var(--panel-dark); border-bottom:1px solid var(--border-glow);
@@ -157,10 +158,12 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
 .ev-check-texto { font-size:12.5px; flex:1; }
 .ev-check-mencion { font-size:10px; color:var(--accent-blue); }
 .ev-check-add-row { display:flex; gap:6px; margin-top:8px; position:relative; }
-.ev-check-add-row input { flex:1; }
-.ev-check-add-row button { padding:0 14px; border-radius:8px; border:none; background:var(--accent-blue); color:#fff; font-weight:700; cursor:pointer; }
+.ev-check-add-row input { flex:1; min-width:0; }
+.ev-check-add-row button { padding:0 14px; border-radius:8px; border:none; background:var(--accent-blue); color:#fff; font-weight:700; cursor:pointer; flex-shrink:0; }
 
 .ev-section-titulo { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin:18px 0 8px; }
+.ev-msg-titulo-sticky { font-size:13px; font-weight:800; color:var(--text-main); background:var(--bg); padding:6px 0;
+  margin:18px 0 8px; position:sticky; top:0; z-index:3; }
 
 /* Reutilizado tal cual de Ventas/Servicio: hover-zoom + reacciones */
 .msg-fila { transition: background .12s ease, border-color .12s ease; cursor:default; padding:8px 10px; border-radius:10px;
@@ -249,7 +252,7 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
 /* ── Checklists múltiples agrupados ── */
 .ev-checklist-grupo { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:11px; padding:12px; margin-bottom:10px; }
 .ev-checklist-grupo-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-.ev-checklist-titulo-input { flex:1; background:none; border:none; font-size:12.5px; font-weight:800; color:var(--text-main);
+.ev-checklist-titulo-input { flex:1; min-width:0; background:none; border:none; font-size:12.5px; font-weight:800; color:var(--text-main);
   font-family:inherit; padding:3px 0; border-bottom:1px dashed transparent; }
 .ev-checklist-titulo-input:focus { outline:none; border-bottom-color:var(--accent-blue); }
 .ev-checklist-progreso-chico { font-size:10px; color:var(--accent-green); font-weight:700; flex-shrink:0; white-space:nowrap; }
@@ -257,7 +260,9 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
 .ev-btn-borrar-checklist:hover { color:#ef4444; }
 .ev-check-item-fila { display:flex; align-items:center; gap:8px; padding:5px 0; }
 .ev-check-item-fila input[type=checkbox] { width:16px; height:16px; cursor:pointer; flex-shrink:0; }
-.ev-check-item-texto-fija { flex:1; font-size:12.5px; }
+.ev-check-item-texto-fija { flex:1; min-width:0; font-size:12.5px; font-family:inherit; background:none; border:none;
+  color:var(--text-main); padding:2px 0; border-bottom:1px dashed transparent; }
+.ev-check-item-texto-fija:focus { outline:none; border-bottom-color:var(--accent-blue); }
 .ev-check-item-fila.hecho .ev-check-item-texto-fija { text-decoration:line-through; color:var(--text-muted); }
 .ev-btn-borrar-item { background:none; border:none; color:var(--text-dim); font-size:11px; cursor:pointer; flex-shrink:0; padding:2px 5px; }
 .ev-btn-borrar-item:hover { color:#ef4444; }
@@ -944,7 +949,7 @@ function _renderOverlayTarjeta() {
     '</div>' +
 
     '<div class="ev-overlay-col-mensajes">' +
-      '<div class="ev-section-titulo" style="margin-top:0;">💬 Mensajes internos</div>' +
+      '<div class="ev-msg-titulo-sticky">💬 Mensajes internos</div>' +
       '<div id="ev-msg-lista">' + _construirHtmlListaMensajesEv(t) + '</div>' +
       '<div class="ev-check-add-row" style="position:relative; margin-top:10px;">' +
         '<input type="text" id="ev-msg-nuevo" placeholder="Escribí un mensaje... usá @ para mencionar" oninput="_onMsgInputEv(event)" onkeydown="_onMsgKeydownEv(event)">' +
@@ -1024,7 +1029,7 @@ function _renderChecklistsGrupos(t) {
       '<div>' + items.map(function(item) {
         return '<div class="ev-check-item-fila' + (item.hecho?' hecho':'') + '">' +
           '<input type="checkbox"' + (item.hecho?' checked':'') + ' onchange="_toggleChecklistItem(\'' + g.id + '\',\'' + item.id + '\')">' +
-          '<span class="ev-check-item-texto-fija">' + _esc(item.texto) + '</span>' +
+          '<input type="text" class="ev-check-item-texto-fija" value="' + _esc(item.texto) + '" onchange="_editarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\',this.value)">' +
           '<button class="ev-btn-borrar-item" onclick="_eliminarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\')" title="Eliminar ítem">✕</button>' +
         '</div>';
       }).join('') + '</div>' +
@@ -1060,6 +1065,18 @@ function _eliminarChecklistItemEv(idGrupo, idItem) {
       t.checklists = r.checklists;
       document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
       _renderTablero();
+    });
+}
+function _editarChecklistItemEv(idGrupo, idItem, nuevoTexto) {
+  var t = _tarjetaActual();
+  nuevoTexto = (nuevoTexto || '').trim();
+  if (!nuevoTexto) { document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); return; }
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_editarChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, id_item:idItem, texto:nuevoTexto }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert(r.error||'Error'); document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); return; }
+      t.checklists = r.checklists;
     });
 }
 var _mencionChecklistSeleccionada = [];
