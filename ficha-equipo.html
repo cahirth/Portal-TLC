@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.09.4 (2 pedidos de Cristian: (1) Pipeline obligatorio — todo negocio creado desde el flujo del QR de FacoExtrema (?qr_telefono=&qr_nombre= en la URL) fuerza el select de pipeline al pipeline "FacoExtrema" (busca uno existente por nombre — case-insensitive, contiene "faco" — y si no existe lo crea solo la primera vez), y lo deja deshabilitado para que el vendedor no pueda cambiarlo por error a otro pipeline. Antes se usaba el último pipeline elegido a mano (localStorage), pudiendo terminar cualquier negocio del QR en un pipeline equivocado. (2) Validación de teléfono vacío — el QR de la credencial de FacoExtrema no trae teléfono (dato que el organizador no incluyó), así que _compartirFichaWspPersonalizado ahora avisa y lleva el foco al campo en vez de abrir WhatsApp sin número (antes lo abría igual, mandando "a nadie" sin que el vendedor lo notara). Confirmado con jsdom: el caso de crear el pipeline cuando no existe + forzar + deshabilitar el select, y el aviso+bloqueo cuando el teléfono está vacío.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.06.3 (Se sacó el botón "📷 Escanear QR Visitante" (y toda su infraestructura: modal de cámara compartido, _escanearQRVisitante, _abrirScannerQR/_cerrarScannerQR) — quedó redundante desde que existe el flujo nuevo del FAB de QR en index.html, que hace lo mismo pero desde el home, sin necesitar estar ya parado en la ficha de un equipo puntual. _compartirFichaWspPersonalizado se mantiene intacta, la sigue usando el flujo nuevo (_precargarContactoQR). Pedido por Cristian con captura: "este botón ya lo podemos sacar de ficha técnica".) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.06.2 (Recibe ?qr_telefono=&qr_nombre= cuando se llega desde el flujo nuevo del FAB de QR en index.html (home → escanear → elegir equipo en selector-dispositivos.html) — precarga teléfono/contacto y resalta el botón "Enviar por WhatsApp" (retargeteado al mensaje personalizado del stand, _compartirFichaWspPersonalizado) para que sea un solo toque más. NO dispara WhatsApp solo al cargar — el navegador bloquearía la ventana por no ser ya un click directo del usuario en esta página nueva. _guardarSeguimientoVentas (regla de 7 días) sigue intacto, se dispara igual que siempre al tocar el botón.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.06.1 (Flujo B — Flujo Principal de Stand: botón "📷 Escanear QR Visitante" que lee la credencial de Faco Extrema, autocompleta empresa/teléfono/contacto, y dispara el mismo flujo que ya existía de WhatsApp + Crear Negocio (_guardarSeguimientoVentas, con la regla de los 7 días que ya vivía en buscarNegocioAgrupable — no hizo falta tocar el backend) pero con el mensaje personalizado del stand. El QR no trae CUIT, así que se busca/crea la Empresa por el nombre de la persona. Ver FotoMap.gs v159 y empresas.html v2026.08.06.1 (Flujo A).) -->
@@ -294,7 +295,7 @@ var PIPELINES_FICHA_KEY = 'tlc_ficha_pipeline_actual';
 
 async function _cargarPipelinesFicha() {
   var sel = document.getElementById('fi-pipeline-select');
-  if (!sel) return;
+  if (!sel) return [];
   try {
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarPipelines' }) });
@@ -310,7 +311,38 @@ async function _cargarPipelinesFicha() {
     var guardado = localStorage.getItem(PIPELINES_FICHA_KEY) || 'GENERAL';
     var existe = guardado === 'GENERAL' || lista.some(function(p){ return p.id === guardado; });
     sel.value = existe ? guardado : 'GENERAL';
-  } catch(e) { /* si falla, se queda en Pipeline General, no bloquea nada */ }
+    return lista;
+  } catch(e) { return []; } // si falla, se queda en Pipeline General, no bloquea nada
+}
+
+// Pipeline obligatorio para negocios creados desde el QR de
+// FacoExtrema — no queda a elección del vendedor, se fuerza siempre
+// al pipeline del congreso, pise o no lo que tenga guardado de antes
+// en su navegador (localStorage). Si el pipeline "FacoExtrema"
+// todavía no existe (primera vez que se usa), se crea solo. Pedido
+// por Cristian: "todos los negocios que se creen desde el QR deben ir
+// obligatoriamente al pipeline de FACOEXTREMA, y no a otro pipeline".
+async function _forzarPipelineFacoExtrema(lista) {
+  var sel = document.getElementById('fi-pipeline-select');
+  if (!sel) return;
+  var match = (lista || []).find(function(p) { return p.nombre.toLowerCase().indexOf('faco') !== -1; });
+  var pipelineId = match ? match.id : null;
+  if (!pipelineId) {
+    try {
+      var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ accion:'guardarPipeline', nombre:'FacoExtrema 2026' }) });
+      var r = await resp.json();
+      if (r.ok) {
+        pipelineId = r.id;
+        sel.innerHTML += '<option value="' + pipelineId + '">🏷️ FacoExtrema 2026</option>';
+      }
+    } catch(e) {}
+  }
+  if (!pipelineId) return; // sin conexión — no se puede forzar, sigue con lo que ya haya en el select
+  sel.value = pipelineId;
+  sel.disabled = true;
+  sel.title = 'Los negocios cargados desde el QR de FacoExtrema van siempre a este pipeline.';
+  localStorage.setItem(PIPELINES_FICHA_KEY, pipelineId);
 }
 
 window._onCambiarPipelineFicha = function(valor) {
@@ -449,7 +481,10 @@ async function _cargarFicha() {
         var elBtnCrearNegocio = document.getElementById('fi-btn-crear-negocio');
         if (elBtnCrearNegocio) elBtnCrearNegocio.style.display = 'none';
     } else {
-        _cargarPipelinesFicha();
+        var esFlujoQR = !!(params.get('qr_telefono') || params.get('qr_nombre'));
+        _cargarPipelinesFicha().then(function(lista) {
+          if (esFlujoQR) _forzarPipelineFacoExtrema(lista);
+        });
         _precargarContactoQR(params);
     }
 
@@ -928,11 +963,23 @@ function _compartirFichaWsp(e) {
 // podría bloquear la ventana de WhatsApp por no ser ya un click
 // directo del usuario), pero con el mensaje personalizado del stand.
 function _compartirFichaWspPersonalizado(nombrePila) {
+  var elTel = document.getElementById('fi-telefono-destino');
+  var telWsp = _formatearTelefonoWsp((elTel && elTel.value) || '');
+  // El QR de credenciales de FacoExtrema no trae teléfono (dato que
+  // el organizador no incluyó ahí) — antes esto mandaba igual a
+  // wa.me/?text=... sin número, sin avisar, y quedaba "enviado a
+  // nadie" sin que el vendedor lo notara. Ahora avisa y lleva el foco
+  // al campo para cargarlo a mano. Reportado por Cristian: "no brinda
+  // el teléfono... deberemos cargarlo a mano".
+  if (!telWsp) {
+    alert('Este contacto no tiene teléfono cargado (el QR de la credencial no lo trae) — completalo a mano antes de enviar por WhatsApp.');
+    if (elTel) { elTel.focus(); elTel.style.borderColor = '#ef4444'; setTimeout(function(){ elTel.style.borderColor = ''; }, 2500); }
+    return;
+  }
   var link = 'https://ir.tlcsrl.com.ar/ficha-equipo.html?nombre=' + encodeURIComponent(_fichaNombreActual) + '&modo=cliente';
   if (_variantesOcultas.length) link += '&ocultar=' + encodeURIComponent(_variantesOcultas.join(','));
   var msg = encodeURIComponent('¡Hola ' + nombrePila + '! Un gusto saludarte en Faco Extrema. Te envío la ficha técnica del ' + _fichaNombreActual + ' que estuvimos viendo en el stand de TLC: ' + link);
-  var telWsp = _formatearTelefonoWsp(document.getElementById('fi-telefono-destino').value || '');
-  var url = telWsp ? ('https://wa.me/' + telWsp + '?text=' + msg) : ('https://wa.me/?text=' + msg);
+  var url = 'https://wa.me/' + telWsp + '?text=' + msg;
   window.open(url, '_blank');
   if (_sesionVendedor) _guardarSeguimientoVentas('whatsapp');
 }
