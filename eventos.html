@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.09.12 (Progreso de checklists visible en la vista Lista — antes solo mostraba el texto "x/y" sin barra, a diferencia del Kanban que ya tenía barra visual. Se agregó la misma barra compacta (42px) + texto a cada fila de la lista, y se sumó el porcentaje al texto del Kanban también ("2/4 subtareas · 50%") para más claridad en los dos lados por igual. Pedido por Cristian: "podemos mostrar el progreso de las tarjetas en la miniatura, de kanban y listas?". Confirmado con jsdom con un checklist de 4 ítems (2 tildados): barra al 50% en ambas vistas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.11 (3 pedidos de Cristian: (1) Menú de 3 puntos en el topbar del evento (mismo patrón que el de la tarjeta) — reemplaza los botones sueltos "Borrar evento"/"Todos los eventos" por: 🔗 Copiar link de este evento (nuevo), 📋 Duplicar evento (nuevo — usa ev_duplicarEvento de FotoMap.gs v166, solo Administrador), 🗑️ Borrar evento (Administrador) y 📋 Todos los eventos. (2) Nombre de pila completo del responsable ahora visible junto al avatar en la tarjeta cerrada del tablero Y en la vista Lista — antes solo se veía la inicial en un círculo, había que pasar el mouse para saber quién era. Confirmado con jsdom: se ve "Lucio" completo, no solo "L". Ambos pedidos con captura de Cristian.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.10 (BUG REAL #2 sobre "no se ven los ítems" — no era dato vacío puntual como pensé la primera vez (pasaba con TODOS los ítems de TODOS los checklists por igual, ver captura de Cristian con 7 ítems en 2 listas distintas, todos invisibles). Causa: _abrirTarjeta() llamaba a _autoResizeTodosItemsChecklistEv() (que mide scrollHeight de cada textarea para ajustarle el alto) ANTES de agregar la clase "open" al overlay — y el overlay arranca con display:none. Medir scrollHeight de un elemento adentro de algo con display:none SIEMPRE da 0 en cualquier navegador (no hay layout que medir), así que TODOS los textareas de ítems quedaban con height:0px clavado por JS — colapsados visualmente a la nada, aunque el texto siempre estuvo ahí y guardado bien (confirmado con jsdom: el value de cada textarea nunca estuvo vacío). Fix: se invierte el orden — primero .open (visible), recién ahí se mide y ajusta la altura. Esta parte específica no se puede confirmar con un test automático (jsdom no calcula layout real, scrollHeight siempre da 0 ahí sea cual sea el display) — el razonamiento es sólido (comportamiento de navegador bien conocido) pero necesita confirmación real de Cristian en el navegador.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.9 (BUG REAL encontrado y confirmado con click simulado (mousedown+mouseup+click, no solo Enter): el picker de menciones de los ítems de checklist tiraba "ReferenceError: idGrupo is not defined" en cada click, silenciosamente (no se veía en pantalla, solo en la consola del navegador). Causa: la función "qué hacer al elegir una mención" se pasaba como closure y se convertía a TEXTO con .toString() para meterla en el onclick="..." del botón — eso pierde CUALQUIER variable externa que el closure use (acá, idGrupo, el ID del checklist), porque el texto se vuelve a ejecutar en el scope global, donde esa variable no existe. El chat no tenía este problema porque su closure usaba un string fijo ('ev-msg-nuevo'), no una variable — por eso "andaba solo en negocios/chat" y no en checklist. Por eso también Enter SÍ funcionaba (llama a la función real en memoria, con su closure intacto) pero el click no. Fix de raíz: se saca el patrón de función-a-texto por completo — ahora se pasa el ID del input destino como STRING PLANO (inmune a este problema) y una sola función global (_seleccionarMencionEv) hace la inserción. También: ítems de checklist con texto vacío ahora muestran un placeholder explicando qué pasó, en vez de quedar invisibles (probable causa del reporte de "no se ven los ítems" — un ítem creado sin texto durante pruebas anteriores, ahora al menos es visible/editable/borrable). Confirmado con jsdom: click real ya inserta la mención sin error, tanto en checklist como en chat. Pedido por Cristian con 3 capturas.) -->
@@ -117,6 +118,10 @@ a { color:var(--accent-blue); }
 .ev-card-progreso-wrap { height:4px; background:var(--panel-darker); border-radius:4px; margin-top:8px; overflow:hidden; }
 .ev-card-progreso-bar { height:100%; background:var(--accent-green); border-radius:4px; transition:width .2s; }
 .ev-card-progreso-txt { font-size:9.5px; color:var(--text-muted); margin-top:3px; }
+.ev-list-progreso { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+.ev-list-progreso-bar-wrap { width:42px; height:5px; background:var(--panel-darker); border-radius:4px; overflow:hidden; flex-shrink:0; }
+.ev-list-progreso-bar { height:100%; background:var(--accent-green); border-radius:4px; }
+.ev-list-progreso-txt { font-size:10px; color:var(--text-muted); white-space:nowrap; }
 
 /* ── Overlay tarjeta ── */
 .ev-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:500; display:none; align-items:flex-end; justify-content:center; }
@@ -853,7 +858,7 @@ function _renderListaTarjetasEv() {
       '<div class="ev-list-meta">' +
         (t.categoria ? '<span class="ev-card-cat" style="background:' + cat.bg + ';color:' + cat.color + ';">' + _esc(t.categoria) + '</span>' : '') +
         (fechaInfo.html ? '<span class="ev-card-fecha ' + fechaInfo.clase + '">' + fechaInfo.html + '</span>' : '') +
-        (p.total ? '<span>' + p.hechos + '/' + p.total + '</span>' : '') +
+        (p.total ? '<span class="ev-list-progreso"><span class="ev-list-progreso-bar-wrap"><span class="ev-list-progreso-bar" style="width:' + p.pct + '%;"></span></span><span class="ev-list-progreso-txt">' + p.hechos + '/' + p.total + '</span></span>' : '') +
         (t.responsable_nombre ? '<span class="ev-card-resp-chip" title="' + _esc(t.responsable_nombre) + '"><span class="ev-card-resp">' + inicialResp + '</span><span class="ev-card-resp-nombre">' + _esc(nombrePila) + '</span></span>' : '') +
       '</div>' +
     '</div>';
@@ -880,7 +885,7 @@ function _renderCard(t) {
       (t.responsable_nombre ? '<span class="ev-card-resp-chip" title="' + _esc(t.responsable_nombre) + '"><span class="ev-card-resp">' + inicialResp + '</span><span class="ev-card-resp-nombre">' + _esc(nombrePila) + '</span></span>' : '') +
     '</div>' +
     (p.total ? '<div class="ev-card-progreso-wrap"><div class="ev-card-progreso-bar" style="width:' + p.pct + '%;"></div></div>' +
-      '<div class="ev-card-progreso-txt">' + p.hechos + '/' + p.total + ' subtareas</div>' : '') +
+      '<div class="ev-card-progreso-txt">' + p.hechos + '/' + p.total + ' subtareas · ' + p.pct + '%</div>' : '') +
   '</div>';
 }
 
