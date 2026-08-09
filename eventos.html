@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.09.5 (3 pedidos de Cristian con captura: (1) el campo "Agregar ítem" se veía gigante — bug relacionado al anterior pero distinto: el picker de menciones (.ev-mencion-sug) quedaba DENTRO de la fila flex .ev-check-add-row-chico junto al input y el botón, y como esa fila no tenía align-items definido (default: stretch), cuando el picker se poblaba con varios candidatos y crecía en alto, TODO el input y el botón se estiraban para igualar esa altura. Fix: el picker sale de la fila flex y pasa a ser un hermano debajo (mismo patrón que ya usa el chat) — así solo el picker crece, sin arrastrar al resto. (2) La portada de la tarjeta ahora es clickeable — abre en grande con un lightbox (tocar afuera o en la imagen la cierra), tanto desde el modal como desde la tarjeta cerrada en el tablero. (3) Sobre "no aparecen los 10 destinatarios": confirmado con test que si listarInternos devuelve 10, el picker efectivamente pinta los 10 — no hay ningún límite ni filtro adicional en el código de Eventos. El picker tiene scroll interno (max-height:160px, igual que Negocios) — si Cristian los ve incompletos incluso scrolleando, el problema estaría en la hoja Vendedores, no en el código.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.4 (BUG REAL encontrado tras descartar caché — Cristian confirmó con captura que solo pasaba en Listas de comprobación, no en Mensajes internos, lo cual apuntaba a código y no a versión vieja. Causa: el picker de menciones (.ev-mencion-sug) queda anidado DENTRO de .ev-check-add-row-chico (la fila del input "Agregar ítem" + botón "+ Agregar"), y la regla ".ev-check-add-row-chico button" (pensada solo para el botón verde "+ Agregar") tiene la MISMA especificidad CSS que ".ev-mencion-sug button" pero está definida más abajo en la hoja de estilos — por cascada, le ganaba y pintaba TODOS los botones de sugerencias de verde (menos el resaltado, que sí ganaba por tener 2 clases ".activo"). En el chat no pasaba porque ahí el picker no está anidado dentro de ningún contenedor con esa regla. Fix: los selectores pasan a usar combinador de hijo directo (".ev-check-add-row-chico > button/input"), así solo afectan al input y botón que son hijos directos, sin filtrarse a los botones del picker anidado más adentro. Confirmado con getComputedStyle real vía jsdom: los botones no-activos ahora dan rgba(0,0,0,0) en vez de verde.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.3 (Chat "Mensajes internos" ahora usa EXACTAMENTE el mismo formato que Negocios (cotizaciones.html): lista de mensajes envuelta en su propia caja con borde y scroll interno (max-height:340px) — antes era un <div> suelto sin caja, por eso el contenido se mezclaba con el resto de la página en vez de quedar contenido; esto también resuelve de raíz el problema de que el título se perdía de scroll (se sacó el parche sticky, ya no hace falta). Título "Mensajes internos" pasa a texto plano bold 13px, igual que Negocios (antes tenía tratamiento de section-titulo). Pedido por Cristian con capturas comparando ambos módulos: "así ya está hecho en Negocios y funciona... usa misma tipografía y mismo formato que en negocios". Confirmado con jsdom: caja con clase ev-msg-lista-box, picker de menciones position:static (no absolute), resaltado del primero con clase .activo — todo calcado del comportamiento real de cotizaciones.html.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.2 (2 fixes con captura de Cristian: (1) el input del chat de "Mensajes internos" se iba de pantalla en mobile — bug clásico de flexbox, el <input flex:1> se negaba a encogerse por debajo de su ancho intrínseco sin min-width:0, agregado ahí y en los otros 2 lugares con el mismo patrón (fila de agregar ítem de checklist, título de checklist). De paso, título de "Mensajes internos" ahora sticky y más grande, para que nunca se pierda de vista al hacer scroll, y overflow-x:hidden defensivo en el panel del modal. (2) Los ítems de checklist ahora son editables (antes solo se podían tildar o borrar) — usa la nueva acción ev_editarChecklistItem de FotoMap.gs v162.) -->
@@ -775,7 +776,7 @@ function _renderCard(t) {
   var inicialResp = (t.responsable_nombre || '').trim().charAt(0).toUpperCase() || '?';
   var portada = (t.adjuntos || []).find(function(a){ return a.esPortada; });
   return '<div class="ev-card" data-id-tarjeta="' + t.id + '" data-responsable="' + _esc(t.responsable_email||'') + '" data-categoria="' + _esc(t.categoria||'') + '" draggable="true" ondragstart="_dragStartCard(event,\'' + t.id + '\')" ondragend="_dragEndCard(event)" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
-    (portada ? '<div class="ev-card-portada"><img src="' + portada.url + '" alt=""></div>' : '') +
+    (portada ? '<div class="ev-card-portada"><img src="' + portada.url + '" alt="" style="cursor:pointer;" onclick="event.stopPropagation(); _ampliarPortadaEv(\'' + portada.url.replace(/'/g,"\\'") + '\')"></div>' : '') +
     (t.categoria ? '<span class="ev-card-cat" style="background:' + cat.bg + ';color:' + cat.color + ';">' + _esc(t.categoria) + '</span>' : '') +
     '<div class="ev-card-titulo">' + _esc(t.titulo) + '</div>' +
     '<div class="ev-card-meta">' +
@@ -918,7 +919,7 @@ function _renderOverlayTarjeta() {
 
   document.getElementById('ev-overlay-body').innerHTML =
     '<div class="ev-overlay-col-principal">' +
-      (portada ? '<div class="ev-portada-banner"><img src="' + portada.url + '" alt=""><div><div style="font-size:11.5px;font-weight:700;">' + _esc(portada.nombre) + '</div><div style="font-size:10px;color:var(--text-muted);">Portada de la tarjeta</div></div></div>' : '') +
+      (portada ? '<div class="ev-portada-banner"><img src="' + portada.url + '" alt="" style="cursor:pointer;" onclick="_ampliarPortadaEv(\'' + portada.url.replace(/'/g,"\\'") + '\')"><div><div style="font-size:11.5px;font-weight:700;">' + _esc(portada.nombre) + '</div><div style="font-size:10px;color:var(--text-muted);">Portada de la tarjeta — tocá para ampliar</div></div></div>' : '') +
       '<input type="text" class="ev-det-titulo-input" id="ev-t-titulo" value="' + _esc(t.titulo) + '" onchange="_guardarCampoTarjeta(\'titulo\',this.value)" placeholder="Título de la tarjeta">' +
       '<div class="ev-det-header-info">' +
         (fechaCreado ? 'Creada el <b>' + fechaCreado + '</b> · ' : '') +
@@ -1042,11 +1043,11 @@ function _renderChecklistsGrupos(t) {
         '</div>';
       }).join('') + '</div>' +
       '<div class="ev-check-add-row-chico">' +
-        '<div id="ev-cl-sug-' + g.id + '" class="ev-mencion-sug"></div>' +
         '<input type="text" id="ev-cl-nuevo-' + g.id + '" placeholder="Agregar ítem... @ para mencionar" ' +
           'oninput="_onChecklistInput(event,\'' + g.id + '\')" onkeydown="_onChecklistKeydown(event,\'' + g.id + '\')">' +
         '<button onclick="_agregarChecklistItem(\'' + g.id + '\')">+ Agregar</button>' +
       '</div>' +
+      '<div id="ev-cl-sug-' + g.id + '" class="ev-mencion-sug"></div>' +
       '<div class="ev-mencion-aviso">Al mencionar con @ a un colaborador en un ítem, se le enviará un correo y una notificación Push.</div>' +
     '</div>';
   }).join('');
@@ -1226,6 +1227,22 @@ function _resumenReaccionesEv(reacciones) {
   if (!partes.length) return '';
   return '<div class="msg-reacciones-resumen">' + partes.join('&nbsp;&nbsp;') + '</div>';
 }
+// Lightbox de la portada — click abre la imagen en grande, click
+// afuera o en la imagen la cierra. Mismo patrón que
+// _mostrarQuienReaccionoEv (overlay creado al vuelo, sin HTML fijo).
+// Pedido por Cristian: "la imagen de portada, ampliarla si la
+// clickeo con el mouse".
+window._ampliarPortadaEv = function(url) {
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;cursor:zoom-out;';
+  overlay.onclick = function() { if (overlay.parentNode) document.body.removeChild(overlay); };
+  var img = document.createElement('img');
+  img.src = url;
+  img.style.cssText = 'max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 12px 50px rgba(0,0,0,.6);';
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
+};
+
 window._mostrarQuienReaccionoEv = function(ev, emoji, nombresStr) {
   if (ev) ev.stopPropagation();
   var overlay = document.createElement('div');
