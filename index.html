@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.09.1 (Modal del escáner QR de FacoExtrema: agregada instrucción fija visible MIENTRAS la cámara está activa escaneando — antes solo existía el texto de "antes de arrancar la cámara" (#qr-fac-reader-vacio: "Apuntá la cámara..."), que se ocultaba apenas el video en vivo arrancaba, dejando la pantalla de escaneo real sin ninguna guía visible (confirmado con captura de Cristian, cámara activa sin texto). Nueva instrucción ("📷 Centrá el QR de la credencial en el recuadro... no hace falta tocar nada, se lee solo") se muestra recién cuando la cámara arranca de verdad, y se oculta en los 3 casos de error (sin librería, sin permiso de cámara, excepción al iniciar) para no confundir cuando no hay video. Pedido por Cristian: "ponele instrucciones de uso para que el usuario sepa qué hacer".) -->
 <!-- Portal TLC | index.html | v2026.08.06.3 (Modal QR: los 5 campos leídos (Nombre, Apellido, Email, Teléfono, DNI, Categoría) ahora son editables — antes eran texto fijo, sin forma de corregir un dato mal leído. Teléfono: se agregó mapeo a nombres de campo alternativos (tel/phone/celular/movil) por si el QR real usa otra clave, más un console.log del JSON crudo para diagnosticar en la consola del navegador qué trae exactamente el QR cuando un campo no aparece. Pedido por Cristian con captura de su propio QR de prueba: "el teléfono no me lo lee, chequealo". La acción de backend guardarEmpresaContactoQR ya existe en FotoMap.gs v160 — el guardado real ya funciona.) -->
 <!-- Portal TLC | index.html | v2026.08.06.2 (FAB de QR de FacoExtrema — nuevo, centrado abajo elevado sobre la bottom-nav. Modal centrado en pantalla con tipografía grande (pedido explícito por legibilidad). Escanea credencial (JSON: id/nombre/apellido/dni/email/telefono/vip/categoria) vía html5-qrcode, muestra tilde verde de confirmación 1s, después los datos leídos con 3 botones: Cancelar / Guardar (Empresa+Contacto, sin negocio) / Enviar por WhatsApp y Guardar (ídem + redirige a selector-dispositivos.html?modo=qr_ficha para elegir equipo — de ahí el circuito sigue en ficha-equipo.html v2026.08.06.2, que ya tenía la lógica de Negocio con la regla de 7 días). PENDIENTE DE BACKEND: la acción 'guardarEmpresaContactoQR' que llama el botón Guardar TODAVÍA NO EXISTE en FotoMap.gs — hay que agregarla antes de que el guardado funcione de verdad; mientras tanto el escaneo y la UI andan completos. Iterado primero como demo/mockup (index_DEMO_QR.html) y confirmado por Cristian antes de integrarlo acá.) -->
 <!-- Portal TLC | index.html | v2026.08.06.1 (Fix robusto del picker de reacciones: ver detalle completo en servicio.html v2026.08.06.3 — mismo mecanismo (_abrirReaccionPicker), un solo picker global con position:fixed en vez de uno por mensaje que quedaba cortado por el overflow-y:auto del contenedor.) -->
@@ -407,6 +408,9 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
 #qr-fac-reader { width:100%; border-radius:12px; overflow:hidden; }
 .qr-scan-icon { font-size:38px; margin-bottom:10px; }
 .qr-scan-txt { font-size:15px; color:var(--text-muted); margin-bottom:16px; line-height:1.55; }
+.qr-scan-instruccion-activa { display:none; margin-top:12px; text-align:center; }
+.qr-scan-instruccion-activa .titulo { font-size:14px; font-weight:800; color:var(--text-main); margin-bottom:4px; }
+.qr-scan-instruccion-activa .sub { font-size:12.5px; color:var(--text-muted); line-height:1.5; }
 .qr-btn-simular { margin-top:10px; background:none; border:none; color:var(--accent-blue); font-size:14px; cursor:pointer; text-decoration:underline; }
 
 .qr-ok-circulo { width:96px; height:96px; border-radius:50%; background:var(--accent-green); margin:0 auto;
@@ -3358,6 +3362,10 @@ function _iaToggleMic() {
           <div class="qr-scan-icon">🎫</div>
           <div class="qr-scan-txt">Apuntá la cámara al código QR de la credencial<br>para cargar los datos del contacto.</div>
         </div>
+        <div class="qr-scan-instruccion-activa" id="qr-scan-instruccion-activa">
+          <div class="titulo">📷 Centrá el QR de la credencial en el recuadro</div>
+          <div class="sub">No hace falta tocar nada — se lee solo apenas lo detecte.<br>Si está oscuro o brilla, alejá un poco el celular.</div>
+        </div>
       </div>
     </div>
 
@@ -3424,6 +3432,7 @@ window._abrirModalQR = function() {
   document.getElementById('qr-fac-paso-scan').style.display = 'block';
   document.getElementById('qr-fac-paso-ok').style.display = 'none';
   document.getElementById('qr-fac-paso-datos').style.display = 'none';
+  document.getElementById('qr-scan-instruccion-activa').style.display = 'none';
   _datosQrFacActuales = null;
   _iniciarCamaraQRFac();
 };
@@ -3451,15 +3460,23 @@ function _iniciarCamaraQRFac() {
       function() { /* frame sin QR, normal — se ignora a propósito */ }
     ).then(function() {
       document.getElementById('qr-fac-reader-vacio').style.display = 'none';
+      // Instrucción fija — antes solo existía el texto de "antes de
+      // arrancar la cámara" (#qr-fac-reader-vacio), que se ocultaba
+      // apenas la cámara arrancaba, dejando el video en vivo SIN
+      // ninguna guía visible. Pedido por Cristian: "ponele
+      // instrucciones de uso para que el usuario sepa qué hacer".
+      document.getElementById('qr-scan-instruccion-activa').style.display = 'block';
     }).catch(function(err) {
       document.getElementById('qr-fac-reader-vacio').innerHTML =
         '<div class="qr-scan-icon">⚠️</div><div class="qr-scan-txt">No se pudo acceder a la cámara.<br>' + _esc(String(err)) + '</div>' +
         '<button class="qr-btn-simular" onclick="_simularEscaneoQRFac()">🧪 Simular escaneo con datos de prueba</button>';
+      document.getElementById('qr-scan-instruccion-activa').style.display = 'none';
     });
   } catch(e) {
     document.getElementById('qr-fac-reader-vacio').innerHTML =
       '<div class="qr-scan-icon">⚠️</div><div class="qr-scan-txt">Lector de QR no disponible acá.</div>' +
       '<button class="qr-btn-simular" onclick="_simularEscaneoQRFac()">🧪 Simular escaneo con datos de prueba</button>';
+    document.getElementById('qr-scan-instruccion-activa').style.display = 'none';
   }
 }
 
