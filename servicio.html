@@ -1,6 +1,9 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.09.4 (Candado Preparación/CC → Para Instalar suma un 4to requisito, confirmado por Cristian: el "Estado" de CADA equipo (Pendiente/Retirado del depósito/Verificado/Listo para despacho) debe estar en "Listo para despacho" — antes ese desplegable era puramente informativo, no bloqueaba nada, aunque el resto (Serie+POE-8+Checklist) estuviera completo. Mensaje de aviso extendido para mencionarlo. Confirmado con test: el escenario exacto de la captura de Cristian (todo completo pero Estado en "Pendiente") ahora bloquea correctamente.) -->
+<!-- Portal TLC | servicio.html | v2026.08.09.3 (Puntos 4 y "nomenclatura" del circuito completo Ventas↔Preparación pedido por Cristian (ver FotoMap.gs v170): (1) Candado Preparación/CC → Para Instalar en _validarGate — exige N° de Serie en todos los equipos, POE-8 completado en todos, y Checklist completado SOLO en los que tengan uno mapeado (los que no tienen checklist disponible no lo exigen). Aplicado tanto al drag&drop como al selector desplegable del detalle (antes el selector no pasaba por NINGÚN gate, era una vía de escape sin querer). Mensaje de bloqueo exacto pedido por Cristian. (2) Nomenclatura del título de la Orden de Preparación pasa a formato compacto MM26 (mes 2 dígitos + año 2 dígitos, sin espacios) en vez de "Ago 2026" — solo para tipo_orden==='preparacion_equipos', los tickets normales mantienen el formato con nombre de mes de siempre. Se mantiene el indicador "(+N)" cuando hay más de un equipo. Confirmado con test aislado: 5 escenarios de candado (falta todo / todo completo con checklist mapeado / todo completo sin checklist mapeado / mezcla de 2 equipos / movimiento hacia atrás siempre libre).) -->
 <!-- Portal TLC | servicio.html | v2026.08.09.1 (4 correcciones a la Orden de Preparación con captura anotada: (1) título del ticket mostraba "Sin equipo" aunque la grilla tuviera equipos cargados — _nombreTarjetaTicket usaba equipo_marca/equipo_modelo (campos de un ticket de UN equipo), pero la Orden de Preparación tiene una LISTA (t.equipos[]); ahora usa el primer equipo de esa lista (+cuántos más haya). (2) Se sacó el botón "Ver Orden" de accesos rápidos para este tipo de ticket — ya tiene su propio "🖨 Imprimir/Exportar Orden de Preparación", era redundante y apuntaba a un documento que no le correspondía (orden-servicio.html, pensado para tickets de reparación normales). (3) Se sacó por completo el mini-stepper "Estado del pedido" (Preparación → Facturación → Expedición) y su botón de avanzar — Cristian lo marcó con X sobre el paso de Facturación y el botón. La función queda definida pero sin llamar. (4) Columna "Checklist" nueva en la grilla de equipos — cada fila matchea su propio SKU+descripción contra CHECKLIST_POR_MODELO (mismo mapeo y misma función _archivoChecklistParaModelo que ya existían para tickets normales, que nunca se disparaban acá porque dependían de equipo_modelo). El link del POE-8 ya estaba bien armado y confirmado por test aislado — llega precargado con tecnico/cliente/domicilio/teléfono/modelo/serie, y POE8_Instalacion.html ya sabía leer esos query params.) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.6 (Link al POE-8 "Registro de Instalación" (POE8_Instalacion.html, ya existía en el repo) agregado como columna nueva en la grilla de equipos de la Orden de Preparación — un link por equipo, se abre ya completado vía query params (?tecnico=&cliente=&domicilio=&telefono=&modelo=&serie=) tomados del ticket, para que el técnico no tenga que retipear nada al llegar a instalar. El POE-8 no tiene marca/modelo separados en la grilla (solo SKU+descripción libre), así que van juntos en "modelo" sin inventar un split. Pedido por Cristian: "llevar el POE completo... ya completado con los datos del cliente hacia la tarjeta de servicio en preparación".) -->
+<!-- Portal TLC | servicio.html | v2026.08.09.2 (Prerrequisito #2 del circuito completo Ventas↔Preparación (en curso, ver FotoMap.gs v169): _urlPOE8 ahora manda también id_ticket+equipo_index en la URL, para que el formulario POE8_Instalacion.html sepa a qué equipo puntual pertenece cuando se completa. El link de POE-8 y el de Checklist en la grilla ahora muestran "✅ Completado" en verde si ya se hizo, en vez del texto genérico de siempre — dato nuevo (eq.poe8_completado / eq.checklist_completado) que empieza a llegar desde que existe el backend nuevo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.5 (Circuito propio para Orden de Preparación de Equipos — CONFIRMADO tras probar con servicio_DEMO.html: reemplaza el bloque completo de reparación (Información del equipo duplicada, Fotos, Asignación de 12 etapas, Trabajo técnico) por un mini-stepper de 3 pasos "Estado del pedido" — Preparación → Facturación → Expedición y Seguimiento — reusando 3 etapas de Kanban que YA EXISTÍAN (preparacion_control_calidad/para_facturar/finalizado), cero columnas nuevas, cero backend nuevo. Se agregó "Dirección de envío" como campo propio (distinto del Domicilio del contacto — puede ser un depósito/transportista distinto). Se sacó el botón "Generar/Modificar Presupuesto" de accesos rápidos (no aplica a este tipo de ticket) y el ícono 📄 duplicado del header (ya está "Ver Orden" en accesos rápidos). "Gastos del servicio" pasa a llamarse "Gastos asociados" para este tipo de ticket. Circuito iterado en varias rondas con Cristian sobre servicio_PREVIEW.html/servicio_DEMO.html antes de confirmar.) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.4 (3 pedidos sobre Orden de Preparación de Equipos, con captura anotada: (1) los campos Domicilio de Envío/Fecha límite/Técnico responsable eran solo texto — ahora son editables (mismo patrón _guardarCampoSiCambio del resto del ticket); (2) se agregaron Cliente/Clínica, Nombre del médico, Domicilio y Teléfono a esa misma tarjeta (editables) para tener el contacto completo sin depender de la sección "Información del equipo" de más abajo; (3) grilla de equipos ahora responsiva — en pantallas angostas cada fila se convierte en tarjeta apilada con etiquetas por campo, en vez de una tabla con scroll horizontal forzado; (4) se quitó por completo la Firma Digital por canvas — la orden se firma en papel, holográficamente, por el técnico y por el transporte al despacho (queda pendiente de definición el punto 5: qué hacer con el resto de la sección "Información del equipo" / "Trabajo técnico" para este tipo de ticket).) -->
 <!-- Portal TLC | servicio.html | v2026.08.06.3 (Fix robusto del picker de reacciones: cada mensaje/notificación tenía su propio popover con position:absolute anclado a su fila, y quedaba cortado/tapado por el overflow-y:auto del contenedor de mensajes cuando estaba cerca del borde — a veces no se veía completo, a veces no dejaba clickear. Reemplazado por UN SOLO picker global (en <body>), reposicionado con JS en cada apertura vía getBoundingClientRect() del botón — abre arriba o abajo según el espacio libre en pantalla, con position:fixed, así nunca depende de qué contenedor lo rodea. Mismo mecanismo (_abrirReaccionPicker) para mensajes internos y campanita. Reportado por Cristian con captura: "a veces aparece solo el corazón, a veces te deja clickear y a veces no, en la campanita lo mismo".) -->
@@ -1457,7 +1460,20 @@ function _nombreTarjetaTicket(t) {
     equipo = (yaIncluida ? modelo : [marca, modelo].filter(Boolean).join(' ').trim()) || 'Sin equipo';
   }
   var fechaBase = t.creado_en ? new Date(t.creado_en) : new Date();
-  var mesAno = isNaN(fechaBase.getTime()) ? '' : (MESES_TICKET[fechaBase.getMonth()] + ' ' + fechaBase.getFullYear());
+  var mesAno = '';
+  if (!isNaN(fechaBase.getTime())) {
+    if (t.tipo_orden === 'preparacion_equipos') {
+      // Formato compacto MM26 (mes de 2 dígitos + últimos 2 del año,
+      // sin espacios) — pedido puntual de Cristian para la Orden de
+      // Preparación, distinto del "Ago 2026" que usan los tickets
+      // normales: "[Cliente] - [Primer Equipo] - [MM26]".
+      var mm = String(fechaBase.getMonth() + 1).padStart(2, '0');
+      var yy = String(fechaBase.getFullYear()).slice(-2);
+      mesAno = mm + yy;
+    } else {
+      mesAno = MESES_TICKET[fechaBase.getMonth()] + ' ' + fechaBase.getFullYear();
+    }
+  }
   return cliente + ' - ' + equipo + (mesAno ? ' - ' + mesAno : '');
 }
 
@@ -1575,12 +1591,26 @@ function _ejecutarMovimientoEtapa(t, nuevaCol, asignado, depositoAnterior, cerra
 }
 
 // Cambio de etapa desde el <select> del detalle — mismo flujo de
-// asignación que el drag&drop, sin agregar validaciones nuevas (el
-// select nunca llamó a _validarGate, se mantiene ese comportamiento).
+// asignación que el drag&drop. El resto de los gates NUNCA se
+// validaron acá a propósito (decisión de una vuelta anterior) — se
+// mantiene así. La ÚNICA excepción nueva es el candado
+// Preparación/CC → Para Instalar: como layer de seguridad, si alguien
+// intenta saltarlo desde el selector en vez de arrastrar la tarjeta,
+// igual se bloquea. Pedido por Cristian: "SÓLO Y EXCLUSIVAMENTE podrá
+// moverse... si el técnico intenta moverla sin cumplir esto, bloqueá
+// el movimiento".
 window._cambiarEtapaDesdeDropdown = function(id, nuevoValor, valorAnterior) {
   if (nuevoValor === valorAnterior) return;
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
   if (!t) return;
+  if (valorAnterior === 'preparacion_control_calidad' && nuevoValor === 'para_instalar') {
+    var errores = _validarGate(t, nuevoValor);
+    if (errores.length) {
+      _stMostrarError('⚠ ' + errores[0]);
+      _renderDetalle(t); // re-pinta el select de vuelta a su valor real
+      return;
+    }
+  }
   _resolverAsignacionYMover(t, nuevoValor, valorAnterior);
 };
 
@@ -1616,6 +1646,40 @@ window._onDrop = function(e, nuevaCol) {
 function _validarGate(t, destino) {
   var origen = t.deposito || 'recepcion';
   var errores = [];
+
+  // Candado Preparación/CC → Para Instalar — pieza 4 del circuito
+  // completo Ventas↔Servicio pedido por Cristian. Vive FUERA de
+  // FLUJO_ETAPAS (esas 2 etapas no forman parte del flujo principal de
+  // reparación) por eso va acá arriba, antes del corte temprano de
+  // abajo. Exige: (1) N° de Serie cargado en TODOS los equipos, (2)
+  // POE-8 completado en TODOS los equipos, (3) Checklist completado en
+  // los equipos que SÍ tengan uno mapeado (los que no tienen checklist
+  // disponible no lo exigen, no hay nada que completar), (4) el Estado
+  // de CADA equipo en "Listo para despacho" — confirmado con Cristian:
+  // "sí, agregalo como requisito más del candado" (antes ese
+  // desplegable era puramente informativo, no bloqueaba nada). El
+  // punto (3) va a bloquear hoy cualquier ticket con un equipo tipo
+  // HBM-1/HRK-1 (que sí tienen checklist mapeado) hasta que los
+  // formularios de checklist individuales avisen de vuelta al ticket
+  // cuando se completan — esa conexión todavía no existe (necesito
+  // esos archivos de Cristian). Para equipos sin checklist mapeado
+  // (como el HDR-7100 P de las pruebas) el candado ya funciona 100%
+  // con lo que hay hoy (Serie + POE-8 + Estado).
+  if (origen === 'preparacion_control_calidad' && destino === 'para_instalar') {
+    var equiposGate = Array.isArray(t.equipos) ? t.equipos : [];
+    var faltaSerie = equiposGate.some(function(eq) { return !eq.nro_serie || !eq.nro_serie.trim(); });
+    var faltaPOE8 = equiposGate.some(function(eq) { return !eq.poe8_completado; });
+    var faltaChecklist = equiposGate.some(function(eq) {
+      var textoModelo = [eq.sku, eq.descripcion].filter(Boolean).join(' ');
+      var tieneChecklist = !!_archivoChecklistParaModelo(textoModelo);
+      return tieneChecklist && !eq.checklist_completado;
+    });
+    var faltaEstado = equiposGate.some(function(eq) { return eq.estado !== 'Listo para despacho'; });
+    if (faltaSerie || faltaPOE8 || faltaChecklist || faltaEstado) {
+      return ['Atención: Debe completar todos los checklists, el POE, los N° de Serie, y dejar el Estado de cada equipo en "Listo para despacho" antes de pasar a "Para Instalar"'];
+    }
+    return errores;
+  }
 
   // Solo validar si el movimiento es hacia adelante en el flujo principal
   var idxOrigen  = FLUJO_ETAPAS.indexOf(origen);
@@ -1939,10 +2003,10 @@ function _renderDetalle(t) {
 // mal — el técnico lo ajusta a mano en el momento si hace falta.
 // Pedido por Cristian: "llevar el POE completo, ya completado con
 // los datos del cliente, hacia la tarjeta de servicio en preparación".
-function _urlPOE8(t, eq) {
+function _urlPOE8(t, eq, indiceEquipo) {
   var base = 'https://cahirth.github.io/Portal-TLC/POE8_Instalacion.html';
   var params = [];
-  var add = function(clave, valor) { if (valor) params.push(clave + '=' + encodeURIComponent(valor)); };
+  var add = function(clave, valor) { if (valor !== undefined && valor !== null && valor !== '') params.push(clave + '=' + encodeURIComponent(valor)); };
   add('tecnico', t.tecnico_responsable_nombre);
   add('cliente', t.cliente);
   add('domicilio', t.domicilio_envio || t.domicilio || '');
@@ -1951,6 +2015,14 @@ function _urlPOE8(t, eq) {
     add('modelo', [eq.sku, eq.descripcion].filter(Boolean).join(' — '));
     add('serie', eq.nro_serie);
   }
+  // id_ticket + equipo_index — para que el POE-8, al enviarse, le
+  // pueda avisar de vuelta a ESTE equipo puntual del ticket que ya
+  // está completado (antes el formulario no sabía de qué ticket ni de
+  // qué equipo venía, era un envío "a ciegas"). Prerrequisito del
+  // candado Preparación/CC → Para Instalar (flujo pedido por
+  // Cristian).
+  if (t.id_ticket) add('id_ticket', t.id_ticket);
+  if (indiceEquipo !== undefined && indiceEquipo !== null) add('equipo_index', indiceEquipo);
   return base + (params.length ? '?' + params.join('&') : '');
 }
 
@@ -1966,7 +2038,11 @@ function _renderSeccionOrdenPreparacion(t) {
     // de preparación".
     var textoModeloFila = [eq.sku, eq.descripcion].filter(Boolean).join(' ');
     var archivoChecklistFila = _archivoChecklistParaModelo(textoModeloFila);
-    var urlChecklistFila = archivoChecklistFila ? (CHECKLIST_URL_BASE + archivoChecklistFila + '?ticket=' + encodeURIComponent(t.id_ticket)) : '';
+    var urlChecklistFila = archivoChecklistFila
+      ? (CHECKLIST_URL_BASE + archivoChecklistFila + '?ticket=' + encodeURIComponent(t.id_ticket) + '&equipo_index=' + i)
+      : '';
+    var poe8Completado = !!eq.poe8_completado;
+    var checklistCompletado = !!eq.checklist_completado;
     return '<tr>' +
       '<td data-th="Cant.">' + (eq.cantidad || 1) + '</td>' +
       '<td data-th="SKU"><input type="text" value="' + _esc(eq.sku||'') + '" placeholder="—" onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'sku\',this.value)"></td>' +
@@ -1978,9 +2054,9 @@ function _renderSeccionOrdenPreparacion(t) {
           return '<option ' + (eq.estado===op?'selected':'') + '>' + op + '</option>';
         }).join('') +
       '</select></td>' +
-      '<td data-th="POE-8"><a href="' + _urlPOE8(t, eq) + '" target="_blank" class="op-btn" style="padding:4px 9px;font-size:10.5px;text-decoration:none;display:inline-block;white-space:nowrap;">📋 Instalación</a></td>' +
+      '<td data-th="POE-8"><a href="' + _urlPOE8(t, eq, i) + '" target="_blank" class="op-btn" style="padding:4px 9px;font-size:10.5px;text-decoration:none;display:inline-block;white-space:nowrap;' + (poe8Completado ? 'background:#06d6a0;' : '') + '">' + (poe8Completado ? '✅ Completado' : '📋 Instalación') + '</a></td>' +
       '<td data-th="Checklist">' + (urlChecklistFila
-        ? '<a href="' + urlChecklistFila + '" target="_blank" class="op-btn" style="padding:4px 9px;font-size:10.5px;text-decoration:none;display:inline-block;white-space:nowrap;background:#3a86ff;">✅ Checklist</a>'
+        ? ('<a href="' + urlChecklistFila + '" target="_blank" class="op-btn" style="padding:4px 9px;font-size:10.5px;text-decoration:none;display:inline-block;white-space:nowrap;' + (checklistCompletado ? 'background:#06d6a0;' : 'background:#3a86ff;') + '">' + (checklistCompletado ? '✅ Completado' : '✅ Checklist') + '</a>')
         : '<span style="color:var(--text-muted);font-size:10.5px;">—</span>') + '</td>' +
     '</tr>';
   }).join('');
