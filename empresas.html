@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.10.1 (Fix — empresas viejas que solo tenían el campo genérico "domicilio" cargado (nunca migradas a los 3 campos nuevos) quedaban con el domicilio invisible en el formulario desde que se sacó ese campo de la UI la vuelta pasada. El dato nunca se borró (guardarEmpresa no lo toca si no se lo mandan), pero no había forma de VERLO. Ahora, al abrir el detalle, si los 3 campos nuevos están vacíos y el campo viejo tiene algo, se muestra como Domicilio Comercial de arranque — al guardar cambios ya queda migrado a la estructura nueva sin que el usuario tenga que hacer nada especial. Reportado por Cristian con captura: "podés ver estos datos que se borraron... número de teléfono, domicilio". El teléfono de la empresa se confirmó intacto en la misma captura (no afectado); el teléfono vacío del contacto es un campo aparte que nunca se tocó en ningún cambio reciente — no es un efecto de esta modificación. Confirmado con test: empresa vieja migra visualmente bien, empresa con los 3 campos ya cargados no se toca.) -->
 <!-- Portal TLC | empresas.html | v2026.08.09.1 (Se sacó el campo "Domicilio" plano del formulario (Nueva Empresa y Editar empresa) — quedaba redundante con Domicilio Fiscal/Comercial/Envío. El link de "Nuevo Ticket" precargado ahora usa Domicilio Comercial (con fallback a Fiscal, y al campo viejo como último recurso) en vez del campo plano. La importación masiva desde Excel se dejó intacta — sigue mandando "domicilio" para empresas nuevas sin los 3 campos granulares, es una fuente legítima de datos que no tiene esa distinción. Ver FotoMap.gs v168: guardarEmpresa ya no pisa el campo viejo con vacío si el formulario no lo manda más — protege los datos ya cargados de empresas existentes. Pedido por Cristian: "Domicilio está de más, ya hay demasiados domicilios... solamente dejar Domicilio Comercial, Domicilio Fiscal, Domicilio de Envío... que no redunde información sin romper nada". Confirmado con jsdom: los campos ya no existen en el HTML, el detalle abre sin crashear, y guardar cambios no manda "domicilio" en el payload.) -->
 <!-- Portal TLC | empresas.html | v2026.08.06.1 (Flujo A de la integración QR Faco Extrema: botón "📷 Escanear QR" en el formulario de Nuevo Contacto, autocompleta Nombre/Email/Teléfono/DNI directo desde la credencial (html5-qrcode). Campo DNI nuevo en el contacto. Ver FotoMap.gs v159 y ficha-equipo.html v2026.08.06.1 (Flujo B).) -->
 <!-- Portal TLC | empresas.html | v2026.08.04.10 (Mismo fix de color-scheme que cotizaciones.html — causa raíz real del hover oscuro en modo claro.) -->
@@ -611,8 +612,18 @@ window._abrirDetalleEmpresa = function(id) {
   document.getElementById('det-razon').value = e.razonSocial;
   document.getElementById('det-cuit').value = e.cuit;
   document.getElementById('det-telefono').value = e.telefono;
+  // Empresas viejas que nunca llegaron a tener los 3 campos nuevos
+  // cargados (solo el campo genérico "domicilio" de antes, que ya no
+  // se muestra en el formulario) quedaban con el domicilio invisible
+  // — el dato seguía en la base (nunca se borró, guardarEmpresa no lo
+  // toca si no se lo mandan), pero no había forma de VERLO. Se
+  // muestra acá como Domicilio Comercial de arranque; al guardar
+  // cambios ya queda migrado a la estructura nueva. Reportado por
+  // Cristian con captura: "podés ver estos datos que se borraron de
+  // la última modificación... domicilio".
+  var domicilioLegado = (!e.domicilioFiscal && !e.domicilioComercial && !e.domicilioEnvio) ? (e.domicilio || '') : '';
   document.getElementById('det-domicilio-fiscal').value = e.domicilioFiscal || '';
-  document.getElementById('det-domicilio-comercial').value = e.domicilioComercial || '';
+  document.getElementById('det-domicilio-comercial').value = e.domicilioComercial || domicilioLegado;
   document.getElementById('det-domicilio-envio').value = e.domicilioEnvio || '';
   document.getElementById('det-comentarios').value = e.comentariosGenerales || '';
   var _sesionAdmin = _leerSesionCompartida();
