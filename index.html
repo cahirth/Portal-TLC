@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.10.1 (Teléfono obligatorio y válido en el modal QR de FacoExtrema — antes se podía Guardar o Enviar por WhatsApp con el teléfono vacío o mal tipeado, sin ningún aviso. Ahora _guardarContactoQR valida con el mismo _formatearTelefonoWsp que usa ficha-equipo.html antes de dejar pasar cualquiera de los 2 botones — si no es un WhatsApp argentino válido, bloquea, muestra un popup con el motivo y un ejemplo de formato correcto (+549 11 4829 1441), y le pone el foco al campo Teléfono resaltado en rojo. Pedido por Cristian. Confirmado con test: sin teléfono bloquea, con uno inválido bloquea, con uno válido deja pasar sin avisos.) -->
 <!-- Portal TLC | index.html | v2026.08.09.2 (2 pedidos de Cristian: (1) "Regulatoria" y "Reportes" eran los ÚNICOS dos ítems del menú de Administración que no pasaban por NINGÚN chequeo de permiso — ni columna en el Sheet, ni bloqueo visual (opacidad/candado), ni el wrapper abrirModuloConPermiso/abrirUrlConPermiso — a diferencia de absolutamente todos los demás módulos. Se agregaron las columnas "Regulatoria" y "Reportes" a la lectura de permisos (mismo patrón que "Eventos"), se sumaron a aplicarPermisosMenu() para que se vean grises+candado si el usuario no tiene el permiso, y sus onclick pasan a usar abrirModuloConPermiso / la nueva abrirProximamenteConPermiso (para Regulatoria, que todavía no tiene vista real, solo un toast "próximamente" — antes ni siquiera ESE toast respetaba el permiso). (2) "Gestión Eventos / Congresos" pasa a ser el primer ítem del menú de Administración (antes estaba segundo, después de Reportes).) -->
 <!-- Portal TLC | index.html | v2026.08.09.1 (Modal del escáner QR de FacoExtrema: agregada instrucción fija visible MIENTRAS la cámara está activa escaneando — antes solo existía el texto de "antes de arrancar la cámara" (#qr-fac-reader-vacio: "Apuntá la cámara..."), que se ocultaba apenas el video en vivo arrancaba, dejando la pantalla de escaneo real sin ninguna guía visible (confirmado con captura de Cristian, cámara activa sin texto). Nueva instrucción ("📷 Centrá el QR de la credencial en el recuadro... no hace falta tocar nada, se lee solo") se muestra recién cuando la cámara arranca de verdad, y se oculta en los 3 casos de error (sin librería, sin permiso de cámara, excepción al iniciar) para no confundir cuando no hay video. Pedido por Cristian: "ponele instrucciones de uso para que el usuario sepa qué hacer".) -->
 <!-- Portal TLC | index.html | v2026.08.06.3 (Modal QR: los 5 campos leídos (Nombre, Apellido, Email, Teléfono, DNI, Categoría) ahora son editables — antes eran texto fijo, sin forma de corregir un dato mal leído. Teléfono: se agregó mapeo a nombres de campo alternativos (tel/phone/celular/movil) por si el QR real usa otra clave, más un console.log del JSON crudo para diagnosticar en la consola del navegador qué trae exactamente el QR cuando un campo no aparece. Pedido por Cristian con captura de su propio QR de prueba: "el teléfono no me lo lee, chequealo". La acción de backend guardarEmpresaContactoQR ya existe en FotoMap.gs v160 — el guardado real ya funciona.) -->
@@ -3565,10 +3566,10 @@ function _procesarQRFac(textoLeido) {
 // modificar algún dato si fue mal leído".
 function _renderDatosQrFac() {
   var d = _datosQrFacActuales;
-  var campo = function(etiqueta, clave, tipo) {
+  var campo = function(etiqueta, clave, tipo, idExtra) {
     return '<div class="qr-dato-fila">' +
       '<span class="qr-lbl">' + etiqueta + '</span>' +
-      '<input type="' + (tipo || 'text') + '" class="qr-dato-input" value="' + _esc(d[clave] || '') + '" ' +
+      '<input type="' + (tipo || 'text') + '" class="qr-dato-input" ' + (idExtra ? 'id="' + idExtra + '" ' : '') + 'value="' + _esc(d[clave] || '') + '" ' +
         'oninput="_datosQrFacActuales[\'' + clave + '\']=this.value">' +
     '</div>';
   };
@@ -3576,15 +3577,44 @@ function _renderDatosQrFac() {
     campo('Nombre', 'nombre') +
     campo('Apellido', 'apellido') +
     campo('Email', 'email', 'email') +
-    campo('Teléfono', 'telefono', 'tel') +
+    campo('Teléfono', 'telefono', 'tel', 'qr-fac-input-telefono') +
     campo('DNI', 'dni') +
     campo('Categoría', 'categoria') +
     (d.vip ? '<div style="text-align:right;margin-top:6px;"><span class="qr-badge-vip">VIP</span></div>' : '');
 }
 
+// Mismo formateo/validación de teléfono que ficha-equipo.html — un
+// numero argentino de WhatsApp válido queda como 549 + código de área
+// + número (13 dígitos en total, sin el +).
+function _formatearTelefonoWsp(raw) {
+    var d = String(raw || '').replace(/\D/g, '');
+    if (!d) return '';
+    if (d.charAt(0) === '0' && d.length > 10) d = d.slice(1);
+    if (d.indexOf('549') === 0) {
+        d = '549' + d.slice(3).replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2');
+    } else if (d.length <= 10) {
+        d = '549' + d.replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2');
+    }
+    return d;
+}
+
 window._guardarContactoQR = function(conWhatsapp) {
   var d = _datosQrFacActuales;
   if (!d) return;
+  // Teléfono obligatorio y válido para WhatsApp — antes se podía
+  // guardar (o hasta mandar WhatsApp) con el teléfono vacío o mal
+  // tipeado, sin ningún aviso. Pedido por Cristian: "si el modal no
+  // tiene teléfono válido para WhatsApp, no permitir seguir adelante
+  // con los botones Guardar o Enviar por WhatsApp y Guardar, avisar
+  // con un popup... y mostrar cómo sería válido".
+  var telFormateado = _formatearTelefonoWsp(d.telefono);
+  var telValido = /^549\d{9,11}$/.test(telFormateado);
+  if (!telValido) {
+    alert('⚠️ Falta un teléfono válido para WhatsApp.\n\nEjemplo de formato válido:\n+549 11 4829 1441\n\n(código de país 54 + 9 + código de área + número, sin el 15)');
+    var inputTel = document.getElementById('qr-fac-input-telefono');
+    if (inputTel) { inputTel.focus(); inputTel.style.borderColor = '#ef4444'; setTimeout(function(){ inputTel.style.borderColor = ''; }, 2500); }
+    return;
+  }
   var nombreCompleto = [d.nombre, d.apellido].filter(Boolean).join(' ');
 
   fetch(GAS_URL_QR, {
