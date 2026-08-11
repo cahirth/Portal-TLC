@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.10.1 (Circuito nuevo "Etiquetas de Despacho" — pedido por Cristian con archivo de referencia (etiqueta-despacho-100x150.html). Botón "🏷️ Generar Etiquetas de Despacho" en el detalle de la Orden de Preparación, visible solo en la etapa Para Instalar. Abre el modal "Asignación de Cajas" — lista los equipos con su N° de Serie, permite asignar cada uno a una caja (select por ítem), botón "+ Agregar Caja", contador "Total bultos: N cajas", campo de Transporte/Expreso. Al confirmar, guarda la asignación en el ticket (st_guardarEtiquetasCajas, ver FotoMap.gs v171) y abre etiqueta-despacho.html en pestaña nueva, que imprime una etiqueta de 100×150mm por caja. Bloquea con aviso si alguna caja queda sin ítems asignados. Confirmado con test aislado de punta a punta: abrir modal, agregar caja, reasignar ítem, confirmar — arma bien los grupos por caja y abre la pestaña correcta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.09.4 (Candado Preparación/CC → Para Instalar suma un 4to requisito, confirmado por Cristian: el "Estado" de CADA equipo (Pendiente/Retirado del depósito/Verificado/Listo para despacho) debe estar en "Listo para despacho" — antes ese desplegable era puramente informativo, no bloqueaba nada, aunque el resto (Serie+POE-8+Checklist) estuviera completo. Mensaje de aviso extendido para mencionarlo. Confirmado con test: el escenario exacto de la captura de Cristian (todo completo pero Estado en "Pendiente") ahora bloquea correctamente.) -->
 <!-- Portal TLC | servicio.html | v2026.08.09.3 (Puntos 4 y "nomenclatura" del circuito completo Ventas↔Preparación pedido por Cristian (ver FotoMap.gs v170): (1) Candado Preparación/CC → Para Instalar en _validarGate — exige N° de Serie en todos los equipos, POE-8 completado en todos, y Checklist completado SOLO en los que tengan uno mapeado (los que no tienen checklist disponible no lo exigen). Aplicado tanto al drag&drop como al selector desplegable del detalle (antes el selector no pasaba por NINGÚN gate, era una vía de escape sin querer). Mensaje de bloqueo exacto pedido por Cristian. (2) Nomenclatura del título de la Orden de Preparación pasa a formato compacto MM26 (mes 2 dígitos + año 2 dígitos, sin espacios) en vez de "Ago 2026" — solo para tipo_orden==='preparacion_equipos', los tickets normales mantienen el formato con nombre de mes de siempre. Se mantiene el indicador "(+N)" cuando hay más de un equipo. Confirmado con test aislado: 5 escenarios de candado (falta todo / todo completo con checklist mapeado / todo completo sin checklist mapeado / mezcla de 2 equipos / movimiento hacia atrás siempre libre).) -->
 <!-- Portal TLC | servicio.html | v2026.08.09.1 (4 correcciones a la Orden de Preparación con captura anotada: (1) título del ticket mostraba "Sin equipo" aunque la grilla tuviera equipos cargados — _nombreTarjetaTicket usaba equipo_marca/equipo_modelo (campos de un ticket de UN equipo), pero la Orden de Preparación tiene una LISTA (t.equipos[]); ahora usa el primer equipo de esa lista (+cuántos más haya). (2) Se sacó el botón "Ver Orden" de accesos rápidos para este tipo de ticket — ya tiene su propio "🖨 Imprimir/Exportar Orden de Preparación", era redundante y apuntaba a un documento que no le correspondía (orden-servicio.html, pensado para tickets de reparación normales). (3) Se sacó por completo el mini-stepper "Estado del pedido" (Preparación → Facturación → Expedición) y su botón de avanzar — Cristian lo marcó con X sobre el paso de Facturación y el botón. La función queda definida pero sin llamar. (4) Columna "Checklist" nueva en la grilla de equipos — cada fila matchea su propio SKU+descripción contra CHECKLIST_POR_MODELO (mismo mapeo y misma función _archivoChecklistParaModelo que ya existían para tickets normales, que nunca se disparaban acá porque dependían de equipo_modelo). El link del POE-8 ya estaba bien armado y confirmado por test aislado — llega precargado con tecnico/cliente/domicilio/teléfono/modelo/serie, y POE8_Instalacion.html ya sabía leer esos query params.) -->
@@ -738,6 +739,31 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
     <div id="modal-asignar-etapa-nombre" style="font-size:12px;color:var(--text-muted);margin-bottom:16px;"></div>
     <div id="modal-asignar-lista" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
     <button type="button" onclick="_cerrarModalAsignar()" style="width:100%;padding:10px;border-radius:8px;background:transparent;border:1px solid var(--border-glow);color:var(--text-muted);font-size:12px;font-weight:600;cursor:pointer;">Cancelar</button>
+  </div>
+</div>
+
+<!-- Modal "Asignación de Cajas" — Etiquetas de Despacho, solo para
+     tickets de Orden de Preparación en la etapa Para Instalar -->
+<div id="modal-etiquetas-cajas" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(3,7,18,0.8);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:16px;padding:20px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.5);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div style="font-size:15px;font-weight:800;color:var(--text-main);">🏷️ Asignación de Cajas</div>
+      <button type="button" onclick="_cerrarModalEtiquetasCajas()" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;">✕</button>
+    </div>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px;">Marcá en qué caja va cada equipo. Cada ítem entra en una sola caja.</div>
+
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Transporte / Expreso</label>
+      <input type="text" id="etq-transporte" placeholder="Ej: Cruz del Sur, transporte propio..." style="width:100%;padding:8px 10px;border-radius:8px;background:var(--panel-darker);border:1px solid var(--border-glow);color:var(--text-main);font-size:12px;">
+    </div>
+
+    <div id="etq-items-lista" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
+
+    <button type="button" onclick="_agregarCajaEtq()" style="width:100%;padding:9px;border-radius:8px;background:var(--panel-darker);border:1px dashed var(--border-glow);color:var(--accent-blue,#3a86ff);font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px;">+ Agregar Caja</button>
+
+    <div style="font-size:12.5px;font-weight:700;color:var(--text-main);margin-bottom:14px;" id="etq-contador-cajas">Total bultos: 1 caja</div>
+
+    <button type="button" onclick="_confirmarImprimirEtiquetas()" style="width:100%;padding:11px;border-radius:8px;background:#8b5cf6;border:none;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">🖨️ Imprimir Etiquetas</button>
   </div>
 </div>
 
@@ -2026,6 +2052,110 @@ function _urlPOE8(t, eq, indiceEquipo) {
   return base + (params.length ? '?' + params.join('&') : '');
 }
 
+// ── Etiquetas de Despacho — Asignación de Cajas ──
+// Cada equipo de t.equipos[] entra en UNA sola caja (no se puede
+// partir la cantidad de una misma fila entre 2 cajas — si hace falta
+// eso en algún caso puntual, se resuelve por ahora separándolo a mano
+// en 2 filas de equipos desde antes). Al confirmar, se guarda la
+// asignación en el ticket (st_guardarEtiquetasCajas) y se abre
+// etiqueta-despacho.html?ticket=ID en una pestaña nueva — esa página
+// lee la asignación guardada e imprime una etiqueta de 100×150mm por
+// caja. Pedido por Cristian, con etiqueta-despacho-100x150.html como
+// referencia de diseño.
+var _ETQ_ESTADO = null;
+
+window._abrirModalEtiquetasCajas = function(idTicket) {
+  var t = _tickets.find(function(x){ return x.id_ticket === idTicket; });
+  if (!t) return;
+  var equipos = Array.isArray(t.equipos) ? t.equipos : [];
+  if (!equipos.length) { alert('Esta orden no tiene equipos cargados.'); return; }
+  _ETQ_ESTADO = {
+    idTicket: idTicket,
+    equipos: equipos,
+    asignaciones: equipos.map(function(){ return 1; }), // todos arrancan en Caja 1
+    totalCajas: 1,
+  };
+  document.getElementById('etq-transporte').value = t.etiquetas_transporte || '';
+  _renderItemsEtq();
+  document.getElementById('modal-etiquetas-cajas').style.display = 'flex';
+};
+
+window._cerrarModalEtiquetasCajas = function() {
+  document.getElementById('modal-etiquetas-cajas').style.display = 'none';
+  _ETQ_ESTADO = null;
+};
+
+function _renderItemsEtq() {
+  var est = _ETQ_ESTADO;
+  if (!est) return;
+  var cont = document.getElementById('etq-items-lista');
+  cont.innerHTML = est.equipos.map(function(eq, i) {
+    var opciones = '';
+    for (var n = 1; n <= est.totalCajas; n++) {
+      opciones += '<option value="' + n + '"' + (est.asignaciones[i] === n ? ' selected' : '') + '>Caja ' + n + '</option>';
+    }
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--panel-darker);border-radius:8px;">' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:12px;font-weight:700;color:var(--text-main);">' + _esc(eq.descripcion || eq.sku || 'Equipo') + '</div>' +
+        '<div style="font-size:10.5px;color:var(--text-muted);">Cant: ' + (eq.cantidad||1) + ' · Serie: ' + _esc(eq.nro_serie || 'Sin cargar') + '</div>' +
+      '</div>' +
+      '<select onchange="_asignarCajaEtq(' + i + ', this.value)" style="padding:6px 8px;border-radius:6px;background:var(--panel-dark);border:1px solid var(--border-glow);color:var(--text-main);font-size:11.5px;">' + opciones + '</select>' +
+    '</div>';
+  }).join('');
+  _actualizarContadorCajasEtq();
+}
+
+window._asignarCajaEtq = function(indice, numeroCaja) {
+  if (!_ETQ_ESTADO) return;
+  _ETQ_ESTADO.asignaciones[indice] = parseInt(numeroCaja, 10);
+};
+
+window._agregarCajaEtq = function() {
+  if (!_ETQ_ESTADO) return;
+  _ETQ_ESTADO.totalCajas++;
+  _renderItemsEtq();
+};
+
+function _actualizarContadorCajasEtq() {
+  var est = _ETQ_ESTADO;
+  if (!est) return;
+  document.getElementById('etq-contador-cajas').textContent = 'Total bultos: ' + est.totalCajas + ' caja' + (est.totalCajas !== 1 ? 's' : '');
+}
+
+window._confirmarImprimirEtiquetas = function() {
+  var est = _ETQ_ESTADO;
+  if (!est) return;
+  var transporte = document.getElementById('etq-transporte').value.trim();
+
+  // Agrupa los equipos por el N° de caja asignado.
+  var cajasMap = {};
+  est.equipos.forEach(function(eq, i) {
+    var n = est.asignaciones[i];
+    if (!cajasMap[n]) cajasMap[n] = [];
+    cajasMap[n].push({ descripcion: eq.descripcion || eq.sku || 'Equipo', cantidad: eq.cantidad || 1, nro_serie: eq.nro_serie || 'Sin serie' });
+  });
+  var cajas = [];
+  for (var n = 1; n <= est.totalCajas; n++) {
+    cajas.push({ numero: n, items: cajasMap[n] || [] });
+  }
+  // No permite cajas vacías — si se agregó una caja de más sin
+  // asignarle nada, mejor avisar antes que imprimir una etiqueta en
+  // blanco.
+  var cajaVacia = cajas.find(function(c){ return !c.items.length; });
+  if (cajaVacia) { alert('La Caja ' + cajaVacia.numero + ' no tiene ningún equipo asignado — asignale algo o quitala.'); return; }
+
+  var idTicket = est.idTicket;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_guardarEtiquetasCajas', id_ticket:idTicket, cajas:cajas, transporte:transporte }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error al guardar: ' + (r.error||'')); return; }
+      window._cerrarModalEtiquetasCajas();
+      window.open('https://cahirth.github.io/Portal-TLC/etiqueta-despacho.html?ticket=' + encodeURIComponent(idTicket), '_blank');
+    })
+    .catch(function(){ alert('Error de conexión al guardar la asignación de cajas.'); });
+};
+
 function _renderSeccionOrdenPreparacion(t) {
   var equipos = Array.isArray(t.equipos) ? t.equipos : [];
   var filas = equipos.map(function(eq, i) {
@@ -2102,6 +2232,9 @@ function _renderSeccionOrdenPreparacion(t) {
       '<tbody>' + (filas || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:14px;">Sin equipos cargados.</td></tr>') + '</tbody></table>' +
     '</div>' +
     '<div style="margin-bottom:10px;"><button class="op-btn" onclick="window.open(\'https://cahirth.github.io/Portal-TLC/orden-preparacion.html?id=' + t.id_ticket + '\',\'_blank\')" style="width:100%;">🖨 Imprimir / Exportar Orden de Preparación</button></div>' +
+    (t.deposito === 'para_instalar' ?
+      '<div style="margin-bottom:10px;"><button class="op-btn" style="width:100%;background:#8b5cf6;color:#fff;border-color:#8b5cf6;" onclick="_abrirModalEtiquetasCajas(\'' + t.id_ticket + '\')">🏷️ Generar Etiquetas de Despacho</button></div>'
+      : '') +
   '</div>';
 }
 

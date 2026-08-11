@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<!-- Portal TLC | etiqueta-despacho.html | v2026.08.10.1 (Página nueva — imprime una etiqueta térmica de 100×150mm por cada caja asignada en el modal "Asignación de Cajas" de servicio.html. Diseño calcado del archivo de referencia etiqueta-despacho-100x150.html que armó Cristian (header con logo + íconos de manipulación, indicador CAJA X DE N, bloque Destinatario/Remitente, packing list de esa caja, footer con N° de orden + QR de verificación). Lee ?ticket=ID, trae el ticket completo de Firebase (servicio_tecnico/{id}) y usa t.etiquetas_cajas (guardado por st_guardarEtiquetasCajas, ver FotoMap.gs v171). Cada etiqueta es su propia página física — @page:100mm×150mm, page-break-after:always entre cajas, un solo click en "Imprimir todas las etiquetas" manda todo el lote a la impresora térmica de una vez. Parte del circuito "Etiquetas de Despacho" pedido por Cristian.) -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Etiquetas de Despacho — TLC</title>
+<style>
+  :root {
+    --ink:#0f172a;
+    --muted:#64748b;
+    --surface:#f8fafc;
+    --line:#e2e8f0;
+    --line-strong:#cbd5e1;
+    --white:#ffffff;
+  }
+
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { min-height:100%; }
+  body { background:#e9eef5; color:var(--ink); font-family:Arial,Helvetica,sans-serif; -webkit-font-smoothing:antialiased; }
+  button { font:inherit; }
+
+  .toolbar { max-width:720px; margin:18px auto 10px; display:flex; align-items:center; justify-content:space-between; gap:12px; color:#475569; font-size:12px; padding:0 16px; flex-wrap:wrap; }
+  .toolbar-note { line-height:1.35; }
+  .toolbar-botones { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn-accion { flex:0 0 auto; min-height:38px; padding:9px 15px; border:0; border-radius:7px; color:var(--white); font-size:12px; font-weight:800; cursor:pointer; box-shadow:0 5px 14px rgba(15,23,42,.2); }
+  .btn-pdf { background:var(--ink); }
+  .btn-pdf:hover { background:#1e293b; }
+  .btn-volver { background:#3a86ff; }
+  .btn-volver:hover { background:#2f6fd6; }
+
+  .estado-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 20px; text-align:center; }
+  .spinner { width:40px; height:40px; border:3px solid #e2e8f0; border-top-color:#0f172a; border-radius:50%; animation:girar .8s linear infinite; margin-bottom:20px; }
+  @keyframes girar { to { transform:rotate(360deg); } }
+  .estado-titulo { font-size:15px; font-weight:700; color:#0f172a; margin-bottom:6px; }
+  .estado-msg { font-size:13px; color:#64748b; max-width:340px; line-height:1.5; margin:0 auto; }
+  .estado-icono { font-size:36px; margin-bottom:14px; }
+  .btn-reintentar { margin-top:18px; padding:9px 20px; background:#0f172a; color:white; border:none; border-radius:6px; font-size:13px; cursor:pointer; }
+
+  .label-shell { width:100mm; height:150mm; margin:0 auto 24px; }
+
+  .shipping-label {
+    width:100mm; height:150mm; padding:4mm; overflow:hidden;
+    display:flex; flex-direction:column; gap:2.1mm;
+    background:var(--white); border:1px solid var(--line-strong);
+    box-shadow:0 12px 34px rgba(15,23,42,.16);
+    print-color-adjust:exact; -webkit-print-color-adjust:exact;
+  }
+
+  .logistics-header { min-height:14mm; display:flex; align-items:center; justify-content:space-between; gap:3mm; padding-bottom:2mm; border-bottom:1.5px solid var(--ink); }
+  .brand { min-width:0; flex:1 1 auto; }
+  .brand-logo { display:block; width:auto; max-width:42mm; height:45px; object-fit:contain; object-position:left center; }
+  .handling-icons { flex:0 0 47mm; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1mm; }
+  .handling-item { min-width:0; text-align:center; color:var(--ink); }
+  .handling-symbol { display:block; min-height:17px; margin-bottom:.4mm; font-family:"Segoe UI Symbol","Arial Unicode MS",Arial,sans-serif; font-size:16px; font-weight:700; line-height:1; white-space:nowrap; }
+  .handling-label { display:block; font-size:6.7px; font-weight:900; line-height:1.05; letter-spacing:.15px; }
+
+  .parcel-indicator { min-height:13mm; display:flex; align-items:center; justify-content:center; padding:1.7mm 3mm; border-radius:1.7mm; background:var(--ink); color:var(--white); text-align:center; font-size:9.2mm; font-weight:900; line-height:1; letter-spacing:.45mm; white-space:nowrap; }
+
+  .block { border:1px solid var(--line-strong); border-radius:2mm; background:var(--surface); }
+  .section-kicker { font-size:7.7px; font-weight:900; letter-spacing:.8px; line-height:1; text-transform:uppercase; color:var(--muted); }
+
+  .recipient-block { min-height:39mm; padding:2.7mm 3mm 2.5mm; display:flex; flex-direction:column; justify-content:flex-start; }
+  .recipient-heading { display:flex; align-items:baseline; justify-content:space-between; gap:2mm; margin-bottom:1.8mm; }
+  .recipient-heading strong { color:var(--ink); font-size:11px; font-weight:900; letter-spacing:.4px; }
+  .recipient-heading span { color:var(--muted); font-size:7px; font-weight:800; letter-spacing:.65px; }
+  .recipient-name { margin-bottom:1.5mm; font-size:5.1mm; font-weight:900; line-height:1.04; text-transform:uppercase; overflow-wrap:anywhere; }
+  .recipient-address { margin-bottom:1.7mm; font-size:4.1mm; font-weight:800; line-height:1.12; text-transform:uppercase; overflow-wrap:anywhere; }
+  .recipient-details { margin-top:auto; display:grid; grid-template-columns:1fr 1fr; gap:1.8mm 3mm; }
+  .detail-label { display:block; margin-bottom:.5mm; color:var(--muted); font-size:7px; font-weight:900; letter-spacing:.45px; text-transform:uppercase; }
+  .detail-value { display:block; color:var(--ink); font-size:10.2px; font-weight:800; line-height:1.12; overflow-wrap:anywhere; }
+
+  .sender-block { min-height:11.5mm; padding:2.1mm 3mm; display:flex; align-items:center; gap:2.5mm; }
+  .sender-title { flex:0 0 auto; padding-right:2.5mm; border-right:1px solid var(--line-strong); }
+  .sender-copy { min-width:0; font-size:9.3px; font-weight:700; line-height:1.27; }
+  .sender-copy strong { font-weight:900; }
+
+  .packing-section { min-height:33mm; display:flex; flex-direction:column; overflow:hidden; border:1px solid var(--line-strong); border-radius:2mm; background:var(--white); }
+  .packing-title { padding:1.8mm 2.7mm 1.5mm; background:var(--surface); border-bottom:1px solid var(--line); }
+  .packing-table { width:100%; border-collapse:collapse; table-layout:fixed; }
+  .packing-table thead { display:table-header-group; }
+  .packing-table th { padding:1.5mm 1.7mm; background:var(--ink); color:var(--white); font-size:7.7px; font-weight:900; line-height:1.08; text-align:left; }
+  .packing-table td { padding:1.65mm 1.7mm; border-bottom:1px solid var(--line); color:var(--ink); font-size:8.6px; font-weight:700; line-height:1.15; vertical-align:top; overflow-wrap:anywhere; }
+  .packing-table tbody tr:last-child td { border-bottom:0; }
+  .packing-table .qty { width:12mm; text-align:center; }
+  .packing-table .serial { width:27mm; font-weight:900; }
+
+  .label-footer { min-height:17mm; margin-top:auto; padding-top:2mm; display:flex; align-items:center; justify-content:space-between; gap:3mm; border-top:2px solid var(--ink); }
+  .verification-copy { min-width:0; flex:1 1 auto; }
+  .verification-title { margin-bottom:1mm; font-size:8px; font-weight:900; letter-spacing:.45px; text-transform:uppercase; }
+  .verification-order { font-size:10px; font-weight:900; line-height:1.25; overflow-wrap:anywhere; }
+  .verification-note { margin-top:.8mm; color:var(--muted); font-size:7.2px; font-weight:700; line-height:1.25; }
+  .qr-wrap { flex:0 0 auto; width:21mm; height:21mm; padding:.8mm; display:flex; align-items:center; justify-content:center; background:var(--white); border:1px solid var(--ink); }
+  .qr-image { display:block; width:100%; height:100%; }
+
+  @page { size:100mm 150mm; margin:0; }
+
+  @media print {
+    html, body { width:100mm; margin:0 !important; padding:0 !important; background:var(--white); }
+    .no-print { display:none !important; }
+    .label-shell { width:100mm; height:150mm; margin:0; page-break-after:always; }
+    .label-shell:last-child { page-break-after:auto; }
+    .shipping-label { width:100mm; height:150mm; margin:0; border:0; box-shadow:none; }
+  }
+
+  @media screen and (max-width:430px) {
+    body { overflow-x:auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar no-print" id="toolbar" style="display:none;">
+  <div class="toolbar-note">
+    <span id="toolbar-cantidad">—</span> etiqueta(s) — tamaño real 100 × 150 mm cada una.<br>
+    Al imprimir, elegí escala 100 % y sin márgenes adicionales.
+  </div>
+  <div class="toolbar-botones">
+    <button class="btn-accion btn-volver" type="button" onclick="window._volverEtiquetas()">&#8592; Volver</button>
+    <button class="btn-accion btn-pdf" type="button" onclick="window.print()">🖨 Imprimir todas las etiquetas</button>
+  </div>
+</div>
+
+<div id="estado-cargando" class="estado-wrap">
+  <div class="spinner"></div>
+  <div class="estado-titulo">Cargando etiquetas…</div>
+  <div class="estado-msg">Un momento, estamos trayendo los datos del ticket.</div>
+</div>
+
+<div id="labels-root" style="display:none;"></div>
+
+<script>
+'use strict';
+
+var FIREBASE_DB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+var LOGO_URL = 'https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25';
+
+function esc(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, function(c) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
+}
+
+function getIdFromUrl() {
+  var params = new URLSearchParams(window.location.search);
+  return (params.get('ticket') || '').trim();
+}
+
+var _ID_TICKET = getIdFromUrl();
+
+// "Volver" — misma idea que orden-preparacion.html: esta página se
+// abre siempre en pestaña nueva (window.open desde el modal de
+// Asignación de Cajas), así que no hay historial previo para volver
+// con history.back(). Vuelve directo al ticket de origen.
+window._volverEtiquetas = function() {
+  if (_ID_TICKET) {
+    window.location.href = 'servicio.html?ticket=' + encodeURIComponent(_ID_TICKET);
+  } else {
+    window.location.href = 'index.html';
+  }
+};
+
+function mostrarError(titulo, mensaje, conReintento) {
+  document.getElementById('estado-cargando').innerHTML =
+    '<div class="estado-icono">⚠️</div>' +
+    '<div class="estado-titulo">' + esc(titulo) + '</div>' +
+    '<div class="estado-msg">' + esc(mensaje) + '</div>' +
+    (conReintento ? '<button class="btn-reintentar" onclick="location.reload()">Reintentar</button>' : '');
+}
+
+function renderItems(items) {
+  return (items || []).map(function(item) {
+    return '<tr>' +
+      '<td class="qty">' + esc(item.cantidad || 1) + '</td>' +
+      '<td>' + esc(item.descripcion || '—') + '</td>' +
+      '<td class="serial">' + esc(item.nro_serie || 'Sin serie') + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// Una etiqueta = un <div class="label-shell"> completo. Se arman
+// todas seguidas en #labels-root, cada una con page-break-after:always
+// (menos la última) — así "Imprimir todas las etiquetas" manda el
+// lote entero a la impresora térmica de una vez, una hoja física de
+// 100×150mm por caja.
+function renderEtiquetaCaja(t, caja, totalCajas, urlQr) {
+  var destinatario = {
+    nombre: t.cliente || '—',
+    direccion: t.domicilio_envio || t.domicilio || 'Sin cargar',
+    telefono: t.telefono || '—',
+    transporte: t.etiquetas_transporte || 'Sin especificar',
+  };
+  return '' +
+    '<div class="label-shell">' +
+      '<main class="shipping-label" aria-label="Etiqueta térmica de despacho">' +
+        '<header class="logistics-header">' +
+          '<div class="brand"><img class="brand-logo" src="' + LOGO_URL + '" alt="Tecnología Láser Corneal" onerror="this.style.display=\'none\'"></div>' +
+          '<div class="handling-icons" aria-label="Indicaciones de manipulación">' +
+            '<div class="handling-item"><span class="handling-symbol">🍸</span><span class="handling-label">FRÁGIL</span></div>' +
+            '<div class="handling-item"><span class="handling-symbol">⬆⬆</span><span class="handling-label">ESTE LADO<br>ARRIBA</span></div>' +
+            '<div class="handling-item"><span class="handling-symbol">☔</span><span class="handling-label">MANTENER<br>SECO</span></div>' +
+          '</div>' +
+        '</header>' +
+
+        '<section class="parcel-indicator" aria-label="Número de bulto">CAJA ' + esc(caja.numero) + ' DE ' + esc(totalCajas) + '</section>' +
+
+        '<section class="recipient-block block">' +
+          '<div class="recipient-heading"><strong>DESTINATARIO</strong><span>SHIP TO</span></div>' +
+          '<div class="recipient-name">' + esc(destinatario.nombre) + '</div>' +
+          '<div class="recipient-address">' + esc(destinatario.direccion) + '</div>' +
+          '<div class="recipient-details">' +
+            '<div><span class="detail-label">Teléfono</span><span class="detail-value">' + esc(destinatario.telefono) + '</span></div>' +
+            '<div><span class="detail-label">Transporte / Expreso</span><span class="detail-value">' + esc(destinatario.transporte) + '</span></div>' +
+          '</div>' +
+        '</section>' +
+
+        '<section class="sender-block block">' +
+          '<div class="sender-title"><div class="section-kicker">Remitente<br>From</div></div>' +
+          '<div class="sender-copy"><strong>TECNOLOGÍA LÁSER CORNEAL S.R.L.</strong><br>Pasaje del Carmen 716 LOCAL PB CABA</div>' +
+        '</section>' +
+
+        '<section class="packing-section">' +
+          '<div class="packing-title"><div class="section-kicker">Contenido de esta caja · Packing list sin precios</div></div>' +
+          '<table class="packing-table">' +
+            '<thead><tr><th class="qty">Cant.</th><th>Equipo / Descripción</th><th class="serial">N° de Serie</th></tr></thead>' +
+            '<tbody>' + renderItems(caja.items) + '</tbody>' +
+          '</table>' +
+        '</section>' +
+
+        '<footer class="label-footer">' +
+          '<div class="verification-copy">' +
+            '<div class="verification-title">Escanear para verificar</div>' +
+            '<div class="verification-order">ORDEN DE PREPARACIÓN N° ' + esc(t.id_ticket) + '</div>' +
+            '<div class="verification-note">Etiqueta logística de uso interno. Verifique el bulto contra la orden antes del despacho.</div>' +
+          '</div>' +
+          '<div class="qr-wrap"><img class="qr-image" src="' + urlQr + '" alt="Código QR de verificación"></div>' +
+        '</footer>' +
+      '</main>' +
+    '</div>';
+}
+
+function renderTodasLasEtiquetas(t) {
+  var cajas = Array.isArray(t.etiquetas_cajas) ? t.etiquetas_cajas : [];
+  if (!cajas.length) {
+    mostrarError('Sin cajas asignadas', 'Esta orden todavía no tiene una asignación de cajas guardada — volvé al ticket y usá "🏷️ Generar Etiquetas de Despacho".', false);
+    return;
+  }
+  // QR de verificación — apunta al ticket en servicio.html, generado
+  // vía un servicio público de QR (no hace falta ninguna librería
+  // nueva en el Portal).
+  var urlTicket = 'https://ir.tlcsrl.com.ar/servicio.html?ticket=' + encodeURIComponent(t.id_ticket);
+  var urlQr = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(urlTicket);
+
+  document.getElementById('labels-root').innerHTML = cajas.map(function(caja) {
+    return renderEtiquetaCaja(t, caja, cajas.length, urlQr);
+  }).join('');
+
+  document.title = 'Etiquetas de Despacho — ' + (t.id_ticket || '') + ' (' + cajas.length + ')';
+  document.getElementById('toolbar-cantidad').textContent = cajas.length;
+  document.getElementById('estado-cargando').style.display = 'none';
+  document.getElementById('labels-root').style.display = 'block';
+  document.getElementById('toolbar').style.display = 'flex';
+}
+
+function cargarTicket(id) {
+  fetch(FIREBASE_DB_URL + '/servicio_tecnico/' + encodeURIComponent(id) + '.json?_=' + Date.now(), { cache:'no-store' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(t) {
+      if (!t) { mostrarError('No encontramos esa orden', 'No hay ningún ticket con el ID “' + id + '”.', false); return; }
+      if (!t.id_ticket) t.id_ticket = id;
+      renderTodasLasEtiquetas(t);
+    })
+    .catch(function() {
+      mostrarError('Error de conexión', 'No se pudo conectar con Firebase. Revisá la conexión a internet y volvé a intentar.', true);
+    });
+}
+
+if (_ID_TICKET) {
+  cargarTicket(_ID_TICKET);
+} else {
+  mostrarError('Falta el ticket', 'Esta página necesita un ticket (?ticket=ID en la URL) para saber qué etiquetas imprimir.', false);
+}
+</script>
+
+</body>
+</html>
