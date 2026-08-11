@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<!-- Portal TLC | orden-preparacion.html | v2026.08.09.1 (2 pedidos de Cristian con captura: (1) Logo de TLC agregado al header, mismo patrón visual que presupuesto.html (LOGO_URL, 64px, junto al nombre y dirección de la empresa). (2) Se agregaron "Nombre del médico" y "Domicilio" como campos separados en la grilla de info — antes solo existía "Domicilio de Envío" (renombrado a "Dirección de Envío" con la misma aclaración que usa el detalle interactivo de servicio.html: "si es distinta del domicilio de arriba"). Usa el fix de FotoMap.gs v168 que ya arma t.domicilio desde los domicilios estructurados de la empresa. Confirmado con jsdom: logo, nombre del médico, domicilio y dirección de envío se pintan todos correctamente con datos de prueba.) -->
-<!-- Portal TLC | orden-preparacion.html | v2026.08.06.1 (Documento público imprimible de la Orden de Preparación de Equipos — mismo criterio que presupuesto.html: fetch directo a Firebase RTDB (lectura pública), sin login. Header con cliente/domicilio de envío/fecha límite/técnico, grilla de equipos con N° de serie y estado, firma digital si ya está cargada, botón Imprimir/Guardar PDF vía window.print(). Parte del circuito "Orden de Preparación de Equipos" pedido por Cristian.) -->
+<!-- Portal TLC | orden-preparacion.html | v2026.08.10.1 (Rediseño visual completo, alineado 100% al estilo de presupuesto.html — enviado por Cristian, ya probado visualmente de su lado. Verificado acá antes de integrar: mantiene intacta la lectura de Firebase (FIREBASE_DB_URL + servicio_tecnico/{id}.json) y el parámetro ?id= de la URL, y todos los campos agregados en rondas anteriores (logo, nombre_medico, domicilio separado de domicilio_envio, firma digital). Suma una vista previa con datos de ejemplo cuando se abre sin ?id= (antes no había nada para mostrar en ese caso). Confirmado con test en los 3 escenarios: ID válido con datos reales, sin ID (vista previa), e ID inexistente (mensaje de error sin romper).) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -8,39 +7,427 @@
 <title>Orden de Preparación — TLC</title>
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:"Times New Roman",Times,serif; background:#f1f5f9; color:#0f172a; font-size:13px; }
-  .page { max-width:780px; margin:20px auto; background:white; box-shadow:0 4px 32px rgba(0,0,0,0.12); padding:32px 36px; min-height:200px; }
-  table { border-collapse:collapse; width:100%; }
-  @media print {
-    body{background:white;}
-    .page{margin:0;box-shadow:none;padding:0 28px;}
-    .no-print{display:none!important;}
+
+  body {
+    font-family:"Times New Roman",Times,serif;
+    background:#f1f5f9;
+    color:#0f172a;
+    font-size:13px;
   }
-  .op-header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #0a1424; padding-bottom:16px; margin-bottom:20px; }
-  .op-logo-txt { font-size:18px; font-weight:800; color:#0a1424; }
-  .op-logo-sub { font-size:10px; color:#64748b; }
-  .op-doc-titulo { text-align:right; }
-  .op-doc-titulo h1 { font-size:16px; font-weight:800; color:#0a1424; }
-  .op-doc-titulo p { font-size:10.5px; color:#64748b; margin-top:2px; }
-  .op-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
-  .op-info-box { border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; }
-  .op-info-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#64748b; margin-bottom:4px; }
-  .op-info-val { font-size:13px; font-weight:600; color:#0a1424; }
-  .op-tabla th { text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:#64748b; padding:8px 6px; border-bottom:2px solid #0a1424; }
-  .op-tabla td { padding:8px 6px; border-bottom:1px solid #e2e8f0; font-size:12px; }
-  .op-firma-zona { margin-top:34px; display:flex; gap:30px; }
-  .op-firma-col { flex:1; text-align:center; }
-  .op-firma-img { max-width:200px; max-height:80px; margin:0 auto 6px; display:block; }
-  .op-firma-linea { border-top:1px solid #0a1424; margin-top:50px; padding-top:6px; font-size:11px; }
-  .op-btn-imprimir { display:inline-flex; align-items:center; gap:8px; padding:12px 22px; border-radius:10px; background:#06d6a0; color:#0a1424; border:none; font-size:13px; font-weight:800; cursor:pointer; }
-  .op-toolbar { max-width:780px; margin:16px auto; display:flex; justify-content:center; }
-  .op-loading, .op-error { max-width:780px; margin:60px auto; text-align:center; color:#64748b; font-family:Arial,sans-serif; }
+
+  .page {
+    max-width:780px;
+    margin:0 auto 20px;
+    background:#fff;
+    box-shadow:0 4px 32px rgba(0,0,0,.12);
+    padding:20px 36px 32px;
+    min-height:200px;
+  }
+
+  table {
+    width:100%;
+    border-collapse:collapse;
+  }
+
+  .op-toolbar {
+    max-width:780px;
+    margin:20px auto 0;
+    padding:16px 36px 0;
+    background:#fff;
+    box-shadow:0 -4px 32px rgba(0,0,0,.08);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+
+  .btn-accion {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    min-height:36px;
+    padding:8px 18px;
+    border:0;
+    border-radius:6px;
+    color:#fff;
+    font:700 12px/1 Arial,sans-serif;
+    cursor:pointer;
+    transition:background .2s ease,opacity .2s ease,box-shadow .2s ease;
+  }
+
+  .btn-volver { background:#3a86ff; }
+  .btn-volver:hover { background:#2f6fd6; }
+  .btn-pdf { background:#0f172a; }
+  .btn-pdf:hover { background:#1e293b; }
+
+
+  .op-header {
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:18px;
+    margin-bottom:22px;
+  }
+
+  .op-brand {
+    display:flex;
+    align-items:flex-start;
+    flex:1 1 300px;
+    min-width:0;
+  }
+
+  .op-header-logo {
+    width:auto;
+    height:64px;
+    flex:0 0 auto;
+    object-fit:contain;
+  }
+
+  .op-doc-title {
+    flex:0 1 270px;
+    min-width:230px;
+    margin-left:auto;
+    text-align:right;
+    font-family:Arial,sans-serif;
+  }
+
+  .op-doc-main {
+    font-size:15px;
+    font-weight:800;
+    line-height:1.25;
+    color:#0f172a;
+  }
+
+  .op-doc-subtitle {
+    margin-top:1px;
+    font-size:11.5px;
+    font-weight:600;
+    font-style:italic;
+    line-height:1.3;
+    color:#334155;
+  }
+
+  .op-doc-number {
+    margin-top:3px;
+    font-size:12px;
+    font-weight:700;
+    line-height:1.35;
+    color:#0f172a;
+    white-space:normal;
+  }
+
+  .op-doc-validity {
+    margin-top:5px;
+    font-size:10.5px;
+    font-weight:700;
+    font-style:italic;
+    line-height:1.35;
+    color:#64748b;
+  }
+
+  .op-doc-disclaimer {
+    max-width:270px;
+    margin:2px 0 0 auto;
+    font-size:10px;
+    font-style:italic;
+    line-height:1.45;
+    text-align:justify;
+    color:#64748b;
+  }
+
+  .op-section-label {
+    margin-bottom:9px;
+    font:700 10px/1.2 Arial,sans-serif;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:#64748b;
+  }
+
+  .op-info-grid {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+    margin-bottom:22px;
+  }
+
+  .op-info-box {
+    min-width:0;
+    padding:13px 15px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:12px;
+    box-shadow:0 4px 6px -1px rgba(0,0,0,.05),0 2px 4px -1px rgba(0,0,0,.03);
+  }
+
+  .op-info-box-full { grid-column:1 / -1; }
+
+  .op-info-label {
+    margin-bottom:5px;
+    font:700 9px/1.25 Arial,sans-serif;
+    letter-spacing:.55px;
+    text-transform:uppercase;
+    color:#64748b;
+  }
+
+  .op-info-label-note {
+    font-weight:400;
+    letter-spacing:0;
+    text-transform:none;
+    color:#94a3b8;
+  }
+
+  .op-info-val {
+    overflow-wrap:anywhere;
+    font:600 12.5px/1.45 Arial,sans-serif;
+    color:#0f172a;
+  }
+
+  .op-table-wrap {
+    width:100%;
+    overflow-x:auto;
+    margin-bottom:24px;
+    border-radius:8px 8px 0 0;
+  }
+
+  .op-tabla {
+    min-width:690px;
+    font-family:Arial,sans-serif;
+  }
+
+  .op-tabla thead {
+    display:table-header-group;
+  }
+
+  .op-tabla th {
+    padding:9px 10px;
+    background:#0f172a;
+    color:#fff;
+    font-size:11px;
+    font-weight:700;
+    line-height:1.25;
+    text-align:left;
+    vertical-align:middle;
+  }
+
+  .op-tabla th:first-child { border-radius:7px 0 0 0; }
+  .op-tabla th:last-child { border-radius:0 7px 0 0; }
+
+  .op-tabla td {
+    padding:13px 10px;
+    border-bottom:1px solid #e2e8f0;
+    font-size:12px;
+    line-height:1.4;
+    color:#334155;
+    vertical-align:top;
+  }
+
+  .op-tabla tbody tr {
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+
+  .op-tabla tbody tr:hover { background:#f8fafc; }
+
+  .op-col-cant { width:56px; text-align:center!important; }
+  .op-col-sku { width:92px; }
+  .op-col-serie { width:132px; }
+  .op-col-calidad { width:80px; text-align:center!important; }
+  .op-col-estado { width:105px; }
+
+  .op-serie {
+    font-weight:800;
+    color:#0f172a;
+  }
+
+  .op-calidad-ok {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:28px;
+    font-size:14px;
+  }
+
+  .op-empty {
+    padding:18px!important;
+    text-align:center;
+    color:#94a3b8!important;
+  }
+
+  .op-cierre-documento {
+    margin-top:8px;
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+
+  .op-firma-zona {
+    display:flex;
+    gap:30px;
+    margin-top:34px;
+    margin-bottom:32px;
+  }
+
+  .op-firma-col {
+    flex:1 1 0;
+    min-width:0;
+    text-align:center;
+    font-family:Arial,sans-serif;
+  }
+
+  .op-firma-img {
+    display:block;
+    max-width:200px;
+    max-height:80px;
+    margin:0 auto 6px;
+    object-fit:contain;
+  }
+
+  .op-firma-linea {
+    min-height:58px;
+    margin-top:50px;
+    padding-top:7px;
+    border-top:1px solid #0f172a;
+    font-size:11px;
+    line-height:1.45;
+    color:#0f172a;
+  }
+
+  .op-firma-con-imagen .op-firma-linea { margin-top:0; }
+
+  .op-firma-secundaria {
+    display:block;
+    margin-top:3px;
+    color:#64748b;
+  }
+
+  .op-footer-oficial {
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding-top:12px;
+    border-top:2px solid #0f172a;
+    font-family:Arial,sans-serif;
+  }
+
+  .op-footer-logo {
+    width:80px;
+    height:auto;
+    flex:0 0 auto;
+    object-fit:contain;
+  }
+
+  .op-footer-datos {
+    font-size:11px;
+    line-height:1.6;
+    color:#0f172a;
+  }
+
+  .op-footer-datos strong {
+    font-weight:800;
+  }
+
+  .op-footer-extra { color:#475569; }
+
+  .op-loading,
+  .op-error {
+    max-width:780px;
+    margin:60px auto;
+    padding:0 20px;
+    text-align:center;
+    color:#64748b;
+    font-family:Arial,sans-serif;
+  }
+
+  @page {
+    margin:40px 28px 45px 28px;
+    @bottom-center {
+      content:"Página " counter(page) " de " counter(pages);
+      font-size:10px;
+      font-family:Arial,sans-serif;
+      color:#64748b;
+    }
+  }
+
+  @media print {
+    body { background:#fff; }
+    .no-print { display:none!important; }
+    .page {
+      max-width:none;
+      margin:0;
+      padding:0 28px;
+      box-shadow:none;
+    }
+    .op-table-wrap { overflow:visible; }
+    .op-tabla { min-width:0; }
+    .op-tabla tbody tr:hover { background:transparent; }
+  }
+
+  @media (max-width:700px) {
+    .op-toolbar {
+      margin:0;
+      padding:12px;
+      max-width:none;
+      box-shadow:0 2px 12px rgba(15,23,42,.08);
+    }
+
+
+    .page {
+      margin:0;
+      padding:18px 12px 26px;
+      box-shadow:none;
+    }
+
+    .btn-accion {
+      flex:1 1 auto;
+      padding:9px 12px;
+    }
+
+    .op-header {
+      flex-direction:column;
+      gap:16px;
+    }
+
+    .op-brand {
+      flex-basis:auto;
+      width:100%;
+      align-items:flex-start;
+    }
+
+    .op-header-logo { height:56px; }
+
+    .op-doc-title {
+      width:100%;
+      min-width:0;
+      margin-left:0;
+      text-align:left;
+    }
+
+    .op-doc-disclaimer {
+      max-width:none;
+      margin-left:0;
+      text-align:left;
+    }
+
+    .op-info-grid { grid-template-columns:1fr; }
+    .op-info-box-full { grid-column:auto; }
+
+    .op-firma-zona {
+      flex-direction:column;
+      gap:24px;
+    }
+
+    .op-footer-oficial {
+      align-items:flex-start;
+    }
+  }
 </style>
 </head>
 <body>
 
 <div class="op-toolbar no-print" id="op-toolbar" style="display:none;">
-  <button class="op-btn-imprimir" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
+  <button class="btn-accion btn-volver" type="button" onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='index.html'; }">← Volver</button>
+  <button class="btn-accion btn-pdf" type="button" onclick="window.print()">🖨 Guardar PDF / Imprimir</button>
 </div>
 
 <div class="op-loading" id="op-loading">Cargando orden de preparación...</div>
@@ -61,67 +448,169 @@ function _fmtFecha(f) {
   return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : f;
 }
 
-function _renderOrden(t) {
+function _renderOrden(t, opciones) {
+  opciones = opciones || {};
   var equipos = Array.isArray(t.equipos) ? t.equipos : [];
   var filasHtml = equipos.map(function(eq) {
     return '<tr>' +
-      '<td style="text-align:center;">' + (eq.cantidad||1) + '</td>' +
-      '<td>' + _esc(eq.sku||'—') + '</td>' +
-      '<td>' + _esc(eq.descripcion||'') + '</td>' +
-      '<td><strong>' + _esc(eq.nro_serie || 'Sin cargar') + '</strong></td>' +
-      '<td style="text-align:center;">' + (eq.calidad_verificada ? '✅' : '—') + '</td>' +
-      '<td>' + _esc(eq.estado||'Pendiente') + '</td>' +
+      '<td class="op-col-cant">' + (eq.cantidad||1) + '</td>' +
+      '<td class="op-col-sku">' + _esc(eq.sku||'—') + '</td>' +
+      '<td>' + _esc(eq.descripcion||'—') + '</td>' +
+      '<td class="op-col-serie"><strong class="op-serie">' + _esc(eq.nro_serie || 'Sin cargar') + '</strong></td>' +
+      '<td class="op-col-calidad">' + (eq.calidad_verificada ? '<span class="op-calidad-ok" title="Calidad verificada">✅</span>' : '—') + '</td>' +
+      '<td class="op-col-estado">' + _esc(eq.estado||'Pendiente') + '</td>' +
     '</tr>';
   }).join('');
 
   var firmaHtml = t.firma_digital
-    ? '<img class="op-firma-img" src="' + t.firma_digital + '">' +
-      '<div class="op-firma-linea">' + _esc(t.firma_firmante||'') + '<br><span style="color:#64748b;">Firmado el ' + (t.firma_fecha ? new Date(t.firma_fecha).toLocaleDateString('es-AR') : '') + '</span></div>'
-    : '<div class="op-firma-linea">&nbsp;<br><span style="color:#64748b;">Firma pendiente</span></div>';
+    ? '<div class="op-firma-con-imagen">' +
+        '<img class="op-firma-img" src="' + t.firma_digital + '" alt="Firma digital">' +
+        '<div class="op-firma-linea">' + _esc(t.firma_firmante||'') + '<br><span class="op-firma-secundaria">Firmado el ' + (t.firma_fecha ? new Date(t.firma_fecha).toLocaleDateString('es-AR') : '') + '</span></div>' +
+      '</div>'
+    : '<div class="op-firma-linea">&nbsp;<br><span class="op-firma-secundaria">Firma pendiente</span></div>';
 
   document.getElementById('op-page').innerHTML =
     '<div class="op-header">' +
-      '<div style="display:flex;align-items:center;gap:14px;">' +
-        '<img src="' + LOGO_URL + '" alt="TLC" style="width:64px;height:auto;flex-shrink:0;" onerror="this.style.display=\'none\'">' +
-        '<div><div class="op-logo-txt">TECNOLOGÍA LÁSER CORNEAL S.R.L.</div><div class="op-logo-sub">Pasaje del Carmen 716 Local PB C1019AAB · Buenos Aires, Argentina</div></div>' +
+      '<div class="op-brand">' +
+        '<img class="op-header-logo" src="' + LOGO_URL + '" alt="TLC" onerror="this.style.display=\'none\'">' +
       '</div>' +
-      '<div class="op-doc-titulo"><h1>📦 ORDEN DE PREPARACIÓN</h1><p>N° ' + _esc(t.id_ticket||'') + '</p></div>' +
+      '<div class="op-doc-title">' +
+        '<div class="op-doc-main">ORDEN DE PREPARACIÓN</div>' +
+        '<div class="op-doc-subtitle">FACTURA PROFORMA</div>' +
+        '<div class="op-doc-number">N° DE TICKET: ' + _esc(t.id_ticket||'') + '</div>' +
+        '<div class="op-doc-validity">DOCUMENTO INTERNO — VÁLIDO ÚNICAMENTE PARA FINES ADMINISTRATIVOS</div>' +
+        '<div class="op-doc-disclaimer">(Emitido para preparación, control y despacho interno. No constituye factura, remito ni constancia de entrega.)</div>' +
+      '</div>' +
     '</div>' +
 
+    '<div class="op-section-label">Información del cliente y despacho</div>' +
     '<div class="op-info-grid">' +
       '<div class="op-info-box"><div class="op-info-label">Cliente / Clínica</div><div class="op-info-val">' + _esc(t.cliente||'—') + '</div></div>' +
       '<div class="op-info-box"><div class="op-info-label">Nombre del médico</div><div class="op-info-val">' + _esc(t.nombre_medico||'—') + '</div></div>' +
       '<div class="op-info-box"><div class="op-info-label">Domicilio</div><div class="op-info-val">' + _esc(t.domicilio||'—') + '</div></div>' +
       '<div class="op-info-box"><div class="op-info-label">Teléfono</div><div class="op-info-val">' + _esc(t.telefono||'—') + '</div></div>' +
-      '<div class="op-info-box" style="grid-column:1/-1;"><div class="op-info-label">Dirección de Envío <span style="font-weight:400;color:#94a3b8;">(si es distinta del domicilio de arriba)</span></div><div class="op-info-val">' + _esc(t.domicilio_envio||'No cargado') + '</div></div>' +
+      '<div class="op-info-box op-info-box-full"><div class="op-info-label">Dirección de Envío <span class="op-info-label-note">(si es distinta del domicilio de arriba)</span></div><div class="op-info-val">' + _esc(t.domicilio_envio||'No cargado') + '</div></div>' +
       '<div class="op-info-box"><div class="op-info-label">Fecha límite de despacho</div><div class="op-info-val">' + _fmtFecha(t.fecha_limite_despacho) + '</div></div>' +
       '<div class="op-info-box"><div class="op-info-label">Técnico responsable</div><div class="op-info-val">' + _esc(t.tecnico_responsable_nombre||'Sin asignar') + '</div></div>' +
     '</div>' +
 
-    '<table class="op-tabla"><thead><tr><th>Cant.</th><th>SKU</th><th>Equipo</th><th>N° de Serie</th><th>Calidad</th><th>Estado</th></tr></thead>' +
-    '<tbody>' + (filasHtml || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:16px;">Sin equipos cargados.</td></tr>') + '</tbody></table>' +
+    '<div class="op-section-label">Packing list de equipos</div>' +
+    '<div class="op-table-wrap">' +
+      '<table class="op-tabla">' +
+        '<thead><tr>' +
+          '<th class="op-col-cant">Cant.</th>' +
+          '<th class="op-col-sku">SKU</th>' +
+          '<th>Equipo / Descripción</th>' +
+          '<th class="op-col-serie">N° de Serie</th>' +
+          '<th class="op-col-calidad">Calidad</th>' +
+          '<th class="op-col-estado">Estado</th>' +
+        '</tr></thead>' +
+        '<tbody>' + (filasHtml || '<tr><td colspan="6" class="op-empty">Sin equipos cargados.</td></tr>') + '</tbody>' +
+      '</table>' +
+    '</div>' +
 
-    '<div class="op-firma-zona">' +
-      '<div class="op-firma-col">' + firmaHtml + '</div>' +
-      '<div class="op-firma-col"><div class="op-firma-linea">&nbsp;<br><span style="color:#64748b;">Recibí conforme (Logística/Transporte)</span></div></div>' +
+    '<div class="op-cierre-documento">' +
+      '<div class="op-firma-zona">' +
+        '<div class="op-firma-col">' + firmaHtml + '</div>' +
+        '<div class="op-firma-col"><div class="op-firma-linea">&nbsp;<br><span class="op-firma-secundaria">Recibí conforme (Logística / Transporte)</span></div></div>' +
+      '</div>' +
+
+      '<div class="op-footer-oficial">' +
+        '<img class="op-footer-logo" src="' + LOGO_URL + '" alt="TLC" onerror="this.style.display=\'none\'">' +
+        '<div class="op-footer-datos">' +
+          '<strong>TECNOLOGÍA LÁSER CORNEAL S.R.L.</strong><br>' +
+          'Pasaje del Carmen 716 LOCAL PB C1019AAB · Buenos Aires, Argentina<br>' +
+          '<span class="op-footer-extra">info@tlcsrl.com.ar · Documento interno de preparación y control de equipos</span>' +
+        '</div>' +
+      '</div>' +
     '</div>';
+
+  document.title = opciones.preview
+    ? 'Vista previa — Orden de Preparación TLC'
+    : 'Orden de Preparación TLC — ' + (t.id_ticket || '');
 
   document.getElementById('op-loading').style.display = 'none';
   document.getElementById('op-page').style.display = 'block';
   document.getElementById('op-toolbar').style.display = 'flex';
 }
 
-(function() {
-  var params = new URLSearchParams(window.location.search);
-  var id = params.get('id');
-  if (!id) { document.getElementById('op-loading').textContent = 'Falta el ID de la orden en el link.'; return; }
+var ORDEN_DEMO = {
+  id_ticket:'VISTA PREVIA',
+  cliente:'Clínica de ejemplo',
+  nombre_medico:'Dra. Nombre Apellido',
+  domicilio:'Domicilio del cliente',
+  telefono:'(11) 0000-0000',
+  domicilio_envio:'Dirección de envío a confirmar',
+  fecha_limite_despacho:'2026-08-15',
+  tecnico_responsable_nombre:'Técnico responsable',
+  equipos:[
+    {
+      cantidad:1,
+      sku:'EQ-001',
+      descripcion:'Equipo oftalmológico de ejemplo',
+      nro_serie:'SERIE-0001',
+      calidad_verificada:true,
+      estado:'Preparado'
+    },
+    {
+      cantidad:1,
+      sku:'ACC-002',
+      descripcion:'Accesorio / componente de ejemplo',
+      nro_serie:'Sin cargar',
+      calidad_verificada:false,
+      estado:'Pendiente'
+    }
+  ]
+};
+
+function _mostrarVistaPrevia() {
+  _renderOrden(ORDEN_DEMO, { preview:true });
+}
+
+function _mostrarErrorCarga(mensaje) {
+  var loading = document.getElementById('op-loading');
+  var page = document.getElementById('op-page');
+  var toolbar = document.getElementById('op-toolbar');
+
+  loading.textContent = mensaje;
+  loading.style.display = 'block';
+  page.style.display = 'none';
+  toolbar.style.display = 'none';
+}
+
+function _cargarOrdenFirebase(id) {
+  id = String(id || '').trim();
+
+  if (!id) {
+    _mostrarVistaPrevia();
+    return;
+  }
+
   fetch(FIREBASE_DB_URL + '/servicio_tecnico/' + encodeURIComponent(id) + '.json?_=' + Date.now(), { cache:'no-store' })
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(t) {
-      if (!t) { document.getElementById('op-loading').textContent = 'No encontramos esta orden de preparación.'; return; }
-      _renderOrden(t);
+      if (!t) {
+        _mostrarErrorCarga('No encontramos una orden con el ID “' + id + '”.');
+        return;
+      }
+
+      if (!t.id_ticket) t.id_ticket = id;
+      _renderOrden(t, { preview:false });
     })
-    .catch(function() { document.getElementById('op-loading').textContent = 'Error de conexión al cargar la orden.'; });
+    .catch(function() {
+      _mostrarErrorCarga('No se pudo conectar con Firebase. Revisá la conexión a internet y volvé a intentar.');
+    });
+}
+
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var id = (params.get('id') || '').trim();
+
+  if (id) {
+    _cargarOrdenFirebase(id);
+  } else {
+    _mostrarVistaPrevia();
+  }
 })();
 </script>
 </body>
