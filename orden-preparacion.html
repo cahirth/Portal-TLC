@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | orden-preparacion.html | v2026.08.10.2 (Fix del botón "← Volver" — usaba history.back(), pero esta página siempre se abre en pestaña NUEVA (window.open desde servicio.html), así que esa pestaña nunca tiene historial previo: no hacía nada, o caía al fallback de index.html en vez de volver a la tarjeta de origen. El id que ya se lee de la URL acá ES el id_ticket, así que ahora vuelve directo a "servicio.html?ticket={id}" — no depende del historial del navegador ni de cómo se haya abierto la pestaña. Pedido por Cristian: "quiero que vuelva adonde fue llamado, o sea la tarjeta de servicio técnico". Confirmado con test: arma la URL correcta a partir del id de la orden.) -->
 <!-- Portal TLC | orden-preparacion.html | v2026.08.10.1 (Rediseño visual completo, alineado 100% al estilo de presupuesto.html — enviado por Cristian, ya probado visualmente de su lado. Verificado acá antes de integrar: mantiene intacta la lectura de Firebase (FIREBASE_DB_URL + servicio_tecnico/{id}.json) y el parámetro ?id= de la URL, y todos los campos agregados en rondas anteriores (logo, nombre_medico, domicilio separado de domicilio_envio, firma digital). Suma una vista previa con datos de ejemplo cuando se abre sin ?id= (antes no había nada para mostrar en ese caso). Confirmado con test en los 3 escenarios: ID válido con datos reales, sin ID (vista previa), e ID inexistente (mensaje de error sin romper).) -->
 <html lang="es">
 <head>
@@ -426,7 +427,7 @@
 <body>
 
 <div class="op-toolbar no-print" id="op-toolbar" style="display:none;">
-  <button class="btn-accion btn-volver" type="button" onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='index.html'; }">← Volver</button>
+  <button class="btn-accion btn-volver" type="button" onclick="window._volverOrdenPrep()">← Volver</button>
   <button class="btn-accion btn-pdf" type="button" onclick="window.print()">🖨 Guardar PDF / Imprimir</button>
 </div>
 
@@ -605,6 +606,25 @@ function _cargarOrdenFirebase(id) {
 (function() {
   var params = new URLSearchParams(window.location.search);
   var id = (params.get('id') || '').trim();
+
+  // "Volver" — antes usaba history.back(), pero esta página se abre
+  // siempre en una PESTAÑA NUEVA (window.open desde el botón "Imprimir
+  // / Exportar" de servicio.html), así que esa pestaña nunca tiene
+  // historial previo — history.back() no hacía nada, o caía al
+  // fallback de index.html. El id que ya se lee de la URL acá arriba
+  // ES el id_ticket, así que vuelve directo a esa tarjeta puntual de
+  // Servicio Técnico, sin depender del historial del navegador.
+  // Reportado por Cristian: "quiero que vuelva adonde fue llamado, o
+  // sea la tarjeta de servicio técnico".
+  window._volverOrdenPrep = function() {
+    if (id) {
+      window.location.href = 'servicio.html?ticket=' + encodeURIComponent(id);
+    } else if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = 'index.html';
+    }
+  };
 
   if (id) {
     _cargarOrdenFirebase(id);
