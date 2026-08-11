@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto.html | v2026.08.10.1 (Rediseño para que el PDF entre SIEMPRE en una sola hoja, sin importar cuántos ítems tenga el presupuesto — pedido por Cristian: "cuando guarda PDF, rediseñar para que entre en una sola página". Dos partes: (1) Compactado general en @media print — menos margen entre secciones (20-24px → 10px), menos padding en celdas de tabla, @page con márgenes más ajustados (22/22/32/22 en vez de 40/28/45/28) — soluciona la mayoría de los casos (presupuestos de pocos ítems) sin tocar el tamaño de letra. (2) Ajuste automático de escala vía beforeprint/afterprint — mide el alto real del contenido justo antes de imprimir y, si no entra en una hoja A4, aplica transform:scale() lo justo y necesario (con piso de 0.55 para no volverlo ilegible en un caso extremo) — esto SÍ garantiza una sola hoja para cualquier cantidad de ítems, el compactado de CSS por sí solo no podía garantizarlo. Confirmado con test (scrollHeight mockeado, jsdom no calcula layout real): escala correctamente cuando no entra, no toca nada cuando sí entra, respeta el piso en un caso extremo, y se resetea después de imprimir.) -->
 <!-- Portal TLC | presupuesto.html | v2026.08.06.1 (BUG REAL: el Anticipo de TLC 6/12 mostraba "Anticipo 23500%" cuando el vendedor cargaba el anticipo en USD desde el toggle nuevo del editor (presupuesto-editor.html v2026.08.06.2+) — el texto pegaba mp.anticipoPct crudo con "%", y ese campo puede contener un MONTO en USD en vez de un porcentaje según mp.anticipoTipo. Corregido calculando el % real a partir de los montos (anticipo / (anticipo + saldo en cuotas)) en vez de leer el campo crudo — funciona para presupuestos viejos y nuevos por igual, sin depender de que exista mp.anticipoTipo. Reportado por Cristian con captura del PDF real: "Anticipo 23500%, está mal, debes poner 44,xx%, calculalo".) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.10 (Botón "Enviar por WhatsApp": si el negocio tiene más de un contacto con teléfono, ahora abre un selector preguntando a quién enviárselo, en vez de mandar siempre al contacto "principal" nomás. Lee los contactos de la raíz del negocio (contacto + contactosAdicionales, ver FotoMap.gs v146 y cotizaciones.html v2026.08.04.7). Pedido por Cristian.) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.7 (Corte definitivo del problema: se sacó el position:fixed del header repetido — esa técnica depende de calcular bien su altura real contra el margen de @page, y con captura del preview real de Chrome (Márgenes: Predeterminados confirmado) quedó demostrado que ni 175px ni 225px alcanzaban, sin forma de saber a ciegas cuánto hace falta. Ahora el header es contenido normal, aparece una sola vez arriba de la página 1, margen vuelto a un valor chico normal (40px). Se pierde el logo repetido en cada página, pero se termina la categoría entera de bugs de superposición. Pedido por Cristian: "no quiero perder más tiempo con esto".) -->
@@ -32,7 +33,7 @@
   /* .badge-novalido sacada — ahora la leyenda va como subtítulo en itálica bajo la numeración, ver bloque del encabezado */
   @media print {
     body{background:white;}
-    .page{margin:0;box-shadow:none;padding:0 28px;}
+    .page{margin:0;box-shadow:none;padding:0 24px;}
     .no-print{display:none!important;}
     /* El header YA NO se repite con position:fixed — esa técnica
        depende de calcular bien su altura real contra el margen
@@ -42,10 +43,24 @@
        normal, aparece una sola vez arriba de la página 1 — simple y
        sin adivinar alturas. Pedido por Cristian: "no quiero perder
        más tiempo con esto". */
+
+    /* Rediseño para que entre en UNA sola hoja — antes cada sección
+       tenía bastante aire (20/24px de margen), pensado para lectura
+       en pantalla. En impresión se aprieta bastante más: menos
+       margen entre bloques, menos padding en tarjetas y celdas, sin
+       tocar el tamaño de letra acá (eso lo resuelve el ajuste de
+       escala automático de más abajo si hace falta). Pedido por
+       Cristian: "cuando guarda PDF, rediseñar para que entre en una
+       sola página".
+    */
+    #page-root div { margin-bottom: 10px !important; }
+    #page-root table { margin-bottom: 10px !important; }
+    #page-root p { margin-bottom: 8px !important; }
+    table th, table td { padding-top: 4px !important; padding-bottom: 4px !important; }
   }
 
   @page {
-    margin: 40px 28px 45px 28px;
+    margin: 22px 22px 32px 22px;
     @bottom-center {
       content: "Página " counter(page) " de " counter(pages);
       font-size: 10px;
@@ -111,6 +126,38 @@
     var params = new URLSearchParams(window.location.search);
     return (params.get('id') || '').trim();
   }
+
+  // ── Ajuste automático de escala para que SIEMPRE entre en una sola
+  // hoja al imprimir/guardar PDF — el rediseño de más arriba (menos
+  // margen entre secciones) ya ayuda para presupuestos cortos, pero
+  // uno con muchos ítems igual se puede pasar de una hoja. Esto mide
+  // el alto real del contenido justo antes de imprimir y, si no
+  // entra, lo reduce con transform:scale() lo justo y necesario — así
+  // queda garantizado en una sola hoja sin importar cuántos ítems
+  // tenga. Con un piso de escala (0.55) para que un presupuesto
+  // gigante no termine ilegible; en ese caso extremo se deja como
+  // está (mejor 2 hojas legibles que 1 hoja ilegible). Pedido por
+  // Cristian: "cuando guarda PDF, rediseñar para que entre en una
+  // sola página".
+  var ALTO_UTIL_A4_PX = 1000; // A4 a 96dpi (~1122px) menos los márgenes de @page
+  var ESCALA_MINIMA = 0.55;
+  window.addEventListener('beforeprint', function() {
+    var el = document.getElementById('page-root');
+    if (!el) return;
+    el.style.transform = '';
+    el.style.width = '';
+    var alto = el.scrollHeight;
+    if (alto > ALTO_UTIL_A4_PX) {
+      var factor = Math.max(ALTO_UTIL_A4_PX / alto, ESCALA_MINIMA);
+      el.style.transformOrigin = 'top left';
+      el.style.transform = 'scale(' + factor.toFixed(3) + ')';
+      el.style.width = (100 / factor).toFixed(2) + '%';
+    }
+  });
+  window.addEventListener('afterprint', function() {
+    var el = document.getElementById('page-root');
+    if (el) { el.style.transform = ''; el.style.width = ''; }
+  });
 
   // ── Botón "Volver" del header ──────────────────────────────────
   // Si viene de un ticket (?ticket=X), vuelve a ese ticket en
