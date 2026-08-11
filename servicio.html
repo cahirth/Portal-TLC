@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.10.2 (Candado Preparación/CC → Para Instalar APAGADO temporalmente — pedido por Cristian: "me pide muchas condiciones... liberame temporalmente". El requisito de Checklist no se puede cumplir en la práctica todavía (falta conectar los formularios individuales de checklist, prerrequisito pendiente). Toda la lógica del candado sigue intacta en _validarGate, controlada por un interruptor nuevo (GATE_PARA_INSTALAR_ACTIVO = false) — para reactivarlo alcanza con volver ese valor a true, sin tocar nada más. Confirmado con test: con el interruptor apagado, deja pasar aunque no haya nada completo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.1 (Circuito nuevo "Etiquetas de Despacho" — pedido por Cristian con archivo de referencia (etiqueta-despacho-100x150.html). Botón "🏷️ Generar Etiquetas de Despacho" en el detalle de la Orden de Preparación, visible solo en la etapa Para Instalar. Abre el modal "Asignación de Cajas" — lista los equipos con su N° de Serie, permite asignar cada uno a una caja (select por ítem), botón "+ Agregar Caja", contador "Total bultos: N cajas", campo de Transporte/Expreso. Al confirmar, guarda la asignación en el ticket (st_guardarEtiquetasCajas, ver FotoMap.gs v171) y abre etiqueta-despacho.html en pestaña nueva, que imprime una etiqueta de 100×150mm por caja. Bloquea con aviso si alguna caja queda sin ítems asignados. Confirmado con test aislado de punta a punta: abrir modal, agregar caja, reasignar ítem, confirmar — arma bien los grupos por caja y abre la pestaña correcta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.09.4 (Candado Preparación/CC → Para Instalar suma un 4to requisito, confirmado por Cristian: el "Estado" de CADA equipo (Pendiente/Retirado del depósito/Verificado/Listo para despacho) debe estar en "Listo para despacho" — antes ese desplegable era puramente informativo, no bloqueaba nada, aunque el resto (Serie+POE-8+Checklist) estuviera completo. Mensaje de aviso extendido para mencionarlo. Confirmado con test: el escenario exacto de la captura de Cristian (todo completo pero Estado en "Pendiente") ahora bloquea correctamente.) -->
 <!-- Portal TLC | servicio.html | v2026.08.09.3 (Puntos 4 y "nomenclatura" del circuito completo Ventas↔Preparación pedido por Cristian (ver FotoMap.gs v170): (1) Candado Preparación/CC → Para Instalar en _validarGate — exige N° de Serie en todos los equipos, POE-8 completado en todos, y Checklist completado SOLO en los que tengan uno mapeado (los que no tienen checklist disponible no lo exigen). Aplicado tanto al drag&drop como al selector desplegable del detalle (antes el selector no pasaba por NINGÚN gate, era una vía de escape sin querer). Mensaje de bloqueo exacto pedido por Cristian. (2) Nomenclatura del título de la Orden de Preparación pasa a formato compacto MM26 (mes 2 dígitos + año 2 dígitos, sin espacios) en vez de "Ago 2026" — solo para tipo_orden==='preparacion_equipos', los tickets normales mantienen el formato con nombre de mes de siempre. Se mantiene el indicador "(+N)" cuando hay más de un equipo. Confirmado con test aislado: 5 escenarios de candado (falta todo / todo completo con checklist mapeado / todo completo sin checklist mapeado / mezcla de 2 equipos / movimiento hacia atrás siempre libre).) -->
@@ -1691,7 +1692,7 @@ function _validarGate(t, destino) {
   // esos archivos de Cristian). Para equipos sin checklist mapeado
   // (como el HDR-7100 P de las pruebas) el candado ya funciona 100%
   // con lo que hay hoy (Serie + POE-8 + Estado).
-  if (origen === 'preparacion_control_calidad' && destino === 'para_instalar') {
+  if (GATE_PARA_INSTALAR_ACTIVO && origen === 'preparacion_control_calidad' && destino === 'para_instalar') {
     var equiposGate = Array.isArray(t.equipos) ? t.equipos : [];
     var faltaSerie = equiposGate.some(function(eq) { return !eq.nro_serie || !eq.nro_serie.trim(); });
     var faltaPOE8 = equiposGate.some(function(eq) { return !eq.poe8_completado; });
@@ -2360,6 +2361,19 @@ async function _actualizarEstadoChecklistCard(idTicket) {
 }
 
 // ── CAMPOS TÉCNICOS ──────────────────────────────────────────────
+// Interruptor del candado Preparación/CC → Para Instalar — apagado
+// TEMPORALMENTE a pedido de Cristian ("me pide muchas condiciones...
+// liberame temporalmente"), porque el requisito de Checklist todavía
+// no se puede cumplir en la práctica: falta conectar los formularios
+// de checklist individuales para que avisen de vuelta al ticket
+// cuando se completan (prerrequisito pendiente, necesito esos
+// archivos de Cristian). Con el candado prendido, cualquier ticket
+// con un equipo tipo HBM-1/HRK-1 queda trabado sin salida posible.
+// Toda la lógica del candado (Serie + POE-8 + Checklist + Estado)
+// sigue intacta más abajo en _validarGate — para reactivarlo, pasar
+// esto a "true" de nuevo.
+var GATE_PARA_INSTALAR_ACTIVO = false;
+
 var FLUJO_ETAPAS = ['recepcion','diagnostico','presupuesto','reparacion','para_facturar'];
 
 // ══════════════════════════════════════════════════════════════════
