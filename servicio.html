@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.10.4 (3 pedidos de Cristian con captura sobre la grilla de la Orden de Preparación: (1) columnas responsivas — antes la tabla no tenía anchos definidos, así que en pantallas angostas o con muchas columnas el navegador apretaba SKU y N° de Serie hasta casi desaparecer, cortando el texto tipeado en vez de mostrarlo entero. Ahora la tabla tiene table-layout:fixed con anchos mínimos por columna y min-width:860px en total — si no entra, el contenedor (que ya tenía overflow-x:auto) scrollea en vez de apretar. (2) Campo "Equipo" pasa a ser editable (antes texto fijo) — permite corregir/aclarar la descripción de un equipo puntual, por ejemplo distinguir 2 unidades idénticas que van a domicilios distintos (usa st_actualizarEquipoOrden con "descripcion", ver FotoMap.gs v173). (3) Confirmado que el link del POE-8 ya manda todos los datos disponibles (tecnico/cliente/domicilio/telefono/modelo/serie/id_ticket/equipo_index) al archivo nuevo — no hacía falta ningún cambio ahí. Confirmado con test: input editable con el valor correcto, URL del POE-8 completa.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.3 (Tope en "+ Agregar Caja" del modal "Asignación de Cajas" — no se puede tener más cajas que equipos (cada equipo entra en una sola caja, cualquier caja de más quedaría vacía sí o sí). Botón se deshabilita visualmente al llegar al tope, y avisa si de todas formas se intenta pasar. Pedido por Cristian: "cantidad máxima a agregar cajas, la cantidad de ítems, topealo". Confirmado con test: con 3 equipos, permite hasta 3 cajas, se deshabilita ahí, y avisa si se intenta una 4ta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.2 (Candado Preparación/CC → Para Instalar APAGADO temporalmente — pedido por Cristian: "me pide muchas condiciones... liberame temporalmente". El requisito de Checklist no se puede cumplir en la práctica todavía (falta conectar los formularios individuales de checklist, prerrequisito pendiente). Toda la lógica del candado sigue intacta en _validarGate, controlada por un interruptor nuevo (GATE_PARA_INSTALAR_ACTIVO = false) — para reactivarlo alcanza con volver ese valor a true, sin tocar nada más. Confirmado con test: con el interruptor apagado, deja pasar aunque no haya nada completo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.1 (Circuito nuevo "Etiquetas de Despacho" — pedido por Cristian con archivo de referencia (etiqueta-despacho-100x150.html). Botón "🏷️ Generar Etiquetas de Despacho" en el detalle de la Orden de Preparación, visible solo en la etapa Para Instalar. Abre el modal "Asignación de Cajas" — lista los equipos con su N° de Serie, permite asignar cada uno a una caja (select por ítem), botón "+ Agregar Caja", contador "Total bultos: N cajas", campo de Transporte/Expreso. Al confirmar, guarda la asignación en el ticket (st_guardarEtiquetasCajas, ver FotoMap.gs v171) y abre etiqueta-despacho.html en pestaña nueva, que imprime una etiqueta de 100×150mm por caja. Bloquea con aviso si alguna caja queda sin ítems asignados. Confirmado con test aislado de punta a punta: abrir modal, agregar caja, reasignar ítem, confirmar — arma bien los grupos por caja y abre la pestaña correcta.) -->
@@ -184,15 +185,23 @@ body.tema-claro .btn-icon:hover{background:#cbd5e1;border-color:#3a86ff;}
 .op-banner{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;
   background:rgba(6,214,160,.08);border:1px solid rgba(6,214,160,.3);margin-bottom:10px;}
 .op-banner b{color:#06d6a0;}
-.op-grid-tabla{width:100%;border-collapse:collapse;font-size:11.5px;}
+.op-grid-tabla{width:100%;min-width:860px;border-collapse:collapse;font-size:11.5px;table-layout:fixed;}
+.op-grid-tabla th:nth-child(1),.op-grid-tabla td:nth-child(1){width:48px;}   /* Cant. */
+.op-grid-tabla th:nth-child(2),.op-grid-tabla td:nth-child(2){width:90px;}   /* SKU */
+.op-grid-tabla th:nth-child(3),.op-grid-tabla td:nth-child(3){width:190px;}  /* Equipo */
+.op-grid-tabla th:nth-child(4),.op-grid-tabla td:nth-child(4){width:130px;}  /* N° de Serie */
+.op-grid-tabla th:nth-child(5),.op-grid-tabla td:nth-child(5){width:60px;text-align:center;}  /* Calidad */
+.op-grid-tabla th:nth-child(6),.op-grid-tabla td:nth-child(6){width:140px;}  /* Estado */
+.op-grid-tabla th:nth-child(7),.op-grid-tabla td:nth-child(7){width:110px;}  /* POE-8 */
+.op-grid-tabla th:nth-child(8),.op-grid-tabla td:nth-child(8){width:110px;}  /* Checklist */
 .op-grid-tabla th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);
   padding:6px 6px;border-bottom:1px solid var(--border-glow);}
-.op-grid-tabla td{padding:6px 6px;border-bottom:1px solid var(--border-glow);vertical-align:middle;}
+.op-grid-tabla td{padding:6px 6px;border-bottom:1px solid var(--border-glow);vertical-align:middle;overflow:hidden;}
 .op-grid-tabla tr:last-child td{border-bottom:none;}
-.op-grid-tabla input[type=text]{width:100%;background:var(--bg);border:1px solid var(--border-glow);border-radius:6px;
-  padding:5px 7px;color:var(--text-main);font-size:11.5px;font-family:inherit;}
-.op-grid-tabla select{background:var(--bg);border:1px solid var(--border-glow);border-radius:6px;
-  padding:5px 6px;color:var(--text-main);font-size:11px;font-family:inherit;}
+.op-grid-tabla input[type=text]{width:100%;min-width:0;background:var(--bg);border:1px solid var(--border-glow);border-radius:6px;
+  padding:5px 7px;color:var(--text-main);font-size:11.5px;font-family:inherit;box-sizing:border-box;}
+.op-grid-tabla select{width:100%;min-width:0;background:var(--bg);border:1px solid var(--border-glow);border-radius:6px;
+  padding:5px 6px;color:var(--text-main);font-size:11px;font-family:inherit;box-sizing:border-box;}
 .op-grid-tabla input[type=checkbox]{width:16px;height:16px;cursor:pointer;}
 .op-btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border-glow);background:var(--panel-dark);
   color:var(--text-main);font-size:11.5px;font-weight:700;cursor:pointer;}
@@ -2193,7 +2202,7 @@ function _renderSeccionOrdenPreparacion(t) {
     return '<tr>' +
       '<td data-th="Cant.">' + (eq.cantidad || 1) + '</td>' +
       '<td data-th="SKU"><input type="text" value="' + _esc(eq.sku||'') + '" placeholder="—" onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'sku\',this.value)"></td>' +
-      '<td data-th="Equipo" style="min-width:140px;">' + _esc(eq.descripcion||'') + '</td>' +
+      '<td data-th="Equipo"><input type="text" value="' + _esc(eq.descripcion||'') + '" placeholder="Descripción del equipo..." onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'descripcion\',this.value)"></td>' +
       '<td data-th="N° de Serie"><input type="text" value="' + _esc(eq.nro_serie||'') + '" placeholder="Escanear/tipear..." onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'nro_serie\',this.value)"></td>' +
       '<td data-th="Calidad"><input type="checkbox" ' + (eq.calidad_verificada?'checked':'') + ' onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'calidad_verificada\',this.checked)"></td>' +
       '<td data-th="Estado"><select onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'estado\',this.value)">' +
