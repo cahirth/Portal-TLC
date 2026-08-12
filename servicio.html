@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.10.6 (Link del checklist ahora manda cliente/serie/técnico además de ticket/equipo_index — mismos 3 datos que ya recibe el POE-8, antes el checklist se completaba "a ciegas" sin esos datos ya disponibles. Backend nuevo listo del otro lado (registrarChecklistCompletado, ver FotoMap.gs v175) — falta conectar desde el archivo real del checklist (Cristian mandó capturas del HRK-1.html pero no el archivo, lo necesito para cablear el "Marcar como completado" con esta acción nueva). Pedido con captura: "completar con los datos que ya tenés el formulario... cuando aprietas marcar como completado tildás calidad y aparece [checklist] completado".) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.5 (2 fixes: (1) botón "✂️ Separar" nuevo en la columna Cant. — visible solo cuando cantidad>1, permite separar una fila vieja en varias independientes de cantidad:1 (usa st_separarEquipoOrden, ver FotoMap.gs v174). (2) BUG REAL — el link "📋 Instalación" del POE-8 llevaba a la página principal de la empresa (tlcsrl.com.ar) en vez del formulario. Causa: POE8_Instalacion.html vive en la subcarpeta POE/ del repo, no en la raíz — _urlPOE8 armaba la URL asumiendo raíz, 404 y algún redirect/fallback terminaba mandando al sitio principal. Corregido a .../Portal-TLC/POE/POE8_Instalacion.html. Confirmado por Cristian con la URL real del archivo en GitHub. Reportado con captura: "el ítem 2 tiene 2 equipos... el link de instalación me lleva a la página web y no al POE8 html".) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.4 (3 pedidos de Cristian con captura sobre la grilla de la Orden de Preparación: (1) columnas responsivas — antes la tabla no tenía anchos definidos, así que en pantallas angostas o con muchas columnas el navegador apretaba SKU y N° de Serie hasta casi desaparecer, cortando el texto tipeado en vez de mostrarlo entero. Ahora la tabla tiene table-layout:fixed con anchos mínimos por columna y min-width:860px en total — si no entra, el contenedor (que ya tenía overflow-x:auto) scrollea en vez de apretar. (2) Campo "Equipo" pasa a ser editable (antes texto fijo) — permite corregir/aclarar la descripción de un equipo puntual, por ejemplo distinguir 2 unidades idénticas que van a domicilios distintos (usa st_actualizarEquipoOrden con "descripcion", ver FotoMap.gs v173). (3) Confirmado que el link del POE-8 ya manda todos los datos disponibles (tecnico/cliente/domicilio/telefono/modelo/serie/id_ticket/equipo_index) al archivo nuevo — no hacía falta ningún cambio ahí. Confirmado con test: input editable con el valor correcto, URL del POE-8 completa.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.3 (Tope en "+ Agregar Caja" del modal "Asignación de Cajas" — no se puede tener más cajas que equipos (cada equipo entra en una sola caja, cualquier caja de más quedaría vacía sí o sí). Botón se deshabilita visualmente al llegar al tope, y avisa si de todas formas se intenta pasar. Pedido por Cristian: "cantidad máxima a agregar cajas, la cantidad de ítems, topealo". Confirmado con test: con 3 equipos, permite hasta 3 cajas, se deshabilita ahí, y avisa si se intenta una 4ta.) -->
@@ -2195,8 +2196,17 @@ function _renderSeccionOrdenPreparacion(t) {
     // de preparación".
     var textoModeloFila = [eq.sku, eq.descripcion].filter(Boolean).join(' ');
     var archivoChecklistFila = _archivoChecklistParaModelo(textoModeloFila);
+    // Se agregan cliente/serie/técnico a la URL — antes solo mandaba
+    // ticket+equipo_index, dejando que el checklist se completara "a
+    // ciegas" sin los datos ya disponibles del ticket. Mismos 3 datos
+    // que ya recibe el POE-8. Pedido por Cristian con captura: "en
+    // imagen 1, completar con los datos que ya tenés el formulario".
     var urlChecklistFila = archivoChecklistFila
-      ? (CHECKLIST_URL_BASE + archivoChecklistFila + '?ticket=' + encodeURIComponent(t.id_ticket) + '&equipo_index=' + i)
+      ? (CHECKLIST_URL_BASE + archivoChecklistFila +
+         '?ticket=' + encodeURIComponent(t.id_ticket) + '&equipo_index=' + i +
+         '&cliente=' + encodeURIComponent(t.cliente || '') +
+         '&serie=' + encodeURIComponent(eq.nro_serie || '') +
+         '&tecnico=' + encodeURIComponent(t.tecnico_responsable_nombre || ''))
       : '';
     var poe8Completado = !!eq.poe8_completado;
     var checklistCompletado = !!eq.checklist_completado;
