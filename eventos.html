@@ -2,6 +2,7 @@
 <!-- Portal TLC | eventos.html | v2026.08.09.13 (Logo del evento — nuevo. Se ve como una miniatura de 30px junto al nombre en el header, y también en cada tarjeta del selector "Todos los eventos". Se agrega/cambia/quita desde el menú de tres puntos (⋯) del topbar: "🖼️ Agregar/Cambiar logo del evento" y "🚫 Quitar logo del evento" (este último solo visible si ya hay uno puesto) — ambos Administrador, usan ev_subirLogoEvento/ev_quitarLogoEvento de FotoMap.gs v167. Pedido por Cristian: "dame la posibilidad de agregar logo al nombre del evento". Confirmado con jsdom de punta a punta: subir actualiza el header y los textos del menú, quitar los revierte.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.12 (Progreso de checklists visible en la vista Lista — antes solo mostraba el texto "x/y" sin barra, a diferencia del Kanban que ya tenía barra visual. Se agregó la misma barra compacta (42px) + texto a cada fila de la lista, y se sumó el porcentaje al texto del Kanban también ("2/4 subtareas · 50%") para más claridad en los dos lados por igual. Pedido por Cristian: "podemos mostrar el progreso de las tarjetas en la miniatura, de kanban y listas?". Confirmado con jsdom con un checklist de 4 ítems (2 tildados): barra al 50% en ambas vistas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.11 (3 pedidos de Cristian: (1) Menú de 3 puntos en el topbar del evento (mismo patrón que el de la tarjeta) — reemplaza los botones sueltos "Borrar evento"/"Todos los eventos" por: 🔗 Copiar link de este evento (nuevo), 📋 Duplicar evento (nuevo — usa ev_duplicarEvento de FotoMap.gs v166, solo Administrador), 🗑️ Borrar evento (Administrador) y 📋 Todos los eventos. (2) Nombre de pila completo del responsable ahora visible junto al avatar en la tarjeta cerrada del tablero Y en la vista Lista — antes solo se veía la inicial en un círculo, había que pasar el mouse para saber quién era. Confirmado con jsdom: se ve "Lucio" completo, no solo "L". Ambos pedidos con captura de Cristian.) -->
+<!-- Portal TLC | eventos.html | v2026.08.10.4 (2 pedidos de Cristian sobre rendimiento: (1) Vista Lista por defecto en vez de Tablero (PC y celular), es más liviana de pintar — VISTA_ACTUAL_EV arranca en 'list', y _abrirEvento aplica el toggle correcto (visibilidad + botón activo) después de renderizar. De paso, el switch de vista del menú mobile (misma clase que el de escritorio pero sin el mismo id) nunca sincronizaba su botón activo — el selector de _cambiarVistaEv pasa de #ev-view-switch a .ev-view-switch para cubrir ambos. (2) Adjuntos con miniatura real para imágenes (antes solo mostraban un ícono genérico 🖼️, nunca la imagen en sí) — con loading="lazy" para que abrir la tarjeta no espere a que carguen todos los adjuntos, se pintan progresivamente a medida que entran en pantalla. PDF/XLSX siguen con ícono, no aplica. Confirmado con test: vista Lista activa por defecto en ambos switches, tablero oculto, miniatura de imagen con lazy load, PDF con ícono normal.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.3 (Rendimiento — Cristian confirmó "en listas abre más rápido que en tarjetas" (se refería a abrir el EVENTO). Como ev_obtenerEvento ahora manda notas/mensajes vacíos (ver FotoMap.gs v179), _abrirTarjeta pasa a traer el detalle completo de esa tarjeta puntual (ev_obtenerTarjetaEv) recién al abrirla, ANTES de renderizar el modal — si falla la conexión, abre igual con notas/mensajes vacíos en vez de trabarse. Confirmado con test de punta a punta: el tablero arranca con notas/mensajes vacíos, y al abrir una tarjeta se completan con los datos reales, visibles en el chat y en las notas del modal.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.2 (2 pedidos de Cristian: (1) Poder deseleccionar la portada — antes el botón "📌 Usar como portada" solo podía MARCAR una nueva, nunca sacarla del todo; tocarla de nuevo la re-marcaba a sí misma sin efecto. Ahora, si ya es portada, el botón dice "tocá para sacarla" y al tocarlo la quita (usa ev_marcarPortada con adjId vacío, ver FotoMap.gs v176). (2) Debounce de 200ms en el buscador del tablero — antes refiltraba TODAS las tarjetas en cada tecla tipeada, ahora espera una pausa breve. Sobre el reporte de lentitud al ABRIR un evento (antes de ver el tablero): se revisó ev_obtenerEvento a fondo, sin encontrar ningún bug de loop ni normalización costosa — la demora es más probable que sea tiempo de arranque de Apps Script ("cold start") combinado con el volumen acumulado del tablero de FacoExtrema, no algo corregible desde acá sin arriesgar romper la lectura de datos. Confirmado con test: deseleccionar portada funciona de punta a punta.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.1 (Rendimiento — Cristian reportó que el tablero (FacoExtrema en particular, con varias tarjetas y meses de uso activo) tarda muchísimo en cargar en una compu vieja/débil, aunque en una potente casi no se note. Encontrado: (1) los adjuntos/portada se subían SIN comprimir, hasta 10MB tal cual salían de la cámara del celular — un tablero con varias portadas terminaba bajando y decodificando decenas de MB solo para mostrar miniaturas chicas. Ahora las imágenes (PNG/JPG) se comprimen client-side antes de subir (mismo criterio ya probado en servicio.html: máximo 800px de ancho, JPEG 65% calidad) — PDF/XLSX se suben igual, no aplica. (2) loading="lazy" agregado a las portadas del tablero y al logo del selector de eventos — el navegador ya no decodifica TODAS las imágenes de golpe al pintar el tablero, solo las que entran en pantalla. Ojo: esto acelera las subidas NUEVAS de acá en adelante — las imágenes ya cargadas en tarjetas viejas del tablero de FacoExtrema siguen pesando lo mismo hasta que se resuban a mano; el lazy-load sí ayuda de inmediato con esas también, sin tocar ningún dato. El flujo de carga en sí (_abrirEvento → _renderTablero) se revisó y está bien armado — un solo fetch, un solo pintado, sin re-renders redundantes.) -->
@@ -335,6 +336,7 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 .ev-adjunto-fila { display:flex; align-items:center; gap:9px; background:var(--panel-darker); border:1px solid var(--border-glow);
   border-radius:10px; padding:8px 10px; margin-top:7px; }
 .ev-adjunto-fila .ic { font-size:17px; flex-shrink:0; }
+.ev-adjunto-thumb { width:28px; height:28px; border-radius:6px; object-fit:cover; flex-shrink:0; cursor:pointer; background:var(--panel-darker); }
 .ev-adjunto-fila .info { flex:1; min-width:0; }
 .ev-adjunto-fila .n { font-size:11.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ev-adjunto-fila .s { font-size:9.5px; color:var(--text-dim); }
@@ -399,8 +401,8 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
     <div class="ev-tablero-topbar">
       <select class="ev-select-evento" id="ev-select-evento" onchange="_cambiarEventoDesdeSelect(this.value)"></select>
       <div class="ev-view-switch" id="ev-view-switch">
-        <button data-vista="board" class="activo" onclick="_cambiarVistaEv('board')">▦ Tablero</button>
-        <button data-vista="list" onclick="_cambiarVistaEv('list')">☰ Lista</button>
+        <button data-vista="board" onclick="_cambiarVistaEv('board')">▦ Tablero</button>
+        <button data-vista="list" class="activo" onclick="_cambiarVistaEv('list')">☰ Lista</button>
       </div>
       <div style="position:relative;flex-shrink:0;">
         <button class="ev-btn-menu-tarjeta" onclick="_toggleMenuEvento(event)" title="Más acciones del evento">⋯</button>
@@ -703,7 +705,7 @@ async function _abrirEvento(id, tarjetaId) {
   document.getElementById('ev-vista-selector').style.display = 'none';
   document.getElementById('ev-vista-tablero').style.display = 'block';
   document.getElementById('ev-board').innerHTML = '<div style="padding:30px;"><div class="spinner" style="margin:0 auto;"></div></div>';
-  VISTA_ACTUAL_EV = 'board';
+  VISTA_ACTUAL_EV = 'list';
   try {
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_obtenerEvento', id: id }) });
     var r = await resp.json();
@@ -732,6 +734,7 @@ async function _abrirEvento(id, tarjetaId) {
     _renderSelectEventos();
     _renderFiltrosEv();
     _renderTablero();
+    _cambiarVistaEv(VISTA_ACTUAL_EV); // aplica visibilidad+botón activo correctos (Lista por defecto — más rápida en PC y celular)
     history.replaceState(null, '', 'eventos.html?id=' + encodeURIComponent(id));
     // Deep-link desde una notificación o un link compartido — abre
     // directo la tarjeta puntual, sin que el usuario tenga que
@@ -756,10 +759,10 @@ function _renderSelectEventos() {
 function _cambiarEventoDesdeSelect(id) { if (id) _abrirEvento(id); }
 
 // ── Vista Tablero / Lista ──
-var VISTA_ACTUAL_EV = 'board';
+var VISTA_ACTUAL_EV = 'list';
 function _cambiarVistaEv(v) {
   VISTA_ACTUAL_EV = v;
-  document.querySelectorAll('#ev-view-switch button').forEach(function(b){ b.classList.toggle('activo', b.dataset.vista === v); });
+  document.querySelectorAll('.ev-view-switch button').forEach(function(b){ b.classList.toggle('activo', b.dataset.vista === v); });
   document.getElementById('ev-board').classList.toggle('oculto', v !== 'board');
   document.getElementById('ev-list-wrap').classList.toggle('activo', v === 'list');
   if (v === 'list') _renderListaTarjetasEv();
@@ -1470,14 +1473,25 @@ function _eliminarNotaEv(idNota) {
 
 // ── Adjuntos + portada ──
 var ADJUNTOS_ICONOS_EV = { pdf:'📄', png:'🖼️', jpg:'🖼️', jpeg:'🖼️', xlsx:'📊' };
+var ADJUNTOS_EXT_IMAGEN_EV = ['png', 'jpg', 'jpeg'];
 function _renderAdjuntos(t) {
   var adjuntos = Array.isArray(t.adjuntos) ? t.adjuntos : [];
   if (!adjuntos.length) return '';
   return adjuntos.map(function(a) {
     var ext = (a.nombre.split('.').pop() || '').toLowerCase();
     var kb = Math.round((a.tamano||0) / 1024);
+    var esImagen = ADJUNTOS_EXT_IMAGEN_EV.indexOf(ext) !== -1;
+    // Miniatura real para imágenes (antes solo se veía un ícono
+    // genérico 🖼️, nunca la imagen en sí) — con loading="lazy" para
+    // que abrir la tarjeta no espere a que carguen todos los
+    // adjuntos: se pintan progresivamente a medida que entran en
+    // pantalla, no de golpe. Pedido por Cristian: "las imágenes...
+    // hacelo progresivo, pero abrí la tarjeta rápido".
+    var iconoHtml = esImagen
+      ? '<img class="ev-adjunto-thumb" src="' + a.url + '" alt="" loading="lazy" onclick="_ampliarPortadaEv(\'' + a.url.replace(/'/g,"\\'") + '\')">'
+      : '<span class="ic">' + (ADJUNTOS_ICONOS_EV[ext] || '📎') + '</span>';
     return '<div class="ev-adjunto-fila">' +
-      '<span class="ic">' + (ADJUNTOS_ICONOS_EV[ext] || '📎') + '</span>' +
+      iconoHtml +
       '<a class="info" href="' + a.url + '" target="_blank" style="text-decoration:none;color:inherit;">' +
         '<div class="n">' + _esc(a.nombre) + '</div><div class="s">' + kb + ' KB</div>' +
       '</a>' +
