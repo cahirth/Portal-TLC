@@ -2,6 +2,8 @@
 <!-- Portal TLC | eventos.html | v2026.08.09.13 (Logo del evento — nuevo. Se ve como una miniatura de 30px junto al nombre en el header, y también en cada tarjeta del selector "Todos los eventos". Se agrega/cambia/quita desde el menú de tres puntos (⋯) del topbar: "🖼️ Agregar/Cambiar logo del evento" y "🚫 Quitar logo del evento" (este último solo visible si ya hay uno puesto) — ambos Administrador, usan ev_subirLogoEvento/ev_quitarLogoEvento de FotoMap.gs v167. Pedido por Cristian: "dame la posibilidad de agregar logo al nombre del evento". Confirmado con jsdom de punta a punta: subir actualiza el header y los textos del menú, quitar los revierte.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.12 (Progreso de checklists visible en la vista Lista — antes solo mostraba el texto "x/y" sin barra, a diferencia del Kanban que ya tenía barra visual. Se agregó la misma barra compacta (42px) + texto a cada fila de la lista, y se sumó el porcentaje al texto del Kanban también ("2/4 subtareas · 50%") para más claridad en los dos lados por igual. Pedido por Cristian: "podemos mostrar el progreso de las tarjetas en la miniatura, de kanban y listas?". Confirmado con jsdom con un checklist de 4 ítems (2 tildados): barra al 50% en ambas vistas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.11 (3 pedidos de Cristian: (1) Menú de 3 puntos en el topbar del evento (mismo patrón que el de la tarjeta) — reemplaza los botones sueltos "Borrar evento"/"Todos los eventos" por: 🔗 Copiar link de este evento (nuevo), 📋 Duplicar evento (nuevo — usa ev_duplicarEvento de FotoMap.gs v166, solo Administrador), 🗑️ Borrar evento (Administrador) y 📋 Todos los eventos. (2) Nombre de pila completo del responsable ahora visible junto al avatar en la tarjeta cerrada del tablero Y en la vista Lista — antes solo se veía la inicial en un círculo, había que pasar el mouse para saber quién era. Confirmado con jsdom: se ve "Lucio" completo, no solo "L". Ambos pedidos con captura de Cristian.) -->
+<!-- Portal TLC | eventos.html | v2026.08.10.2 (2 pedidos de Cristian: (1) Poder deseleccionar la portada — antes el botón "📌 Usar como portada" solo podía MARCAR una nueva, nunca sacarla del todo; tocarla de nuevo la re-marcaba a sí misma sin efecto. Ahora, si ya es portada, el botón dice "tocá para sacarla" y al tocarlo la quita (usa ev_marcarPortada con adjId vacío, ver FotoMap.gs v176). (2) Debounce de 200ms en el buscador del tablero — antes refiltraba TODAS las tarjetas en cada tecla tipeada, ahora espera una pausa breve. Sobre el reporte de lentitud al ABRIR un evento (antes de ver el tablero): se revisó ev_obtenerEvento a fondo, sin encontrar ningún bug de loop ni normalización costosa — la demora es más probable que sea tiempo de arranque de Apps Script ("cold start") combinado con el volumen acumulado del tablero de FacoExtrema, no algo corregible desde acá sin arriesgar romper la lectura de datos. Confirmado con test: deseleccionar portada funciona de punta a punta.) -->
+<!-- Portal TLC | eventos.html | v2026.08.10.1 (Rendimiento — Cristian reportó que el tablero (FacoExtrema en particular, con varias tarjetas y meses de uso activo) tarda muchísimo en cargar en una compu vieja/débil, aunque en una potente casi no se note. Encontrado: (1) los adjuntos/portada se subían SIN comprimir, hasta 10MB tal cual salían de la cámara del celular — un tablero con varias portadas terminaba bajando y decodificando decenas de MB solo para mostrar miniaturas chicas. Ahora las imágenes (PNG/JPG) se comprimen client-side antes de subir (mismo criterio ya probado en servicio.html: máximo 800px de ancho, JPEG 65% calidad) — PDF/XLSX se suben igual, no aplica. (2) loading="lazy" agregado a las portadas del tablero y al logo del selector de eventos — el navegador ya no decodifica TODAS las imágenes de golpe al pintar el tablero, solo las que entran en pantalla. Ojo: esto acelera las subidas NUEVAS de acá en adelante — las imágenes ya cargadas en tarjetas viejas del tablero de FacoExtrema siguen pesando lo mismo hasta que se resuban a mano; el lazy-load sí ayuda de inmediato con esas también, sin tocar ningún dato. El flujo de carga en sí (_abrirEvento → _renderTablero) se revisó y está bien armado — un solo fetch, un solo pintado, sin re-renders redundantes.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.10 (BUG REAL #2 sobre "no se ven los ítems" — no era dato vacío puntual como pensé la primera vez (pasaba con TODOS los ítems de TODOS los checklists por igual, ver captura de Cristian con 7 ítems en 2 listas distintas, todos invisibles). Causa: _abrirTarjeta() llamaba a _autoResizeTodosItemsChecklistEv() (que mide scrollHeight de cada textarea para ajustarle el alto) ANTES de agregar la clase "open" al overlay — y el overlay arranca con display:none. Medir scrollHeight de un elemento adentro de algo con display:none SIEMPRE da 0 en cualquier navegador (no hay layout que medir), así que TODOS los textareas de ítems quedaban con height:0px clavado por JS — colapsados visualmente a la nada, aunque el texto siempre estuvo ahí y guardado bien (confirmado con jsdom: el value de cada textarea nunca estuvo vacío). Fix: se invierte el orden — primero .open (visible), recién ahí se mide y ajusta la altura. Esta parte específica no se puede confirmar con un test automático (jsdom no calcula layout real, scrollHeight siempre da 0 ahí sea cual sea el display) — el razonamiento es sólido (comportamiento de navegador bien conocido) pero necesita confirmación real de Cristian en el navegador.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.9 (BUG REAL encontrado y confirmado con click simulado (mousedown+mouseup+click, no solo Enter): el picker de menciones de los ítems de checklist tiraba "ReferenceError: idGrupo is not defined" en cada click, silenciosamente (no se veía en pantalla, solo en la consola del navegador). Causa: la función "qué hacer al elegir una mención" se pasaba como closure y se convertía a TEXTO con .toString() para meterla en el onclick="..." del botón — eso pierde CUALQUIER variable externa que el closure use (acá, idGrupo, el ID del checklist), porque el texto se vuelve a ejecutar en el scope global, donde esa variable no existe. El chat no tenía este problema porque su closure usaba un string fijo ('ev-msg-nuevo'), no una variable — por eso "andaba solo en negocios/chat" y no en checklist. Por eso también Enter SÍ funcionaba (llama a la función real en memoria, con su closure intacto) pero el click no. Fix de raíz: se saca el patrón de función-a-texto por completo — ahora se pasa el ID del input destino como STRING PLANO (inmune a este problema) y una sola función global (_seleccionarMencionEv) hace la inserción. También: ítems de checklist con texto vacío ahora muestran un placeholder explicando qué pasó, en vez de quedar invisibles (probable causa del reporte de "no se ven los ítems" — un ítem creado sin texto durante pruebas anteriores, ahora al menos es visible/editable/borrable). Confirmado con jsdom: click real ya inserta la mención sin error, tanto en checklist como en chat. Pedido por Cristian con 3 capturas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.8 (El botón de borrar suelto en el header del detalle de tarjeta (🗑) quedaba muy expuesto y fácil de confundir con la ✕ de cerrar — se reemplaza por un menú de tres puntos (⋯) con dropdown: 🔗 Copiar link a esta tarjeta (nuevo), 📋 Duplicar tarjeta (nuevo — usa ev_duplicarTarjeta de FotoMap.gs v164, quedaba pendiente desde el v1 del módulo), y 🗑️ Borrar tarjeta al final en rojo (misma confirmación de siempre, ahora un paso más adentro para evitar el toque accidental). El dropdown se cierra solo al clickear afuera. Pedido por Cristian con captura: "modificá ese acceso, ej. 3 puntos con acciones varias ahí adentro además de borrar tarjeta". Confirmado con jsdom: el menú abre/cierra bien, y duplicar tarjeta crea la copia, repinta el tablero y abre su detalle.) -->
@@ -413,7 +415,7 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
       </div>
     </div>
     <div class="ev-filtros" id="ev-filtros">
-      <input type="search" class="ev-search-input" id="ev-search-input" placeholder="Buscar tareas, responsables o checklists..." autocomplete="off" oninput="_aplicarFiltrosEv()">
+      <input type="search" class="ev-search-input" id="ev-search-input" placeholder="Buscar tareas, responsables o checklists..." autocomplete="off" oninput="_onBuscarConDebounceEv()">
       <select id="ev-filtro-responsable" onchange="_aplicarFiltrosEv()"><option value="">Responsable: todos</option></select>
       <select id="ev-filtro-categoria" onchange="_aplicarFiltrosEv()"><option value="">Categoría: todas</option></select>
       <select id="ev-filtro-vencimiento" onchange="_aplicarFiltrosEv()">
@@ -561,7 +563,7 @@ function _renderListaEventos() {
   var cont = document.getElementById('ev-lista-eventos');
   if (!EVENTOS.length) { cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);">Todavía no hay eventos cargados.</div>'; return; }
   cont.innerHTML = EVENTOS.map(function(e) {
-    var logoImg = (e.logo && e.logo.url) ? '<img class="ev-selector-logo" src="' + e.logo.url + '" alt="">' : '';
+    var logoImg = (e.logo && e.logo.url) ? '<img class="ev-selector-logo" src="' + e.logo.url + '" alt="" loading="lazy">' : '';
     return '<div class="ev-selector-card" onclick="_abrirEvento(\'' + e.id + '\')">' +
       '<div style="display:flex;align-items:center;">' + logoImg + '<div><div class="ev-selector-nombre">' + (logoImg ? '' : '📅 ') + _esc(e.nombre) + '</div>' +
         '<div class="ev-selector-meta">' + e.cantidadTarjetas + ' tarjeta' + (e.cantidadTarjetas !== 1 ? 's' : '') + '</div></div></div>' +
@@ -892,6 +894,15 @@ function _tarjetaPasaFiltrosEv(t) {
   return true;
 }
 
+// Debounce del buscador — con un tablero grande, refiltrar TODAS las
+// tarjetas en cada tecla tipeada podía sumar, sobre todo en una compu
+// vieja/débil. Espera 200ms de pausa antes de aplicar el filtro.
+var _debounceBusquedaEv = null;
+function _onBuscarConDebounceEv() {
+  clearTimeout(_debounceBusquedaEv);
+  _debounceBusquedaEv = setTimeout(_aplicarFiltrosEv, 200);
+}
+
 window._aplicarFiltrosEv = function() {
   document.querySelectorAll('.ev-card').forEach(function(card) {
     var t = EVENTO_ACTUAL.tarjetas.find(function(x){ return x.id === card.dataset.idTarjeta; });
@@ -956,7 +967,7 @@ function _renderCard(t) {
   var inicialResp = nombrePila.charAt(0).toUpperCase() || '?';
   var portada = (t.adjuntos || []).find(function(a){ return a.esPortada; });
   return '<div class="ev-card" data-id-tarjeta="' + t.id + '" data-responsable="' + _esc(t.responsable_email||'') + '" data-categoria="' + _esc(t.categoria||'') + '" draggable="true" ondragstart="_dragStartCard(event,\'' + t.id + '\')" ondragend="_dragEndCard(event)" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
-    (portada ? '<div class="ev-card-portada"><img src="' + portada.url + '" alt="" style="cursor:pointer;" onclick="event.stopPropagation(); _ampliarPortadaEv(\'' + portada.url.replace(/'/g,"\\'") + '\')"></div>' : '') +
+    (portada ? '<div class="ev-card-portada"><img src="' + portada.url + '" alt="" loading="lazy" style="cursor:pointer;" onclick="event.stopPropagation(); _ampliarPortadaEv(\'' + portada.url.replace(/'/g,"\\'") + '\')"></div>' : '') +
     (t.categoria ? '<span class="ev-card-cat" style="background:' + cat.bg + ';color:' + cat.color + ';">' + _esc(t.categoria) + '</span>' : '') +
     '<div class="ev-card-titulo">' + _esc(t.titulo) + '</div>' +
     '<div class="ev-card-meta">' +
@@ -1454,11 +1465,43 @@ function _renderAdjuntos(t) {
       '<a class="info" href="' + a.url + '" target="_blank" style="text-decoration:none;color:inherit;">' +
         '<div class="n">' + _esc(a.nombre) + '</div><div class="s">' + kb + ' KB</div>' +
       '</a>' +
-      '<button class="ev-btn-portada' + (a.esPortada?' activo':'') + '" onclick="_marcarPortadaEv(\'' + a.id + '\')">📌 ' + (a.esPortada?'Portada':'Usar como portada') + '</button>' +
+      '<button class="ev-btn-portada' + (a.esPortada?' activo':'') + '" onclick="' + (a.esPortada ? '_marcarPortadaEv(null)' : "_marcarPortadaEv('" + a.id + "')") + '">📌 ' + (a.esPortada?'Portada (tocá para sacarla)':'Usar como portada') + '</button>' +
       '<button class="ev-btn-borrar-item" onclick="_eliminarAdjuntoEv(\'' + a.id + '\')" title="Eliminar">✕</button>' +
     '</div>';
   }).join('');
 }
+// Comprime imágenes ANTES de subir — antes se guardaban tal cual
+// salían de la cámara del celular (hasta 10MB cada una, sin tocar).
+// Un tablero con varias tarjetas con portada terminaba bajando y
+// decodificando decenas de MB solo para mostrar miniaturas chicas —
+// en una compu potente casi no se nota, pero en una vieja/débil se
+// vuelve larguísimo de cargar. Mismo criterio ya probado en
+// servicio.html (_comprimirImagen): máximo 800px de ancho, JPEG al
+// 65% de calidad — para PDF/XLSX no aplica, esos se suben igual.
+// Reportado por Cristian: "el módulo de eventos es lentísimo... en
+// una compu antigua se nota mucho".
+function _comprimirImagenEv(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var maxAncho = 800;
+      var escala = Math.min(1, maxAncho / img.width);
+      var w = Math.max(1, Math.round(img.width * escala));
+      var h = Math.max(1, Math.round(img.height * escala));
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/jpeg', 0.65));
+    };
+    img.onerror = function() { callback(null); };
+    img.src = e.target.result;
+  };
+  reader.onerror = function() { callback(null); };
+  reader.readAsDataURL(file);
+}
+
 function _subirAdjuntoEv(ev) {
   var file = ev.target.files[0];
   ev.target.value = '';
@@ -1468,12 +1511,13 @@ function _subirAdjuntoEv(ev) {
   var ext = (file.name.split('.').pop() || '').toLowerCase();
   if (extPermitidas.indexOf(ext) === -1) { alert('Formato no permitido — solo PDF, PNG, JPG, XLSX.'); return; }
   var t = _tarjetaActual();
-  var reader = new FileReader();
-  reader.onload = function() {
-    var base64 = reader.result.split(',')[1];
+  var esImagen = ['png','jpg','jpeg'].indexOf(ext) !== -1;
+
+  var enviar = function(base64DataUrl, nombreFinal, tipoMimeFinal) {
+    var base64 = base64DataUrl.split(',')[1];
     fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
       accion:'subirAdjunto', modulo:'eventos', idRegistro: EVENTO_ACTUAL.id + '/tarjetas/' + t.id,
-      nombre:file.name, tipoMime:file.type, base64:base64, subidoPorNombre:_session.name,
+      nombre:nombreFinal, tipoMime:tipoMimeFinal, base64:base64, subidoPorNombre:_session.name,
     }) })
       .then(function(r){ return r.json(); })
       .then(function(r) {
@@ -1484,7 +1528,17 @@ function _subirAdjuntoEv(ev) {
         document.getElementById('ev-adjuntos-cont').innerHTML = _renderAdjuntos(t);
       });
   };
-  reader.readAsDataURL(file);
+
+  if (esImagen) {
+    _comprimirImagenEv(file, function(dataUrlComprimido) {
+      if (!dataUrlComprimido) { alert('No se pudo procesar la imagen — probá con otro archivo.'); return; }
+      enviar(dataUrlComprimido, file.name, 'image/jpeg');
+    });
+  } else {
+    var reader = new FileReader();
+    reader.onload = function() { enviar(reader.result, file.name, file.type); };
+    reader.readAsDataURL(file);
+  }
 }
 function _eliminarAdjuntoEv(adjId) {
   var t = _tarjetaActual();
@@ -1503,12 +1557,12 @@ function _eliminarAdjuntoEv(adjId) {
 function _marcarPortadaEv(adjId) {
   var t = _tarjetaActual();
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
-    accion:'ev_marcarPortada', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, adjId:adjId,
+    accion:'ev_marcarPortada', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, adjId: adjId || '',
   }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
-      (t.adjuntos||[]).forEach(function(a){ a.esPortada = (a.id === adjId); });
+      (t.adjuntos||[]).forEach(function(a){ a.esPortada = (adjId && a.id === adjId); });
       _renderOverlayTarjeta();
       _renderTablero();
     });
