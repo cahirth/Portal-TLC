@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.10.5 (Solución de fondo pedida por Cristian: "cada vez tiene más datos y se vuelve pesada... necesito la solución". 3 piezas: (1) Carga diferida de "Negocios Asociados" — historico.json + servicio_tecnico completos ya no se piden al cargar la lista, se piden UNA sola vez (cacheados) recién cuando se abre la primera ficha. Ojo: el backend siempre manda negocios:[] de arranque (nunca undefined), así que hizo falta una bandera aparte (_negociosYaCalculados) en vez de chequear la verdad del array — chequear !e.negocios nunca daba true. (2) Renderizado por tandas de 100 en la lista principal, con botón "Mostrar más" — antes se armaban TODAS las tarjetas HTML de una sola vez sin límite; con una base grande cada tecla en el buscador se ponía más pesada con el tiempo, solo por volumen de datos. Ahora el techo es constante sin importar cuánto crezca la base. Bug propio corregido en el camino: comparar filtro crudo (undefined en la carga inicial) contra el string vacío que manda "Mostrar más" reseteaba el contador de vuelta a 100 en el primer click — se corrigió comparando siempre el string ya normalizado. (3) Debounce de 300ms en el buscador. Se aclaró además por qué NO se implementó la propuesta de "listeners/sockets de Firebase con unsubscribe": el Portal no usa el SDK de Firebase en el cliente, todo pasa por fetch() a Apps Script — no hay listeners que limpiar. Confirmado con test de punta a punta con catálogo simulado de 350 empresas: carga inicial no pide negocios, techo de 100 tarjetas, "Mostrar más" suma sin resetear, debounce funciona, y la carga diferida se dispara una sola vez sin importar cuántas fichas se abran después.) -->
 <!-- Portal TLC | empresas.html | v2026.08.10.4 (BUG GRANDE encontrado — _cargarNegociosCruzados (cruce con Ventas/Servicio) recorría TODAS las cotizaciones y TODOS los tickets por CADA empresa, EN EL NAVEGADOR del usuario (no en el backend) — O(empresas × cotizaciones + empresas × tickets). Con un catálogo real (300 empresas × 241+ cotizaciones × cientos de tickets) eso son decenas de miles de vueltas de JS bloqueando el hilo principal justo después de que la lista aparecía — en una compu débil se sentía como que la página se trababa. Ahora se agrupan cotizaciones (por CUIT y por razón social) y tickets (por razón social) UNA sola vez en mapas, y cada empresa busca ahí directo — mismo criterio que el fix de listarEmpresas en FotoMap.gs v181, O(empresas + cotizaciones + tickets). Se preservó el match ORIGINAL exacto (OR inclusivo entre CUIT y razón, con dedupe) — no un else-if que hubiera perdido cotizaciones viejas sin CUIT cargado. Reportado por Cristian: "la filosofía de esta app es que vuele de rápido... es muy lenta en estos 2 módulos". Confirmado con test simulando el mismo tamaño real: los 3 casos de match (por CUIT, por razón sola, caso normal) dan igual que antes, y corre en 6ms en vez de decenas de miles de vueltas.) -->
 <!-- Portal TLC | empresas.html | v2026.08.10.3 (BUG MÍO — al sacar el campo "Domicilio" plano del formulario Nueva Empresa en v2026.08.09.1, me olvidé de sacarlo también de la lista que limpia el formulario (_toggleFormNuevaEmpresa), que seguía intentando document.getElementById('ne-domicilio').value='' sobre un elemento que ya no existe — TypeError "Cannot set properties of null" al abrir/cerrar el panel de Nueva Empresa, rompía todo el botón. Reportado por Cristian con la consola completa del navegador. Confirmado con test: el toggle ya no crashea.) -->
 <!-- Portal TLC | empresas.html | v2026.08.10.2 (BUG REAL — la lista de contactos armaba email/teléfono con [c.email,c.telefono].filter(Boolean).join(' · '), que OMITE en silencio cualquier campo vacío. Si un contacto no tenía teléfono cargado, la fila simplemente no mostraba nada ahí — indistinguible de "el dato se perdió". Reportado por Cristian: "no tengo forma de saber si están todos, o falta alguno". Ahora cada contacto muestra explícitamente "Sin teléfono" (en rojo) o "Sin email" cuando falta ese dato, en vez de omitirlo. Confirmado con test: contacto sin teléfono lo dice explícito, contacto con teléfono muestra el número real sin ninguna marca de "falta".) -->
@@ -197,7 +198,7 @@
     <!-- VISTA LISTA -->
     <div id="vista-lista">
       <div class="buscador-row" style="margin-bottom:10px;">
-        <input type="text" class="buscador-input" id="buscador-empresas" placeholder="Buscar por razón social, CUIT, contacto o N° de serie..." oninput="_filtrarEmpresas(this.value)">
+        <input type="text" class="buscador-input" id="buscador-empresas" placeholder="Buscar por razón social, CUIT, contacto o N° de serie..." oninput="_onBuscarEmpresasConDebounce(this.value)">
       </div>
       <div class="buscador-row">
         <button class="btn-nueva" onclick="_toggleFormNuevaEmpresa()">+ Nueva empresa</button>
@@ -393,7 +394,13 @@ async function _cargarEmpresas() {
   } catch(e) { console.warn('Error de conexión al listar empresas:', e); }
   _cargando = false;
   _renderListaEmpresas();
-  _cargarNegociosCruzados(); // en segundo plano — no bloquea el primer pintado de la lista
+  // Antes esto se disparaba automáticamente ACÁ, en cuanto cargaba la
+  // lista — bajando historico.json + servicio_tecnico ENTEROS de una,
+  // aunque el usuario no hubiera abierto ninguna ficha todavía. Ahora
+  // es carga bajo demanda de verdad: recién se dispara la primera vez
+  // que se abre una ficha puntual (ver _asegurarNegociosCargados,
+  // llamado desde _abrirDetalleEmpresa) — una sola vez por sesión,
+  // con el resultado cacheado en memoria para las fichas siguientes.
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -406,6 +413,21 @@ async function _cargarEmpresas() {
 // ══════════════════════════════════════════════════════════════════
 var HISTORICO_URL = 'https://raw.githubusercontent.com/cahirth/Portal-TLC/main/historico.json';
 var RTDB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+
+// Carga bajo demanda de "Negocios Asociados" — historico.json (Ventas)
+// y servicio_tecnico (Firebase) completos pesan lo mismo se abra 1
+// ficha o 300, así que no tiene sentido pedirlos de nuevo cada vez.
+// Se traen UNA sola vez (la primera vez que alguien abre CUALQUIER
+// ficha en la sesión), se cachean en memoria, y de ahí en más cada
+// ficha nueva usa lo que ya está cargado — sin volver a pegarle a la
+// red. _negociosCargadosPromise evita pedidos duplicados si el
+// usuario abre 2 fichas rápido, antes de que termine el primero.
+var _negociosCargadosPromise = null;
+var _negociosYaCalculados = false; // el backend siempre manda negocios:[] de arranque (nunca undefined), así que hace falta una bandera aparte para saber si YA se calculó el cruce real o todavía no
+function _asegurarNegociosCargados() {
+  if (!_negociosCargadosPromise) _negociosCargadosPromise = _cargarNegociosCruzados().then(function() { _negociosYaCalculados = true; });
+  return _negociosCargadosPromise;
+}
 
 function _montoCot(c) {
   return parseFloat((c.totales||{}).total_con_iva || c.totalConIva || c.montoUSD || 0) || 0;
@@ -523,9 +545,18 @@ window._volverDesdeHeader = function() {
 };
 
 // ── LISTA ──
+var CANTIDAD_POR_TANDA_EMPRESAS = 100;
+var _empresasMostradas = CANTIDAD_POR_TANDA_EMPRESAS; // se resetea en cada búsqueda nueva
+
 function _renderListaEmpresas(filtro) {
   var cont = document.getElementById('lista-empresas');
   var q = (filtro || '').toLowerCase();
+  // Compara contra "q" ya normalizado (no el "filtro" crudo) — la
+  // primera carga llama a esto sin argumento (filtro=undefined), pero
+  // "Mostrar más" y el buscador siempre mandan un string (aunque sea
+  // ''); comparar undefined !== '' hacía que el primer clic en
+  // "Mostrar más" resetee el contador en vez de sumar.
+  if (q !== _ultimoFiltroRenderizado) { _empresasMostradas = CANTIDAD_POR_TANDA_EMPRESAS; _ultimoFiltroRenderizado = q; }
   var lista = EMPRESAS.filter(function(e) {
     if (!q) return true;
     if (e.razonSocial.toLowerCase().includes(q)) return true;
@@ -534,7 +565,20 @@ function _renderListaEmpresas(filtro) {
     return (e.negocios||[]).some(function(n) { return n.equipoSerie && n.equipoSerie.toLowerCase().includes(q); });
   }).sort(function(a, b) { return a.razonSocial.localeCompare(b.razonSocial, 'es', { sensitivity:'base' }); });
   if (!lista.length) { cont.innerHTML = '<div class="empty-lista">' + (EMPRESAS.length ? 'Sin resultados.' : 'Todavía no cargaste ninguna empresa.') + '</div>'; return; }
-  cont.innerHTML = lista.map(function(e) {
+  // Renderizado por tandas — antes esto pintaba TODAS las empresas
+  // que coincidieran de una sola vez en el DOM, sin ningún límite. Con
+  // una base chica no se nota, pero a medida que crece (cientos,
+  // eventualmente miles de empresas) cada tecla tipeada en el
+  // buscador termina construyendo un HTML cada vez más grande — la
+  // app se va poniendo más lenta con el tiempo sin que cambie nada en
+  // el código, solo por el volumen de datos. Ahora solo se pintan las
+  // primeras 100 que coincidan, con un botón para pedir 100 más — la
+  // velocidad de pintado queda constante sin importar cuánto crezca
+  // la base. Pedido por Cristian: "cada vez tiene más datos y se
+  // vuelve pesada... necesito que me des la solución".
+  var listaAMostrar = lista.slice(0, _empresasMostradas);
+  var quedanMas = lista.length > _empresasMostradas;
+  cont.innerHTML = listaAMostrar.map(function(e) {
     var contactoQueMatchea = null;
     var serieQueMatchea = null;
     if (q && !e.razonSocial.toLowerCase().includes(q) && !(e.cuit||'').includes(q)) {
@@ -552,12 +596,26 @@ function _renderListaEmpresas(filtro) {
       (serieQueMatchea ? '<div style="font-size:11px;color:#3a86ff;margin-top:2px;">🔧 Coincide por N° de serie: ' + serieQueMatchea + '</div>' : '') +
       '<div class="empresa-card-meta">' +
         '<span>👤 <b>' + e.contactos.length + '</b> contacto' + (e.contactos.length!==1?'s':'') + '</span>' +
-        '<span>💼 <b>' + e.negocios.length + '</b> negocio' + (e.negocios.length!==1?'s':'') + '</span>' +
+        '<span>💼 <b>' + (e.negocios||[]).length + '</b> negocio' + ((e.negocios||[]).length!==1?'s':'') + '</span>' +
       '</div>' +
     '</div>';
-  }).join('');
+  }).join('') +
+  (quedanMas ? '<button class="empty-lista" style="width:100%;cursor:pointer;border:1px dashed var(--border-color,#ccc);border-radius:8px;padding:12px;background:none;font:inherit;color:inherit;" onclick="_mostrarMasEmpresas()">Mostrar 100 más (' + (lista.length - _empresasMostradas) + ' restantes)</button>' : '');
 }
+var _ultimoFiltroRenderizado = undefined;
+window._mostrarMasEmpresas = function() {
+  _empresasMostradas += CANTIDAD_POR_TANDA_EMPRESAS;
+  _renderListaEmpresas(document.getElementById('buscador-empresas').value);
+};
 window._filtrarEmpresas = function(q) { _renderListaEmpresas(q); };
+
+// Debounce de 300ms — con una base grande, refiltrar Y repintar en
+// CADA tecla tipeada suma. Espera una pausa breve antes de aplicar.
+var _debounceBuscadorEmpresas = null;
+function _onBuscarEmpresasConDebounce(q) {
+  clearTimeout(_debounceBuscadorEmpresas);
+  _debounceBuscadorEmpresas = setTimeout(function() { _filtrarEmpresas(q); }, 300);
+}
 
 window._toggleFormNuevaEmpresa = function() {
   var panel = document.getElementById('form-nueva-empresa-panel');
@@ -661,7 +719,18 @@ window._abrirDetalleEmpresa = function(id) {
   var btnBorrarEmpresa = document.getElementById('btn-borrar-empresa-actual');
   if (btnBorrarEmpresa) btnBorrarEmpresa.style.display = (_sesionAdmin && _sesionAdmin.rol === 'Administrador') ? '' : 'none';
   _renderContactos(e);
-  _renderNegocios(e);
+  // Primera ficha que se abre en la sesión: dispara la carga (una
+  // sola vez, cacheada) y muestra "Cargando..." mientras se resuelve.
+  // Fichas siguientes: la promesa ya está resuelta, esto es
+  // instantáneo — no vuelve a pedir nada por red.
+  if (!_negociosYaCalculados) {
+    document.getElementById('lista-negocios').innerHTML = '<div class="empty-lista">Cargando negocios asociados...</div>';
+    _asegurarNegociosCargados().then(function() {
+      if (_empresaActualId === id) _renderNegocios(e); // por si cambió de ficha mientras cargaba
+    });
+  } else {
+    _renderNegocios(e);
+  }
   window.scrollTo(0,0);
 };
 
@@ -866,11 +935,12 @@ function _fmtFechaNegocio(f) {
 }
 
 function _renderNegocios(e) {
-  var total = e.negocios.length;
+  var negocios = e.negocios || [];
+  var total = negocios.length;
   document.getElementById('negocios-contador').textContent = total + ' negocio' + (total!==1?'s':'') + (total > 5 ? ' (últimos 5)' : '');
   var cont = document.getElementById('lista-negocios');
   if (!total) { cont.innerHTML = '<div class="empty-lista">Todavía no tiene negocios asociados.</div>'; return; }
-  var negociosAMostrar = e.negocios.slice(0, 5); // ya vienen ordenados por fecha desc — los más recientes primero
+  var negociosAMostrar = negocios.slice(0, 5); // ya vienen ordenados por fecha desc — los más recientes primero
   cont.innerHTML = negociosAMostrar.map(function(n) {
     var info = ESTADO_INFO[n.estado] || { label:n.estado, c:'#94a3b8', bg:'rgba(148,163,184,.12)' };
     var link = n.tipo === 'ventas'
