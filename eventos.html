@@ -2,6 +2,7 @@
 <!-- Portal TLC | eventos.html | v2026.08.09.13 (Logo del evento — nuevo. Se ve como una miniatura de 30px junto al nombre en el header, y también en cada tarjeta del selector "Todos los eventos". Se agrega/cambia/quita desde el menú de tres puntos (⋯) del topbar: "🖼️ Agregar/Cambiar logo del evento" y "🚫 Quitar logo del evento" (este último solo visible si ya hay uno puesto) — ambos Administrador, usan ev_subirLogoEvento/ev_quitarLogoEvento de FotoMap.gs v167. Pedido por Cristian: "dame la posibilidad de agregar logo al nombre del evento". Confirmado con jsdom de punta a punta: subir actualiza el header y los textos del menú, quitar los revierte.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.12 (Progreso de checklists visible en la vista Lista — antes solo mostraba el texto "x/y" sin barra, a diferencia del Kanban que ya tenía barra visual. Se agregó la misma barra compacta (42px) + texto a cada fila de la lista, y se sumó el porcentaje al texto del Kanban también ("2/4 subtareas · 50%") para más claridad en los dos lados por igual. Pedido por Cristian: "podemos mostrar el progreso de las tarjetas en la miniatura, de kanban y listas?". Confirmado con jsdom con un checklist de 4 ítems (2 tildados): barra al 50% en ambas vistas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.11 (3 pedidos de Cristian: (1) Menú de 3 puntos en el topbar del evento (mismo patrón que el de la tarjeta) — reemplaza los botones sueltos "Borrar evento"/"Todos los eventos" por: 🔗 Copiar link de este evento (nuevo), 📋 Duplicar evento (nuevo — usa ev_duplicarEvento de FotoMap.gs v166, solo Administrador), 🗑️ Borrar evento (Administrador) y 📋 Todos los eventos. (2) Nombre de pila completo del responsable ahora visible junto al avatar en la tarjeta cerrada del tablero Y en la vista Lista — antes solo se veía la inicial en un círculo, había que pasar el mouse para saber quién era. Confirmado con jsdom: se ve "Lucio" completo, no solo "L". Ambos pedidos con captura de Cristian.) -->
+<!-- Portal TLC | eventos.html | v2026.08.10.8 (Sacado el botón hamburguesa (☰) del header y todo el panel de "Menú" mobile que abría — quedó totalmente redundante: el selector de evento, el switch Tablero/Lista y "Cambiar tema" que tenía adentro ya están visibles directo en el header/topbar (el sol 🌙 y el propio switch). Pedido por Cristian con captura, circulado en amarillo: "borrá ese menú". Confirmado con test: el evento sigue abriendo bien, el dropdown de eventos sigue funcionando, sin el botón ni el overlay.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.7 (Rediseño de navegación — se eliminó la pantalla intermedia "elegir evento" (ev-vista-selector), el módulo entra DIRECTO al tablero del último evento usado (guardado en localStorage), o el primero de la lista si no hay ninguno guardado, o el ?id= de la URL si viene por deep-link. Mismo patrón que cotizaciones.html: "+ Crear nuevo evento..." pasa a ser una opción más del desplegable de eventos, no un botón aparte en una pantalla separada. Se sacó también "Todos los eventos" del menú de 3 puntos y del menú mobile (redundante ahora, cambiar de evento se hace desde el desplegable de arriba) y se limpiaron _renderListaEventos/_volverASelectorEventos (código muerto de la pantalla eliminada — esta última se dejó como alias de "salir del módulo" para no romper sus usos existentes como fallback de error). Si no hay NINGÚN evento cargado, muestra un mensaje amigable con botón para crear el primero, en vez de un tablero roto. Pedido por Cristian: "podés borrarla y aparecer directamente [en el tablero]". Confirmado con test en los 3 escenarios: primera vez (abre el primero de la lista), con último evento guardado (abre ese), y sin ningún evento (mensaje amigable).) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.6 (Cero carga automática de imágenes — Cristian identificó bien la causa: eventos es el único de los 3 tableros del Portal con muchas imágenes en alta resolución, y con pocas tarjetas visibles en pantalla el "loading=lazy" del navegador no ayuda mucho (todo entra en viewport igual). Antes: portada en la tarjeta cerrada del tablero y miniaturas en la lista de adjuntos del detalle SÍ tenían <img src="..."> — el navegador las pedía apenas se pintaba, aunque fuera "lazy". Ahora NINGUNA imagen se pide hasta que el usuario toca un ícono — ni la portada de la tarjeta cerrada, ni los adjuntos del detalle. El ícono (🖼️) reemplaza la miniatura; al tocarlo recién ahí se abre la imagen real en el visor ampliado (que ya la pedía on-demand desde antes). Pedido por Cristian: "que abras de una el texto... a los adjuntos ni los abras, solamente cuando el usuario cliquea uno". Confirmado con test: cero <img> en el tablero y en el detalle hasta el click, y clickear el ícono sí dispara el pedido de la imagen real.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.5 (_abrirTarjeta ahora también trae el checklist completo (con el texto de cada ítem) al abrir una tarjeta puntual — el tablero manda los checklists recortados desde v180 de FotoMap.gs (solo id+hecho, sin texto, para la barra de progreso), el texto real se completa recién acá. Parte de la 2da ronda de optimización de rendimiento tras probar Cristian desde el celular (LTE) y seguir viendo demoras/errores de conexión — ver también el fetchAll en paralelo de FotoMap.gs v180. Confirmado con test: la barra de progreso del tablero funciona bien con los datos livianos, y al abrir la tarjeta el checklist se completa con el texto real.) -->
@@ -359,7 +360,6 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 <body>
 
 <div class="ev-header">
-  <button class="ev-hamburger ev-icon-btn" onclick="_abrirMenuMobileEv()">☰</button>
   <button class="ev-btn-back" onclick="_volverEventos()">←</button>
   <div class="ev-header-title">
     <img id="ev-hdr-logo" class="ev-hdr-logo" style="display:none;" alt="">
@@ -372,25 +372,6 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
   <button class="ev-icon-btn" onclick="_toggleCampanaEv(event)" title="Notificaciones">
     🔔<span class="ev-badge" id="ev-campana-badge" style="display:none;">0</span>
   </button>
-</div>
-
-<!-- Menú mobile — evento actual + tema + vista, colapsado para pantallas chicas -->
-<div class="ev-mobile-menu-overlay" id="ev-mobile-menu-overlay" onclick="if(event.target===this)_cerrarMenuMobileEv()">
-  <div class="ev-mobile-menu-panel">
-    <h3>Menú <button class="ev-icon-btn" style="width:28px;height:28px;" onclick="_cerrarMenuMobileEv()">✕</button></h3>
-    <div class="ev-campo">
-      <label>Evento</label>
-      <select class="ev-select-evento" id="ev-select-evento-mobile" style="width:100%;" onchange="_cambiarEventoDesdeSelect(this.value)"></select>
-    </div>
-    <div class="ev-campo">
-      <label>Vista</label>
-      <div class="ev-view-switch" style="width:100%;">
-        <button data-vista="board" onclick="_cambiarVistaEv('board');_cerrarMenuMobileEv();" style="flex:1;">▦ Tablero</button>
-        <button data-vista="list" onclick="_cambiarVistaEv('list');_cerrarMenuMobileEv();" style="flex:1;">☰ Lista</button>
-      </div>
-    </div>
-    <button class="ev-btn-secundario" style="width:100%;padding:10px;" onclick="_toggleTemaEv()">🌙 Cambiar tema</button>
-  </div>
 </div>
 
 <div class="ev-body">
@@ -559,8 +540,6 @@ function _volverEventos() {
 })();
 
 function _esAdministradorEv() { return _session && _session.rol === 'Administrador'; }
-function _abrirMenuMobileEv() { document.getElementById('ev-mobile-menu-overlay').classList.add('abierto'); }
-function _cerrarMenuMobileEv() { document.getElementById('ev-mobile-menu-overlay').classList.remove('abierto'); }
 
 // ══════════════════════════════════════════════════════════════════
 // EVENTOS — listar / crear / abrir
@@ -763,8 +742,6 @@ function _renderSelectEventos() {
   // el backend lo va a rechazar con el aviso correspondiente.
   opciones += '<option value="__crear__">➕ Crear nuevo evento...</option>';
   document.getElementById('ev-select-evento').innerHTML = opciones;
-  var selMobile = document.getElementById('ev-select-evento-mobile');
-  if (selMobile) selMobile.innerHTML = opciones;
 }
 function _cambiarEventoDesdeSelect(id) {
   if (id === '__crear__') {
