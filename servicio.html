@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.10.5 (2 fixes: (1) botón "✂️ Separar" nuevo en la columna Cant. — visible solo cuando cantidad>1, permite separar una fila vieja en varias independientes de cantidad:1 (usa st_separarEquipoOrden, ver FotoMap.gs v174). (2) BUG REAL — el link "📋 Instalación" del POE-8 llevaba a la página principal de la empresa (tlcsrl.com.ar) en vez del formulario. Causa: POE8_Instalacion.html vive en la subcarpeta POE/ del repo, no en la raíz — _urlPOE8 armaba la URL asumiendo raíz, 404 y algún redirect/fallback terminaba mandando al sitio principal. Corregido a .../Portal-TLC/POE/POE8_Instalacion.html. Confirmado por Cristian con la URL real del archivo en GitHub. Reportado con captura: "el ítem 2 tiene 2 equipos... el link de instalación me lleva a la página web y no al POE8 html".) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.4 (3 pedidos de Cristian con captura sobre la grilla de la Orden de Preparación: (1) columnas responsivas — antes la tabla no tenía anchos definidos, así que en pantallas angostas o con muchas columnas el navegador apretaba SKU y N° de Serie hasta casi desaparecer, cortando el texto tipeado en vez de mostrarlo entero. Ahora la tabla tiene table-layout:fixed con anchos mínimos por columna y min-width:860px en total — si no entra, el contenedor (que ya tenía overflow-x:auto) scrollea en vez de apretar. (2) Campo "Equipo" pasa a ser editable (antes texto fijo) — permite corregir/aclarar la descripción de un equipo puntual, por ejemplo distinguir 2 unidades idénticas que van a domicilios distintos (usa st_actualizarEquipoOrden con "descripcion", ver FotoMap.gs v173). (3) Confirmado que el link del POE-8 ya manda todos los datos disponibles (tecnico/cliente/domicilio/telefono/modelo/serie/id_ticket/equipo_index) al archivo nuevo — no hacía falta ningún cambio ahí. Confirmado con test: input editable con el valor correcto, URL del POE-8 completa.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.3 (Tope en "+ Agregar Caja" del modal "Asignación de Cajas" — no se puede tener más cajas que equipos (cada equipo entra en una sola caja, cualquier caja de más quedaría vacía sí o sí). Botón se deshabilita visualmente al llegar al tope, y avisa si de todas formas se intenta pasar. Pedido por Cristian: "cantidad máxima a agregar cajas, la cantidad de ítems, topealo". Confirmado con test: con 3 equipos, permite hasta 3 cajas, se deshabilita ahí, y avisa si se intenta una 4ta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.2 (Candado Preparación/CC → Para Instalar APAGADO temporalmente — pedido por Cristian: "me pide muchas condiciones... liberame temporalmente". El requisito de Checklist no se puede cumplir en la práctica todavía (falta conectar los formularios individuales de checklist, prerrequisito pendiente). Toda la lógica del candado sigue intacta en _validarGate, controlada por un interruptor nuevo (GATE_PARA_INSTALAR_ACTIVO = false) — para reactivarlo alcanza con volver ese valor a true, sin tocar nada más. Confirmado con test: con el interruptor apagado, deja pasar aunque no haya nada completo.) -->
@@ -2041,7 +2042,7 @@ function _renderDetalle(t) {
 // Pedido por Cristian: "llevar el POE completo, ya completado con
 // los datos del cliente, hacia la tarjeta de servicio en preparación".
 function _urlPOE8(t, eq, indiceEquipo) {
-  var base = 'https://cahirth.github.io/Portal-TLC/POE8_Instalacion.html';
+  var base = 'https://cahirth.github.io/Portal-TLC/POE/POE8_Instalacion.html';
   var params = [];
   var add = function(clave, valor) { if (valor !== undefined && valor !== null && valor !== '') params.push(clave + '=' + encodeURIComponent(valor)); };
   add('tecnico', t.tecnico_responsable_nombre);
@@ -2200,7 +2201,9 @@ function _renderSeccionOrdenPreparacion(t) {
     var poe8Completado = !!eq.poe8_completado;
     var checklistCompletado = !!eq.checklist_completado;
     return '<tr>' +
-      '<td data-th="Cant.">' + (eq.cantidad || 1) + '</td>' +
+      '<td data-th="Cant.">' + (eq.cantidad || 1) +
+        ((eq.cantidad||1) > 1 ? '<button type="button" onclick="_separarEquipoOrden(\'' + t.id_ticket + '\',' + i + ',' + (eq.cantidad||1) + ')" title="Separar en ' + (eq.cantidad||1) + ' filas independientes, una por N° de Serie" style="display:block;margin-top:4px;background:none;border:none;color:var(--accent-blue,#3a86ff);font-size:9.5px;text-decoration:underline;cursor:pointer;padding:0;white-space:nowrap;">✂️ Separar</button>' : '') +
+      '</td>' +
       '<td data-th="SKU"><input type="text" value="' + _esc(eq.sku||'') + '" placeholder="—" onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'sku\',this.value)"></td>' +
       '<td data-th="Equipo"><input type="text" value="' + _esc(eq.descripcion||'') + '" placeholder="Descripción del equipo..." onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'descripcion\',this.value)"></td>' +
       '<td data-th="N° de Serie"><input type="text" value="' + _esc(eq.nro_serie||'') + '" placeholder="Escanear/tipear..." onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'nro_serie\',this.value)"></td>' +
@@ -2323,6 +2326,27 @@ window._avanzarPasoPrep = function(idTicket, nuevaEtapa) {
   var t = _tickets.find(function(x){ return x.id_ticket === idTicket; });
   if (!t) return;
   _resolverAsignacionYMover(t, nuevaEtapa, t.deposito);
+};
+
+// Separar una fila de cantidad>1 en varias filas independientes —
+// para tickets viejos, creados antes de que la Orden de Preparación
+// desdoblara esto automáticamente al crearse. Reportado por Cristian
+// con captura: "el ítem 2 tiene 2 equipos, por favor separarlos,
+// siempre debe haber 1 equipo en cada renglón".
+window._separarEquipoOrden = function(idTicket, indice, cantidad) {
+  if (!confirm('¿Separar esta fila en ' + cantidad + ' filas independientes, una por cada N° de Serie?\n\nEl N° de Serie que tenga cargado ahora se borra — hay que volver a cargarlo por separado en cada fila nueva.')) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_separarEquipoOrden', id_ticket:idTicket, indice:indice }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('No se pudo separar: ' + (r.error||'')); return; }
+      if (_ticketActual && _ticketActual.id_ticket === idTicket) {
+        _ticketActual.equipos = r.equipos;
+        _renderDetalle(_ticketActual);
+      }
+      _toastServicio('✅ Separado en ' + cantidad + ' filas');
+    })
+    .catch(function(){ alert('Error de conexión al separar.'); });
 };
 
 window._actualizarFilaOrden = function(idTicket, indice, campo, valor) {
