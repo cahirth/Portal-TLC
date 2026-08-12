@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | POE8_Instalacion.html | v2026.08.10.2 (Fix — el botón "Volver" usaba una ruta relativa ('servicio.html') que asumía este archivo en la raíz del repo, pero en realidad vive en la subcarpeta POE/ (confirmado por Cristian: https://github.com/cahirth/Portal-TLC/blob/main/POE/POE8_Instalacion.html) — esa ruta relativa hubiera apuntado a POE/servicio.html, que no existe. Corregido a '../servicio.html' y '../index.html' (el otro fallback), subiendo un nivel para llegar a la raíz del repo. Parte del mismo hallazgo que motivó el fix de _urlPOE8 en servicio.html v2026.08.10.5.) -->
 <!-- Portal TLC | POE8_Instalacion.html | v2026.08.10.1 (Rediseño visual completo enviado por Cristian — mismo patrón visual que presupuesto.html/orden-preparacion.html (doc-header con logo, tech-bar, data-block por secciones, protocolo con barra de progreso, firmas en par). Se preservó y sumó lo necesario para que siga funcionando dentro del circuito: (1) CONFIG.id_ticket + CONFIG.equipo_index (se leen solos de la URL, mismo mecanismo que tecnico/cliente/domicilio/etc.) — sin esto se rompía la conexión con el ticket de Servicio Técnico, ya que es lo que le permite a registrarInstalacionPOE8 (ver FotoMap.gs v169) marcar el equipo puntual como completado y mostrar "✅ Completado" en la grilla de Preparación en vez del genérico "📋 Instalación". (2) Botón "Volver" ahora va directo a servicio.html?ticket={id_ticket} en vez de depender de history.back() — este formulario siempre se abre en pestaña nueva, así que no hay historial previo para volver (mismo criterio ya usado en orden-preparacion.html y etiqueta-despacho.html). El resto de la lógica funcional (checklist, progreso, firmas, submit) se mantuvo intacta. Pedido por Cristian: "quiero esa cáscara y ese formato, no lo cambies".) -->
 <html lang="es">
 <head>
@@ -578,11 +579,11 @@ const CHECK_ITEMS = [
 // orden-preparacion.html y etiqueta-despacho.html.
 function volverPOE8() {
   if (CONFIG.id_ticket) {
-    window.location.href = 'servicio.html?ticket=' + encodeURIComponent(CONFIG.id_ticket);
+    window.location.href = '../servicio.html?ticket=' + encodeURIComponent(CONFIG.id_ticket);
   } else if (history.length > 1) {
     history.back();
   } else {
-    location.href = 'index.html';
+    location.href = '../index.html';
   }
 }
 
