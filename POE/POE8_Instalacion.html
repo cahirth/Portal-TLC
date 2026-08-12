@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<!-- Portal TLC | POE8_Instalacion.html | v2026.08.10.1 (Rediseño visual completo enviado por Cristian — mismo patrón visual que presupuesto.html/orden-preparacion.html (doc-header con logo, tech-bar, data-block por secciones, protocolo con barra de progreso, firmas en par). Se preservó y sumó lo necesario para que siga funcionando dentro del circuito: (1) CONFIG.id_ticket + CONFIG.equipo_index (se leen solos de la URL, mismo mecanismo que tecnico/cliente/domicilio/etc.) — sin esto se rompía la conexión con el ticket de Servicio Técnico, ya que es lo que le permite a registrarInstalacionPOE8 (ver FotoMap.gs v169) marcar el equipo puntual como completado y mostrar "✅ Completado" en la grilla de Preparación en vez del genérico "📋 Instalación". (2) Botón "Volver" ahora va directo a servicio.html?ticket={id_ticket} en vez de depender de history.back() — este formulario siempre se abre en pestaña nueva, así que no hay historial previo para volver (mismo criterio ya usado en orden-preparacion.html y etiqueta-despacho.html). El resto de la lógica funcional (checklist, progreso, firmas, submit) se mantuvo intacta. Pedido por Cristian: "quiero esa cáscara y ese formato, no lo cambies".) -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>POE-8 · Registro de Instalación — TLC</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html { -webkit-text-size-adjust:100%; overscroll-behavior-x:none; }
+  body {
+    font-family:"Times New Roman",Times,serif;
+    background:#f1f5f9;
+    color:#0f172a;
+    font-size:13px;
+    min-height:100vh;
+  }
+  table { border-collapse:collapse; width:100%; }
+
+  :root {
+    --ink:#0f172a;
+    --ink-mid:#374151;
+    --ink-soft:#64748b;
+    --rule:#e2e8f0;
+    --rule-dark:#cbd5e1;
+    --surface:#f8fafc;
+    --white:#ffffff;
+    --green:#16a34a;
+    --red:#dc2626;
+    --amber:#d97706;
+  }
+
+  .toolbar {
+    max-width:780px;
+    margin:20px auto 0;
+    padding:0 0 12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    font-family:Arial,sans-serif;
+  }
+  .toolbar-right { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn-accion {
+    padding:8px 18px;
+    border:none;
+    border-radius:6px;
+    color:white;
+    font-size:12px;
+    font-family:Arial,sans-serif;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    cursor:pointer;
+    transition:background .25s ease,opacity .25s ease,box-shadow .25s ease;
+  }
+  .btn-volver { background:#3a86ff; font-weight:700; }
+  .btn-volver:hover { background:#2f6fd6; }
+  .btn-pdf { background:#0f172a; }
+  .btn-pdf:hover { background:#1e293b; }
+
+  .card {
+    width:100%;
+    max-width:780px;
+    margin:0 auto 20px;
+    background:#fff;
+    box-shadow:0 4px 32px rgba(0,0,0,.12);
+    padding:32px 36px;
+    min-height:200px;
+  }
+
+  .doc-header {
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:20px;
+  }
+  .logo-block { flex:0 1 260px; }
+  .logo-block img {
+    display:block;
+    max-width:200px;
+    width:100%;
+    height:auto;
+  }
+  .doc-id-block {
+    text-align:right;
+    flex:1 1 280px;
+    min-width:190px;
+    font-family:Arial,sans-serif;
+  }
+  .doc-id-block .badge {
+    display:block;
+    margin:0 0 2px;
+    padding:0;
+    border:0;
+    background:none;
+    color:#334155;
+    font-size:11.5px;
+    font-weight:600;
+    font-style:italic;
+    line-height:1.3;
+    letter-spacing:0;
+    text-transform:none;
+  }
+  .doc-id-block .doc-title {
+    font-size:15px;
+    font-weight:800;
+    color:#0f172a;
+    line-height:1.25;
+  }
+  .doc-id-block .doc-meta {
+    margin-top:4px;
+    color:#64748b;
+    font-size:10.5px;
+    font-weight:700;
+    font-style:italic;
+    line-height:1.45;
+  }
+  .doc-id-block .doc-disclaimer {
+    margin-top:2px;
+    margin-left:auto;
+    max-width:285px;
+    color:#64748b;
+    font-size:10px;
+    font-style:italic;
+    font-weight:400;
+    line-height:1.45;
+    text-align:justify;
+  }
+
+  .tech-bar {
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:12px;
+    box-shadow:0 4px 6px -1px rgba(0,0,0,.05),0 2px 4px -1px rgba(0,0,0,.03);
+    padding:14px 18px;
+    margin-bottom:20px;
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    font-family:Arial,sans-serif;
+  }
+  .tech-bar .tb-label {
+    font-size:9px;
+    color:#64748b;
+    text-transform:uppercase;
+    letter-spacing:.7px;
+    font-weight:700;
+    margin-bottom:4px;
+  }
+  .tech-bar .tb-name { font-size:13px; font-weight:700; color:#0f172a; }
+  .tech-bar .tb-date { font-size:12px; color:#374151; text-align:right; padding-top:2px; }
+
+  .doc-body { display:flex; flex-direction:column; gap:16px; }
+
+  .sec-head {
+    font-family:Arial,sans-serif;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:#64748b;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    margin:2px 0 -5px;
+  }
+  .sec-head svg { width:12px; height:12px; flex-shrink:0; stroke:#64748b; }
+
+  .data-block {
+    overflow:hidden;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:12px;
+    box-shadow:0 4px 6px -1px rgba(0,0,0,.05),0 2px 4px -1px rgba(0,0,0,.03);
+  }
+  .data-row {
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    padding:10px 14px;
+    border-bottom:1px solid #e2e8f0;
+    font-family:Arial,sans-serif;
+    font-size:12px;
+  }
+  .data-row:last-child { border-bottom:none; }
+  .data-row .dr-label {
+    color:#64748b;
+    font-weight:700;
+    font-size:9px;
+    letter-spacing:.45px;
+    text-transform:uppercase;
+    flex-shrink:0;
+  }
+  .data-row .dr-val { color:#0f172a; font-weight:600; text-align:right; line-height:1.4; }
+  .data-row .dr-code { font-family:Arial,sans-serif; color:#0f172a; font-weight:800; font-size:12px; }
+  .data-row.span-row { flex-direction:column; align-items:flex-start; gap:4px; }
+  .data-row.span-row .dr-val { text-align:left; }
+
+  .progress-bar-wrap { height:5px; background:#e2e8f0; border-radius:999px; overflow:hidden; }
+  .progress-bar-fill { height:100%; background:#0f172a; border-radius:999px; transition:width .25s ease; }
+  .status-pill {
+    font-family:Arial,sans-serif;
+    font-size:10px;
+    font-weight:700;
+    padding:3px 9px;
+    border-radius:20px;
+    text-transform:uppercase;
+    letter-spacing:.4px;
+  }
+  .pill-ok { background:#dcfce7; color:#166534; }
+  .pill-pending { background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
+
+  .check-list { display:flex; flex-direction:column; gap:7px; }
+  .check-item {
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:10px 12px;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+    cursor:pointer;
+    background:#fff;
+    transition:background .12s,border-color .12s;
+    font-family:Arial,sans-serif;
+  }
+  .check-item:hover { background:#f8fafc; }
+  .check-item input[type="checkbox"] {
+    width:16px;
+    height:16px;
+    flex-shrink:0;
+    margin-top:1px;
+    accent-color:#0f172a;
+    cursor:pointer;
+  }
+  .check-item.checked { background:#f0fdf4; border-color:#bbf7d0; }
+  .check-item.checked .check-text { text-decoration:line-through; color:#64748b; }
+  .check-text { font-size:12px; color:#374151; line-height:1.4; }
+  .check-num { font-weight:800; color:#0f172a; margin-right:3px; }
+
+  .field-label {
+    font-family:Arial,sans-serif;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.6px;
+    color:#64748b;
+    margin-bottom:6px;
+  }
+  textarea,input.text-field {
+    width:100%;
+    background:#f8fafc;
+    border:1px solid #cbd5e1;
+    border-radius:8px;
+    color:#0f172a;
+    font-family:Arial,sans-serif;
+    font-size:13px;
+    padding:10px 12px;
+    resize:none;
+    min-height:72px;
+    line-height:1.45;
+    -webkit-appearance:none;
+    box-shadow:0 1px 2px rgba(15,23,42,.03);
+  }
+  input.text-field { min-height:unset; height:40px; }
+  textarea:focus,input.text-field:focus {
+    outline:none;
+    border-color:#64748b;
+    background:#fff;
+    box-shadow:0 0 0 3px rgba(15,23,42,.07);
+  }
+
+  .signature-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; page-break-inside:avoid; break-inside:avoid; }
+  .firma-wrap,.conformity-wrap {
+    border:1px solid #e2e8f0;
+    border-radius:10px;
+    background:#fff;
+    overflow:hidden;
+    box-shadow:0 2px 5px rgba(15,23,42,.04);
+  }
+  .firma-titular {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px;
+    padding:9px 12px;
+    background:#f8fafc;
+    border-bottom:1px solid #e2e8f0;
+    font-family:Arial,sans-serif;
+    font-size:11px;
+  }
+  .firma-titular .ft-label { color:#64748b; font-weight:600; }
+  .firma-titular .ft-name { font-weight:800; color:#0f172a; }
+  canvas.sig-pad { display:block; width:100%; height:90px; background:#fff; cursor:crosshair; touch-action:none; }
+  .firma-actions { display:flex; justify-content:flex-end; padding:6px 8px; border-top:1px solid #e2e8f0; background:#f8fafc; }
+  .btn-clear-sig {
+    font-family:Arial,sans-serif;
+    font-size:10px;
+    color:#64748b;
+    background:#fff;
+    border:1px solid #cbd5e1;
+    border-radius:5px;
+    padding:4px 9px;
+    cursor:pointer;
+  }
+  .conformity-wrap { background:#fff; }
+  .conformity-text {
+    font-family:Arial,sans-serif;
+    font-size:11px;
+    color:#374151;
+    line-height:1.5;
+    padding:10px 12px;
+    border-bottom:1px solid #e2e8f0;
+    background:#f8fafc;
+  }
+  .conformity-text strong { color:#0f172a; }
+  .conformity-fields { padding:10px 12px 12px; display:flex; flex-direction:column; gap:7px; background:#fff; }
+
+  .btn-submit {
+    width:100%;
+    background:#0f172a;
+    color:#fff;
+    border:none;
+    border-radius:6px;
+    padding:13px 16px;
+    font-family:Arial,sans-serif;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:.2px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    transition:background .15s;
+  }
+  .btn-submit:hover { background:#1e293b; }
+  .btn-submit:active { background:#020617; }
+
+  .official-footer {
+    border-top:2px solid #0f172a;
+    padding-top:12px;
+    margin-top:4px;
+    display:flex;
+    align-items:center;
+    gap:16px;
+    page-break-inside:avoid;
+    break-inside:avoid;
+    font-family:Arial,sans-serif;
+  }
+  .official-footer img { width:80px; height:auto; flex-shrink:0; }
+  .official-footer .footer-copy { font-size:11px; color:#0f172a; line-height:1.6; }
+
+  @page {
+    margin:22px 22px 32px 22px;
+    @bottom-center {
+      content:"Página " counter(page) " de " counter(pages);
+      font-size:10px;
+      font-family:Arial,sans-serif;
+      color:#64748b;
+    }
+  }
+  @media print {
+    body { background:#fff; }
+    .no-print { display:none!important; }
+    .card { max-width:none; margin:0; box-shadow:none; padding:0 24px; }
+    .btn-submit,.btn-clear-sig,.btn-pdf { display:none!important; }
+    .doc-body { gap:10px; }
+    .tech-bar { margin-bottom:10px; box-shadow:none; }
+    .data-block,.firma-wrap,.conformity-wrap { box-shadow:none; }
+    .data-row { padding-top:6px; padding-bottom:6px; }
+    .check-item { padding-top:6px; padding-bottom:6px; }
+    textarea,input.text-field { box-shadow:none; }
+    canvas.sig-pad { border:0; }
+  }
+
+  @media (max-width:600px) {
+    .toolbar { margin:12px 12px 0; }
+    .toolbar .btn-accion { flex:1 1 auto; justify-content:center; }
+    .toolbar-right { flex:1 1 auto; }
+    .toolbar-right .btn-accion { width:100%; }
+    .card { margin:0; padding:20px 12px 28px; box-shadow:none; }
+    .doc-header { flex-direction:column; }
+    .logo-block { flex-basis:auto; width:100%; }
+    .logo-block img { width:190px; max-width:70%; }
+    .doc-id-block { text-align:left; min-width:0; width:100%; }
+    .doc-id-block .doc-disclaimer { margin-left:0; max-width:none; text-align:left; }
+    .tech-bar { flex-direction:column; }
+    .tech-bar .tb-date { text-align:left; }
+    .data-row { flex-direction:column; align-items:flex-start; gap:4px; }
+    .data-row .dr-val { text-align:left; }
+    .signature-grid { grid-template-columns:1fr; }
+    .official-footer { align-items:flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar no-print">
+  <button class="btn-accion btn-volver" type="button" onclick="volverPOE8()">← Volver</button>
+  <div class="toolbar-right">
+    <button class="btn-accion btn-pdf" type="button" onclick="window.print()">↓ Guardar PDF / Imprimir</button>
+  </div>
+</div>
+<div class="card">
+  <!-- ── HEADER · MISMO PATRÓN VISUAL QUE presupuesto.html ── -->
+  <div class="doc-header">
+    <div class="logo-block">
+      <img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25" alt="TLC" onerror="this.style.display='none'">
+    </div>
+    <div class="doc-id-block">
+      <div class="doc-title">REGISTRO DE INSTALACIÓN</div>
+      <div class="badge">POE 8 · PROCEDIMIENTO</div>
+      <div class="doc-meta">Anexo II — Rev. 02 · 01/03/2022<br>Disp. A.N.M.A.T. 3266/13</div>
+      <div class="doc-disclaimer">Documento interno de servicio técnico para registrar la instalación, puesta en marcha, capacitación y conformidad del cliente.</div>
+    </div>
+  </div>
+
+  <!-- ── TÉCNICO / FECHA ───────────────────────────────── -->
+  <div class="tech-bar">
+    <div>
+      <div class="tb-label">Técnico certificante</div>
+      <div class="tb-name" id="tb-tech-name">—</div>
+    </div>
+    <div>
+      <div class="tb-label" style="text-align:right;">Fecha del registro</div>
+      <div class="tb-date" id="tb-date">—</div>
+    </div>
+  </div>
+
+  <div class="doc-body">
+
+    <!-- ── ORDEN / CLIENTE ────────────────────────────────── -->
+    <div class="sec-head">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 13h4"/></svg>
+      Datos de la Orden y Cliente
+    </div>
+    <div class="data-block" id="block-orden">
+      <div class="data-row"><span class="dr-label">Fecha de Servicio</span><span class="dr-val" id="field-fecha">—</span></div>
+      <div class="data-row span-row"><span class="dr-label">Cliente / Institución</span><span class="dr-val" id="field-cliente">—</span></div>
+      <div class="data-row span-row"><span class="dr-label">Domicilio de Instalación</span><span class="dr-val" id="field-domicilio">—</span></div>
+      <div class="data-row"><span class="dr-label">Teléfono</span><span class="dr-val" id="field-telefono">—</span></div>
+    </div>
+
+    <!-- ── EQUIPO ──────────────────────────────────────────── -->
+    <div class="sec-head" id="sec-equipo">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3h-8l-2 4h12z"/></svg>
+      Datos del Equipo
+    </div>
+    <div class="data-block" id="block-equipo">
+      <div class="data-row"><span class="dr-label">Marca</span><span class="dr-val" id="field-marca">—</span></div>
+      <div class="data-row"><span class="dr-label">Modelo</span><span class="dr-val" id="field-modelo">—</span></div>
+      <div class="data-row"><span class="dr-label">Serie N°</span><span class="dr-code" id="field-serie">—</span></div>
+      <div class="data-row span-row"><span class="dr-label">Accesorios entregados</span><span class="dr-val" id="field-accesorios">—</span></div>
+    </div>
+
+    <!-- ── PROTOCOLO POE 8 ─────────────────────────────────── -->
+    <div class="sec-head">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Protocolo de Verificación Operativa
+    </div>
+
+    <!-- Barra de progreso -->
+    <div id="block-progress" style="display:flex; align-items:center; gap:8px; grid-column:1/-1">
+      <div class="progress-bar-wrap" style="flex:1;">
+        <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+      <span class="status-pill pill-pending" id="progress-label">0 / 7</span>
+    </div>
+
+    <div class="check-list" id="check-list"></div>
+
+    <!-- ── CAPACITACIÓN ────────────────────────────────────── -->
+    <div class="sec-head">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3.33 1.67 8.67 1.67 12 0v-5"/></svg>
+      Programa de Capacitación · Informe del Técnico
+    </div>
+    <div id="block-cap">
+      <div class="field-label">Resumen de la inducción técnica realizada</div>
+      <textarea id="obs-capacitacion" placeholder="Describir los temas cubiertos durante la capacitación: operación básica, limpieza, calibración, mantenimiento preventivo, rutinas de uso..." style="min-height:110px;"></textarea>
+    </div>
+
+    <!-- ── OBSERVACIONES ──────────────────────────────────── -->
+    <div id="block-obs">
+      <div class="field-label">Observaciones (a completar por Soporte Técnico)</div>
+      <textarea id="obs-soporte" placeholder="Condiciones del lugar de instalación, inconvenientes detectados, pendientes..." style="min-height:110px;"></textarea>
+    </div>
+
+    <!-- ── FIRMAS EN PAR ───────────────────────────────────── -->
+    <div class="signature-grid">
+      <!-- Firma técnico -->
+      <div class="firma-wrap">
+        <div class="firma-titular">
+          <span class="ft-label">Firma del Técnico Certificante</span>
+          <span class="ft-name" id="sig-tech-label">—</span>
+        </div>
+        <canvas class="sig-pad" id="canvas-tech" width="444" height="90"></canvas>
+        <div class="firma-actions">
+          <button class="btn-clear-sig" onclick="clearCanvas('canvas-tech')">Limpiar</button>
+        </div>
+      </div>
+
+      <!-- Firma cliente -->
+      <div class="conformity-wrap">
+        <div class="conformity-text">
+          <strong>Entrega en presencia del cliente:</strong> Recibe el equipo de conformidad, habiéndose instalado, probado y puesto en marcha en su presencia.
+        </div>
+        <canvas class="sig-pad" id="canvas-client"
+          style="border-top:1px solid #e2e8f0; height:90px;"
+          width="444" height="90"></canvas>
+        <div class="firma-actions" >
+          <button class="btn-clear-sig" onclick="clearCanvas('canvas-client')">Limpiar</button>
+        </div>
+        <div class="conformity-fields">
+          <div class="field-label">Nombre y Apellido del Responsable</div>
+          <input type="text" class="text-field" id="client-name" placeholder="Dr. / Sr. ..." autocomplete="off">
+          <div class="field-label" style="margin-top:4px;">DNI / Matrícula Profesional</div>
+          <input type="text" class="text-field" id="client-dni" placeholder="DNI / M.P." autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SUBMIT ─────────────────────────────────────────── -->
+    <button class="btn-submit" id="btn-submit" onclick="submitPOE()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Registrar Servicio y Archivar POE-8
+    </button>
+
+    <div class="official-footer">
+      <img src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25" alt="TLC" onerror="this.style.display='none'">
+      <div class="footer-copy">
+        <strong>TECNOLOGÍA LÁSER CORNEAL S.R.L.</strong><br>
+        Pasaje del Carmen 716 LOCAL PB C1019AAB · Buenos Aires, Argentina<br>
+        <span style="color:#64748b;">Registro interno de instalación y conformidad técnica · POE 8</span>
+      </div>
+    </div>
+</div><!-- /card -->
+
+<script>
+// ─── CONFIG — completar antes de cada uso ──────────────────
+// Estos valores pueden ser sobreescritos desde la URL:
+// POE8_instalacion.html?tecnico=Juan&cliente=Hospital+Tal
+const CONFIG = {
+  tecnico:   '',          // Nombre del técnico TLC (variable; se recibe por URL/flujo)
+  cliente:   '',          // Razón social / nombre
+  domicilio: '',
+  telefono:  '',
+  marca:     '',
+  modelo:    '',
+  serie:     '',
+  accesorios:'',
+  id_ticket:    '',  // ← para avisar de vuelta a qué ticket/equipo pertenece este registro
+  equipo_index: '',  // ← índice del equipo dentro de t.equipos[] (Orden de Preparación)
+  // GAS endpoint para submit (mismo que el resto del portal)
+  gasUrl: 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec',
+};
+
+// ─── ITEMS DEL CHECKLIST POE 8 ─────────────────────────────
+const CHECK_ITEMS = [
+  'Armado del equipo completo y accesorios.',
+  'Puesta en marcha inicial completa.',
+  '¿El propietario ha designado un responsable?',
+  'El equipo está funcionando correctamente.',
+  'El personal a cargo y usuario ha sido capacitado.',
+  'Se constata comprensión adecuada respecto al manejo y el uso.',
+  'Se ha dejado un original del manual de usuario.',
+];
+
+// "Volver" — este formulario se abre siempre en pestaña nueva (desde
+// la grilla de la Orden de Preparación en servicio.html), así que esa
+// pestaña nunca tiene historial previo — history.back() no serviría.
+// Con id_ticket disponible (llega por la URL), vuelve directo a esa
+// tarjeta puntual de Servicio Técnico. Mismo criterio ya usado en
+// orden-preparacion.html y etiqueta-despacho.html.
+function volverPOE8() {
+  if (CONFIG.id_ticket) {
+    window.location.href = 'servicio.html?ticket=' + encodeURIComponent(CONFIG.id_ticket);
+  } else if (history.length > 1) {
+    history.back();
+  } else {
+    location.href = 'index.html';
+  }
+}
+
+// ─── INIT ──────────────────────────────────────────────────
+(function init() {
+  // Leer parámetros de la URL si existen
+  const q = new URLSearchParams(location.search);
+  Object.keys(CONFIG).forEach(k => { if (q.get(k)) CONFIG[k] = q.get(k); });
+
+  // Fecha
+  const hoy = new Date();
+  const fechaStr = hoy.toLocaleDateString('es-AR', { day:'2-digit', month:'long', year:'numeric' });
+  document.getElementById('tb-date').textContent   = fechaStr;
+  document.getElementById('field-fecha').textContent = fechaStr;
+
+  // Técnico
+  document.getElementById('tb-tech-name').textContent = CONFIG.tecnico || '—';
+  document.getElementById('sig-tech-label').textContent = CONFIG.tecnico || '—';
+
+  // Datos del cliente / equipo
+  const setField = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val || '—';
+  };
+  setField('field-cliente',   CONFIG.cliente);
+  setField('field-domicilio', CONFIG.domicilio);
+  setField('field-telefono',  CONFIG.telefono);
+  setField('field-marca',     CONFIG.marca);
+  setField('field-modelo',    CONFIG.modelo);
+  setField('field-serie',     CONFIG.serie ? 'S/N: ' + CONFIG.serie : '—');
+  setField('field-accesorios',CONFIG.accesorios);
+
+  // Renderizar checklist
+  const list = document.getElementById('check-list');
+  CHECK_ITEMS.forEach((txt, i) => {
+    const wrap = document.createElement('label');
+    wrap.className = 'check-item';
+    wrap.innerHTML = `
+      <input type="checkbox" onchange="updateProgress()">
+      <span class="check-text"><span class="check-num">${i+1}.</span> ${txt}</span>`;
+    wrap.querySelector('input').addEventListener('change', function() {
+      wrap.classList.toggle('checked', this.checked);
+    });
+    list.appendChild(wrap);
+  });
+
+  updateProgress();
+  initSignaturePads();
+})();
+
+// ─── PROGRESO ──────────────────────────────────────────────
+function updateProgress() {
+  const total  = CHECK_ITEMS.length;
+  const checks = document.querySelectorAll('#check-list input[type=checkbox]:checked').length;
+  const pct    = Math.round((checks / total) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  const lbl    = document.getElementById('progress-label');
+  lbl.textContent = checks + ' / ' + total;
+  lbl.className   = 'status-pill ' + (checks === total ? 'pill-ok' : 'pill-pending');
+}
+
+// ─── FIRMA DIGITAL ─────────────────────────────────────────
+function initSignaturePads() {
+  ['canvas-tech', 'canvas-client'].forEach(id => {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    // Ajustar resolución al DPR
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width  = (rect.width  || 444) * dpr;
+    canvas.height = (parseInt(canvas.style.height) || 90) * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.strokeStyle = '#0f1923';
+    ctx.lineWidth   = 2;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+
+    let drawing = false;
+    const getPos = (e) => {
+      const r = canvas.getBoundingClientRect();
+      const src = e.touches ? e.touches[0] : e;
+      return { x: (src.clientX - r.left), y: (src.clientY - r.top) };
+    };
+    const start = (e) => { e.preventDefault(); drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); };
+    const draw  = (e) => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); };
+    const stop  = ()  => { drawing = false; };
+
+    canvas.addEventListener('mousedown',  start);
+    canvas.addEventListener('mousemove',  draw);
+    canvas.addEventListener('mouseup',    stop);
+    canvas.addEventListener('mouseleave', stop);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove',  draw,  { passive: false });
+    canvas.addEventListener('touchend',   stop);
+  });
+}
+
+function clearCanvas(id) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function isCanvasSigned(id) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return false;
+  const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  return data.some(v => v !== 0);
+}
+
+// ─── SUBMIT ────────────────────────────────────────────────
+async function submitPOE() {
+  const btn = document.getElementById('btn-submit');
+
+  // Validaciones
+  const checks = document.querySelectorAll('#check-list input[type=checkbox]:checked').length;
+  if (checks < CHECK_ITEMS.length) {
+    alert('Por favor completá todos los ítems del protocolo de verificación antes de registrar.');
+    return;
+  }
+  if (!document.getElementById('obs-capacitacion').value.trim()) {
+    alert('Por favor completá el resumen de capacitación.');
+    return;
+  }
+  if (!isCanvasSigned('canvas-tech')) {
+    alert('Por favor agregá la firma del técnico.');
+    return;
+  }
+  if (!isCanvasSigned('canvas-client')) {
+    alert('Por favor solicitá la firma del cliente.');
+    return;
+  }
+  if (!document.getElementById('client-name').value.trim()) {
+    alert('Por favor completá el nombre del responsable del cliente.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10"/></svg> Registrando...`;
+
+  // Capturar firmas como base64
+  const sigTech   = document.getElementById('canvas-tech').toDataURL('image/png');
+  const sigClient = document.getElementById('canvas-client').toDataURL('image/png');
+
+  const payload = {
+    accion:          'registrarInstalacionPOE8',
+    id_ticket:       CONFIG.id_ticket || '',
+    equipo_index:    CONFIG.equipo_index || '',
+    tecnico:         CONFIG.tecnico,
+    cliente:         CONFIG.cliente   || document.getElementById('field-cliente').textContent,
+    domicilio:       CONFIG.domicilio || document.getElementById('field-domicilio').textContent,
+    telefono:        CONFIG.telefono  || document.getElementById('field-telefono').textContent,
+    marca:           CONFIG.marca     || document.getElementById('field-marca').textContent,
+    modelo:          CONFIG.modelo    || document.getElementById('field-modelo').textContent,
+    serie:           CONFIG.serie     || document.getElementById('field-serie').textContent,
+    accesorios:      CONFIG.accesorios|| document.getElementById('field-accesorios').textContent,
+    capacitacion:    document.getElementById('obs-capacitacion').value.trim(),
+    observaciones:   document.getElementById('obs-soporte').value.trim(),
+    clienteNombre:   document.getElementById('client-name').value.trim(),
+    clienteDni:      document.getElementById('client-dni').value.trim(),
+    fecha:           new Date().toISOString(),
+    firmaTecnico:    sigTech,
+    firmaCliente:    sigClient,
+  };
+
+  try {
+    const resp = await fetch(CONFIG.gasUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload),
+    });
+    const result = await resp.json();
+
+    if (result.ok || result.status === 'SUCCESS') {
+      btn.style.background = '#16a34a';
+      btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg> Registro archivado correctamente`;
+      // Opcional: imprimir luego de guardar
+      setTimeout(() => { if (confirm('¿Deseás imprimir el registro?')) window.print(); }, 800);
+    } else {
+      throw new Error(result.error || result.message || 'Error del servidor');
+    }
+  } catch(err) {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Registrar Servicio y Archivar POE-8`;
+    alert('Error al guardar: ' + err.message + '\n\nPodés imprimir el formulario manualmente con Ctrl+P.');
+  }
+}
+</script>
+</body>
+</html>
