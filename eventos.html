@@ -2,6 +2,7 @@
 <!-- Portal TLC | eventos.html | v2026.08.09.13 (Logo del evento — nuevo. Se ve como una miniatura de 30px junto al nombre en el header, y también en cada tarjeta del selector "Todos los eventos". Se agrega/cambia/quita desde el menú de tres puntos (⋯) del topbar: "🖼️ Agregar/Cambiar logo del evento" y "🚫 Quitar logo del evento" (este último solo visible si ya hay uno puesto) — ambos Administrador, usan ev_subirLogoEvento/ev_quitarLogoEvento de FotoMap.gs v167. Pedido por Cristian: "dame la posibilidad de agregar logo al nombre del evento". Confirmado con jsdom de punta a punta: subir actualiza el header y los textos del menú, quitar los revierte.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.12 (Progreso de checklists visible en la vista Lista — antes solo mostraba el texto "x/y" sin barra, a diferencia del Kanban que ya tenía barra visual. Se agregó la misma barra compacta (42px) + texto a cada fila de la lista, y se sumó el porcentaje al texto del Kanban también ("2/4 subtareas · 50%") para más claridad en los dos lados por igual. Pedido por Cristian: "podemos mostrar el progreso de las tarjetas en la miniatura, de kanban y listas?". Confirmado con jsdom con un checklist de 4 ítems (2 tildados): barra al 50% en ambas vistas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.11 (3 pedidos de Cristian: (1) Menú de 3 puntos en el topbar del evento (mismo patrón que el de la tarjeta) — reemplaza los botones sueltos "Borrar evento"/"Todos los eventos" por: 🔗 Copiar link de este evento (nuevo), 📋 Duplicar evento (nuevo — usa ev_duplicarEvento de FotoMap.gs v166, solo Administrador), 🗑️ Borrar evento (Administrador) y 📋 Todos los eventos. (2) Nombre de pila completo del responsable ahora visible junto al avatar en la tarjeta cerrada del tablero Y en la vista Lista — antes solo se veía la inicial en un círculo, había que pasar el mouse para saber quién era. Confirmado con jsdom: se ve "Lucio" completo, no solo "L". Ambos pedidos con captura de Cristian.) -->
+<!-- Portal TLC | eventos.html | v2026.08.13.2 (2 pedidos de Cristian tras confirmar que el tablero ya carga instantáneo: (1) abrir una tarjeta puntual todavía esperaba (await) un viaje real al backend para traer notas/mensajes/checklist completo, antes de mostrar el modal — con el tablero ya instantáneo, esta era la demora que más se notaba. Mismo criterio cache-first que ya usa _abrirEvento: si ya se vio esa tarjeta antes en este navegador, se abre al instante con lo último guardado, y se actualiza sola en segundo plano. (2) Feedback visual inmediato al tocar una tarjeta — antes no había ninguna señal de que el toque "agarró" hasta que el modal aparecía; si tardaba, no se sabía si había funcionado, llevando a tocar 2-3 veces de más. Ahora la tarjeta cambia de color al instante (._onTocarTarjetaEv, clase .ev-card-tocada) y se mantiene así hasta que el modal termina de abrir. Confirmado con test: color inmediato al tocar, se mantiene mientras espera, se saca al abrir, queda cacheada, y la segunda apertura de la misma tarjeta es instantánea.) -->
 <!-- Portal TLC | eventos.html | v2026.08.13.1 (Estrategia cache-first para abrir eventos — Cristian seguía viendo lentitud extrema pese a los arreglos anteriores. _abrirEvento ahora: si ya existe una caché local (localStorage) del evento pedido, lo pinta AL INSTANTE con eso (0ms, sin esperar al backend), y dispara el pedido real en segundo plano — cuando responde, actualiza EVENTO_ACTUAL, la caché, y repinta todo silenciosamente. Si es la primera vez que se abre ese evento en el navegador (sin caché todavía), no hay forma de evitar esperar el primer pedido, igual que antes. También en el arranque de la página: si ya sabemos qué evento se abrió la última vez Y tenemos su caché, ni se espera la lista completa de eventos (ev_listarEventos) para decidir cuál abrir — directo a _abrirEvento, que ya resuelve todo. _renderTablero/_renderOverlayTarjeta siguen operando 100% sobre el array local EVENTO_ACTUAL.tarjetas, sin ningún fetch bloqueante de por medio (ya confirmado en rondas anteriores). Además: placeholder "Cargando eventos..." agregado también en el tramo de bajar la lista completa (antes quedaba en blanco ahí); y _cargarEventos ahora distingue "falló el pedido" de "genuinamente no hay eventos", mostrando un mensaje de error con botón Reintentar en el primer caso en vez del engañoso "creá tu primer evento". Confirmado con test: pintado instantáneo desde caché antes de que responda el backend, actualización silenciosa cuando llega el dato real, y funcionamiento correcto sin caché (primera vez).) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.11 (Placeholder de carga con texto — antes el spinner al abrir un evento no tenía ningún mensaje al lado, ahora dice "Cargando eventos...", mismo criterio que ya usan servicio.html/cotizaciones.html. Pedido por Cristian. Confirmado con test.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.10 (Diferencia REAL de fondo encontrada comparando contra servicio.html (27 tickets, anda rápido) — Eventos ESPERABA (await) la carga de la lista de internos (Google Sheets, ver v182) antes de pintar CUALQUIER COSA, tanto al abrir un evento como al abrir una tarjeta puntual. servicio.html nunca espera esto (_cargarInternosMenciones().then(...), sin await) — dispara la carga y sigue de una, actualizando lo que haga falta cuando termine en segundo plano. Confirmado que la caché de internos NO hace falta para pintar el tablero (el nombre del responsable ya viene guardado en cada tarjeta) — solo la usan el desplegable de "Responsable" y el resaltado de menciones, ninguno de los dos bloquea el pintado inicial. Mismo criterio aplicado acá: se dispara sin esperar, y si la tarjeta detalle sigue abierta cuando termina de cargar, se repinta sola para completar esas 2 cosas. Reportado por Cristian: "eventos tiene solo 8 tarjetas y servicio tiene 27 y anda rápido... explorá y comparalos". Confirmado con test: incluso con la carga de internos artificialmente COLGADA (simula un timeout real), el tablero se pinta igual, de una. Sigue pendiente: revisar permisos.js (compartido por los 4 módulos, según pista de Cristian sobre "el Excel de permisos") — no lo tengo en esta sesión, hace falta que lo suba para completar la comparación.) -->
@@ -118,9 +119,10 @@ a { color:var(--accent-blue); }
 .ev-col-nueva:hover { border-color:var(--accent-blue); color:var(--accent-blue); }
 
 .ev-card { background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:10px; padding:10px 11px;
-  margin-bottom:8px; cursor:grab; transition:border-color .15s, transform .1s; }
+  margin-bottom:8px; cursor:grab; transition:border-color .15s, transform .1s, background .15s; }
 .ev-card:hover { border-color:var(--accent-blue); }
 .ev-card.dragging { opacity:.4; }
+.ev-card.ev-card-tocada { background:var(--accent-blue); border-color:var(--accent-blue); opacity:.75; }
 .ev-card-cat { display:inline-block; font-size:9px; font-weight:800; padding:2px 7px; border-radius:8px; margin-bottom:6px; }
 .ev-card-titulo { font-size:12.5px; font-weight:700; margin-bottom:6px; line-height:1.35; }
 .ev-card-meta { display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:10.5px; color:var(--text-muted); }
@@ -276,8 +278,9 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 .ev-list-wrap.activo { display:block; }
 .ev-board.oculto { display:none; }
 .ev-list-fila { display:flex; align-items:center; gap:10px; background:var(--panel-dark); border:1px solid var(--border-glow);
-  border-radius:10px; padding:10px 13px; margin-bottom:7px; cursor:pointer; }
+  border-radius:10px; padding:10px 13px; margin-bottom:7px; cursor:pointer; transition:background .15s, border-color .15s; }
 .ev-list-fila:hover { border-color:var(--accent-blue); }
+.ev-list-fila.ev-card-tocada { background:var(--accent-blue); border-color:var(--accent-blue); opacity:.75; }
 .ev-list-fila .ev-list-titulo { flex:1; font-size:12.5px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ev-list-fila .ev-list-meta { display:flex; align-items:center; gap:9px; flex-shrink:0; font-size:11px; color:var(--text-muted); }
 
@@ -1054,7 +1057,7 @@ function _renderListaTarjetasEv() {
     var fechaInfo = _fechaLimiteInfo(t.fecha_limite);
     var nombrePila = (t.responsable_nombre || '').trim().split(' ')[0] || '';
     var inicialResp = nombrePila.charAt(0).toUpperCase() || '?';
-    return '<div class="ev-list-fila" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
+    return '<div class="ev-list-fila" onclick="_onTocarTarjetaEv(event,\'' + t.id + '\')">' +
       '<span class="ev-col-dot" style="background:' + (col ? col.color : '#94a3b8') + ';" title="' + _esc(col ? col.nombre : '') + '"></span>' +
       '<span class="ev-list-titulo">' + _esc(t.titulo) + '</span>' +
       '<div class="ev-list-meta">' +
@@ -1078,7 +1081,7 @@ function _renderCard(t) {
   var nombrePila = (t.responsable_nombre || '').trim().split(' ')[0] || '';
   var inicialResp = nombrePila.charAt(0).toUpperCase() || '?';
   var portada = (t.adjuntos || []).find(function(a){ return a.esPortada; });
-  return '<div class="ev-card" data-id-tarjeta="' + t.id + '" data-responsable="' + _esc(t.responsable_email||'') + '" data-categoria="' + _esc(t.categoria||'') + '" draggable="true" ondragstart="_dragStartCard(event,\'' + t.id + '\')" ondragend="_dragEndCard(event)" onclick="_abrirTarjeta(\'' + t.id + '\')">' +
+  return '<div class="ev-card" data-id-tarjeta="' + t.id + '" data-responsable="' + _esc(t.responsable_email||'') + '" data-categoria="' + _esc(t.categoria||'') + '" draggable="true" ondragstart="_dragStartCard(event,\'' + t.id + '\')" ondragend="_dragEndCard(event)" onclick="_onTocarTarjetaEv(event,\'' + t.id + '\')">' +
     (portada ? '<div class="ev-card-portada ev-card-portada-icono" onclick="event.stopPropagation(); _ampliarPortadaEv(\'' + portada.url.replace(/'/g,"\\'") + '\')" title="Tocá para ver la portada">🖼️</div>' : '') +
     (t.categoria ? '<span class="ev-card-cat" style="background:' + cat.bg + ';color:' + cat.color + ';">' + _esc(t.categoria) + '</span>' : '') +
     '<div class="ev-card-titulo">' + _esc(t.titulo) + '</div>' +
@@ -1242,36 +1245,84 @@ function _borrarTarjetaActual() {
 // ══════════════════════════════════════════════════════════════════
 // DETALLE DE TARJETA — edición + checklist + chat con reacciones
 // ══════════════════════════════════════════════════════════════════
+// Feedback visual inmediato al tocar una tarjeta — antes no había
+// ninguna señal de que el toque "agarró" hasta que el modal
+// realmente aparecía, y si tardaba un poco (viaje al backend), no se
+// sabía si había funcionado o no — llevaba a tocar 2 o 3 veces de
+// más. Ahora la tarjeta cambia de color al instante, apenas se toca,
+// y se mantiene así hasta que el modal se termina de abrir (haya
+// caché o no). Pedido por Cristian: "debería marcarse la tarjeta de
+// un color diferente cuando la tocás, porque a veces no sabés si la
+// tocaste bien o mal".
+window._onTocarTarjetaEv = function(event, idTarjeta) {
+  var el = event.currentTarget;
+  el.classList.add('ev-card-tocada');
+  Promise.resolve(_abrirTarjeta(idTarjeta)).finally(function() {
+    el.classList.remove('ev-card-tocada');
+  });
+};
+
 async function _abrirTarjeta(idTarjeta) {
   TARJETA_ACTUAL_ID = idTarjeta;
-  // Igual que en _abrirEvento — no se espera esto para abrir la
-  // tarjeta, se dispara y se repinta el overlay cuando termine (si la
-  // tarjeta sigue siendo la misma que está abierta en ese momento).
   if (!_internosCacheEv) {
     _cargarInternosEv().then(function() {
       if (TARJETA_ACTUAL_ID === idTarjeta) _renderOverlayTarjeta();
     });
   }
-  // Notas, mensajes y el TEXTO completo de cada ítem de checklist ya
-  // NO vienen con el tablero (ev_obtenerEvento los manda liviano a
-  // propósito — checklists solo con id+hecho, sin texto; notas y
-  // mensajes vacíos — para que abrir el EVENTO sea rápido). Se traen
-  // acá, recién al abrir esta tarjeta puntual. Reportado por Cristian
-  // probando desde el celular: "tiene que volar esto".
+
   var t = _tarjetaActual();
-  if (t) {
-    try {
-      var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({ accion:'ev_obtenerTarjetaEv', id_evento:EVENTO_ACTUAL.id, id_tarjeta:idTarjeta }) });
-      var r = await resp.json();
-      if (r.ok) {
-        t.notas = r.tarjeta.notas || [];
-        t.mensajes = r.tarjeta.mensajes || [];
-        t.checklists = r.tarjeta.checklists || [];
-      }
-    } catch(e) { /* si falla, se abre igual con lo que ya había (liviano) — mejor eso que trabarse */ }
+  if (!t) return;
+
+  // Cache-first, mismo criterio que ya usa el tablero (_abrirEvento)
+  // — antes esto SIEMPRE esperaba (await) el viaje real al backend
+  // para traer notas/mensajes/checklist completo antes de mostrar el
+  // modal. Con el tablero ya cargando instantáneo desde caché, esta
+  // era la demora que más se sentía al tocar una tarjeta. Ahora: si
+  // ya se vio esta tarjeta antes en este navegador, se abre con lo
+  // último guardado al instante, y se actualiza sola atrás sin cerrar
+  // ni recargar nada. Si es la primera vez, sí hay que esperar el
+  // pedido (no hay nada más para mostrar). Reportado por Cristian:
+  // "cuando abrís una tarjeta tarda, eso bastante molesta".
+  var claveCacheTarjeta = 'ev_cache_tarjeta_' + idTarjeta;
+  var cacheado = null;
+  try {
+    var crudo = localStorage.getItem(claveCacheTarjeta);
+    if (crudo) cacheado = JSON.parse(crudo);
+  } catch(eCache) { cacheado = null; }
+
+  if (cacheado) {
+    t.notas = cacheado.notas || [];
+    t.mensajes = cacheado.mensajes || [];
+    t.checklists = cacheado.checklists || [];
+    _renderOverlayTarjeta(); // instantáneo, con lo último guardado
   }
-  _renderOverlayTarjeta();
+
+  var pedido = fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_obtenerTarjetaEv', id_evento:EVENTO_ACTUAL.id, id_tarjeta:idTarjeta }) })
+    .then(function(resp) { return resp.json(); })
+    .then(function(r) {
+      if (!r.ok) throw new Error(r.error || 'Error desconocido');
+      t.notas = r.tarjeta.notas || [];
+      t.mensajes = r.tarjeta.mensajes || [];
+      t.checklists = r.tarjeta.checklists || [];
+      try { localStorage.setItem(claveCacheTarjeta, JSON.stringify({ notas:t.notas, mensajes:t.mensajes, checklists:t.checklists })); } catch(eLs) {}
+      // Solo repinta si esta tarjeta sigue siendo la que está abierta
+      // (si el usuario ya cerró o abrió otra mientras tanto, no hace
+      // falta tocar nada).
+      if (TARJETA_ACTUAL_ID === idTarjeta) _renderOverlayTarjeta();
+    });
+
+  if (!cacheado) {
+    // Sin caché — no hay nada que mostrar todavía, así que sí hay que
+    // esperar. Si falla, igual hace falta UN render (con lo liviano
+    // que ya había) para no dejar el modal vacío.
+    try { await pedido; } catch(e) { _renderOverlayTarjeta(); }
+  } else {
+    // Con caché ya mostrado, la actualización de fondo no debe
+    // interrumpir — si falla, se queda con lo que ya se estaba viendo.
+    pedido.catch(function(e) { console.warn('[Eventos] No se pudo refrescar la tarjeta en segundo plano:', e); });
+  }
+
   // El overlay arranca con display:none — medir scrollHeight de un
   // elemento adentro de algo con display:none SIEMPRE da 0 en
   // cualquier navegador, así que el auto-resize dejaba TODOS los
