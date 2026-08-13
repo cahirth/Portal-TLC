@@ -2,6 +2,7 @@
 <!-- Portal TLC | eventos.html | v2026.08.09.13 (Logo del evento — nuevo. Se ve como una miniatura de 30px junto al nombre en el header, y también en cada tarjeta del selector "Todos los eventos". Se agrega/cambia/quita desde el menú de tres puntos (⋯) del topbar: "🖼️ Agregar/Cambiar logo del evento" y "🚫 Quitar logo del evento" (este último solo visible si ya hay uno puesto) — ambos Administrador, usan ev_subirLogoEvento/ev_quitarLogoEvento de FotoMap.gs v167. Pedido por Cristian: "dame la posibilidad de agregar logo al nombre del evento". Confirmado con jsdom de punta a punta: subir actualiza el header y los textos del menú, quitar los revierte.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.12 (Progreso de checklists visible en la vista Lista — antes solo mostraba el texto "x/y" sin barra, a diferencia del Kanban que ya tenía barra visual. Se agregó la misma barra compacta (42px) + texto a cada fila de la lista, y se sumó el porcentaje al texto del Kanban también ("2/4 subtareas · 50%") para más claridad en los dos lados por igual. Pedido por Cristian: "podemos mostrar el progreso de las tarjetas en la miniatura, de kanban y listas?". Confirmado con jsdom con un checklist de 4 ítems (2 tildados): barra al 50% en ambas vistas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.11 (3 pedidos de Cristian: (1) Menú de 3 puntos en el topbar del evento (mismo patrón que el de la tarjeta) — reemplaza los botones sueltos "Borrar evento"/"Todos los eventos" por: 🔗 Copiar link de este evento (nuevo), 📋 Duplicar evento (nuevo — usa ev_duplicarEvento de FotoMap.gs v166, solo Administrador), 🗑️ Borrar evento (Administrador) y 📋 Todos los eventos. (2) Nombre de pila completo del responsable ahora visible junto al avatar en la tarjeta cerrada del tablero Y en la vista Lista — antes solo se veía la inicial en un círculo, había que pasar el mouse para saber quién era. Confirmado con jsdom: se ve "Lucio" completo, no solo "L". Ambos pedidos con captura de Cristian.) -->
+<!-- Portal TLC | eventos.html | v2026.08.10.9 (Vista por defecto según tamaño de pantalla — Tablero en PC (>640px), Lista en celular (mismo corte que ya usa el resto del Portal para mobile/desktop). Antes ambos arrancaban en Lista siempre. Se aplica tanto al abrir la página por primera vez como cada vez que se abre un evento puntual. Pedido por Cristian: "volvé a abrir en PC modo tablero y en móvil modo lista". Confirmado con test simulando ambos anchos de pantalla.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.8 (Sacado el botón hamburguesa (☰) del header y todo el panel de "Menú" mobile que abría — quedó totalmente redundante: el selector de evento, el switch Tablero/Lista y "Cambiar tema" que tenía adentro ya están visibles directo en el header/topbar (el sol 🌙 y el propio switch). Pedido por Cristian con captura, circulado en amarillo: "borrá ese menú". Confirmado con test: el evento sigue abriendo bien, el dropdown de eventos sigue funcionando, sin el botón ni el overlay.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.7 (Rediseño de navegación — se eliminó la pantalla intermedia "elegir evento" (ev-vista-selector), el módulo entra DIRECTO al tablero del último evento usado (guardado en localStorage), o el primero de la lista si no hay ninguno guardado, o el ?id= de la URL si viene por deep-link. Mismo patrón que cotizaciones.html: "+ Crear nuevo evento..." pasa a ser una opción más del desplegable de eventos, no un botón aparte en una pantalla separada. Se sacó también "Todos los eventos" del menú de 3 puntos y del menú mobile (redundante ahora, cambiar de evento se hace desde el desplegable de arriba) y se limpiaron _renderListaEventos/_volverASelectorEventos (código muerto de la pantalla eliminada — esta última se dejó como alias de "salir del módulo" para no romper sus usos existentes como fallback de error). Si no hay NINGÚN evento cargado, muestra un mensaje amigable con botón para crear el primero, en vez de un tablero roto. Pedido por Cristian: "podés borrarla y aparecer directamente [en el tablero]". Confirmado con test en los 3 escenarios: primera vez (abre el primero de la lista), con último evento guardado (abre ese), y sin ningún evento (mensaje amigable).) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.6 (Cero carga automática de imágenes — Cristian identificó bien la causa: eventos es el único de los 3 tableros del Portal con muchas imágenes en alta resolución, y con pocas tarjetas visibles en pantalla el "loading=lazy" del navegador no ayuda mucho (todo entra en viewport igual). Antes: portada en la tarjeta cerrada del tablero y miniaturas en la lista de adjuntos del detalle SÍ tenían <img src="..."> — el navegador las pedía apenas se pintaba, aunque fuera "lazy". Ahora NINGUNA imagen se pide hasta que el usuario toca un ícono — ni la portada de la tarjeta cerrada, ni los adjuntos del detalle. El ícono (🖼️) reemplaza la miniatura; al tocarlo recién ahí se abre la imagen real en el visor ampliado (que ya la pedía on-demand desde antes). Pedido por Cristian: "que abras de una el texto... a los adjuntos ni los abras, solamente cuando el usuario cliquea uno". Confirmado con test: cero <img> en el tablero y en el detalle hasta el click, y clickear el ícono sí dispara el pedido de la imagen real.) -->
@@ -683,7 +684,7 @@ function _borrarEventoActual() {
 async function _abrirEvento(id, tarjetaId) {
   document.getElementById('ev-vista-tablero').style.display = 'block';
   document.getElementById('ev-board').innerHTML = '<div style="padding:30px;"><div class="spinner" style="margin:0 auto;"></div></div>';
-  VISTA_ACTUAL_EV = 'list';
+  VISTA_ACTUAL_EV = _vistaPorDefectoEv();
   try {
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_obtenerEvento', id: id }) });
     var r = await resp.json();
@@ -756,7 +757,16 @@ function _cambiarEventoDesdeSelect(id) {
 }
 
 // ── Vista Tablero / Lista ──
-var VISTA_ACTUAL_EV = 'list';
+// Por defecto: Tablero en PC (pantalla ancha), Lista en celular
+// (pantalla angosta) — la Lista es más liviana y cómoda para tocar
+// con el dedo, el Tablero aprovecha mejor el espacio horizontal de un
+// monitor. Mismo corte de 640px que ya usa el resto del Portal para
+// distinguir mobile/desktop. Pedido por Cristian: "volvé a abrir en
+// PC modo tablero y en móvil modo lista".
+function _vistaPorDefectoEv() {
+  return (window.innerWidth <= 640) ? 'list' : 'board';
+}
+var VISTA_ACTUAL_EV = _vistaPorDefectoEv();
 function _cambiarVistaEv(v) {
   VISTA_ACTUAL_EV = v;
   document.querySelectorAll('.ev-view-switch button').forEach(function(b){ b.classList.toggle('activo', b.dataset.vista === v); });
