@@ -1,4 +1,14 @@
-// Portal TLC | permisos.js | Validación de acceso a módulos secundarios
+// Portal TLC | permisos.js | v2026.08.13.1 | Validación de acceso a módulos secundarios
+// FIX: el fetch al Sheet de Google no tenía ningún límite de tiempo —
+// si Google tardaba de más o no respondía (pasa de vez en cuando con
+// el endpoint gviz, no es una API pensada para alta disponibilidad),
+// el await se quedaba esperando PARA SIEMPRE, colgando la página
+// entera en TODOS los módulos que usan esta función (empresas.html,
+// eventos.html, servicio.html, cotizaciones.html — los 4 la cargan).
+// Ahora corta sola a los 4 segundos y sigue de largo (fail-open, mismo
+// criterio que ya tenía el resto de la función). Reportado por
+// Cristian: "a veces no carga, da error de timeout... comparalos, y
+// acordate que ayer miraba un excel de permisos en gsheet".
 // ══════════════════════════════════════════════════════════════════
 // Se carga DESPUÉS de version.js en cualquier módulo que necesite
 // controlar acceso por columna de la solapa "Vendedores" (empresas.html
@@ -40,8 +50,28 @@ async function validarAccesoModulo(columnaSheet) {
 
     // 2) Consulta directa al Sheet publicado (mismo endpoint gviz que
     // usa index.html — sin pasar por el GAS, lectura pública).
+    //
+    // TIMEOUT REAL — antes este fetch no tenía ningún límite de
+    // tiempo. Si el endpoint de Google tardaba mucho o directamente
+    // no respondía (pasa de vez en cuando con gviz, no es una API
+    // pensada para alta disponibilidad), el await se quedaba
+    // esperando PARA SIEMPRE — y como esta función se llama con
+    // await antes de pintar cualquier cosa en TODOS los módulos que
+    // la usan, la página entera quedaba colgada sin ningún aviso.
+    // Ahora, si Google no responde en 4 segundos, se corta sola y
+    // sigue de largo (mismo criterio fail-open que ya tenía el resto
+    // de la función para cualquier otro error). Reportado por
+    // Cristian: "a veces no carga, da error de timeout y se torna
+    // lento... comparalos".
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID_PERMISOS_JS}/gviz/tq?tqx=out:json&sheet=Vendedores`;
-    const res = await fetch(url);
+    let res;
+    try {
+      res = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const text = await res.text();
     const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
     if (!match) return true; // respuesta rara del Sheet — fail-open
