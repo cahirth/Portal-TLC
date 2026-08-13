@@ -65,7 +65,22 @@ self.addEventListener('notificationclick', function(event) {
 //      la primera vez que se abrían, sin importar cuántas versiones
 //      nuevas se subieran después. Esto probablemente explica más de
 //      un "no se ve el cambio" de hoy, no solo el botón de instalar.
-const CACHE_NAME = 'portal-tlc-v17';
+// v18: BUG DE FONDO encontrado tras varias rondas de "sigue lento sin
+//      explicación" en eventos.html — el mismo problema que ya se
+//      había detectado y arreglado en v17 para OTROS 6 archivos volvió
+//      a pasar, esta vez con eventos.html y con TODOS los archivos
+//      nuevos del circuito de Orden de Preparación/checklists creados
+//      esta misma sesión (orden-preparacion.html, etiqueta-despacho.html,
+//      POE8_Instalacion.html, y los checklists individuales tipo
+//      HRK-1.html) — ninguno estaba en HTML_LOCAL, así que quedaban
+//      cacheados PARA SIEMPRE desde la primera vez que se abrían, sin
+//      importar cuántas versiones nuevas se subieran después. Por más
+//      que se optimizara el código de eventos.html, el navegador seguía
+//      mostrando la primera versión que se cacheó, de semanas atrás.
+//      CACHE_NAME bumpeado — fuerza limpieza de la caché vieja al
+//      activarse esta versión. Reportado por Cristian: "seguimos con
+//      lentitud extrema, no puede ser".
+const CACHE_NAME = 'portal-tlc-v18';
 
 const HTML_LOCAL = [
     './',
@@ -83,6 +98,11 @@ const HTML_LOCAL = [
     './version.js',
     './permisos.js',
     './adjuntos.js',
+    './eventos.html',
+    './orden-preparacion.html',
+    './etiqueta-despacho.html',
+    'POE8_Instalacion.html',
+    'HRK-1.html',
 ];
 
 const ASSETS_EXTERNOS = [
@@ -147,7 +167,17 @@ self.addEventListener('fetch', event => {
     }
 
     // HTML propio → Network-first: intenta red, si falla usa caché
-    const isLocalHTML = HTML_LOCAL.some(p => url.endsWith(p.replace('./', '')) || url.endsWith('/'));
+    // Blindado — './'.replace('./', '') da STRING VACÍO, y
+    // url.endsWith('') es SIEMPRE true para cualquier URL. Sin este
+    // guard, el primer elemento de la lista ('./') hacía que TODO
+    // matcheara "isLocalHTML" de pura casualidad, sin que la lista
+    // realmente filtrara nada — el caso de la raíz ('/') ya lo cubre
+    // aparte el segundo || de abajo, no hace falta que './' pase por
+    // el .replace().
+    const isLocalHTML = HTML_LOCAL.some(p => {
+        const sufijo = p.replace('./', '');
+        return (sufijo && url.endsWith(sufijo)) || url.endsWith('/');
+    });
     if (isLocalHTML || event.request.mode === 'navigate') {
         event.respondWith(
             fetch(event.request)

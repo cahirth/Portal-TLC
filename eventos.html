@@ -2,6 +2,7 @@
 <!-- Portal TLC | eventos.html | v2026.08.09.13 (Logo del evento — nuevo. Se ve como una miniatura de 30px junto al nombre en el header, y también en cada tarjeta del selector "Todos los eventos". Se agrega/cambia/quita desde el menú de tres puntos (⋯) del topbar: "🖼️ Agregar/Cambiar logo del evento" y "🚫 Quitar logo del evento" (este último solo visible si ya hay uno puesto) — ambos Administrador, usan ev_subirLogoEvento/ev_quitarLogoEvento de FotoMap.gs v167. Pedido por Cristian: "dame la posibilidad de agregar logo al nombre del evento". Confirmado con jsdom de punta a punta: subir actualiza el header y los textos del menú, quitar los revierte.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.12 (Progreso de checklists visible en la vista Lista — antes solo mostraba el texto "x/y" sin barra, a diferencia del Kanban que ya tenía barra visual. Se agregó la misma barra compacta (42px) + texto a cada fila de la lista, y se sumó el porcentaje al texto del Kanban también ("2/4 subtareas · 50%") para más claridad en los dos lados por igual. Pedido por Cristian: "podemos mostrar el progreso de las tarjetas en la miniatura, de kanban y listas?". Confirmado con jsdom con un checklist de 4 ítems (2 tildados): barra al 50% en ambas vistas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.11 (3 pedidos de Cristian: (1) Menú de 3 puntos en el topbar del evento (mismo patrón que el de la tarjeta) — reemplaza los botones sueltos "Borrar evento"/"Todos los eventos" por: 🔗 Copiar link de este evento (nuevo), 📋 Duplicar evento (nuevo — usa ev_duplicarEvento de FotoMap.gs v166, solo Administrador), 🗑️ Borrar evento (Administrador) y 📋 Todos los eventos. (2) Nombre de pila completo del responsable ahora visible junto al avatar en la tarjeta cerrada del tablero Y en la vista Lista — antes solo se veía la inicial en un círculo, había que pasar el mouse para saber quién era. Confirmado con jsdom: se ve "Lucio" completo, no solo "L". Ambos pedidos con captura de Cristian.) -->
+<!-- Portal TLC | eventos.html | v2026.08.13.1 (Estrategia cache-first para abrir eventos — Cristian seguía viendo lentitud extrema pese a los arreglos anteriores. _abrirEvento ahora: si ya existe una caché local (localStorage) del evento pedido, lo pinta AL INSTANTE con eso (0ms, sin esperar al backend), y dispara el pedido real en segundo plano — cuando responde, actualiza EVENTO_ACTUAL, la caché, y repinta todo silenciosamente. Si es la primera vez que se abre ese evento en el navegador (sin caché todavía), no hay forma de evitar esperar el primer pedido, igual que antes. También en el arranque de la página: si ya sabemos qué evento se abrió la última vez Y tenemos su caché, ni se espera la lista completa de eventos (ev_listarEventos) para decidir cuál abrir — directo a _abrirEvento, que ya resuelve todo. _renderTablero/_renderOverlayTarjeta siguen operando 100% sobre el array local EVENTO_ACTUAL.tarjetas, sin ningún fetch bloqueante de por medio (ya confirmado en rondas anteriores). Además: placeholder "Cargando eventos..." agregado también en el tramo de bajar la lista completa (antes quedaba en blanco ahí); y _cargarEventos ahora distingue "falló el pedido" de "genuinamente no hay eventos", mostrando un mensaje de error con botón Reintentar en el primer caso en vez del engañoso "creá tu primer evento". Confirmado con test: pintado instantáneo desde caché antes de que responda el backend, actualización silenciosa cuando llega el dato real, y funcionamiento correcto sin caché (primera vez).) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.11 (Placeholder de carga con texto — antes el spinner al abrir un evento no tenía ningún mensaje al lado, ahora dice "Cargando eventos...", mismo criterio que ya usan servicio.html/cotizaciones.html. Pedido por Cristian. Confirmado con test.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.10 (Diferencia REAL de fondo encontrada comparando contra servicio.html (27 tickets, anda rápido) — Eventos ESPERABA (await) la carga de la lista de internos (Google Sheets, ver v182) antes de pintar CUALQUIER COSA, tanto al abrir un evento como al abrir una tarjeta puntual. servicio.html nunca espera esto (_cargarInternosMenciones().then(...), sin await) — dispara la carga y sigue de una, actualizando lo que haga falta cuando termine en segundo plano. Confirmado que la caché de internos NO hace falta para pintar el tablero (el nombre del responsable ya viene guardado en cada tarjeta) — solo la usan el desplegable de "Responsable" y el resaltado de menciones, ninguno de los dos bloquea el pintado inicial. Mismo criterio aplicado acá: se dispara sin esperar, y si la tarjeta detalle sigue abierta cuando termina de cargar, se repinta sola para completar esas 2 cosas. Reportado por Cristian: "eventos tiene solo 8 tarjetas y servicio tiene 27 y anda rápido... explorá y comparalos". Confirmado con test: incluso con la carga de internos artificialmente COLGADA (simula un timeout real), el tablero se pinta igual, de una. Sigue pendiente: revisar permisos.js (compartido por los 4 módulos, según pista de Cristian sobre "el Excel de permisos") — no lo tengo en esta sesión, hace falta que lo suba para completar la comparación.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.9 (Vista por defecto según tamaño de pantalla — Tablero en PC (>640px), Lista en celular (mismo corte que ya usa el resto del Portal para mobile/desktop). Antes ambos arrancaban en Lista siempre. Se aplica tanto al abrir la página por primera vez como cada vez que se abre un evento puntual. Pedido por Cristian: "volvé a abrir en PC modo tablero y en móvil modo lista". Confirmado con test simulando ambos anchos de pantalla.) -->
@@ -511,6 +512,36 @@ function _volverEventos() {
   var params = new URLSearchParams(window.location.search);
   var idUrl = params.get('id');
   var tarjetaUrl = params.get('tarjeta');
+
+  // Cache-first también acá — si no vino un ?id= puntual por URL pero
+  // ya sabemos qué evento se abrió la última vez Y tenemos su caché
+  // guardada, ni siquiera hace falta esperar la lista completa de
+  // eventos (ev_listarEventos) para decidir cuál abrir: directo a
+  // _abrirEvento con ese id, que YA sabe pintar desde caché al
+  // instante y actualizar todo (lista incluida, vía _renderSelectEventos
+  // después del fetch en segundo plano) sin bloquear nada. Pedido por
+  // Cristian: "tanto el tablero como las tarjetas abran en 0
+  // milisegundos desde caché local mientras se sincronizan en segundo
+  // plano".
+  var idCacheDirecto = null;
+  if (!idUrl) {
+    try {
+      var idGuardadoTemprano = localStorage.getItem('ev_ultimo_evento_id');
+      if (idGuardadoTemprano && localStorage.getItem('ev_cache_' + idGuardadoTemprano)) idCacheDirecto = idGuardadoTemprano;
+    } catch(eLsTemprano) {}
+  }
+  if (idUrl || idCacheDirecto) {
+    _abrirEvento(idUrl || idCacheDirecto, tarjetaUrl);
+    _cargarEventos(); // en segundo plano, para tener EVENTOS al día (dropdown, etc.) sin bloquear nada
+    _cargarNotificaciones(true);
+    setInterval(function(){ _cargarNotificaciones(true); }, 45000);
+    return;
+  }
+
+  // Sin ?id= ni caché de un evento previo — hace falta la lista sí o
+  // sí, para decidir cuál abrir (primera vez en este navegador).
+  document.getElementById('ev-vista-tablero').style.display = 'block';
+  document.getElementById('ev-board').innerHTML = '<div style="padding:30px;text-align:center;"><div class="spinner" style="margin:0 auto 10px;"></div><span style="color:var(--text-muted);font-size:13px;">Cargando eventos...</span></div>';
   await _cargarEventos();
   // Ya no hay pantalla intermedia para "elegir evento" — entra directo
   // al tablero. Prioridad: (1) ?id= puntual en la URL (deep-link desde
@@ -527,9 +558,24 @@ function _volverEventos() {
   }
   if (idParaAbrir) {
     _abrirEvento(idParaAbrir, tarjetaUrl);
+  } else if (_errorCargaEventos) {
+    // El pedido al backend FALLÓ (404, timeout, sin conexión, etc.) —
+    // antes esto mostraba el mismo mensaje que "no hay eventos", algo
+    // engañoso: parecía que se habían borrado todos los eventos
+    // cuando en realidad ni siquiera se pudo consultar el backend.
+    // Reportado por Cristian con captura: "eventos no carga y no pone
+    // el placeholder, no pone nada".
+    document.getElementById('ev-vista-tablero').style.display = 'block';
+    document.getElementById('ev-board').innerHTML =
+      '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);">' +
+        '<div style="font-size:15px;font-weight:700;margin-bottom:10px;color:#dc2626;">⚠️ No se pudo conectar</div>' +
+        '<div style="font-size:12.5px;margin-bottom:16px;">No se pudo traer la lista de eventos — puede ser un problema de conexión o del servidor. Tus eventos siguen ahí, esto no los borró.</div>' +
+        '<button class="ev-btn-primario" style="width:auto;padding:9px 20px;" onclick="location.reload()">🔄 Reintentar</button>' +
+      '</div>';
   } else {
-    // No hay ningún evento cargado todavía — mensaje amigable en vez
-    // de un tablero vacío/roto, con la misma acción de crear.
+    // Acá SÍ es un caso genuino: el pedido funcionó bien y la lista
+    // vino realmente vacía — mensaje amigable en vez de un tablero
+    // vacío/roto, con la acción de crear.
     document.getElementById('ev-vista-tablero').style.display = 'block';
     document.getElementById('ev-board').innerHTML =
       '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);">' +
@@ -547,13 +593,21 @@ function _esAdministradorEv() { return _session && _session.rol === 'Administrad
 // ══════════════════════════════════════════════════════════════════
 // EVENTOS — listar / crear / abrir
 // ══════════════════════════════════════════════════════════════════
+var _errorCargaEventos = false; // distingue "falló el pedido" de "no hay eventos de verdad" — antes ambos casos mostraban el mismo mensaje engañoso de "crear tu primer evento"
 async function _cargarEventos() {
+  _errorCargaEventos = false;
   try {
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_listarEventos' }) });
     var r = await resp.json();
-    EVENTOS = (r.ok && Array.isArray(r.eventos)) ? r.eventos : [];
+    if (r.ok && Array.isArray(r.eventos)) {
+      EVENTOS = r.eventos;
+    } else {
+      EVENTOS = [];
+      _errorCargaEventos = true;
+    }
   } catch(e) {
     EVENTOS = [];
+    _errorCargaEventos = true;
   }
 }
 
@@ -683,65 +737,100 @@ function _borrarEventoActual() {
     });
 }
 
+// Aplica los datos de un evento (de caché o recién bajados) al DOM —
+// separado de _abrirEvento para poder reusarlo tanto en el pintado
+// instantáneo desde caché como en la actualización silenciosa cuando
+// llega la respuesta real del backend.
+function _aplicarEventoActualEv(id, tarjetaId) {
+  document.getElementById('ev-hdr-titulo').textContent = EVENTO_ACTUAL.nombre;
+  document.getElementById('ev-hdr-sub').textContent = EVENTO_ACTUAL.tarjetas.length + ' tarjetas';
+  _actualizarLogoHeaderEv();
+  var esAdmin = _esAdministradorEv();
+  var btnDuplicarEv = document.getElementById('ev-menu-duplicar-evento');
+  var btnBorrarEv = document.getElementById('ev-menu-borrar-evento');
+  var btnLogoEv = document.getElementById('ev-menu-logo-evento');
+  var btnQuitarLogoEv = document.getElementById('ev-menu-quitar-logo-evento');
+  if (btnDuplicarEv) btnDuplicarEv.style.display = esAdmin ? 'block' : 'none';
+  if (btnBorrarEv) btnBorrarEv.style.display = esAdmin ? 'block' : 'none';
+  if (btnLogoEv) {
+    btnLogoEv.style.display = esAdmin ? 'block' : 'none';
+    btnLogoEv.textContent = (EVENTO_ACTUAL.logo && EVENTO_ACTUAL.logo.url) ? '🖼️ Cambiar logo del evento' : '🖼️ Agregar logo al evento';
+  }
+  if (btnQuitarLogoEv) btnQuitarLogoEv.style.display = (esAdmin && EVENTO_ACTUAL.logo && EVENTO_ACTUAL.logo.url) ? 'block' : 'none';
+  if (!_internosCacheEv) _cargarInternosEv();
+  _renderSelectEventos();
+  _renderFiltrosEv();
+  _renderTablero();
+  _cambiarVistaEv(VISTA_ACTUAL_EV);
+  history.replaceState(null, '', 'eventos.html?id=' + encodeURIComponent(id));
+  if (tarjetaId && EVENTO_ACTUAL.tarjetas.some(function(t){ return t.id === tarjetaId; })) {
+    _abrirTarjeta(tarjetaId);
+  }
+}
+
+// Cache-first — si ya visitaste este evento antes en este navegador,
+// se pinta con lo último que quedó guardado ANTES de siquiera pedirle
+// nada al backend (0ms de espera), y se actualiza sola en segundo
+// plano cuando llega la respuesta real, sin volver a mostrar ningún
+// spinner. Si es la primera vez (sin caché todavía), no hay forma de
+// evitar esperar el primer pedido — ahí sí se ve el spinner, como
+// antes. Pedido por Cristian: "necesito que tanto el tablero como las
+// tarjetas abran en 0 milisegundos desde caché local mientras se
+// sincronizan en segundo plano".
 async function _abrirEvento(id, tarjetaId) {
   document.getElementById('ev-vista-tablero').style.display = 'block';
-  document.getElementById('ev-board').innerHTML = '<div style="padding:30px;text-align:center;"><div class="spinner" style="margin:0 auto 10px;"></div><span style="color:var(--text-muted);font-size:13px;">Cargando eventos...</span></div>';
   VISTA_ACTUAL_EV = _vistaPorDefectoEv();
+
+  var cacheado = null;
   try {
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_obtenerEvento', id: id }) });
-    var r = await resp.json();
-    if (!r.ok) { alert('No se pudo abrir el evento: ' + (r.error||'')); return; }
-    EVENTO_ACTUAL = r.evento;
-    // Recuerda el último evento abierto — la próxima vez que se entra
-    // al módulo (sin ?id= puntual en la URL) se abre directo acá, sin
-    // pantalla intermedia para elegir. Pedido por Cristian: "aparecer
-    // directamente [en el tablero]".
+    var crudo = localStorage.getItem('ev_cache_' + id);
+    if (crudo) cacheado = JSON.parse(crudo);
+  } catch(eCache) { cacheado = null; }
+
+  if (cacheado) {
+    // Pintado instantáneo desde lo último guardado — sin spinner.
+    EVENTO_ACTUAL = cacheado;
     try { localStorage.setItem('ev_ultimo_evento_id', id); } catch(eLs) {}
-    document.getElementById('ev-hdr-titulo').textContent = EVENTO_ACTUAL.nombre;
-    document.getElementById('ev-hdr-sub').textContent = EVENTO_ACTUAL.tarjetas.length + ' tarjetas';
-    _actualizarLogoHeaderEv();
-    // "Duplicar evento" y "Borrar evento" — solo Administrador (mismo
-    // criterio que crear/borrar evento, ya que duplicar TAMBIÉN crea
-    // uno nuevo). "Copiar link" y "Todos los eventos" quedan abiertos
-    // a cualquier interno, sin restricción.
-    var esAdmin = _esAdministradorEv();
-    var btnDuplicarEv = document.getElementById('ev-menu-duplicar-evento');
-    var btnBorrarEv = document.getElementById('ev-menu-borrar-evento');
-    var btnLogoEv = document.getElementById('ev-menu-logo-evento');
-    var btnQuitarLogoEv = document.getElementById('ev-menu-quitar-logo-evento');
-    if (btnDuplicarEv) btnDuplicarEv.style.display = esAdmin ? 'block' : 'none';
-    if (btnBorrarEv) btnBorrarEv.style.display = esAdmin ? 'block' : 'none';
-    if (btnLogoEv) {
-      btnLogoEv.style.display = esAdmin ? 'block' : 'none';
-      btnLogoEv.textContent = (EVENTO_ACTUAL.logo && EVENTO_ACTUAL.logo.url) ? '🖼️ Cambiar logo del evento' : '🖼️ Agregar logo al evento';
+    _aplicarEventoActualEv(id, tarjetaId);
+  } else {
+    // Primera vez que se abre este evento en este navegador — no hay
+    // nada para mostrar todavía, así que sí hace falta esperar.
+    document.getElementById('ev-board').innerHTML = '<div style="padding:30px;text-align:center;"><div class="spinner" style="margin:0 auto 10px;"></div><span style="color:var(--text-muted);font-size:13px;">Cargando eventos...</span></div>';
+  }
+
+  // El pedido real SIEMPRE se dispara (haya caché o no) — para
+  // refrescar datos que puedan haber cambiado desde otro dispositivo.
+  // Si había caché, esto corre en segundo plano sin bloquear nada.
+  var pedido = fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_obtenerEvento', id: id }) })
+    .then(function(resp) { return resp.json(); })
+    .then(function(r) {
+      if (!r.ok) throw new Error(r.error || 'Error desconocido');
+      EVENTO_ACTUAL = r.evento;
+      try {
+        localStorage.setItem('ev_ultimo_evento_id', id);
+        localStorage.setItem('ev_cache_' + id, JSON.stringify(r.evento));
+      } catch(eLs) {}
+      // Repinta siempre, tanto si fue la primera carga (sacando el
+      // spinner) como si fue una actualización silenciosa sobre lo
+      // que ya se veía desde caché.
+      _aplicarEventoActualEv(id, tarjetaId);
+    });
+
+  if (!cacheado) {
+    // Sin caché, si o si hay que esperar esto — no hay nada más para
+    // mostrar mientras tanto.
+    try {
+      await pedido;
+    } catch(e) {
+      alert('Error de conexión al abrir el evento.');
+      _volverASelectorEventos();
     }
-    if (btnQuitarLogoEv) btnQuitarLogoEv.style.display = (esAdmin && EVENTO_ACTUAL.logo && EVENTO_ACTUAL.logo.url) ? 'block' : 'none';
-    // Antes esto se ESPERABA (await) antes de pintar nada — el
-    // tablero entero quedaba frenado hasta que terminara de bajar la
-    // lista de internos (lectura de Google Sheets, con su propio
-    // costo de red fijo). servicio.html nunca espera esto — dispara
-    // la carga y sigue de una, actualizando lo que haga falta cuando
-    // termine. Acá pasa lo mismo: el tablero no necesita la caché de
-    // internos para nada (el nombre del responsable ya viene guardado
-    // en cada tarjeta), solo la usa el desplegable de "Responsable" y
-    // el resaltado de menciones — ninguno de los dos bloquea pintar
-    // el tablero. Reportado por Cristian: "el de eventos tiene solo 8
-    // tarjetas y el de servicio tiene 27 y anda rápido... comparalos".
-    if (!_internosCacheEv) _cargarInternosEv();
-    _renderSelectEventos();
-    _renderFiltrosEv();
-    _renderTablero();
-    _cambiarVistaEv(VISTA_ACTUAL_EV); // aplica visibilidad+botón activo correctos (Lista por defecto — más rápida en PC y celular)
-    history.replaceState(null, '', 'eventos.html?id=' + encodeURIComponent(id));
-    // Deep-link desde una notificación o un link compartido — abre
-    // directo la tarjeta puntual, sin que el usuario tenga que
-    // buscarla a mano en el tablero.
-    if (tarjetaId && EVENTO_ACTUAL.tarjetas.some(function(t){ return t.id === tarjetaId; })) {
-      _abrirTarjeta(tarjetaId);
-    }
-  } catch(e) {
-    alert('Error de conexión al abrir el evento.');
-    _volverASelectorEventos();
+  } else {
+    // Con caché ya mostrado, la actualización de fondo no debe
+    // interrumpir al usuario si falla — se queda con lo que ya tenía
+    // en pantalla (mejor eso que un alert molesto sobre algo que ya
+    // estaba viendo bien).
+    pedido.catch(function(e) { console.warn('[Eventos] No se pudo refrescar en segundo plano:', e); });
   }
 }
 
