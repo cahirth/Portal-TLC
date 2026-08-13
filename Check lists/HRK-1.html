@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | HRK-1.html | v2026.08.10.1 (PRERREQUISITO #1 CERRADO — este checklist estaba pensado para un ticket de UN solo equipo (leía ticket.equipo_modelo/equipo_serie, guardaba todo en un único campo ticket.checklist_tecnico), pero la Orden de Preparación tiene VARIOS equipos por ticket — necesitaba distinguir entre ellos. Ahora: (1) lee equipo_index de la URL (nuevo, enviado por servicio.html) — si está presente, precarga el N° de Serie desde equipos[equipo_index].nro_serie en vez de los campos de un solo equipo, y usa la acción nueva registrarChecklistCompletado (ver FotoMap.gs v175) al completar, que marca ESE equipo puntual y tilda Calidad Verificada automáticamente en la grilla — pedido explícito de Cristian. Si NO hay equipo_index (ticket normal de reparación, de un solo equipo), el comportamiento es EXACTAMENTE el de siempre (st_guardarChecklist, campo único a nivel ticket) — retrocompatibilidad confirmada con test. (2) Cliente/Serie/Técnico se precargan primero desde los params de la URL que servicio.html ya manda (más rápido, no dependen de la respuesta de Firebase), con fallback a buscarlos en el ticket si no vinieron por URL. (3) Fix de robustez en _asegurarOpcionCl — no explotaba si listarTecnicos fallaba y el <select> ya había sido reemplazado por un <input> de texto libre. Confirmado con test en los 2 escenarios (Orden de Preparación y ticket normal).) -->
 <!-- Portal TLC | checklist-HRK-1.html | v2026.07.18.1 -->
 <html lang="es">
 <head>
@@ -400,6 +401,11 @@ function _escHtmlCl(s) {
 
 function _asegurarOpcionCl(sel, valor) {
     if (!sel || !valor) return;
+    // Si listarTecnicos falló, _cargarTecnicosDropdown ya reemplazó el
+    // <select> por un <input> de texto libre — este helper tiene que
+    // funcionar en los dos casos, si no explota al intentar leer
+    // sel.options de un input (no existe esa propiedad ahí).
+    if (sel.tagName !== 'SELECT') { sel.value = valor; return; }
     const existe = Array.from(sel.options).some(function(o) { return o.value === valor; });
     if (!existe) {
         const opt = document.createElement('option');
@@ -436,6 +442,34 @@ async function _cargarTecnicosDropdown() {
 function _getTicketId() {
     const params = new URLSearchParams(window.location.search);
     return params.get('ticket') || '';
+}
+
+// equipo_index — presente SOLO cuando este checklist se abre desde
+// la grilla de una Orden de Preparación (varios equipos por ticket,
+// cada uno necesita su propio checklist). Si no viene (ej. un ticket
+// normal de reparación, de un solo equipo), queda null y el
+// comportamiento vuelve a ser el de siempre — guardado a nivel
+// ticket, sin nada per-equipo.
+function _getEquipoIndexCl() {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('equipo_index');
+    return (v !== null && v !== '') ? parseInt(v, 10) : null;
+}
+
+// Datos que servicio.html ya manda por la URL cuando abre este
+// checklist desde la grilla de la Orden de Preparación (cliente,
+// serie, técnico) — se usan como primera fuente antes de ir a buscar
+// el ticket completo a Firebase, que es más lento y en el caso de un
+// ticket con VARIOS equipos ni siquiera tiene estos datos a nivel
+// ticket (son por-equipo). Reportado por Cristian con captura:
+// "completar con los datos que ya tenés el formulario".
+function _getParamsUrlCl() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        cliente: params.get('cliente') || '',
+        serie: params.get('serie') || '',
+        tecnico: params.get('tecnico') || '',
+    };
 }
 
 // Volver al ticket de origen (si se abrió con ?ticket=ID) o, si no,
@@ -508,6 +542,18 @@ function _bloquearFormularioCl() {
 
 async function _cargarChecklistDesdeFirebase() {
     const ticketId = _getTicketId();
+    const equipoIndex = _getEquipoIndexCl();
+    const paramsUrl = _getParamsUrlCl();
+
+    // Primero, lo que ya viene precargado por la URL — no hace falta
+    // esperar la respuesta de Firebase para ver estos 3 campos.
+    const dealerEl0 = document.getElementById('c-dealer');
+    const serieEl0  = document.getElementById('c-serie');
+    const respEl0   = document.getElementById('c-engineer');
+    if (dealerEl0 && !dealerEl0.value && paramsUrl.cliente) dealerEl0.value = paramsUrl.cliente;
+    if (serieEl0 && !serieEl0.value && paramsUrl.serie) serieEl0.value = paramsUrl.serie;
+    if (respEl0 && !respEl0.value && paramsUrl.tecnico) _asegurarOpcionCl(respEl0, paramsUrl.tecnico);
+
     if (!ticketId) return;
     try {
         const resp = await fetch(`${FIREBASE_RTDB_URL_CL}/servicio_tecnico/${ticketId}.json`, { cache: 'no-store' });
@@ -524,12 +570,31 @@ async function _cargarChecklistDesdeFirebase() {
         if (dealerEl && !dealerEl.value) dealerEl.value = ticket.cliente || '';
         if (fechaEl && !fechaEl.value) fechaEl.value = new Date().toISOString().slice(0, 10);
         if (serieEl && !serieEl.value) {
-            const partes = [ticket.equipo_modelo || '', ticket.equipo_serie || ''].filter(Boolean);
-            serieEl.value = partes.join(' / ');
+            // Orden de Preparación (varios equipos por ticket) — el N°
+            // de Serie vive en equipos[equipoIndex].nro_serie, NO en
+            // ticket.equipo_serie (eso es de un ticket de reparación de
+            // un solo equipo). Si ya se precargó por la URL más arriba,
+            // esto ni se ejecuta (el campo ya tiene valor).
+            if (equipoIndex !== null && Array.isArray(ticket.equipos) && ticket.equipos[equipoIndex]) {
+                serieEl.value = ticket.equipos[equipoIndex].nro_serie || '';
+            } else {
+                const partes = [ticket.equipo_modelo || '', ticket.equipo_serie || ''].filter(Boolean);
+                serieEl.value = partes.join(' / ');
+            }
         }
         if (responsableElPrefill && !responsableElPrefill.value) {
-            const nombreTecnico = TECNICO_NOMBRE_CL[ticket.tecnico_asignado] || '';
+            const nombreTecnico = ticket.tecnico_responsable_nombre || TECNICO_NOMBRE_CL[ticket.tecnico_asignado] || '';
             if (nombreTecnico) _asegurarOpcionCl(responsableElPrefill, nombreTecnico);
+        }
+
+        // Orden de Preparación — si ESE equipo puntual ya tiene el
+        // checklist marcado completo, bloquear el formulario de
+        // entrada (antes esto solo miraba ticket.checklist_tecnico,
+        // un campo único que no distingue entre equipos).
+        if (equipoIndex !== null && Array.isArray(ticket.equipos) && ticket.equipos[equipoIndex] && ticket.equipos[equipoIndex].checklist_completado) {
+            _bloquearFormularioCl();
+            _mostrarBannerCl('✅ Checklist ya completado para este equipo. Solo lectura.', 'ok');
+            return;
         }
 
         const data = ticket.checklist_tecnico;
@@ -605,11 +670,36 @@ async function _completarChecklist() {
     datos.completado = true;
     datos.completado_por = responsable;
     datos.fecha_completado = new Date().toISOString();
+
+    const equipoIndex = _getEquipoIndexCl();
+    // Orden de Preparación (equipo_index presente) — usa la acción
+    // nueva, que marca ESE equipo puntual como completado y tilda
+    // Calidad Verificada automáticamente en la grilla, en vez de
+    // pisar un único campo de checklist a nivel ticket que no
+    // distingue entre varios equipos del mismo pedido. Pedido por
+    // Cristian con captura: "cuando aprietas marcar como completado
+    // tildás calidad y aparece [checklist] completado".
+    const accion = (equipoIndex !== null) ? 'registrarChecklistCompletado' : 'st_guardarChecklist';
+    const payload = (equipoIndex !== null)
+        ? {
+            accion: accion,
+            id_ticket: ticketId,
+            equipo_index: equipoIndex,
+            modelo: CL_MODELO,
+            serie: document.getElementById('c-serie')?.value || '',
+            tecnico: responsable,
+            cliente: document.getElementById('c-dealer')?.value || '',
+            respuestas: datos.respuestas,
+            observaciones: datos.comentarios,
+            fecha: datos.fecha_completado,
+          }
+        : { accion: accion, id_ticket: ticketId, checklist_tecnico: datos };
+
     try {
         const resp = await fetch(GAS_URL_CL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ accion: 'st_guardarChecklist', id_ticket: ticketId, checklist_tecnico: datos }),
+            body: JSON.stringify(payload),
         });
         const r = await resp.json();
         if (!r.ok) throw new Error(r.error || 'Error desconocido');
