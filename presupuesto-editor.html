@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.14.1 (BUG REAL encontrado — el campo "Descuento" de cada ítem se auto-completaba con la fórmula (Precio LISTA − Precio CONTADO CNO) / Precio LISTA, sin importar qué tan chica fuera la diferencia. Si en la planilla Lista_Precios el Precio Contado de un equipo quedaba cargado con apenas $1-2 de diferencia contra el Precio Lista (redondeo de centavos al tipear, no un descuento real), la fórmula igual generaba un "descuento" de fracciones de % — en un ítem de ~$30.000, una diferencia de $2 daba 0,01% de descuento = exactos $3 de "Descuentos (Contado)" en el Total, sin que nadie hubiera tocado nada. Reportado por Cristian: "no puse descuento, quiero que sea 0, y no $3". Arreglado en DOS lugares: (1) el auto-cálculo ahora trata cualquier diferencia menor a 0.05% como ruido de redondeo y la deja en 0%, para presupuestos nuevos; (2) clamp defensivo agregado también en _calcularItem(), que corrige presupuestos VIEJOS ya guardados en Firebase con este descuento fantasma sin necesidad de regenerarlos — al volver a abrirlos, el 0,01% guardado se recalcula como 0% real. Confirmado con test numérico reproduciendo el caso exacto (ítem $30.000, Precio Contado con $2 de diferencia → $3 de descuento fantasma → $0 con el fix).) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.13.2 (BUG REAL de redondeo encontrado — en las tarjetas de Modalidades de Pago (TLC 6/12), las cifras "sin IVA" y "con IVA" se redondeaban CADA UNA por separado, arrancando las dos desde el número exacto sin redondear. Como el redondeo de cada una podía "caer" en un múltiplo de 10 distinto, si el cliente tomaba el "sin IVA" que VE en pantalla y le sumaba el IVA a mano, el resultado no coincidía con el "con IVA" que mostraba el sistema — una diferencia de unos pocos dólares sin ninguna explicación visible. Reportado por Cristian: "hace descuentos locos de 3$". Ahora el "con IVA" se calcula encadenado sobre el "sin IVA" YA REDONDEADO, no sobre el exacto — las dos cifras que ve el cliente son consistentes entre sí. Confirmado con números reales: antes había una diferencia de $5,75 en un caso concreto (anticipo USD 26.141,20, IVA 10,5%), ahora coincide siempre.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.13.1 (Fix — al generar un presupuesto (usado tanto desde el tablero de Servicio como desde Ventas, mismo archivo), cuando el guardado salía bien, el código navegaba directo a la página siguiente sin nunca volver a cambiar el texto del botón "Guardando...". Si esa navegación se trababa por cualquier motivo (conexión lenta, algo del navegador), quedaba mostrando "Guardando…" para siempre, aunque el presupuesto YA estuviera guardado de verdad. Reportado por Cristian: "a veces se quedan en estado guardando, y no pasan de ahí, aunque sí los guarda". Ahora, si en 2.5s la navegación no se completó sola, aparece un aviso claro con un link para continuar a mano — nunca se queda sin ninguna salida. Confirmado con test simulando exactamente ese escenario (guardado exitoso + navegación que no ocurre).) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.7 (Ajuste al pedido anterior: el redondeo hacia arriba de las 4 cifras de "Modalidades de Pago" pasa de múltiplos de 100 a múltiplos de 10 — ej. USD 26.150,00 → USD 26.150 en vez de 26.200. Pedido por Cristian: "andá perfecto pero hacelo en el orden de los 10".) -->
@@ -520,9 +521,18 @@ function _restaurarDraftYItemPendiente() {
       // — se auto-completa al agregar el ítem, para que el campo
       // Descuento refleje de entrada el precio de contado real del
       // catálogo. Queda visible y editable ahí mismo.
-      var descuentoAuto = (precioLista > 0)
-        ? Math.max(0, Math.round(((precioLista - precioContado) / precioLista) * 10000) / 100)
-        : 0;
+      var descuentoAuto = 0;
+      if (precioLista > 0) {
+        var _pctExactoContado = ((precioLista - precioContado) / precioLista) * 100;
+        // Diferencias menores a 0.05% entre Precio Lista y Precio
+        // Contado CNO son ruido de redondeo de centavos en la
+        // planilla, no un descuento real — se tratan como 0% en vez
+        // de arrastrar un "descuento fantasma" de fracciones de %.
+        // Reportado por Cristian: "no puse descuento, quiero que sea
+        // 0, y no $3" — un ítem de ~$30.000 con $2 de diferencia en
+        // la planilla generaba 0,01% de descuento = exactos $3.
+        descuentoAuto = (_pctExactoContado > 0.05) ? Math.round(_pctExactoContado * 100) / 100 : 0;
+      }
       // Antes de agregar el ítem nuevo, ¿ya existe uno igual en la
       // lista? (mismo nombre+precio+moneda — típico cuando se envía la
       // misma ficha técnica más de una vez, o se agrega el mismo
@@ -1026,6 +1036,7 @@ function _calcularItem(it) {
     conDescuento = Math.max(0, bruto - descuentoUSD);
   } else {
     var descuentoPct = Math.max(0, it.descuento || 0);
+    if (descuentoPct < 0.05) descuentoPct = 0; // ruido de redondeo, no un descuento real — mismo criterio que el clamp de descuentoAuto
     conDescuento = bruto * (1 - descuentoPct / 100);
   }
   var iva = conDescuento * (it.iva || 0) / 100;
