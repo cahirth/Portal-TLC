@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<!-- Portal TLC | checklist-HOCT-1F.html | v2026.08.13.1 (Cristian pegó el archivo viejo (v2026.07.18.1) directo en el chat, ya que no podía adjuntar más archivos — reconstruido con el mismo patrón "Prerrequisito #1" que ya tiene HRK-1.html v2026.08.10.2: (1) checklist_tecnico pasa de ser un campo ÚNICO a nivel del TICKET COMPLETO a ser por-equipo (ticket.equipos[i].checklist_completado), usando la acción registrarChecklistCompletado en vez de st_guardarChecklist para tickets con equipo_index — con 2+ equipos HOCT-1F en el mismo pedido, antes compartían el mismo campo de completado, y un checklist marcado en UNO aparecía como completado en TODOS. (2) N° de Serie ahora SÍ se prellena de verdad — antes intentaba leer ticket.equipo_modelo/ticket.equipo_serie, campos que NO EXISTEN en un ticket de Orden de Preparación (esos datos viven en ticket.equipos[i], no sueltos en el ticket) — por eso siempre aparecía vacío ("Serial number"), aunque la grilla de la Orden SÍ tuviera el número cargado. Ahora lee primero de los parámetros de la URL (cliente/serie/tecnico/rol, que servicio.html ya manda — ver _urlChecklistFila) y, si faltan, cae a ticket.equipos[equipo_index]. (3) Botón "Reabrir checklist" para Administrador (mismo criterio: reabrirChecklistOrden, FotoMap.gs v184). Reportado por Cristian con captura: "cuando se asigna manualmente el número de serie... se debe cargar el campo en el checklist".) -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Regular Check Sheet HOCT-1(F) — Tecnología Láser Corneal</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: #f1f5f9;
+    color: #0f172a;
+    margin: 0;
+    padding: 20px 12px 60px;
+  }
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 28px 26px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+  .header-brand {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: 0.3px;
+  }
+  .header-brand span { color: #3a86ff; }
+  .doc-title {
+    text-align: right;
+  }
+  .doc-title h1 {
+    font-size: 20px;
+    margin: 0 0 2px;
+    color: #0f172a;
+  }
+  .doc-title .sub {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .datos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 20px;
+    margin-bottom: 24px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  @media (max-width: 560px) { .datos-grid { grid-template-columns: 1fr; } }
+  .campo label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    margin-bottom: 4px;
+  }
+  .campo input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+  }
+  .campo input:focus { outline: 2px solid #3a86ff; outline-offset: 1px; }
+
+  .item {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .item-cat {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .item-cat .n {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: #0f172a;
+    color: #fff;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .item-detail {
+    font-size: 13px;
+    color: #374151;
+    line-height: 1.55;
+    margin-bottom: 10px;
+    white-space: pre-line;
+  }
+  .item-imgs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+  .item-result {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .item-result .lbl { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+  .radio-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .radio-opt input[type=radio] { width: 16px; height: 16px; cursor: pointer; accent-color: #3a86ff; }
+  .radio-opt.ok input:checked ~ span, .radio-opt.ok input:checked { accent-color: #16a34a; }
+  .radio-opt.bad input[type=radio] { accent-color: #dc2626; }
+
+  .valores-extra {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 10px 0;
+  }
+  .valores-extra .campo { flex: 1; min-width: 140px; }
+  .valores-extra input { text-align: center; font-weight: 700; }
+
+  .comment-box {
+    margin-top: 20px;
+  }
+  .comment-box label {
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 6px;
+  }
+  .comment-box textarea {
+    width: 100%;
+    min-height: 90px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+  }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-primary { background: #0f172a; color: #fff; }
+  .btn-primary:hover { background: #1e293b; }
+  .btn-secondary { background: transparent; border: 1px solid #cbd5e1; color: #475569; }
+  .btn-secondary:hover { background: #f1f5f9; }
+
+  .signature-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-top: 28px;
+  }
+  @media (max-width: 560px) { .signature-row { grid-template-columns: 1fr; } }
+  .signature-box {
+    border-top: 1px solid #0f172a;
+    padding-top: 6px;
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
+  }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page { box-shadow: none; padding: 10px 14px; }
+    .no-print { display: none !important; }
+    .item { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="no-print" style="margin-bottom:14px;">
+    <button onclick="_volverChecklist()" style="display:flex;align-items:center;gap:6px;padding:9px 16px;
+      border-radius:8px;border:none;background:#3a86ff;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">
+      ← Volver
+    </button>
+  </div>
+
+  <div class="header">
+    <div class="header-brand" style="display:flex; align-items:center;">
+      <img src="https://cahirth.github.io/Portal-TLC/icons/logo-tlc.png"
+           style="height:34px; width:auto; object-fit:contain;"
+           onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', 'Tecnología <span>Láser</span> Corneal')"
+           alt="Tecnología Láser Corneal">
+    </div>
+    <div class="doc-title">
+      <h1>Regular Check Sheet</h1>
+      <div class="sub">HOCT-1 / HOCT-1F · OCT &amp; Fundus Camera</div>
+    </div>
+  </div>
+
+  <div id="cl-status-banner" class="no-print" style="display:none; margin-bottom:16px; padding:10px 14px; border-radius:8px; font-size:13px; font-weight:700; text-align:center;"></div>
+
+  <div class="datos-grid">
+    <div class="campo"><label>Dealer</label><input type="text" id="c-dealer" placeholder="Nombre del cliente / clínica"></div>
+    <div class="campo"><label>Fecha</label><input type="date" id="c-fecha"></div>
+    <div class="campo"><label>N° de Serie</label><input type="text" id="c-serie" placeholder="Serial number"></div>
+    <div class="campo"><label>Responsable</label><select id="c-engineer"><option value="">Cargando técnicos…</option></select></div>
+    <div class="campo" style="grid-column: 1 / -1;">
+      <label>Modelo</label>
+      <div style="display:flex;gap:18px;margin-top:2px;">
+        <label class="radio-opt"><input type="radio" name="modelo" value="HOCT-1">HOCT-1</label>
+        <label class="radio-opt"><input type="radio" name="modelo" value="HOCT-1F">HOCT-1F</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="item-cat" style="font-size:15px;margin:18px 0 4px;">1. Functional Test</div>
+  <div class="item-cat" style="font-size:12px;color:#64748b;text-transform:none;font-weight:600;margin-bottom:12px;">(1) Common Function</div>
+  <div class="item">
+    <div class="item-cat"><span class="n">1</span>Initialization</div>
+    <div class="item-detail">No debe haber fallas durante la inicialización.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r1" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r1" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">2</span>External Fixation</div>
+    <div class="item-detail">Debe haber iluminación.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r2" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r2" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">3</span>X Y Z-axis</div>
+    <div class="item-detail">El joystick debe moverse arriba, abajo, izquierda y derecha sin trabas, rigidez ni ruidos anormales.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r3" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r3" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">4</span>Scan I/F (joystick switch)</div>
+    <div class="item-detail">Según el botón del joystick del equipo, el escaneo debe correr sin problemas. Debe funcionar normalmente al presionar el joystick (Scan completado y toma de Fundus).</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r4" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r4" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">5</span>Chin Rest Switch</div>
+    <div class="item-detail">Debe funcionar normalmente al presionar el switch arriba y abajo, sin trabas ni ruido anormal en el movimiento del apoyo mentón.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r5" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r5" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">6</span>OPT. Switch</div>
+    <div class="item-detail">OPT. (OPTIMIZE) debe funcionar normalmente al accionar el switch.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r6" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r6" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item-cat" style="font-size:12px;color:#64748b;text-transform:none;font-weight:600;margin:18px 0 12px;">(2) Motor and PI test</div>
+  <div class="item">
+    <div class="item-cat"><span class="n">7</span>Step motor</div>
+    <div class="item-detail">Seleccionar el número de step motor y probar cada motor.</div>
+    <div class="valores-extra"><div class="campo"><label>N° de Motor probado</label><input type="text" placeholder="Ej: 1, 2, 3..."></div></div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r7" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r7" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">8</span>XZ stage motor</div>
+    <div class="item-detail">Seleccionar número de motor y probar cada uno (motor X, motor Z). Seleccionar dirección y probar cada dirección (CW, CCW).</div>
+    <div class="valores-extra"><div class="campo"><label>N° de Motor</label><input type="text" placeholder=""></div><div class="campo"><label>Dirección (CW/CCW)</label><input type="text" placeholder=""></div></div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r8" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r8" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">9</span>Motor PI</div>
+    <div class="item-detail">Iniciar el test de PI y probar el estado de cada PI de motor.</div>
+    <div class="valores-extra"><div class="campo"><label>Motor PI probado</label><input type="text" placeholder=""></div></div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r9" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r9" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item-cat" style="font-size:15px;margin:24px 0 12px;">2. OCT Test (HOCT-1 / HOCT-1F)</div>
+  <div class="item">
+    <div class="item-cat"><span class="n">10</span>Signal test</div>
+    <div class="item-detail">La señal SNR debe ser de al menos 8.2.</div>
+    <div class="valores-extra"><div class="campo"><label>SNR medido</label><input type="text" placeholder="mín. 8.2"></div></div>
+    </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">11</span>SLD power</div>
+    <div class="item-detail">La potencia SLD de referencia es de 550uW a 650uW.</div>
+    <div class="valores-extra"><div class="campo"><label>SLD medido (uW)</label><input type="text" placeholder="550–650"></div></div>
+    </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">12</span>Pattern test</div>
+    <div class="item-detail">Patrón circular en el lente OBJ.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r12" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r12" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">13</span>OCT Scan</div>
+    <div class="item-detail">1. El Split Focus está alineado como línea recta en la pantalla IR FUNDUS.
+2. La imagen de retina de la pantalla B scan está entre las líneas guía verdes.
+3. El video enface en tiempo real marcado con el rectángulo rojo muestra el patrón de grilla.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r13" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r13" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item-cat" style="font-size:15px;margin:24px 0 12px;">3. FUNDUS Test (HOCT-1F)</div>
+  <div class="item">
+    <div class="item-cat"><span class="n">14</span>Focus</div>
+    <div class="item-detail">Medir fundus con ojo modelo 0D y verificar el foco de la imagen de fundus.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r14" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r14" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">15</span>Hot spot</div>
+    <div class="item-detail">Medir fundus y verificar el centro de la imagen para ver si hay un punto caliente (hot spot).</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r15" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r15" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">16</span>Working distance</div>
+    <div class="item-detail">1. Alinear el equipo hasta que la marca objetivo y el ojo modelo estén enfocados correctamente en la pantalla anterior.
+2. Alinear el equipo hasta que el punto de trabajo en la pantalla IR izquierda quede posicionado sobre la línea guía azul.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r16" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r16" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">17</span>Anterior LED</div>
+    <div class="item-detail">Verificar que los 6 puntos del LED anterior estén encendidos (excepto los dos puntos centrales de los ocho puntos en la pantalla anterior).</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r17" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r17" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="item">
+    <div class="item-cat"><span class="n">18</span>Fundus camera</div>
+    <div class="item-detail">No debe haber áreas asimétricas, desenfoque ni manchas en las imágenes de fundus.</div>
+    <div class="item-result">
+      <span class="lbl">Resultado:</span>
+      <label class="radio-opt ok"><input type="radio" name="r18" value="pass">Pass</label>
+      <label class="radio-opt bad"><input type="radio" name="r18" value="fail">Fail</label>
+    </div>
+  </div>
+
+  <div class="comment-box">
+    <label>Comentarios</label>
+    <textarea id="c-comentarios" placeholder="Observaciones adicionales, repuestos utilizados, recomendaciones..."></textarea>
+  </div>
+
+  <div class="signature-row">
+    <div class="signature-box">Firma del Responsable</div>
+    <div class="signature-box">Firma de Conformidad del Cliente</div>
+  </div>
+
+  <div class="actions no-print">
+    <button class="btn btn-primary" id="cl-btn-guardar" onclick="_guardarChecklist()">💾 Guardar respuestas</button>
+    <button class="btn btn-primary" id="cl-btn-completar" style="background:#16a34a;" onclick="_completarChecklist()">✅ Marcar como completado</button>
+    <button class="btn btn-secondary" onclick="window.print()">🖨️ Imprimir / PDF</button>
+    <button class="btn btn-secondary" onclick="if(confirm('¿Limpiar todos los campos del formulario?')) location.reload();">Limpiar formulario</button>
+  </div>
+
+</div>
+
+<script>
+// ── Integración con Firebase RTDB — Checklist técnico vinculado a un ticket ──
+const FIREBASE_RTDB_URL_CL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+const GAS_URL_CL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+const CL_MODELO = 'HOCT-1F';
+// Numeración de ítems no correlativa en este formulario (salta del 9 al 12)
+const CL_ITEM_IDS = [1,2,3,4,5,6,7,8,9,12,13,14,15,16,17,18];
+
+const TECNICO_NOMBRE_CL = {
+    sin_asignar: '', juan_garro: 'Juan Garro', damian_sosa: 'Damián Sosa',
+    fernando_del_campo: 'Fernando Del Campo', cristian_hirth: 'Cristian Hirth',
+    veronica_ribaita: 'Verónica Ribaita', lourdes_davalos: 'Lourdes Dávalos',
+    lucio_raineri: 'Lucio Raineri',
+};
+
+function _escHtmlCl(s) {
+    const d = document.createElement('div');
+    d.textContent = String(s || '');
+    return d.innerHTML;
+}
+
+function _asegurarOpcionCl(sel, valor) {
+    if (!sel || !valor) return;
+    // Si listarTecnicos falló, el <select> se reemplaza por un <input>
+    // de texto libre (ver _cargarTecnicosDropdown) — ese elemento no
+    // tiene .options, así que hay que tratarlo distinto o esto
+    // explota apenas se intenta prellenar el responsable sin conexión.
+    if (sel.tagName !== 'SELECT') { sel.value = valor; return; }
+    const existe = Array.from(sel.options).some(function(o) { return o.value === valor; });
+    if (!existe) {
+        const opt = document.createElement('option');
+        opt.value = valor;
+        opt.textContent = valor;
+        sel.appendChild(opt);
+    }
+    sel.value = valor;
+}
+
+async function _cargarTecnicosDropdown() {
+    const sel = document.getElementById('c-engineer');
+    if (!sel) return;
+    try {
+        const resp = await fetch(GAS_URL_CL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ accion: 'listarTecnicos' }),
+        });
+        const r = await resp.json();
+        if (!r.ok || !Array.isArray(r.tecnicos) || !r.tecnicos.length) throw new Error(r.error || 'Sin técnicos disponibles');
+        sel.innerHTML = '<option value="">-- Seleccionar --</option>' +
+            r.tecnicos.map(function(t) { return '<option value="' + _escHtmlCl(t.nombre) + '">' + _escHtmlCl(t.nombre) + '</option>'; }).join('');
+    } catch (err) {
+        console.warn('[Checklist] No se pudo cargar la lista de técnicos, se deja como texto libre:', err.message);
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = 'c-engineer';
+        input.placeholder = 'Técnico / Responsable';
+        sel.replaceWith(input);
+    }
+}
+
+function _getTicketId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('ticket') || '';
+}
+
+// equipo_index — cuál de los equipos de la Orden de Preparación es
+// este checklist puntual (un mismo ticket puede tener varios HOCT-1F).
+// Sin esto, el checklist_completado se guardaba a nivel del TICKET
+// ENTERO — con 2 equipos en el mismo pedido, completar el checklist
+// de UNO lo marcaba como completado también en el OTRO.
+function _getEquipoIndexCl() {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('equipo_index');
+    return (v !== null && v !== '') ? parseInt(v, 10) : null;
+}
+
+// Datos que servicio.html ya manda por la URL cuando abre este
+// checklist desde la grilla de la Orden de Preparación (cliente,
+// serie, técnico, rol) — se usan como primera fuente antes de ir a
+// buscar el ticket completo a Firebase, que es más lento y en el
+// caso de un ticket con VARIOS equipos ni siquiera tiene estos datos
+// a nivel ticket (son por-equipo).
+function _getParamsUrlCl() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        cliente: params.get('cliente') || '',
+        serie: params.get('serie') || '',
+        tecnico: params.get('tecnico') || '',
+        rol: params.get('rol') || '',
+    };
+}
+
+// Volver al ticket de origen (si se abrió con ?ticket=ID) o, si no,
+// usar el historial del navegador — necesario porque en iPhone, al
+// abrir el Portal como app instalada, no hay gesto nativo de "atrás".
+function _volverChecklist() {
+    const ticketId = _getTicketId();
+    if (ticketId) {
+        window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(ticketId);
+        return;
+    }
+    if (window.history.length > 1) { window.history.back(); return; }
+    window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html';
+}
+
+// Reabre este checklist puntual — solo Administrador (validado
+// también en el backend, esto es nomás para no mostrar el botón a
+// quien no corresponde).
+async function _reabrirChecklistCl(equipoIndex) {
+    if (!confirm('¿Reabrir este checklist? Va a quedar editable de nuevo.')) return;
+    const ticketId = _getTicketId();
+    try {
+        const resp = await fetch(GAS_URL_CL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ accion: 'reabrirChecklistOrden', id_ticket: ticketId, equipo_index: equipoIndex, vendedorRol: _getParamsUrlCl().rol }),
+        });
+        const r = await resp.json();
+        if (!r.ok) { alert('No se pudo reabrir: ' + (r.error || '')); return; }
+        location.reload();
+    } catch (err) {
+        alert('Error de conexión al reabrir: ' + err.message);
+    }
+}
+
+function _mostrarBannerCl(texto, tipo) {
+    const b = document.getElementById('cl-status-banner');
+    if (!b) return;
+    b.style.display = 'block';
+    b.textContent = texto;
+    if (tipo === 'ok') { b.style.background = '#f0fdf4'; b.style.border = '1px solid #16a34a'; b.style.color = '#16a34a'; }
+    else if (tipo === 'warn') { b.style.background = '#fffbeb'; b.style.border = '1px solid #d97706'; b.style.color = '#d97706'; }
+    else { b.style.background = '#fef2f2'; b.style.border = '1px solid #dc2626'; b.style.color = '#dc2626'; }
+}
+
+function _recolectarDatosCl() {
+    const respuestas = {};
+    CL_ITEM_IDS.forEach(function(i) {
+        const sel = document.querySelector(`input[name="r${i}"]:checked`);
+        respuestas['r' + i] = sel ? sel.value : '';
+    });
+    const modeloSel = document.querySelector('input[name="modelo"]:checked');
+    return {
+        modelo: CL_MODELO,
+        submodelo: modeloSel ? modeloSel.value : '',
+        dealer: document.getElementById('c-dealer')?.value || '',
+        fecha: document.getElementById('c-fecha')?.value || '',
+        serie: document.getElementById('c-serie')?.value || '',
+        responsable: document.getElementById('c-engineer')?.value || '',
+        comentarios: document.getElementById('c-comentarios')?.value || '',
+        respuestas,
+    };
+}
+
+function _aplicarDatosCl(d) {
+    if (!d) return;
+    if (d.dealer !== undefined) document.getElementById('c-dealer').value = d.dealer;
+    if (d.fecha !== undefined) document.getElementById('c-fecha').value = d.fecha;
+    if (d.serie !== undefined) document.getElementById('c-serie').value = d.serie;
+    if (d.comentarios !== undefined) document.getElementById('c-comentarios').value = d.comentarios;
+    if (d.responsable !== undefined) _asegurarOpcionCl(document.getElementById('c-engineer'), d.responsable);
+    if (d.submodelo) {
+        const el = document.querySelector(`input[name="modelo"][value="${d.submodelo}"]`);
+        if (el) el.checked = true;
+    }
+    if (d.respuestas) {
+        Object.keys(d.respuestas).forEach(key => {
+            const val = d.respuestas[key];
+            if (!val) return;
+            const el = document.querySelector(`input[name="${key}"][value="${val}"]`);
+            if (el) el.checked = true;
+        });
+    }
+}
+
+function _bloquearFormularioCl() {
+    document.querySelectorAll('.campo input, .campo select, .comment-box textarea, .item-result input[type="radio"]').forEach(el => {
+        el.disabled = true;
+    });
+    const btnG = document.getElementById('cl-btn-guardar');
+    const btnC = document.getElementById('cl-btn-completar');
+    if (btnG) btnG.style.display = 'none';
+    if (btnC) btnC.style.display = 'none';
+}
+
+async function _cargarChecklistDesdeFirebase() {
+    const ticketId = _getTicketId();
+    if (!ticketId) return;
+    const equipoIndex = _getEquipoIndexCl();
+    const paramsUrl = _getParamsUrlCl();
+
+    // Prellenar con lo que ya mandó servicio.html por la URL — antes
+    // de ir a buscar el ticket completo a Firebase (más lento).
+    const dealerEl0 = document.getElementById('c-dealer');
+    const serieEl0 = document.getElementById('c-serie');
+    const responsableElPrefill0 = document.getElementById('c-engineer');
+    if (dealerEl0 && !dealerEl0.value && paramsUrl.cliente) dealerEl0.value = paramsUrl.cliente;
+    if (serieEl0 && !serieEl0.value && paramsUrl.serie) serieEl0.value = paramsUrl.serie;
+    if (paramsUrl.tecnico) _asegurarOpcionCl(responsableElPrefill0, paramsUrl.tecnico);
+
+    try {
+        const resp = await fetch(`${FIREBASE_RTDB_URL_CL}/servicio_tecnico/${ticketId}.json`, { cache: 'no-store' });
+        const ticket = await resp.json();
+        if (!ticket) {
+            _mostrarBannerCl('⚠️ No se encontró el ticket ' + ticketId + ' en el sistema.', 'error');
+            return;
+        }
+
+        const dealerEl = document.getElementById('c-dealer');
+        const fechaEl  = document.getElementById('c-fecha');
+        const serieEl  = document.getElementById('c-serie');
+        const responsableElPrefill = document.getElementById('c-engineer');
+        if (dealerEl && !dealerEl.value) dealerEl.value = ticket.cliente || '';
+        if (fechaEl && !fechaEl.value) fechaEl.value = new Date().toISOString().slice(0, 10);
+        if (serieEl && !serieEl.value) {
+            // Orden de Preparación (equipo_index presente) — el N° de
+            // Serie vive en ticket.equipos[i], NO en ticket.equipo_serie
+            // (ese campo suelto no existe para este tipo de ticket).
+            // Reportado por Cristian con captura: "cuando se asigna
+            // manualmente el número de serie... se debe cargar el campo
+            // en el checklist".
+            if (equipoIndex !== null && Array.isArray(ticket.equipos) && ticket.equipos[equipoIndex]) {
+                serieEl.value = ticket.equipos[equipoIndex].nro_serie || '';
+            } else {
+                const partes = [ticket.equipo_modelo || '', ticket.equipo_serie || ''].filter(Boolean);
+                serieEl.value = partes.join(' / ');
+            }
+        }
+        if (responsableElPrefill && !responsableElPrefill.value) {
+            const nombreTecnico = TECNICO_NOMBRE_CL[ticket.tecnico_asignado] || ticket.tecnico_responsable_nombre || '';
+            if (nombreTecnico) _asegurarOpcionCl(responsableElPrefill, nombreTecnico);
+        }
+        // Preseleccionar el submodelo (HOCT-1 / HOCT-1F) según el equipo
+        if (!document.querySelector('input[name="modelo"]:checked')) {
+            let modeloTxt = '';
+            if (equipoIndex !== null && Array.isArray(ticket.equipos) && ticket.equipos[equipoIndex]) {
+                modeloTxt = (ticket.equipos[equipoIndex].descripcion || ticket.equipos[equipoIndex].sku || '').toUpperCase();
+            } else {
+                modeloTxt = (ticket.equipo_modelo || '').toUpperCase();
+            }
+            const sub = modeloTxt.indexOf('HOCT-1F') !== -1 ? 'HOCT-1F' : (modeloTxt.indexOf('HOCT-1') !== -1 ? 'HOCT-1' : '');
+            if (sub) { const el = document.querySelector(`input[name="modelo"][value="${sub}"]`); if (el) el.checked = true; }
+        }
+
+        // Orden de Preparación — si ESE equipo puntual ya tiene el
+        // checklist marcado completo, bloquear el formulario de
+        // entrada (antes esto solo miraba ticket.checklist_tecnico, un
+        // campo único que no distingue entre equipos).
+        if (equipoIndex !== null && Array.isArray(ticket.equipos) && ticket.equipos[equipoIndex] && ticket.equipos[equipoIndex].checklist_completado) {
+            _bloquearFormularioCl();
+            _mostrarBannerCl('✅ Checklist ya completado para este equipo. Solo lectura.', 'ok');
+            if (paramsUrl.rol === 'Administrador') {
+                const banner = document.getElementById('cl-status-banner');
+                const btnReabrir = document.createElement('button');
+                btnReabrir.textContent = '🔓 Reabrir checklist (solo Administrador)';
+                btnReabrir.style.cssText = 'margin-top:10px;padding:8px 16px;border-radius:6px;border:1px solid #b91c1c;background:#fff;color:#b91c1c;font-size:12.5px;font-weight:700;cursor:pointer;display:block;';
+                btnReabrir.onclick = () => _reabrirChecklistCl(equipoIndex);
+                if (banner) banner.appendChild(btnReabrir);
+            }
+            return;
+        }
+
+        // Sin equipo_index (checklist suelto, fuera del circuito de
+        // Preparación) — mantiene el comportamiento viejo: un solo
+        // checklist_tecnico a nivel ticket.
+        const data = ticket.checklist_tecnico;
+        if (equipoIndex === null && data) {
+            _aplicarDatosCl(data);
+            if (data.completado) {
+                _bloquearFormularioCl();
+                const fechaComp = data.fecha_completado ? new Date(data.fecha_completado).toLocaleString('es-AR') : '';
+                _mostrarBannerCl(`✅ Checklist completado${data.completado_por ? ' por ' + data.completado_por : ''}${fechaComp ? ' — ' + fechaComp : ''}. Solo lectura.`, 'ok');
+            } else {
+                _mostrarBannerCl('📋 Checklist en progreso — se guardó una versión previa, revisá los datos antes de continuar.', 'warn');
+            }
+        }
+
+        const responsableEl = document.getElementById('c-engineer');
+        if (!responsableEl?.value?.trim()) {
+            _mostrarBannerCl('⚠️ Ingresá el nombre del técnico responsable antes de continuar — es obligatorio.', 'warn');
+            responsableEl?.focus();
+        }
+    } catch (err) {
+        console.warn('[Checklist] No se pudo cargar desde Firebase:', err.message);
+    }
+}
+
+async function _guardarChecklist(silencioso) {
+    const ticketId = _getTicketId();
+    if (!ticketId) {
+        if (!silencioso) alert('Este checklist no está vinculado a ningún ticket (falta el parámetro ?ticket= en la URL), así que no se puede guardar en el sistema. Podés igual imprimirlo/exportarlo a PDF.');
+        return false;
+    }
+    const responsableEl = document.getElementById('c-engineer');
+    if (!responsableEl?.value?.trim()) {
+        if (!silencioso) {
+            alert('Completá el campo "Responsable" antes de guardar el checklist. Es obligatorio.');
+            responsableEl?.focus();
+            responsableEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        return false;
+    }
+    const datos = _recolectarDatosCl();
+    datos.completado = false;
+    datos.fecha_guardado = new Date().toISOString();
+    try {
+        const resp = await fetch(GAS_URL_CL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ accion: 'st_guardarChecklist', id_ticket: ticketId, checklist_tecnico: datos }),
+        });
+        const r = await resp.json();
+        if (!r.ok) throw new Error(r.error || 'Error desconocido');
+        if (!silencioso) { _mostrarBannerCl('💾 Respuestas guardadas correctamente.', 'ok'); alert('💾 Checklist guardado correctamente.'); }
+        return true;
+    } catch (err) {
+        if (!silencioso) alert('No se pudo guardar el checklist: ' + err.message);
+        return false;
+    }
+}
+
+// Marca el checklist como completado — si viene con equipo_index
+// (Orden de Preparación), usa registrarChecklistCompletado (por
+// equipo puntual, tilda Calidad automáticamente). Si no, cae al
+// comportamiento viejo (st_guardarChecklist, a nivel ticket entero) —
+// backward-compat para checklists sueltos fuera del circuito de
+// Preparación.
+async function _completarChecklist() {
+    const ticketId = _getTicketId();
+    if (!ticketId) {
+        alert('Este checklist no está vinculado a ningún ticket, no se puede marcar como completado.');
+        return;
+    }
+    if (!confirm('¿Marcar este checklist como COMPLETADO? Una vez completado no se va a poder seguir editando.')) return;
+    const responsable = document.getElementById('c-engineer')?.value?.trim();
+    if (!responsable) {
+        alert('Completá el campo "Responsable" antes de marcar el checklist como completado.');
+        return;
+    }
+    const datos = _recolectarDatosCl();
+    datos.completado = true;
+    datos.completado_por = responsable;
+    datos.fecha_completado = new Date().toISOString();
+
+    const equipoIndex = _getEquipoIndexCl();
+    try {
+        let resp, r;
+        if (equipoIndex !== null) {
+            resp = await fetch(GAS_URL_CL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({
+                    accion: 'registrarChecklistCompletado',
+                    id_ticket: ticketId, equipo_index: equipoIndex,
+                    modelo: datos.submodelo || CL_MODELO, serie: datos.serie,
+                    tecnico: responsable, cliente: datos.dealer,
+                    respuestas: datos.respuestas, observaciones: datos.comentarios,
+                    fecha: datos.fecha_completado,
+                }),
+            });
+        } else {
+            resp = await fetch(GAS_URL_CL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ accion: 'st_guardarChecklist', id_ticket: ticketId, checklist_tecnico: datos }),
+            });
+        }
+        r = await resp.json();
+        if (!r.ok) throw new Error(r.error || 'Error desconocido');
+        _bloquearFormularioCl();
+        _mostrarBannerCl(`✅ Checklist marcado como completado por ${responsable}. Solo lectura.`, 'ok');
+        alert(`✅ Checklist marcado como COMPLETADO por ${responsable}.`);
+    } catch (err) {
+        alert('No se pudo marcar el checklist como completado: ' + err.message);
+    }
+}
+
+(async function _iniciarChecklistCl() {
+    await _cargarTecnicosDropdown();
+    await _cargarChecklistDesdeFirebase();
+})();
+</script>
+</body>
+</html>
