@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.14.4 (DIAGNÓSTICO — Cristian reportó "el precio de lista está clavado en 61800, no actualiza tildando accesorios". Probado el archivo real (v2026.08.14.3) contra un precios.json fresco suyo: el precio SÍ se actualiza bien (61.800 → correctamente sumando cada módulo tildado, confirmado con Kit Conectividad real). El código no tiene el bug — la sospecha es que en GitHub seguía publicada una versión anterior a v2026.08.14.2 (la que arreglaba justamente este comportamiento; antes de esa versión, el precio quedaba fijo A PROPÓSITO). Como este archivo no tenía NINGÚN log de versión visible en consola (a diferencia de presupuesto-editor.html, que sí lo tiene desde siempre), no había forma rápida de confirmar qué versión corría el navegador sin mirar el código fuente — agregado ahora. También agregado un chequeo defensivo: si calculo-financiacion.js no llegó a cargar (ej. no se subió a la misma carpeta que este archivo), ahora avisa clarito por consola y en pantalla en vez de fallar en silencio con un TypeError críptico.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.08.14.3 (Migrado a leer de Firebase RTDB primero (mismo patrón ya probado en selector-dispositivos.html: ~100-200ms, siempre fresco, no depende de que GitHub Pages termine de propagar el último cambio del Excel), con fallback automático a precios.json si Firebase falla o está vacío — nunca se rompe la ficha, en el peor caso vuelve al comportamiento de siempre. Agregado _MAPA_HEADERS_FIREBASE local (mismo criterio que selector-dispositivos.html, con "Pertenece_a" → "Pertenece a" sumado — ese campo faltaba en la tabla original porque hasta ahora nadie lo necesitaba desde Firebase, es nuevo de la arquitectura Padre-Hijo). También sumado ese mismo campo a selector-dispositivos.html por las dudas de que a futuro necesite Padre-Hijo también. Confirmado con 2 tests nuevos: (A) carga real desde un objeto crudo de Firebase con headers sanitizados (espacios→"_"), incluyendo que el Hijo se encuentre bien vía "Pertenece_a"; (B) con Firebase simulando estar caído, cae al fallback de precios.json sin ningún error visible para el usuario.) -->
+<!-- Portal TLC | ficha-equipo.html | v2026.08.14.2 (2 cambios: (1) El "Precio de Lista" del encabezado ahora se actualiza EN VIVO al tildar/destildar módulos (antes quedaba fijo mostrando solo el Padre) — pedido por Cristian: "quiero que el precio de lista también se actualice cuando tildo hijos". (2) Diagnóstico del reporte "agregué un hijo más y no lee el precio": confirmado que ficha-equipo.html sigue leyendo de precios.json (GitHub Pages), TODAVÍA NO de Firebase — el botón "Sincronizar precios a Firebase" del Excel solo ESCRIBE a Firebase, nada en el Portal lee de ahí por ahora. Agregado además un aviso por consola (console.warn) cuando un módulo tildado no tiene "Precio LISTA" cargado en el catálogo — antes este caso fallaba en silencio total (el módulo aparecía como checkbox pero no sumaba nada al precio, sin ninguna pista de por qué). Confirmado con test nuevo simulando exactamente ese escenario (módulo sin precio, tildado, no rompe el resto del cálculo y avisa por consola).) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.14.1 (PILOTO PADRE-HIJO — nuevo bloque "Módulos y Accesorios Opcionales" (checkboxes, sin precio individual a la vista, estrategia comercial pedida por Cristian) para equipos con módulos vinculados en Lista_Precios vía "Pertenece a" (hoy solo HUVITZ HOCT-1F OCTavius: Angiografía/Topografía/Biometría/VUNO). Al tildar/destildar, TODA la sección de financiación se recalcula en vivo (0ms, sin volver a pedir precios.json) usando el motor único calculo-financiacion.js — reemplaza la lectura directa de las columnas viejas del Excel (Adelanto_TLC_$_6, etc.) por un cálculo real sobre Precio Lista Padre + Σ Precio Lista de los Hijos tildados, leyendo los 6 flags/tasas nuevos (Habilitar_TLC6_Pesos...Habilitar_Leasing36_USD) de la fila del Padre — los Hijos siempre heredan, no tienen columnas propias. IMPORTANTE — camino híbrido a propósito: un equipo SOLO usa este motor nuevo si ya tiene alguna de las 6 columnas nuevas cargadas; si no las tiene, sigue funcionando EXACTAMENTE igual que en v2026.08.10.1 (columnas viejas, sin cambios) — así se puede migrar el catálogo equipo por equipo sin romper los que todavía no se tocaron. El precio "Base" del encabezado nunca cambia con los módulos (solo el Padre, como en el mockup original) — únicamente cambian las tarjetas de financiación de abajo. Confirmado con 2 baterías de test con jsdom sobre el archivo real: (1) HOCT-1F con Hijos — aparecen los 4 checkboxes, arrancan destildados, tildar Angiografía recalcula el adelanto de TLC6 USD de 21.630 a 23.380 en vivo, destildar vuelve a 21.630, el precio headline no se mueve; (2) un equipo SIN las columnas nuevas — el card de módulos queda oculto y la financiación sigue leyendo las columnas viejas sin ningún cambio de comportamiento.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.10.1 (BUG REAL — el match de "¿ya existe esta empresa?" al cargar una ficha comparaba el nombre letra por letra (trim+lowercase nada más); cualquier diferencia de espacios entre lo tipeado/escaneado y lo guardado (doble espacio, etc.) hacía que NO la encontrara y creara una empresa NUEVA y casi vacía (solo razón social + teléfono) en vez de usar la que ya tenía todo cargado — CUIT, domicilios, etc. Reportado por Cristian: "Lucio me quiere matar... se borraron todos los datos" (en realidad no se borraron, quedaron en la empresa original, separada). Fix: ahora también colapsa espacios múltiples antes de comparar, mismo criterio que ya usaba _normRazon en empresas.html (que sí era robusto — el bug estaba solo acá). Pendiente de que Cristian revise si hay una "STELLO LUCIO TOMAS" duplicada en la lista para fusionar/borrar la vacía a mano.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.09.4 (2 pedidos de Cristian: (1) Pipeline obligatorio — todo negocio creado desde el flujo del QR de FacoExtrema (?qr_telefono=&qr_nombre= en la URL) fuerza el select de pipeline al pipeline "FacoExtrema" (busca uno existente por nombre — case-insensitive, contiene "faco" — y si no existe lo crea solo la primera vez), y lo deja deshabilitado para que el vendedor no pueda cambiarlo por error a otro pipeline. Antes se usaba el último pipeline elegido a mano (localStorage), pudiendo terminar cualquier negocio del QR en un pipeline equivocado. (2) Validación de teléfono vacío — el QR de la credencial de FacoExtrema no trae teléfono (dato que el organizador no incluyó), así que _compartirFichaWspPersonalizado ahora avisa y lleva el foco al campo en vez de abrir WhatsApp sin número (antes lo abría igual, mandando "a nadie" sin que el vendedor lo notara). Confirmado con jsdom: el caso de crear el pipeline cuando no existe + forzar + deshabilitar el select, y el aviso+bloqueo cuando el teléfono está vacío.) -->
@@ -239,7 +242,66 @@
 
 <script src="calculo-financiacion.js"></script>
 <script>
-var PRECIOS_URL = './precios.json';
+var FICHA_EQUIPO_VERSION = '2026.08.14.4';
+console.log("%c TLC Ficha Equipo v" + FICHA_EQUIPO_VERSION + " ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+console.log('%c ¿Precio de Lista no se actualiza al tildar módulos? %c → confirmá que esta versión sea la última (ver changelog arriba del archivo) y que calculo-financiacion.js esté subido en la MISMA carpeta.', 'color:#f8961e;font-weight:bold;', 'color:inherit;font-weight:normal;');
+
+var PRECIOS_URL = './precios.json'; // fallback — ver cargarPreciosFicha()
+var FIREBASE_RTDB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+
+// ── Carga de precios: Firebase RTDB primero (fresco, ~100-200ms), con
+// fallback a precios.json (GitHub Pages) si Firebase falla o está
+// vacío. Mismo patrón ya probado en selector-dispositivos.html —
+// v2026.08.14, migrado acá para que ficha-equipo.html deje de
+// depender solo de GitHub Pages (que puede tardar minutos en
+// propagar un cambio del Excel). ──
+//
+// Firebase RTDB no admite espacios en las claves — FotoMap.gs
+// sanitiza los headers antes de subir (ej. "Precio LISTA" →
+// "Precio_LISTA"). Este mapa traduce de vuelta a los nombres
+// originales que usa el resto de este archivo. Debe mantenerse
+// IGUAL que el de selector-dispositivos.html si se le agrega algo
+// ahí — mismos campos, mismo criterio.
+const _MAPA_HEADERS_FIREBASE = {
+    'Sub_Categoria':            'Sub Categoria',
+    'Nombre_de_Dispositivo':    'Nombre de Dispositivo',
+    'Precio_LISTA':             'Precio LISTA',
+    'Precio_CONTADO_CNO':       'Precio CONTADO CNO',
+    'Pertenece_a':              'Pertenece a', // ← Padre-Hijo, ver ficha-equipo.html v2026.08.14.1
+};
+
+function _normalizarProductoFirebaseFicha(obj) {
+    var out = {};
+    Object.keys(obj).forEach(function(k) {
+        var keyOriginal = _MAPA_HEADERS_FIREBASE[k] || k;
+        out[keyOriginal] = obj[k];
+    });
+    return out;
+}
+
+async function _fetchPreciosFirebaseFicha() {
+    var resp = await fetch(FIREBASE_RTDB_URL + '/precios.json', { cache: 'no-store' });
+    if (!resp.ok) throw new Error('Firebase RTDB → HTTP ' + resp.status);
+    var obj = await resp.json();
+    if (!obj) throw new Error('Firebase RTDB → nodo /precios vacío');
+    return Object.values(obj).map(_normalizarProductoFirebaseFicha);
+}
+
+async function cargarPreciosFicha() {
+    try {
+        var data = await _fetchPreciosFirebaseFicha();
+        if (data && data.length) {
+            console.log('[Precios] ✅ Firebase RTDB — ' + data.length + ' items');
+            return data;
+        }
+    } catch(err) {
+        console.warn('[Precios] ⚠️ Firebase RTDB no disponible, usando precios.json:', err.message);
+    }
+    var res = await fetch(PRECIOS_URL + '?t=' + Date.now(), { cache:'no-store' });
+    var lista = await res.json();
+    console.log('[Precios] ✅ precios.json (fallback) — ' + (Array.isArray(lista) ? lista.length : 0) + ' items');
+    return lista;
+}
 var FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 var GAS_URL = FOTO_MAP_URL; // mismo backend, alias más claro para las acciones nuevas
 var SESSION_KEY = 'tlc_session_v1';
@@ -531,8 +593,7 @@ async function _cargarFicha() {
     var promesaFotoMap = _cargarFotoMap();
 
     try {
-        var res = await fetch(PRECIOS_URL + '?t=' + Date.now(), { cache:'no-store' });
-        var lista = await res.json();
+        var lista = await cargarPreciosFicha();
         var d = (Array.isArray(lista) ? lista : []).find(function(x) { return x['Nombre de Dispositivo'] === nombre; });
         if (!d) { _mostrarError('No se encontró el equipo "' + nombre + '" en el catálogo.'); return; }
 
@@ -555,12 +616,13 @@ async function _cargarFicha() {
         var precioLista = parseFloat(d['Precio LISTA']);
         _fichaPrecioListaActual = !isNaN(precioLista) ? precioLista : 0;
         _fichaFotoRawActual = d.Foto || '';
-        // El encabezado de precio SIEMPRE muestra el Padre solo (sin
-        // sumar módulos) — mismo criterio del mockup original de
-        // Cristian ("Base: USD 61.800"). Lo que sí cambia en vivo al
-        // tildar/destildar son las tarjetas de financiación de abajo.
-        document.getElementById('fi-precio-lista').textContent = !isNaN(precioLista) ? _fmtMoneda(precioLista, 'USD') : 'Consultar';
-        document.getElementById('fi-precio-lista-iva').textContent = !isNaN(precioLista) ? '+ IVA 10,5%' : '';
+        // El pintado real del precio del encabezado se hace en
+        // _renderFinanciacion() más abajo — se llama tanto acá (carga
+        // inicial) como en cada toggle de módulo, para que el "Precio
+        // de Lista" se actualice en vivo sumando los Hijos tildados.
+        // Pedido por Cristian (14/08/2026): "quiero que el precio de
+        // lista también se actualice cuando tildo hijos" — reemplaza
+        // el comportamiento anterior (headline fijo, solo el Padre).
 
         var contado = parseFloat(d['Precio CONTADO CNO']);
         _fichaPrecioContadoActual = (!isNaN(contado) && contado > 0) ? contado : 0;
@@ -651,9 +713,30 @@ function _renderFinanciacion() {
         if (!_fichaModulosTildados.has(nombre)) return;
         var pl = parseFloat(h['Precio LISTA']);
         var pc = parseFloat(h['Precio CONTADO CNO']);
-        if (!isNaN(pl)) precioListaCombinado += pl;
+        if (!isNaN(pl)) {
+            precioListaCombinado += pl;
+        } else {
+            // No se suma nada — pero se avisa por consola, para poder
+            // diagnosticar rápido un caso como "agregué un módulo
+            // nuevo y no se refleja en el precio": si el campo "Precio
+            // LISTA" de esa fila está vacío o mal escrito en el Excel,
+            // antes esto fallaba en silencio total.
+            console.warn('[ficha-equipo] El módulo "' + nombre + '" está tildado pero no tiene "Precio LISTA" válido en el catálogo — no se sumó al total.');
+        }
         if (!isNaN(pc)) precioContadoCombinado += pc;
     });
+
+    // Headline de precio — se actualiza acá (no en _cargarFicha) para
+    // reflejar Padre + Hijos tildados en vivo, cada vez que cambia la
+    // selección.
+    var elPrecioLista = document.getElementById('fi-precio-lista');
+    var elPrecioListaIva = document.getElementById('fi-precio-lista-iva');
+    if (elPrecioLista) {
+        elPrecioLista.textContent = (precioListaCombinado > 0) ? _fmtMoneda(precioListaCombinado, 'USD') : 'Consultar';
+    }
+    if (elPrecioListaIva) {
+        elPrecioListaIva.textContent = (precioListaCombinado > 0) ? '+ IVA 10,5%' : '';
+    }
 
     // Tarjeta de Contado — igual en los dos caminos (siempre fue
     // independiente de las 6 columnas nuevas).
@@ -671,6 +754,11 @@ function _renderFinanciacion() {
 
     if (_tieneColumnasNuevasFinanciacion(d)) {
         // ── CAMINO NUEVO — motor único CalculoFinanciacion ──
+        if (!window.CalculoFinanciacion) {
+            console.error('[ficha-equipo] calculo-financiacion.js no cargó — ¿está subido en la misma carpeta que este archivo en GitHub/Firebase Storage?');
+            finGrid.innerHTML = tarjetas + '<div class="sin-financiacion">⚠️ Error interno: no se pudo cargar el motor de cálculo. Avisale a Cristian.</div>';
+            return;
+        }
         var tcOficial = parseFloat(d.TC) || null; // ya sincronizado en la planilla (syncDolarBNA), no hace falta pedirlo de nuevo
         var modos = window.CalculoFinanciacion.calcularTodosLosModos(d, precioListaCombinado, tcOficial);
         var ETIQUETAS_MODOS = {
