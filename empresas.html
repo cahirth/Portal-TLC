@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.13.2 (Estrategia cache-first, mismo criterio que ya usa eventos.html — si ya se cargó la lista de empresas antes en este navegador, se pinta AL INSTANTE (0ms) con lo último guardado, sin esperar al backend, y se actualiza sola en segundo plano cuando llega la respuesta real. Nueva función _cargarEmpresasCacheFirst, usada SOLO en el arranque inicial de la página — las otras 2 llamadas a _cargarEmpresas() (después de importar un Excel, después de crear una empresa) siguen esperando el dato fresco como siempre, no tiene sentido mostrarles la caché vieja justo después de una acción que la cambió. Pedido por Cristian: "quiero que quede rápido como quedó eventos, basta de esperar". Confirmado con test: pintado instantáneo desde caché, actualización silenciosa al llegar el dato real, y funcionamiento normal sin caché (primera vez).) -->
+<!-- Portal TLC | empresas.html | v2026.08.13.1 (Avatar con iniciales reales — antes decía "CH" fijo siempre, sin importar quién estuviera logueado (no leía la sesión para nada). Mismo patrón (sin costo de red, solo texto) que ya usan servicio.html/cotizaciones.html. Reportado por Cristian con captura: "este avatar en empresas no hace nada, es fijo para CH... o lo ponemos de verdad que lea el usuario". Confirmado con test: usuario distinto muestra sus propias iniciales.) -->
 <!-- Portal TLC | empresas.html | v2026.08.10.6 (Placeholder de carga con texto propio — antes decía solo "Cargando...", ahora "Cargando empresas y contactos..." con spinner (clase nueva, no existía en este archivo). Mismo criterio que ya usan servicio.html/cotizaciones.html. Pedido por Cristian. Confirmado con test.) -->
 <!-- Portal TLC | empresas.html | v2026.08.10.5 (Solución de fondo pedida por Cristian: "cada vez tiene más datos y se vuelve pesada... necesito la solución". 3 piezas: (1) Carga diferida de "Negocios Asociados" — historico.json + servicio_tecnico completos ya no se piden al cargar la lista, se piden UNA sola vez (cacheados) recién cuando se abre la primera ficha. Ojo: el backend siempre manda negocios:[] de arranque (nunca undefined), así que hizo falta una bandera aparte (_negociosYaCalculados) en vez de chequear la verdad del array — chequear !e.negocios nunca daba true. (2) Renderizado por tandas de 100 en la lista principal, con botón "Mostrar más" — antes se armaban TODAS las tarjetas HTML de una sola vez sin límite; con una base grande cada tecla en el buscador se ponía más pesada con el tiempo, solo por volumen de datos. Ahora el techo es constante sin importar cuánto crezca la base. Bug propio corregido en el camino: comparar filtro crudo (undefined en la carga inicial) contra el string vacío que manda "Mostrar más" reseteaba el contador de vuelta a 100 en el primer click — se corrigió comparando siempre el string ya normalizado. (3) Debounce de 300ms en el buscador. Se aclaró además por qué NO se implementó la propuesta de "listeners/sockets de Firebase con unsubscribe": el Portal no usa el SDK de Firebase en el cliente, todo pasa por fetch() a Apps Script — no hay listeners que limpiar. Confirmado con test de punta a punta con catálogo simulado de 350 empresas: carga inicial no pide negocios, techo de 100 tarjetas, "Mostrar más" suma sin resetear, debounce funciona, y la carga diferida se dispara una sola vez sin importar cuántas fichas se abran después.) -->
 <!-- Portal TLC | empresas.html | v2026.08.10.4 (BUG GRANDE encontrado — _cargarNegociosCruzados (cruce con Ventas/Servicio) recorría TODAS las cotizaciones y TODOS los tickets por CADA empresa, EN EL NAVEGADOR del usuario (no en el backend) — O(empresas × cotizaciones + empresas × tickets). Con un catálogo real (300 empresas × 241+ cotizaciones × cientos de tickets) eso son decenas de miles de vueltas de JS bloqueando el hilo principal justo después de que la lista aparecía — en una compu débil se sentía como que la página se trababa. Ahora se agrupan cotizaciones (por CUIT y por razón social) y tickets (por razón social) UNA sola vez en mapas, y cada empresa busca ahí directo — mismo criterio que el fix de listarEmpresas en FotoMap.gs v181, O(empresas + cotizaciones + tickets). Se preservó el match ORIGINAL exacto (OR inclusivo entre CUIT y razón, con dedupe) — no un else-if que hubiera perdido cotizaciones viejas sin CUIT cargado. Reportado por Cristian: "la filosofía de esta app es que vuele de rápido... es muy lenta en estos 2 módulos". Confirmado con test simulando el mismo tamaño real: los 3 casos de match (por CUIT, por razón sola, caso normal) dan igual que antes, y corre en 6ms en vez de decenas de miles de vueltas.) -->
@@ -186,7 +188,7 @@
       <p id="hdr-sub">Base de clientes y contactos</p>
     </div>
     <div class="avatar-wrap">
-      <button class="avatar-btn" onclick="_toggleAvatarMenu(event)">CH</button>
+      <button class="avatar-btn" id="avatar-initials-emp" onclick="_toggleAvatarMenu(event)">CH</button>
       <div class="avatar-menu" id="avatar-menu">
         <div class="avatar-menu-label">Apariencia</div>
         <div class="tema-toggle">
@@ -381,6 +383,22 @@ function _leerSesionCompartida() {
     return payload.account;
   } catch(e) { return null; }
 }
+// Avatar con iniciales reales — antes decía "CH" fijo siempre, sin
+// importar quién estuviera logueado. Mismo patrón (sin ningún costo
+// de red, es solo texto) que ya usan servicio.html/cotizaciones.html.
+// Reportado por Cristian: "este avatar en empresas no hace nada, es
+// fijo para CH... o lo ponemos de verdad que lea el usuario".
+function _actualizarAvatarEmp(account) {
+  var el = document.getElementById('avatar-initials-emp');
+  if (!el || !account) return;
+  var nombre = account.name || account.username || '—';
+  var partes = nombre.trim().split(' ');
+  var iniciales = partes.length >= 2
+    ? (partes[0][0] + partes[partes.length-1][0]).toUpperCase()
+    : nombre.substring(0,2).toUpperCase();
+  el.textContent = iniciales;
+}
+
 var EMPRESAS = []; // se llena con _cargarEmpresas() — ya no hay datos de prueba
 var _empresaActualId = null;
 var _cargando = false;
@@ -393,7 +411,7 @@ async function _cargarEmpresas() {
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarEmpresas' }) });
     var r = await resp.json();
-    if (r.ok) EMPRESAS = r.empresas || [];
+    if (r.ok) { EMPRESAS = r.empresas || []; try { localStorage.setItem('emp_cache_lista', JSON.stringify(EMPRESAS)); } catch(eLs) {} }
     else console.warn('Error listando empresas:', r.error);
   } catch(e) { console.warn('Error de conexión al listar empresas:', e); }
   _cargando = false;
@@ -405,6 +423,50 @@ async function _cargarEmpresas() {
   // que se abre una ficha puntual (ver _asegurarNegociosCargados,
   // llamado desde _abrirDetalleEmpresa) — una sola vez por sesión,
   // con el resultado cacheado en memoria para las fichas siguientes.
+}
+
+// Cache-first — mismo criterio que ya usa eventos.html: si ya se
+// cargó la lista de empresas antes en este navegador, se pinta AL
+// INSTANTE con lo último guardado (0ms, sin spinner), y se actualiza
+// sola en segundo plano cuando llega la respuesta real, sin
+// interrumpir al usuario. Si es la primera vez (sin caché todavía),
+// no hay forma de evitar esperar el primer pedido — ahí sí se ve el
+// spinner, como antes. Se usa SOLO en el arranque inicial de la
+// página — las otras 2 llamadas a _cargarEmpresas() (después de
+// importar un Excel, después de crear una empresa nueva) siguen
+// usando la versión de siempre, que sí espera el dato fresco — no
+// tiene sentido mostrarles la caché vieja justo después de una
+// acción que la cambió. Pedido por Cristian: "quiero que quede
+// rápido como quedó eventos, basta de esperar".
+async function _cargarEmpresasCacheFirst() {
+  var cacheado = null;
+  try {
+    var crudo = localStorage.getItem('emp_cache_lista');
+    if (crudo) cacheado = JSON.parse(crudo);
+  } catch(eCache) { cacheado = null; }
+
+  if (cacheado && Array.isArray(cacheado)) {
+    EMPRESAS = cacheado;
+    _renderListaEmpresas();
+  }
+
+  var pedido = fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'listarEmpresas' }) })
+    .then(function(resp) { return resp.json(); })
+    .then(function(r) {
+      if (!r.ok) throw new Error(r.error || 'Error desconocido');
+      EMPRESAS = r.empresas || [];
+      try { localStorage.setItem('emp_cache_lista', JSON.stringify(EMPRESAS)); } catch(eLs) {}
+      _renderListaEmpresas();
+    });
+
+  if (!cacheado) {
+    var cont0 = document.getElementById('lista-empresas');
+    if (cont0) cont0.innerHTML = '<div class="empty-lista" style="text-align:center;"><div class="spinner" style="margin:0 auto 10px;"></div>Cargando empresas y contactos...</div>';
+    try { await pedido; } catch(e) { console.warn('Error de conexión al listar empresas:', e); _renderListaEmpresas(); }
+  } else {
+    pedido.catch(function(e) { console.warn('[Empresas] No se pudo refrescar la lista en segundo plano:', e); });
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1334,12 +1396,13 @@ var _volverANegocioId = null;
 (async function() {
   var acceso = await validarAccesoModulo('Empresas');
   if (!acceso) return; // ya mostró el alert y redirigió a index.html
+  _actualizarAvatarEmp(_leerSesionCompartida());
   var params = new URLSearchParams(window.location.search);
   var empresaId = params.get('empresa');
   if (params.get('volverA') === 'negocio' && params.get('idNegocio')) {
     _volverANegocioId = params.get('idNegocio');
   }
-  await _cargarEmpresas();
+  await _cargarEmpresasCacheFirst();
   if (empresaId) _abrirDetalleEmpresa(empresaId);
   if (_volverANegocioId) {
     var hdrSub = document.getElementById('hdr-sub');

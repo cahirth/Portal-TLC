@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.13.2 (BUG encontrado al reconstruir checklist-HOCT-1F.html — CHECKLIST_POR_MODELO apuntaba a 'HOCT-1F.html' (sin prefijo), pero el archivo real de Cristian se llama 'checklist-HOCT-1F.html' (CON prefijo) — el link siempre daba 404 para HOCT-1/HOCT-1F. Corregido.) -->
 <!-- Portal TLC | servicio.html | v2026.08.13.1 (Orden de Preparación ensanchada en PC — el contenedor del detalle estaba topeado en 780px SIEMPRE (cualquier tipo de ticket), pero la grilla de equipos de este tipo puntual necesita 860px mínimo — desbordaba y forzaba scroll horizontal sin importar el tamaño de pantalla. Ahora se ensancha a 1050px SOLO para tipo_orden==='preparacion_equipos' (los demás tickets siguen igual, ese ancho angosto es mejor para leer texto), aplicado por clase CSS — no inline — para no pisar la regla de @media que angosta todo en celular. Reportado por Cristian con captura: "agrandá al máximo de pantalla en PC así no hay que scrollear horizontal".) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.7 (El link del checklist ahora también manda &rol= (el rol de la sesión actual) — HRK-1.html no tiene sesión propia, lo necesita para saber si mostrar el botón "Reabrir checklist" (solo Administrador). Parte del mismo hallazgo de HRK-1.html v2026.08.10.2 / FotoMap.gs v184.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.6 (Link del checklist ahora manda cliente/serie/técnico además de ticket/equipo_index — mismos 3 datos que ya recibe el POE-8, antes el checklist se completaba "a ciegas" sin esos datos ya disponibles. Backend nuevo listo del otro lado (registrarChecklistCompletado, ver FotoMap.gs v175) — falta conectar desde el archivo real del checklist (Cristian mandó capturas del HRK-1.html pero no el archivo, lo necesito para cablear el "Marcar como completado" con esta acción nueva). Pedido con captura: "completar con los datos que ya tenés el formulario... cuando aprietas marcar como completado tildás calidad y aparece [checklist] completado".) -->
@@ -901,8 +902,12 @@ var CHECKLIST_URL_BASE = 'https://cahirth.github.io/Portal-TLC/Check%20lists/';
 // claves, se muestra la tarjeta "Checklist técnico disponible" en el detalle.
 var CHECKLIST_POR_MODELO = {
     'HBM-1':    'HBM-1.html',
-    'HOCT-1':   'HOCT-1F.html',
-    'HOCT-1F':  'HOCT-1F.html',
+    // Nombre real confirmado por Cristian (pegó el archivo directo en
+    // el chat): "checklist-HOCT-1F.html", CON el prefijo — antes acá
+    // apuntaba a "HOCT-1F.html" (sin el prefijo), un archivo que no
+    // existe, así que el link siempre daba 404 para este modelo.
+    'HOCT-1':   'checklist-HOCT-1F.html',
+    'HOCT-1F':  'checklist-HOCT-1F.html',
     'HRK-1':    'HRK-1.html',
     // Keeler — los 3 modelos comparten el mismo checklist
     'KEELER PSL ONE':      'Keeler-Oftalmoscopio.html',
