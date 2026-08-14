@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.13.2 (BUG REAL de redondeo encontrado — en las tarjetas de Modalidades de Pago (TLC 6/12), las cifras "sin IVA" y "con IVA" se redondeaban CADA UNA por separado, arrancando las dos desde el número exacto sin redondear. Como el redondeo de cada una podía "caer" en un múltiplo de 10 distinto, si el cliente tomaba el "sin IVA" que VE en pantalla y le sumaba el IVA a mano, el resultado no coincidía con el "con IVA" que mostraba el sistema — una diferencia de unos pocos dólares sin ninguna explicación visible. Reportado por Cristian: "hace descuentos locos de 3$". Ahora el "con IVA" se calcula encadenado sobre el "sin IVA" YA REDONDEADO, no sobre el exacto — las dos cifras que ve el cliente son consistentes entre sí. Confirmado con números reales: antes había una diferencia de $5,75 en un caso concreto (anticipo USD 26.141,20, IVA 10,5%), ahora coincide siempre.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.13.1 (Fix — al generar un presupuesto (usado tanto desde el tablero de Servicio como desde Ventas, mismo archivo), cuando el guardado salía bien, el código navegaba directo a la página siguiente sin nunca volver a cambiar el texto del botón "Guardando...". Si esa navegación se trababa por cualquier motivo (conexión lenta, algo del navegador), quedaba mostrando "Guardando…" para siempre, aunque el presupuesto YA estuviera guardado de verdad. Reportado por Cristian: "a veces se quedan en estado guardando, y no pasan de ahí, aunque sí los guarda". Ahora, si en 2.5s la navegación no se completó sola, aparece un aviso claro con un link para continuar a mano — nunca se queda sin ninguna salida. Confirmado con test simulando exactamente ese escenario (guardado exitoso + navegación que no ocurre).) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.7 (Ajuste al pedido anterior: el redondeo hacia arriba de las 4 cifras de "Modalidades de Pago" pasa de múltiplos de 100 a múltiplos de 10 — ej. USD 26.150,00 → USD 26.150 en vez de 26.200. Pedido por Cristian: "andá perfecto pero hacelo en el orden de los 10".) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.06.6 (Las 4 cifras que se ven en la tarjeta "Modalidades de Pago" — Anticipo, Anticipo con IVA, Cuota, Cuota con IVA — ahora se muestran redondeadas hacia ARRIBA al múltiplo de 100 más cercano, sin centavos (ej. USD 26.150,00 → USD 26.200; USD 2.179,17 → USD 2.200). Esto es SOLO display en esta tarjeta — el cálculo interno (saldo, cuotas, lo que se guarda en modalidadPago para el PDF) sigue exacto sin redondear, no se tocó. Pedido por Cristian con captura: "sin centavos y redondees para arriba en el orden de los 100".) -->
@@ -1313,20 +1314,32 @@ function _renderModalidadesPago() {
     var r = _calcularTLC(netoUSD, p);
     var monedaGeneral = (document.getElementById('moneda-presupuesto') || {}).value || 'USD';
     var mostrarEnArs = monedaGeneral === 'ARS' && TC_OFICIAL;
-    // Formato redondeado para las 4 cifras que se muestran en la
-    // tarjeta de Modalidades de Pago (anticipo, anticipo con IVA,
-    // cuota, cuota con IVA) — SOLO afecta lo que se ve acá, el cálculo
-    // interno sigue exacto (el saldo/cuotas no se recalculan con este
-    // número redondeado). Redondea hacia ARRIBA al múltiplo de 100 más
-    // cercano, sin centavos — pedido por Cristian con captura: "sin
-    // centavos y redondees para arriba en el orden de los 100".
+    // Redondeo hacia ARRIBA al múltiplo de $10 más cercano, sin
+    // centavos — pedido por Cristian con captura: "sin centavos y
+    // redondees para arriba en el orden de los 10".
+    //
+    // BUG encontrado y corregido acá: antes "sin IVA" y "con IVA" se
+    // redondeaban CADA UNA por separado, arrancando las dos desde el
+    // número EXACTO sin redondear. Como el redondeo de cada una podía
+    // "caer" en un múltiplo de 10 distinto, si alguien tomaba el "sin
+    // IVA" que VE en pantalla y le sumaba el IVA a mano, el resultado
+    // no coincidía con el "con IVA" que mostraba el sistema — una
+    // diferencia de unos pocos dólares, sin ninguna explicación
+    // visible. Reportado por Cristian: "hace descuentos locos de 3$".
+    // Ahora _redondearTlc devuelve el NÚMERO (no el texto todavía), y
+    // el "con IVA" se calcula ENCADENADO sobre el "sin IVA" YA
+    // REDONDEADO — así las dos cifras que ve el cliente son
+    // consistentes entre sí, multiplicando una por la otra a mano da
+    // el mismo resultado que muestra el sistema.
+    var _redondearTlc = function(n) { return Math.ceil(n / 10) * 10; };
     var fmtTlcRedondeado = function(n) {
-      var redondeado = Math.ceil(n / 10) * 10;
       var pref = mostrarEnArs ? '$' : 'USD ';
-      return pref + redondeado.toLocaleString('es-AR');
+      return pref + _redondearTlc(n).toLocaleString('es-AR');
     };
     var anticipoMostrado = mostrarEnArs ? r.anticipo * TC_OFICIAL : r.anticipo;
     var cuotaMostrada = mostrarEnArs ? r.cuota * TC_OFICIAL : r.cuota;
+    var anticipoSinIvaRedondeado = _redondearTlc(anticipoMostrado);
+    var cuotaSinIvaRedondeada = _redondearTlc(cuotaMostrada);
     return '<div style="border:1px solid var(--border-glow);border-radius:10px;padding:12px;">' +
       '<div style="font-size:11px;font-weight:800;color:#f8961e;margin-bottom:6px;">📅 ' + titulo + '</div>' +
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
@@ -1338,9 +1351,9 @@ function _renderModalidadesPago() {
           '<span class="' + ((p.anticipoTipo||'%') === 'USD' ? 'activo' : '') + '">USD</span>' +
         '</div>' +
       '</div>' +
-      '<div style="font-size:13px;font-weight:700;">' + fmtTlcRedondeado(anticipoMostrado) + ' + IVA <span style="font-weight:400;color:var(--text-dim);">(' + fmtTlcRedondeado(anticipoMostrado * factorIva) + ' con IVA)</span></div>' +
+      '<div style="font-size:13px;font-weight:700;">' + fmtTlcRedondeado(anticipoMostrado) + ' + IVA <span style="font-weight:400;color:var(--text-dim);">(' + fmtTlcRedondeado(anticipoSinIvaRedondeado * factorIva) + ' con IVA)</span></div>' +
       '<div style="font-size:10px;color:var(--text-dim);margin-top:6px;">' + r.cuotas + ' cuotas fijas de</div>' +
-      '<div style="font-size:13px;font-weight:700;">' + fmtTlcRedondeado(cuotaMostrada) + ' + IVA c/u <span style="font-weight:400;color:var(--text-dim);">(' + fmtTlcRedondeado(cuotaMostrada * factorIva) + ' con IVA)</span></div>' +
+      '<div style="font-size:13px;font-weight:700;">' + fmtTlcRedondeado(cuotaMostrada) + ' + IVA c/u <span style="font-weight:400;color:var(--text-dim);">(' + fmtTlcRedondeado(cuotaSinIvaRedondeada * factorIva) + ' con IVA)</span></div>' +
     '</div>';
   };
 
