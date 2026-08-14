@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.14.1 (PILOTO PADRE-HIJO — nuevo bloque "Módulos y Accesorios Opcionales" (checkboxes, sin precio individual a la vista, estrategia comercial pedida por Cristian) para equipos con módulos vinculados en Lista_Precios vía "Pertenece a" (hoy solo HUVITZ HOCT-1F OCTavius: Angiografía/Topografía/Biometría/VUNO). Al tildar/destildar, TODA la sección de financiación se recalcula en vivo (0ms, sin volver a pedir precios.json) usando el motor único calculo-financiacion.js — reemplaza la lectura directa de las columnas viejas del Excel (Adelanto_TLC_$_6, etc.) por un cálculo real sobre Precio Lista Padre + Σ Precio Lista de los Hijos tildados, leyendo los 6 flags/tasas nuevos (Habilitar_TLC6_Pesos...Habilitar_Leasing36_USD) de la fila del Padre — los Hijos siempre heredan, no tienen columnas propias. IMPORTANTE — camino híbrido a propósito: un equipo SOLO usa este motor nuevo si ya tiene alguna de las 6 columnas nuevas cargadas; si no las tiene, sigue funcionando EXACTAMENTE igual que en v2026.08.10.1 (columnas viejas, sin cambios) — así se puede migrar el catálogo equipo por equipo sin romper los que todavía no se tocaron. El precio "Base" del encabezado nunca cambia con los módulos (solo el Padre, como en el mockup original) — únicamente cambian las tarjetas de financiación de abajo. Confirmado con 2 baterías de test con jsdom sobre el archivo real: (1) HOCT-1F con Hijos — aparecen los 4 checkboxes, arrancan destildados, tildar Angiografía recalcula el adelanto de TLC6 USD de 21.630 a 23.380 en vivo, destildar vuelve a 21.630, el precio headline no se mueve; (2) un equipo SIN las columnas nuevas — el card de módulos queda oculto y la financiación sigue leyendo las columnas viejas sin ningún cambio de comportamiento.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.10.1 (BUG REAL — el match de "¿ya existe esta empresa?" al cargar una ficha comparaba el nombre letra por letra (trim+lowercase nada más); cualquier diferencia de espacios entre lo tipeado/escaneado y lo guardado (doble espacio, etc.) hacía que NO la encontrara y creara una empresa NUEVA y casi vacía (solo razón social + teléfono) en vez de usar la que ya tenía todo cargado — CUIT, domicilios, etc. Reportado por Cristian: "Lucio me quiere matar... se borraron todos los datos" (en realidad no se borraron, quedaron en la empresa original, separada). Fix: ahora también colapsa espacios múltiples antes de comparar, mismo criterio que ya usaba _normRazon en empresas.html (que sí era robusto — el bug estaba solo acá). Pendiente de que Cristian revise si hay una "STELLO LUCIO TOMAS" duplicada en la lista para fusionar/borrar la vacía a mano.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.09.4 (2 pedidos de Cristian: (1) Pipeline obligatorio — todo negocio creado desde el flujo del QR de FacoExtrema (?qr_telefono=&qr_nombre= en la URL) fuerza el select de pipeline al pipeline "FacoExtrema" (busca uno existente por nombre — case-insensitive, contiene "faco" — y si no existe lo crea solo la primera vez), y lo deja deshabilitado para que el vendedor no pueda cambiarlo por error a otro pipeline. Antes se usaba el último pipeline elegido a mano (localStorage), pudiendo terminar cualquier negocio del QR en un pipeline equivocado. (2) Validación de teléfono vacío — el QR de la credencial de FacoExtrema no trae teléfono (dato que el organizador no incluyó), así que _compartirFichaWspPersonalizado ahora avisa y lleva el foco al campo en vez de abrir WhatsApp sin número (antes lo abría igual, mandando "a nadie" sin que el vendedor lo notara). Confirmado con jsdom: el caso de crear el pipeline cuando no existe + forzar + deshabilitar el select, y el aviso+bloqueo cuando el teléfono está vacío.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.06.3 (Se sacó el botón "📷 Escanear QR Visitante" (y toda su infraestructura: modal de cámara compartido, _escanearQRVisitante, _abrirScannerQR/_cerrarScannerQR) — quedó redundante desde que existe el flujo nuevo del FAB de QR en index.html, que hace lo mismo pero desde el home, sin necesitar estar ya parado en la ficha de un equipo puntual. _compartirFichaWspPersonalizado se mantiene intacta, la sigue usando el flujo nuevo (_precargarContactoQR). Pedido por Cristian con captura: "este botón ya lo podemos sacar de ficha técnica".) -->
@@ -71,6 +72,21 @@
 
         .section-title { font-size:12px; font-weight:800; color:var(--navy-tlc); text-transform:uppercase; letter-spacing:.6px;
             padding:16px 24px; border-bottom:1px solid var(--border-color); background:var(--bg-muted); }
+
+        /* ── MÓDULOS Y ACCESORIOS OPCIONALES (Padre-Hijo) — v2026.08.14 ──
+           Checkboxes SIN precio individual a la vista (estrategia
+           comercial: el cliente ve el impacto en la cuota final, no el
+           precio de cada módulo suelto). Fondo/hover explícitos, mismo
+           criterio anti-bug que presupuesto-editor.html (".contacto-
+           checkbox-fila") — si se deja que el navegador/sistema decida
+           el hover, en algunos temas oscuros queda ilegible. */
+        .modulos-grid { padding:16px 24px; display:flex; flex-direction:column; gap:2px; }
+        .modulo-checkbox-fila { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px;
+            cursor:pointer; background:#ffffff; color:#0f172a; border:1px solid transparent; }
+        .modulo-checkbox-fila:hover { background:#f1f5f9; }
+        .modulo-checkbox-fila input[type=checkbox] { width:18px; height:18px; cursor:pointer; accent-color:var(--blue-tlc); flex-shrink:0; }
+        .modulo-checkbox-fila .modulo-nombre { font-size:14px; font-weight:600; }
+        @media print { .modulos-grid { padding:10px 16px; } }
 
         .financiacion-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; padding:18px 24px; }
         .fin-card { border:1px solid var(--border-color); border-radius:10px; padding:14px; background:#fff; position:relative; }
@@ -155,6 +171,11 @@
         </div>
     </div>
 
+    <div class="card" id="fi-modulos-card" style="display:none;">
+        <div class="section-title">🧩 Módulos y Accesorios Opcionales</div>
+        <div class="modulos-grid" id="fi-modulos-grid"></div>
+    </div>
+
     <div class="card" id="fi-financiacion-card">
         <div class="section-title">💳 Modalidades de pago <span style="font-size:9px;font-weight:400;color:#94a3b8;text-transform:none;">Destildá las que no quieras incluir</span></div>
         <div class="financiacion-grid" id="fi-financiacion-grid"></div>
@@ -216,6 +237,7 @@
 
 </div>
 
+<script src="calculo-financiacion.js"></script>
 <script>
 var PRECIOS_URL = './precios.json';
 var FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -291,6 +313,19 @@ var _fichaNombreActual = '';
 var _fichaPrecioListaActual = 0;
 var _fichaPrecioContadoActual = 0; // ← Precio CONTADO CNO del catálogo — antes solo vivía local a la función de render, nunca viajaba al crear/apilar el negocio
 var _fichaFotoRawActual = '';
+
+// ── PADRE-HIJO (Módulos y Accesorios Opcionales) — v2026.08.14 ──
+// _fichaPadreActual = la fila completa del equipo principal (para
+// releer sus columnas Habilitar_*/precio cada vez que cambia la
+// selección, sin tener que volver a pedir precios.json).
+// _fichaHijosDisponibles = todas las filas cuyo "Pertenece a" matchea
+// el nombre del Padre (match por nombre exacto, mismo criterio frágil
+// que ya usa hoy la planilla — migrar a SKU cuando esa columna exista).
+// _fichaModulosTildados = Set con los nombres de los Hijos tildados en
+// este momento (arranca vacío — todos destildados por defecto).
+var _fichaPadreActual = null;
+var _fichaHijosDisponibles = [];
+var _fichaModulosTildados = new Set();
 var _empresasCacheFicha = null;
 var PIPELINES_FICHA_KEY = 'tlc_ficha_pipeline_actual';
 
@@ -520,41 +555,170 @@ async function _cargarFicha() {
         var precioLista = parseFloat(d['Precio LISTA']);
         _fichaPrecioListaActual = !isNaN(precioLista) ? precioLista : 0;
         _fichaFotoRawActual = d.Foto || '';
+        // El encabezado de precio SIEMPRE muestra el Padre solo (sin
+        // sumar módulos) — mismo criterio del mockup original de
+        // Cristian ("Base: USD 61.800"). Lo que sí cambia en vivo al
+        // tildar/destildar son las tarjetas de financiación de abajo.
         document.getElementById('fi-precio-lista').textContent = !isNaN(precioLista) ? _fmtMoneda(precioLista, 'USD') : 'Consultar';
         document.getElementById('fi-precio-lista-iva').textContent = !isNaN(precioLista) ? '+ IVA 10,5%' : '';
 
-        // Precio contado, si tiene
-        var finGrid = document.getElementById('fi-financiacion-grid');
-        var tarjetas = '';
         var contado = parseFloat(d['Precio CONTADO CNO']);
         _fichaPrecioContadoActual = (!isNaN(contado) && contado > 0) ? contado : 0;
-        if (!isNaN(contado) && contado > 0) {
-            var ocultoContado = _variantesOcultas.indexOf('contado') !== -1;
-            if (!(_modoReceptor && ocultoContado)) {
-                tarjetas += '<div class="fin-card' + (ocultoContado ? ' fin-card-oculta' : '') + '" data-key="contado">' +
-                    _checkboxVariante('contado', !ocultoContado) +
-                    '<div class="fin-titulo">💵 Contado</div>' +
-                    '<div class="fin-row"><span>Precio</span><span class="val contado-val">' + _fmtMoneda(contado, 'USD') + '</span></div>' +
-                    (d.Descripcion_USD_CONTADO ? '<div class="fin-desc">' + _esc(d.Descripcion_USD_CONTADO) + '</div>' : '') +
-                '</div>';
-            }
+
+        // ── PADRE-HIJO — buscar los módulos/accesorios de este equipo
+        // (filas cuyo "Pertenece a" matchea el nombre exacto del Padre)
+        // y pintar los checkboxes, si tiene alguno. ──
+        _fichaPadreActual = d;
+        _fichaHijosDisponibles = lista.filter(function(x) {
+            return x['Pertenece a'] && String(x['Pertenece a']).trim() === String(d['Nombre de Dispositivo']).trim();
+        });
+        _fichaModulosTildados = new Set(); // arranca con todo destildado, cada vez que se carga una ficha nueva
+        _renderModulosOpcionales();
+
+        _renderFinanciacion();
+
+    } catch(err) {
+        console.error(err);
+        _mostrarError('Error al cargar los datos del equipo.');
+    }
+}
+
+// ── Pinta (o esconde) el card de "Módulos y Accesorios Opcionales".
+// Sin precio individual visible al lado de cada uno — estrategia
+// comercial pedida por Cristian: el médico ve el impacto en la cuota
+// final, no el precio de cada módulo suelto. ──
+function _renderModulosOpcionales() {
+    var card = document.getElementById('fi-modulos-card');
+    var grid = document.getElementById('fi-modulos-grid');
+    if (!_fichaHijosDisponibles.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    grid.innerHTML = _fichaHijosDisponibles.map(function(h, i) {
+        var nombre = h['Nombre de Dispositivo'] || '';
+        var marcado = _fichaModulosTildados.has(nombre);
+        // En modo receptor (link ya compartido) los checkboxes se
+        // muestran pero deshabilitados — el cliente puede VER qué
+        // módulos el vendedor incluyó, pero no agregar/sacar otros
+        // por su cuenta desde un link que ya fue armado y enviado.
+        var disabled = _modoReceptor ? 'disabled' : '';
+        return '<label class="modulo-checkbox-fila">' +
+            '<input type="checkbox" ' + (marcado ? 'checked' : '') + ' ' + disabled +
+                ' onchange="_toggleModuloFicha(' + i + ', this.checked)">' +
+            '<span class="modulo-nombre">' + _esc(nombre) + '</span>' +
+        '</label>';
+    }).join('');
+}
+
+window._toggleModuloFicha = function(indiceHijo, marcado) {
+    var hijo = _fichaHijosDisponibles[indiceHijo];
+    if (!hijo) return;
+    var nombre = hijo['Nombre de Dispositivo'] || '';
+    if (marcado) _fichaModulosTildados.add(nombre);
+    else _fichaModulosTildados.delete(nombre);
+    _renderFinanciacion(); // recalcula en vivo, 0ms — no vuelve a pedir precios.json
+};
+
+// ── Arma la sección de financiación. Dos caminos, según si ESTE
+// equipo (Padre) ya tiene las 6 columnas nuevas cargadas en el Excel:
+//   - SI las tiene → usa CalculoFinanciacion (motor único, calcula en
+//     vivo sobre Precio Lista Padre + Σ Precio Lista de los Hijos
+//     tildados).
+//   - NO las tiene todavía (equipo sin migrar al esquema Padre-Hijo)
+//     → sigue funcionando EXACTAMENTE igual que antes, leyendo las
+//     columnas viejas directo (Adelanto_TLC_$_6, etc.) — así no se
+//     rompe nada de lo que ya está en producción mientras se migra el
+//     catálogo equipo por equipo. Ver plan acordado con Cristian:
+//     "lo que aplica, aplica; lo que no aplica, no aplica".
+// ──
+function _tieneColumnasNuevasFinanciacion(filaPadre) {
+    return Object.keys(filaPadre || {}).some(function(k) { return k.indexOf('Habilitar_') === 0; });
+}
+
+function _renderFinanciacion() {
+    var d = _fichaPadreActual;
+    if (!d) return;
+    var finGrid = document.getElementById('fi-financiacion-grid');
+    var tarjetas = '';
+
+    // Base combinada (Padre + Hijos tildados) — Precio LISTA para las
+    // cuentas de financiación (misma base que ya usaban las columnas
+    // viejas: confirmado que Adelanto_TLC_USD_6 = 35% de Precio LISTA,
+    // no de Precio Contado), Precio CONTADO CNO aparte para la
+    // tarjeta de Contado.
+    var precioListaCombinado = _fichaPrecioListaActual;
+    var precioContadoCombinado = _fichaPrecioContadoActual;
+    _fichaHijosDisponibles.forEach(function(h) {
+        var nombre = h['Nombre de Dispositivo'] || '';
+        if (!_fichaModulosTildados.has(nombre)) return;
+        var pl = parseFloat(h['Precio LISTA']);
+        var pc = parseFloat(h['Precio CONTADO CNO']);
+        if (!isNaN(pl)) precioListaCombinado += pl;
+        if (!isNaN(pc)) precioContadoCombinado += pc;
+    });
+
+    // Tarjeta de Contado — igual en los dos caminos (siempre fue
+    // independiente de las 6 columnas nuevas).
+    if (precioContadoCombinado > 0) {
+        var ocultoContado = _variantesOcultas.indexOf('contado') !== -1;
+        if (!(_modoReceptor && ocultoContado)) {
+            tarjetas += '<div class="fin-card' + (ocultoContado ? ' fin-card-oculta' : '') + '" data-key="contado">' +
+                _checkboxVariante('contado', !ocultoContado) +
+                '<div class="fin-titulo">💵 Contado</div>' +
+                '<div class="fin-row"><span>Precio</span><span class="val contado-val">' + _fmtMoneda(precioContadoCombinado, 'USD') + '</span></div>' +
+                (d.Descripcion_USD_CONTADO ? '<div class="fin-desc">' + _esc(d.Descripcion_USD_CONTADO) + '</div>' : '') +
+            '</div>';
         }
+    }
+
+    if (_tieneColumnasNuevasFinanciacion(d)) {
+        // ── CAMINO NUEVO — motor único CalculoFinanciacion ──
+        var tcOficial = parseFloat(d.TC) || null; // ya sincronizado en la planilla (syncDolarBNA), no hace falta pedirlo de nuevo
+        var modos = window.CalculoFinanciacion.calcularTodosLosModos(d, precioListaCombinado, tcOficial);
+        var ETIQUETAS_MODOS = {
+            tlc6_pesos:      { titulo: 'TLC $ — 6 cuotas',        moneda: '$' },
+            tlc6_usd:        { titulo: 'TLC USD — 6 cuotas',      moneda: 'USD' },
+            tlc12_pesos:     { titulo: 'TLC $ — 12 cuotas',       moneda: '$' },
+            tlc12_usd:       { titulo: 'TLC USD — 12 cuotas',     moneda: 'USD' },
+            leasing36_pesos: { titulo: 'Leasing $ — 36 cuotas',   moneda: '$' },
+            leasing36_usd:   { titulo: 'Leasing USD — 36 cuotas', moneda: 'USD' },
+        };
+        Object.keys(ETIQUETAS_MODOS).forEach(function(key) {
+            var r = modos[key];
+            if (!r) return; // no habilitado para este equipo, o no llega al umbral de Leasing
+            var et = ETIQUETAS_MODOS[key];
+            var oculta = _variantesOcultas.indexOf(key) !== -1;
+            if (_modoReceptor && oculta) return;
+            var esLeasing = key.indexOf('leasing36') === 0;
+            var filaAdelanto = esLeasing
+                ? '<div class="fin-row"><span>Maxicanon</span><span class="val">' + _fmtMoneda(r.maxicanon, et.moneda) + '</span></div>'
+                : '<div class="fin-row"><span>Adelanto</span><span class="val">' + _fmtMoneda(r.anticipo, et.moneda) + '</span></div>';
+            var filaCuota = esLeasing
+                ? '<div class="fin-row"><span>' + r.canones + ' cánones</span><span class="val">' + _fmtMoneda(r.canon, et.moneda) + '</span></div>'
+                : '<div class="fin-row"><span>' + r.cuotas + ' cuotas</span><span class="val">' + _fmtMoneda(r.cuota, et.moneda) + '</span></div>';
+            var desc = esLeasing
+                ? 'TNA ' + r.tna + '% · + 1 canon en garantía + opción de compra al finalizar'
+                : (r.tna > 0 ? 'TNA ' + r.tna + '% sobre el saldo' : 'Sin recargo financiero');
+            tarjetas += '<div class="fin-card' + (oculta ? ' fin-card-oculta' : '') + '" data-key="' + key + '">' +
+                _checkboxVariante(key, !oculta) +
+                '<div class="fin-titulo">' + et.titulo + '</div>' +
+                filaAdelanto + filaCuota +
+                '<div class="fin-desc">' + desc + '</div>' +
+            '</div>';
+        });
+    } else {
+        // ── CAMINO VIEJO — sin cambios, para equipos que todavía no
+        // tienen las 6 columnas nuevas cargadas en el Excel. ──
         VARIANTES_FINANCIACION.forEach(function(v) {
             var adelanto = d[v.adelanto];
             var cuota = d[v.cuota];
-            if (!_tieneValor(adelanto) && !_tieneValor(cuota)) return; // sin datos para esta variante en este equipo
-            // Regla de negocio (pedida por Cristian, 30/07/2026): Leasing $
-            // — 36 cuotas solo se ofrece si el total CON IVA supera los
-            // USD 15.000 — por debajo de eso, la tarjeta ni se dibuja aunque
-            // el catálogo tenga los valores cargados para este equipo.
+            if (!_tieneValor(adelanto) && !_tieneValor(cuota)) return;
             if (v.adelanto === 'Adelanto_L$_36') {
                 var precioBaseLeasing = _fichaPrecioContadoActual || _fichaPrecioListaActual || 0;
                 var totalConIvaLeasing = precioBaseLeasing * 1.105;
                 if (totalConIvaLeasing <= 15000) return;
             }
-            var key = v.adelanto; // estable y único por variante
+            var key = v.adelanto;
             var oculta = _variantesOcultas.indexOf(key) !== -1;
-            if (_modoReceptor && oculta) return; // en modo receptor, lo oculto ni se dibuja
+            if (_modoReceptor && oculta) return;
             tarjetas += '<div class="fin-card' + (oculta ? ' fin-card-oculta' : '') + '" data-key="' + key + '">' +
                 _checkboxVariante(key, !oculta) +
                 '<div class="fin-titulo">' + v.titulo + '</div>' +
@@ -563,17 +727,21 @@ async function _cargarFicha() {
                 (d[v.desc] ? '<div class="fin-desc">' + _esc(d[v.desc]) + '</div>' : '') +
             '</div>';
         });
+    }
 
-        if (tarjetas) {
-            finGrid.innerHTML = tarjetas;
-        } else {
-            document.getElementById('fi-financiacion-card').querySelector('.financiacion-grid').outerHTML =
-                '<div class="sin-financiacion">No hay modalidades de financiación cargadas para este equipo — consultá por precio contado.</div>';
+    if (tarjetas) {
+        finGrid.innerHTML = tarjetas;
+        // Si se había pisado por el mensaje de "sin financiación" en una
+        // vuelta anterior (ej. al destildar TODO), hay que restaurar el
+        // contenedor real para poder seguir usándolo.
+        var contFin = document.getElementById('fi-financiacion-card');
+        if (!contFin.querySelector('.financiacion-grid')) {
+            contFin.innerHTML = '<div class="section-title">💳 Modalidades de pago <span style="font-size:9px;font-weight:400;color:#94a3b8;text-transform:none;">Destildá las que no quieras incluir</span></div>' +
+                '<div class="financiacion-grid" id="fi-financiacion-grid">' + tarjetas + '</div>';
         }
-
-    } catch(err) {
-        console.error(err);
-        _mostrarError('Error al cargar los datos del equipo.');
+    } else {
+        document.getElementById('fi-financiacion-card').querySelector('.financiacion-grid').outerHTML =
+            '<div class="sin-financiacion">No hay modalidades de financiación cargadas para este equipo — consultá por precio contado.</div>';
     }
 }
 
