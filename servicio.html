@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.08.13.1 (Orden de Preparación ensanchada en PC — el contenedor del detalle estaba topeado en 780px SIEMPRE (cualquier tipo de ticket), pero la grilla de equipos de este tipo puntual necesita 860px mínimo — desbordaba y forzaba scroll horizontal sin importar el tamaño de pantalla. Ahora se ensancha a 1050px SOLO para tipo_orden==='preparacion_equipos' (los demás tickets siguen igual, ese ancho angosto es mejor para leer texto), aplicado por clase CSS — no inline — para no pisar la regla de @media que angosta todo en celular. Reportado por Cristian con captura: "agrandá al máximo de pantalla en PC así no hay que scrollear horizontal".) -->
+<!-- Portal TLC | servicio.html | v2026.08.10.7 (El link del checklist ahora también manda &rol= (el rol de la sesión actual) — HRK-1.html no tiene sesión propia, lo necesita para saber si mostrar el botón "Reabrir checklist" (solo Administrador). Parte del mismo hallazgo de HRK-1.html v2026.08.10.2 / FotoMap.gs v184.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.6 (Link del checklist ahora manda cliente/serie/técnico además de ticket/equipo_index — mismos 3 datos que ya recibe el POE-8, antes el checklist se completaba "a ciegas" sin esos datos ya disponibles. Backend nuevo listo del otro lado (registrarChecklistCompletado, ver FotoMap.gs v175) — falta conectar desde el archivo real del checklist (Cristian mandó capturas del HRK-1.html pero no el archivo, lo necesito para cablear el "Marcar como completado" con esta acción nueva). Pedido con captura: "completar con los datos que ya tenés el formulario... cuando aprietas marcar como completado tildás calidad y aparece [checklist] completado".) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.5 (2 fixes: (1) botón "✂️ Separar" nuevo en la columna Cant. — visible solo cuando cantidad>1, permite separar una fila vieja en varias independientes de cantidad:1 (usa st_separarEquipoOrden, ver FotoMap.gs v174). (2) BUG REAL — el link "📋 Instalación" del POE-8 llevaba a la página principal de la empresa (tlcsrl.com.ar) en vez del formulario. Causa: POE8_Instalacion.html vive en la subcarpeta POE/ del repo, no en la raíz — _urlPOE8 armaba la URL asumiendo raíz, 404 y algún redirect/fallback terminaba mandando al sitio principal. Corregido a .../Portal-TLC/POE/POE8_Instalacion.html. Confirmado por Cristian con la URL real del archivo en GitHub. Reportado con captura: "el ítem 2 tiene 2 equipos... el link de instalación me lleva a la página web y no al POE8 html".) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.4 (3 pedidos de Cristian con captura sobre la grilla de la Orden de Preparación: (1) columnas responsivas — antes la tabla no tenía anchos definidos, así que en pantallas angostas o con muchas columnas el navegador apretaba SKU y N° de Serie hasta casi desaparecer, cortando el texto tipeado en vez de mostrarlo entero. Ahora la tabla tiene table-layout:fixed con anchos mínimos por columna y min-width:860px en total — si no entra, el contenedor (que ya tenía overflow-x:auto) scrollea en vez de apretar. (2) Campo "Equipo" pasa a ser editable (antes texto fijo) — permite corregir/aclarar la descripción de un equipo puntual, por ejemplo distinguir 2 unidades idénticas que van a domicilios distintos (usa st_actualizarEquipoOrden con "descripcion", ver FotoMap.gs v173). (3) Confirmado que el link del POE-8 ya manda todos los datos disponibles (tecnico/cliente/domicilio/telefono/modelo/serie/id_ticket/equipo_index) al archivo nuevo — no hacía falta ningún cambio ahí. Confirmado con test: input editable con el valor correcto, URL del POE-8 completa.) -->
@@ -168,9 +170,15 @@ body.tema-claro .btn-icon:hover{background:#cbd5e1;border-color:#3a86ff;}
 .detalle-body-wrap{display:flex; gap:16px; align-items:flex-start; max-width:1120px; margin:0 auto; padding:0 14px 40px;}
 #det-body{flex:1; min-width:0; max-width:780px;}
 #det-mensajes-panel{width:320px; flex-shrink:0; position:sticky; top:14px;}
+/* Orden de Preparación necesita más ancho en PC — la grilla de
+   equipos tiene un ancho mínimo de 860px, más que el contenedor
+   normal de 780px. Aplicado por clase (no inline) para que la regla
+   de @media de abajo siga angostando todo en celular sin problema. */
+.detalle-body-wrap.det-ancho-orden-prep{max-width:1400px;}
+#det-body.det-ancho-orden-prep{max-width:1050px;}
 @media (max-width: 900px){
   .detalle-body-wrap{flex-direction:column;}
-  #det-body{max-width:100%;}
+  #det-body, #det-body.det-ancho-orden-prep{max-width:100%;}
   #det-mensajes-panel{width:100%; position:static;}
 }
 .det-section{margin:16px 0 8px;font-size:10px;font-weight:700;text-transform:uppercase;
@@ -1789,6 +1797,22 @@ function _renderDetalle(t) {
   var puedeEditar = _permisos.servicio;
   var esOrdenPrep = t.tipo_orden === 'preparacion_equipos';
 
+  // Orden de Preparación necesita más ancho que un ticket normal — la
+  // grilla de equipos (N° de Serie, Calidad, Estado, POE-8...) tiene
+  // un ancho mínimo de 860px, pero el contenedor del detalle estaba
+  // topeado en 780px SIEMPRE, para cualquier tipo de ticket — así que
+  // esta grilla puntual desbordaba y forzaba scroll horizontal sin
+  // importar qué tan grande fuera la pantalla. Se ensancha SOLO para
+  // este tipo de ticket, y SOLO con una clase CSS (no estilo inline
+  // directo) — un inline pisaría siempre la regla de @media que
+  // angosta todo en celular, rompiendo el layout mobile. Reportado
+  // por Cristian con captura: "agrandá al máximo de pantalla en PC
+  // así no hay que scrollear horizontal".
+  var wrapEl = document.getElementById('det-body-wrap');
+  if (wrapEl) wrapEl.classList.toggle('det-ancho-orden-prep', esOrdenPrep);
+  var bodyEl = document.getElementById('det-body');
+  if (bodyEl) bodyEl.classList.toggle('det-ancho-orden-prep', esOrdenPrep);
+
   var notasHtml = '';
   if (t.notas_comentarios && t.notas_comentarios.length) {
     notasHtml = t.notas_comentarios.map(function(n){
@@ -2206,7 +2230,8 @@ function _renderSeccionOrdenPreparacion(t) {
          '?ticket=' + encodeURIComponent(t.id_ticket) + '&equipo_index=' + i +
          '&cliente=' + encodeURIComponent(t.cliente || '') +
          '&serie=' + encodeURIComponent(eq.nro_serie || '') +
-         '&tecnico=' + encodeURIComponent(t.tecnico_responsable_nombre || ''))
+         '&tecnico=' + encodeURIComponent(t.tecnico_responsable_nombre || '') +
+         '&rol=' + encodeURIComponent(_session.rol || ''))
       : '';
     var poe8Completado = !!eq.poe8_completado;
     var checklistCompletado = !!eq.checklist_completado;
