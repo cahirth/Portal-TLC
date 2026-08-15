@@ -1,4 +1,20 @@
 // ============================================================
+// Portal TLC | calculo-financiacion.js | v2026.08.14.4
+// Agregado un log de versión PROPIO en consola (independiente del de
+// ficha-equipo.html) — hasta ahora este archivo no tenía ninguna
+// forma de confirmar qué versión estaba sirviendo el servidor,
+// aunque ficha-equipo.html mostrara su propia versión correcta. Son
+// DOS archivos con <script src> separados; uno podía quedar
+// actualizado y el otro no, sin manera de detectarlo desde la
+// consola. Reportado por Cristian: la TNA de Leasing seguía en 0%
+// (canon "—" en pantalla) después de confirmar que ficha-equipo.html
+// estaba en la última versión — la causa real era que ESTE archivo
+// específico no se había vuelto a subir con el fix de v2026.08.14.3
+// (regex tolerante a guion bajo de Firebase). Ahora, al abrir
+// cualquier ficha, la consola muestra dos líneas de versión
+// separadas — si alguna vez no coinciden con lo esperado, queda
+// clarísimo cuál de los dos archivos quedó desactualizado.
+// ============================================================
 // Portal TLC | calculo-financiacion.js | v2026.08.14.3
 // _extraerTnaDeEncabezado ahora entiende TANTO el texto tal cual del
 // Excel/GitHub ("TNA: 11,12%", con espacios) COMO el mismo texto
@@ -270,6 +286,7 @@
   }
 
   var CalculoFinanciacion = {
+    VERSION: '2026.08.14.4',
     leerConfigFinanciacion: leerConfigFinanciacion,
     calcularTLC6: calcularTLC6,
     calcularTLC12: calcularTLC12,
@@ -281,6 +298,21 @@
     ANTICIPO_TLC12_PCT: ANTICIPO_TLC12_PCT,
     LEASING36_UMBRAL_USD: LEASING36_UMBRAL_USD,
   };
+
+  // Log propio, independiente del de ficha-equipo.html — hasta ahora
+  // este archivo no tenía NINGUNA forma de confirmar en consola qué
+  // versión estaba realmente sirviendo el servidor, aunque
+  // ficha-equipo.html mostrara su propia versión correcta. Como son
+  // DOS archivos separados con <script src="calculo-financiacion.js">,
+  // uno podía estar actualizado y el otro no, sin ninguna forma de
+  // saberlo desde la consola. Reportado por Cristian: TNA seguía en
+  // 0% después de confirmar ficha-equipo.html en la última versión —
+  // la causa real terminó siendo que este archivo específico no se
+  // había vuelto a subir con el fix (v2026.08.14.3) de la regex
+  // tolerante a guion bajo.
+  if (typeof window !== 'undefined' && window.console) {
+    console.log("%c TLC calculo-financiacion.js v" + CalculoFinanciacion.VERSION + " ", "background:#06d6a0;color:#0f172a;font-weight:bold;border-radius:4px;padding:2px 8px;");
+  }
 
   // UMD chico — funciona tanto en el navegador (window.CalculoFinanciacion)
   // como en Node (para los tests y `node --check`).
