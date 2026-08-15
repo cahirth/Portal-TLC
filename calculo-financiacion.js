@@ -1,4 +1,18 @@
 // ============================================================
+// Portal TLC | calculo-financiacion.js | v2026.08.14.3
+// _extraerTnaDeEncabezado ahora entiende TANTO el texto tal cual del
+// Excel/GitHub ("TNA: 11,12%", con espacios) COMO el mismo texto
+// sanitizado por Firebase RTDB (espacios → "_", ej. "TNA:_11,12%") —
+// antes solo reconocía el primer formato, así que si algún día se
+// sincroniza este catálogo a Firebase (selector-dispositivos.html ya
+// prioriza Firebase por sobre GitHub Pages), las tasas TNA se habrían
+// leído como 0% en silencio, sin ningún aviso. _leerColumna (el
+// prefijo Habilitar_TLC12_Pesos, etc.) ya era robusto a esto de
+// antes, no necesitó cambios — el problema era solo en la extracción
+// del número. Detectado en auditoría cruzada con selector-
+// dispositivos.html (14/08/2026), antes de que el bug llegara a
+// producción.
+// ============================================================
 // Portal TLC | calculo-financiacion.js | v2026.08.14.2
 // Confirmado por Cristian: Leasing 36 USD usa la misma estructura
 // que Leasing 36 Pesos (Maxicanon 15% + 35 cánones + 1 en garantía +
@@ -113,9 +127,20 @@
   // una excepción, para que un typo en el Excel no rompa TODA la
   // ficha, aunque sí genere una tasa incorrecta (0%) para ESE modo
   // puntual — visible apenas se mira el resultado en pantalla.
+  //
+  // Robusto a DOS orígenes de datos con formato distinto:
+  //   - precios.json (GitHub Pages) → texto tal cual se escribió en
+  //     el Excel: "Habilitar_TLC12_Pesos (TNA: 11,12%)".
+  //   - Firebase RTDB → FotoMap.gs sanitiza espacios a "_" antes de
+  //     subir (Firebase no admite espacios en las claves), así que el
+  //     MISMO título llega como "Habilitar_TLC12_Pesos_(TNA:_11,12%)".
+  // Por eso el patrón acepta espacio O guion bajo (o varios seguidos)
+  // en cualquiera de los dos huecos alrededor del número — un único
+  // archivo que entiende las dos fuentes, en vez de mantener tablas
+  // de traducción de headers separadas por archivo.
   function _extraerTnaDeEncabezado(textoEncabezado) {
     if (!textoEncabezado) return 0;
-    var m = String(textoEncabezado).match(/TNA:\s*([\d.,]+)\s*%/i);
+    var m = String(textoEncabezado).match(/TNA:[\s_]*([\d.,]+)[\s_]*%/i);
     if (!m) return 0;
     var numTexto = m[1].replace(',', '.');
     var num = parseFloat(numTexto);
