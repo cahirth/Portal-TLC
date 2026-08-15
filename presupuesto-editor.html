@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.14.2 (Soporte para una LISTA de ítems pendientes (sessionStorage nuevo: tlc_items_pendientes_presupuesto), además del ítem suelto de siempre (tlc_item_pendiente_presupuesto, sin tocar — sigue funcionando exactamente igual). Usado por el botón nuevo "Agregar Cotización" de ficha-equipo.html (ver esa v2026.08.15.5), que manda el equipo Padre + cada módulo/accesorio tildado como varias líneas separadas, en vez de un solo ítem. _restaurarDraftYItemPendiente refactorizada: se extrajo _procesarUnItemPendiente() (agrega una línea, o suma cantidad si ya existe una igual) para poder reusarla tanto con el ítem suelto como con cada elemento de la lista nueva — mismo cálculo de descuento automático y misma detección de duplicados en los dos casos, un solo lugar para arreglar si hiciera falta. Parte del pedido de Cristian de eliminar la pantalla intermedia de selector-dispositivos.html y trasladar "Agregar cotización" a la ficha técnica. Confirmado con 2 tests: una lista de 2 ítems (equipo + accesorio) se carga como 2 líneas separadas con sus precios y descuentos correctos; el flujo viejo del ítem suelto sigue cargando 1 sola línea exactamente igual que antes.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.14.1 (BUG REAL encontrado — el campo "Descuento" de cada ítem se auto-completaba con la fórmula (Precio LISTA − Precio CONTADO CNO) / Precio LISTA, sin importar qué tan chica fuera la diferencia. Si en la planilla Lista_Precios el Precio Contado de un equipo quedaba cargado con apenas $1-2 de diferencia contra el Precio Lista (redondeo de centavos al tipear, no un descuento real), la fórmula igual generaba un "descuento" de fracciones de % — en un ítem de ~$30.000, una diferencia de $2 daba 0,01% de descuento = exactos $3 de "Descuentos (Contado)" en el Total, sin que nadie hubiera tocado nada. Reportado por Cristian: "no puse descuento, quiero que sea 0, y no $3". Arreglado en DOS lugares: (1) el auto-cálculo ahora trata cualquier diferencia menor a 0.05% como ruido de redondeo y la deja en 0%, para presupuestos nuevos; (2) clamp defensivo agregado también en _calcularItem(), que corrige presupuestos VIEJOS ya guardados en Firebase con este descuento fantasma sin necesidad de regenerarlos — al volver a abrirlos, el 0,01% guardado se recalcula como 0% real. Confirmado con test numérico reproduciendo el caso exacto (ítem $30.000, Precio Contado con $2 de diferencia → $3 de descuento fantasma → $0 con el fix).) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.13.2 (BUG REAL de redondeo encontrado — en las tarjetas de Modalidades de Pago (TLC 6/12), las cifras "sin IVA" y "con IVA" se redondeaban CADA UNA por separado, arrancando las dos desde el número exacto sin redondear. Como el redondeo de cada una podía "caer" en un múltiplo de 10 distinto, si el cliente tomaba el "sin IVA" que VE en pantalla y le sumaba el IVA a mano, el resultado no coincidía con el "con IVA" que mostraba el sistema — una diferencia de unos pocos dólares sin ninguna explicación visible. Reportado por Cristian: "hace descuentos locos de 3$". Ahora el "con IVA" se calcula encadenado sobre el "sin IVA" YA REDONDEADO, no sobre el exacto — las dos cifras que ve el cliente son consistentes entre sí. Confirmado con números reales: antes había una diferencia de $5,75 en un caso concreto (anticipo USD 26.141,20, IVA 10,5%), ahora coincide siempre.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.13.1 (Fix — al generar un presupuesto (usado tanto desde el tablero de Servicio como desde Ventas, mismo archivo), cuando el guardado salía bien, el código navegaba directo a la página siguiente sin nunca volver a cambiar el texto del botón "Guardando...". Si esa navegación se trababa por cualquier motivo (conexión lenta, algo del navegador), quedaba mostrando "Guardando…" para siempre, aunque el presupuesto YA estuviera guardado de verdad. Reportado por Cristian: "a veces se quedan en estado guardando, y no pasan de ahí, aunque sí los guarda". Ahora, si en 2.5s la navegación no se completó sola, aparece un aviso claro con un link para continuar a mano — nunca se queda sin ninguna salida. Confirmado con test simulando exactamente ese escenario (guardado exitoso + navegación que no ocurre).) -->
@@ -485,6 +486,44 @@ function _leerParamsIniciales() {
   }
 }
 
+// Procesa UN ítem pendiente (agrega una línea nueva, o suma cantidad
+// si ya existe una igual) — extraída de _restaurarDraftYItemPendiente
+// para poder reusarla tanto con el ítem suelto de siempre (selector-
+// dispositivos.html, flujo normal) como con una LISTA de ítems
+// (ficha-equipo.html, Padre + módulos tildados — ver más abajo).
+function _procesarUnItemPendiente(it) {
+  var descripcionCombinada = it.nombre || '';
+  if (it.descripcionCatalogo && it.descripcionCatalogo.trim()) descripcionCombinada += ' — ' + it.descripcionCatalogo.trim();
+  var precioLista = it.precio || 0;
+  var precioContado = it.precioContado || precioLista;
+  // Descuento = (Precio LISTA − Precio CONTADO CNO) / Precio LISTA —
+  // se auto-completa al agregar el ítem, para que el campo Descuento
+  // refleje de entrada el precio de contado real del catálogo. Queda
+  // visible y editable ahí mismo.
+  var descuentoAuto = 0;
+  if (precioLista > 0) {
+    var _pctExactoContado = ((precioLista - precioContado) / precioLista) * 100;
+    // Diferencias menores a 0.05% entre Precio Lista y Precio Contado
+    // CNO son ruido de redondeo de centavos en la planilla, no un
+    // descuento real — se tratan como 0% en vez de arrastrar un
+    // "descuento fantasma" de fracciones de %. Reportado por
+    // Cristian: "no puse descuento, quiero que sea 0, y no $3".
+    descuentoAuto = (_pctExactoContado > 0.05) ? Math.round(_pctExactoContado * 100) / 100 : 0;
+  }
+  // Antes de agregar el ítem nuevo, ¿ya existe uno igual en la lista?
+  // (mismo nombre+precio+moneda — típico cuando se envía la misma
+  // ficha técnica más de una vez, o se agrega el mismo equipo dos
+  // veces por error). Si existe, no se crea una línea nueva: se le
+  // suma 1 a la cantidad del que ya está.
+  var cantidadPendiente = Math.max(1, parseInt(it.cantidad, 10) || 1);
+  var iguales = ITEMS.filter(function(x){ return _mismoEquipo(x, { descripcion: descripcionCombinada, precio: precioLista, moneda: 'USD' }); });
+  if (iguales.length) {
+    iguales[0].cantidad = (iguales[0].cantidad || 1) + cantidadPendiente;
+  } else {
+    ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: cantidadPendiente, descuento: descuentoAuto, descuentoTipo: '%', descuentoContadoOriginal: descuentoAuto, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
+  }
+}
+
 function _restaurarDraftYItemPendiente() {
   try {
     var raw = sessionStorage.getItem('tlc_presupuesto_draft');
@@ -509,45 +548,30 @@ function _restaurarDraftYItemPendiente() {
   } catch (e) { console.warn('Error restaurando borrador:', e); }
   sessionStorage.removeItem('tlc_presupuesto_draft');
 
+  // Ítem SUELTO (formato de siempre) — sigue funcionando exactamente
+  // igual, para no romper ningún flujo existente del selector.
   try {
     var rawItem = sessionStorage.getItem('tlc_item_pendiente_presupuesto');
-    if (rawItem) {
-      var it = JSON.parse(rawItem);
-      var descripcionCombinada = it.nombre || '';
-      if (it.descripcionCatalogo && it.descripcionCatalogo.trim()) descripcionCombinada += ' — ' + it.descripcionCatalogo.trim();
-      var precioLista = it.precio || 0;
-      var precioContado = it.precioContado || precioLista;
-      // Descuento = (Precio LISTA − Precio CONTADO CNO) / Precio LISTA
-      // — se auto-completa al agregar el ítem, para que el campo
-      // Descuento refleje de entrada el precio de contado real del
-      // catálogo. Queda visible y editable ahí mismo.
-      var descuentoAuto = 0;
-      if (precioLista > 0) {
-        var _pctExactoContado = ((precioLista - precioContado) / precioLista) * 100;
-        // Diferencias menores a 0.05% entre Precio Lista y Precio
-        // Contado CNO son ruido de redondeo de centavos en la
-        // planilla, no un descuento real — se tratan como 0% en vez
-        // de arrastrar un "descuento fantasma" de fracciones de %.
-        // Reportado por Cristian: "no puse descuento, quiero que sea
-        // 0, y no $3" — un ítem de ~$30.000 con $2 de diferencia en
-        // la planilla generaba 0,01% de descuento = exactos $3.
-        descuentoAuto = (_pctExactoContado > 0.05) ? Math.round(_pctExactoContado * 100) / 100 : 0;
-      }
-      // Antes de agregar el ítem nuevo, ¿ya existe uno igual en la
-      // lista? (mismo nombre+precio+moneda — típico cuando se envía la
-      // misma ficha técnica más de una vez, o se agrega el mismo
-      // equipo dos veces por error). Si existe, no se crea una línea
-      // nueva: se le suma 1 a la cantidad del que ya está.
-      var cantidadPendiente = Math.max(1, parseInt(it.cantidad, 10) || 1);
-      var iguales = ITEMS.filter(function(x){ return _mismoEquipo(x, { descripcion: descripcionCombinada, precio: precioLista, moneda: 'USD' }); });
-      if (iguales.length) {
-        iguales[0].cantidad = (iguales[0].cantidad || 1) + cantidadPendiente;
-      } else {
-        ITEMS.push({ id: ++_itemSeq, foto: it.foto || null, descripcion: descripcionCombinada, precio: precioLista, precioContado: precioContado, cantidad: cantidadPendiente, descuento: descuentoAuto, descuentoTipo: '%', descuentoContadoOriginal: descuentoAuto, iva: 10.5, moneda: 'USD', linkFolleto: it.linkFolleto || '', linkVideo: it.linkVideo || '' });
-      }
-    }
+    if (rawItem) _procesarUnItemPendiente(JSON.parse(rawItem));
   } catch (e) { console.warn('Error aplicando ítem pendiente:', e); }
   sessionStorage.removeItem('tlc_item_pendiente_presupuesto');
+
+  // LISTA de ítems (formato nuevo) — usada por el botón "Agregar
+  // cotización" de ficha-equipo.html, que manda el equipo Padre +
+  // cada módulo/accesorio que el vendedor tenía tildado en pantalla,
+  // en vez de un solo ítem suelto. Pedido por Cristian: "el botón
+  // agregar cotización, cuando es llamado por presupuesto editor, que
+  // vaya de una a Ficha" — y que respete los módulos tildados, mismo
+  // criterio que ya se usa al crear el Negocio o compartir por
+  // WhatsApp desde esa misma ficha.
+  try {
+    var rawItems = sessionStorage.getItem('tlc_items_pendientes_presupuesto');
+    if (rawItems) {
+      var lista = JSON.parse(rawItems);
+      if (Array.isArray(lista)) lista.forEach(function(it) { _procesarUnItemPendiente(it); });
+    }
+  } catch (e) { console.warn('Error aplicando la lista de ítems pendientes:', e); }
+  sessionStorage.removeItem('tlc_items_pendientes_presupuesto');
 
   // Fusiona duplicados que ya vinieran cargados en el negocio (ej. la
   // misma ficha técnica apilada más de una vez desde ficha-equipo.html

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.15.5 (Absorbe lo que hacía la pantalla intermedia de selector-dispositivos.html, ahora eliminada de ese flujo (ver selector-dispositivos.html v2026.08.15.1): (1) "Ver Stock" — botón nuevo junto a Folleto/Ficha Técnica, mismo criterio EXACTO que _toggleStockDetalle() del selector (lee el campo "Stock", muestra "✅ Disponible · N unidades" o "❌ Sin stock"). (2) "Agregar Cotización" — banner nuevo, visible solo con ?volverAPresupuesto=1 en la URL (mismo parámetro que ya usaba el selector para este puente con presupuesto-editor.html). A diferencia de la pantalla vieja, que solo mandaba el equipo elegido, este manda el Padre + CADA módulo tildado como una LISTA de ítems (sessionStorage nuevo: tlc_items_pendientes_presupuesto — ver presupuesto-editor.html v2026.08.14.2, que ahora sabe leer una lista además del ítem suelto de siempre) — no se pierde la selección de accesorios al armar la cotización, mismo criterio que ya usan Crear Negocio y WhatsApp desde esta misma ficha. Pedido por Cristian: "el botón agregar cotización, cuando es llamado por presupuesto editor, que vaya de una a Ficha, sería más ágil y sin tantos clicks" — confirmado que debía respetar los módulos tildados. Nueva función compartida _listaModulosTildadosParaEnvio(), reusada también por _guardarSeguimientoVentas (antes tenía esta lógica duplicada inline). Confirmado con test: Ver Stock muestra "3 unidades" correctamente; Agregar Cotización con un módulo tildado guarda 2 ítems (Padre + módulo) en el orden correcto, y el banner solo aparece con ?volverAPresupuesto=1.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.4 (Módulos "tildados por defecto" — nueva columna Tildado_Default (TRUE/FALSE) en las filas de los Hijos, en Lista_Precios: un módulo con Tildado_Default=TRUE (ej. "Mesa Eléctrica", casi siempre incluida) arranca YA tildado cuando se abre la ficha desde cero, sin que el vendedor tenga que acordarse de tocarlo cada vez — lo puede destildar igual si no aplica para ese cliente puntual. Si el link ya trae ?modulos=... explícito (compartido por un vendedor, ver v2026.08.15.3), ESE valor manda por sobre el default — no pisa una selección ya hecha a propósito. Pedido por Cristian: "algunos accesorios los quiero dejar tildados al arranque, ej. mesa eléctrica". Confirmado con test: sin URL explícita, el módulo con default TRUE arranca tildado y el precio ya lo refleja; con ?modulos= explícito, ese gana siempre.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.3 (3 pedidos de Cristian con captura: (1) BUG REAL — un módulo tildado (ej. "Mesa Eléctrica") no viajaba ni al Negocio ni al link de WhatsApp, aunque estuviera visiblemente marcado en pantalla — "si la mesa está tildada, debés respetarla y guardarla, tanto en negocios como en el envío por WhatsApp". _guardarSeguimientoVentas ahora arma la lista completa (Padre + cada módulo tildado) y apila cada uno como su propia línea en el Negocio, en vez de apilar solo el Padre. (2) Los dos botones de WhatsApp (_compartirFichaWsp y _compartirFichaWspPersonalizado) ahora agregan "&modulos=..." al link compartido con los nombres de los módulos tildados — y _cargarFicha los lee para precargar esos mismos checkboxes YA tildados (y bloqueados, en modo receptor) cuando el cliente abre el link, así ve exactamente lo mismo que el vendedor tenía en pantalla al compartir, precio y financiación incluidos. Confirmado con 3 tests: el link incluye el módulo, quien lo recibe lo ve ya tildado con el precio correcto (5.940+800=6.740), y el Negocio apila 2 ítems (Padre + módulo) en el orden correcto. (3) El ícono del FAB "Escanear QR" pasa del emoji 📷 al mismo ícono Font Awesome (fa-solid fa-qrcode) que usa el FAB de index.html — agregado el link de Font Awesome al <head>, que antes no estaba. Pedido: "usar la misma imagen de QR que usamos en index".) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.2 (2 pedidos de Cristian: (1) el botón "Escanear QR del visitante" pasa de ser un botón ancho dentro del formulario a un FAB flotante circular abajo-centro, mismo patrón visual que el FAB de index.html — "quiero el boton flotante del QR abajo en el medio igual que en el index". (2) BUG REAL — "el teléfono no aparece, es como que alguien lo pisa y lo borra": html5-qrcode puede disparar el callback de escaneo exitoso DOS VECES seguidas para el mismo código (la cámara sigue decodificando frames mientras el .stop() todavía no terminó, que es asíncrono) — sin guard, la segunda llamada reiniciaba _procesarQRFichaEscaneado desde cero, pisando el teléfono que la primera pasada ya había completado (del QR o recuperado vía buscarContactoParaQR) con un objeto nuevo otra vez vacío. Agregado un flag _qrfProcesando que ignora cualquier disparo del callback mientras uno ya se está procesando, reseteado cada vez que se abre el modal para el próximo escaneo. Mismo fix aplicado también en index.html (mismo patrón, mismo riesgo, aunque no reportado ahí todavía). Confirmado con test: 2 disparos seguidos del mismo QR solo procesan uno; un escaneo nuevo después de reabrir el modal sí se procesa normal — más toda la batería de tests previa, sin romper nada.) -->
@@ -203,6 +204,19 @@
             <div class="descripcion-equipo" id="fi-descripcion"></div>
 
             <div class="btn-row" id="fi-btn-row"></div>
+            <button type="button" id="fi-btn-ver-stock" onclick="_toggleStockFicha()" style="display:none; margin:8px 0 0; padding:9px 14px; border-radius:8px; border:1px solid var(--blue-tlc); background:#eff6ff; color:var(--blue-tlc); font-size:12.5px; font-weight:700; cursor:pointer;">📦 Ver stock</button>
+            <div id="fi-stock-detalle" style="display:none; margin-top:8px; padding:9px 14px; border-radius:8px; font-size:12.5px; font-weight:700;"></div>
+
+            <!-- Agregar Cotización — solo visible cuando esta ficha se
+                 abrió con ?volverAPresupuesto=1 (desde "+ Agregar ítem"
+                 en presupuesto-editor.html). Reemplaza a la pantalla
+                 intermedia de selector-dispositivos.html que hacía esto
+                 antes — pedido por Cristian: "que vaya de una a Ficha,
+                 sería más ágil y sin tantos clicks". -->
+            <div id="fi-banner-agregar-cotizacion" style="display:none; margin-top:10px; padding:12px 14px; border-radius:10px; background:#fff7ed; border:1px solid #f8961e;">
+                <div style="font-size:12.5px; color:#92400e; margin-bottom:8px;">📎 Estás eligiendo un ítem para el presupuesto en curso.</div>
+                <button type="button" onclick="_agregarACotizacionDesdeFicha()" style="width:100%; padding:12px; border-radius:8px; border:none; background:#f8961e; color:#fff; font-weight:800; font-size:13.5px; cursor:pointer;">+ Agregar esto al presupuesto</button>
+            </div>
 
             <div class="precio-lista-box">
                 <div class="precio-lista-label">Precio de Lista</div>
@@ -523,6 +537,25 @@ var _fichaYaApiladaFicha = false;
 var _contactoSeleccionadoFicha = null; // { nombre, telefono } | null
 
 function _esc(s) { var d=document.createElement('div'); d.textContent=String(s==null?'':s); return d.innerHTML; }
+
+// "Ver Stock" — mismo criterio EXACTO que _toggleStockDetalle() de
+// selector-dispositivos.html (trasladado acá al eliminar la pantalla
+// intermedia, ver v2026.08.15.5).
+window._toggleStockFicha = function() {
+    var wrap = document.getElementById('fi-stock-detalle');
+    if (wrap.style.display !== 'none') { wrap.style.display = 'none'; return; }
+    var d = _fichaPadreActual;
+    if (!d) return;
+    var stockNum = parseFloat(d['Stock']);
+    var hayStock = !isNaN(stockNum) && stockNum > 0;
+    wrap.style.background = hayStock ? '#f0fdf4' : '#fef2f2';
+    wrap.style.border = '1px solid ' + (hayStock ? '#16a34a' : '#dc2626');
+    wrap.style.color = hayStock ? '#16a34a' : '#dc2626';
+    wrap.textContent = hayStock
+        ? ('✅ Disponible · ' + stockNum + (stockNum === 1 ? ' unidad' : ' unidades'))
+        : '❌ Sin stock';
+    wrap.style.display = 'block';
+};
 function _fmtMoneda(n, moneda) {
     var num = parseFloat(n);
     if (isNaN(num)) return '—';
@@ -819,6 +852,14 @@ async function _cargarFicha() {
         if (d.Link_Web) botones += '<a class="btn-link video" href="' + _esc(d.Link_Web) + '" target="_blank">📖 Ficha Técnica Completa</a>';
         btnRow.innerHTML = botones;
 
+        // "Ver Stock" — trasladado acá desde la pantalla intermedia de
+        // selector-dispositivos.html (que se elimina, ver v2026.08.15.5).
+        // Mismo criterio exacto: si el campo "Stock" tiene un número,
+        // se muestra el botón; si no está cargado, ni aparece.
+        var btnStock = document.getElementById('fi-btn-ver-stock');
+        var stockNum = parseFloat(d['Stock']);
+        if (btnStock) btnStock.style.display = (!isNaN(stockNum)) ? 'inline-block' : 'none';
+
         var precioLista = parseFloat(d['Precio LISTA']);
         _fichaPrecioListaActual = !isNaN(precioLista) ? precioLista : 0;
         _fichaFotoRawActual = d.Foto || '';
@@ -876,6 +917,15 @@ async function _cargarFicha() {
         _renderModulosOpcionales();
 
         _renderFinanciacion();
+
+        // Banner "Agregar cotización" — solo cuando esta ficha se abrió
+        // desde "+ Agregar ítem" en presupuesto-editor.html (mismo
+        // parámetro que ya usaba selector-dispositivos.html para esto).
+        // Reemplaza a la pantalla intermedia que se elimina ahí.
+        if (params.get('volverAPresupuesto') === '1') {
+            var elBannerAgregar = document.getElementById('fi-banner-agregar-cotizacion');
+            if (elBannerAgregar) elBannerAgregar.style.display = 'block';
+        }
 
     } catch(err) {
         console.error(err);
@@ -1258,6 +1308,53 @@ function _mostrarResultadoConNegocio(elResultado, mensaje, color, idCot, esNegoc
   if (_origenGuardadoActual === 'whatsapp') titulo += ' + WhatsApp enviado';
   _mostrarPopupToast(titulo, mensaje.replace(/^[✅📎]\s*/, ''), idCot);
 }
+// Lista de módulos/accesorios TILDADOS ahora mismo (sin incluir al
+// Padre) — {nombre, precioLista, precioContado} por cada uno. Función
+// compartida: la usan tanto _guardarSeguimientoVentas (Crear Negocio
+// / WhatsApp) como _agregarACotizacionDesdeFicha (botón nuevo, ver
+// abajo) — mismo criterio en los dos lugares, un solo sitio para
+// arreglar si hace falta.
+function _listaModulosTildadosParaEnvio() {
+  var lista = [];
+  _fichaHijosDisponibles.forEach(function(h) {
+    var nombre = h['Nombre de Dispositivo'] || '';
+    if (!_fichaModulosTildados.has(nombre)) return;
+    var pl = parseFloat(h['Precio LISTA']);
+    var pc = parseFloat(h['Precio CONTADO CNO']);
+    lista.push({ nombre: nombre, precioLista: isNaN(pl) ? 0 : pl, precioContado: isNaN(pc) ? (isNaN(pl) ? 0 : pl) : pc });
+  });
+  return lista;
+}
+
+// "Agregar cotización" — reemplaza a la pantalla intermedia de
+// selector-dispositivos.html (eliminada, ver v2026.08.15.5). Manda el
+// Padre + cada módulo tildado como una LISTA de ítems (formato nuevo,
+// tlc_items_pendientes_presupuesto — ver presupuesto-editor.html), en
+// vez de un solo ítem suelto como hacía la pantalla vieja — así no se
+// pierde la selección de accesorios al pasar por acá. Pedido por
+// Cristian: "el botón Agregar cotización, cuando es llamado por
+// presupuesto editor, que vaya de una a Ficha, sería más ágil y sin
+// tantos clicks" — y confirmado que debía respetar los módulos
+// tildados, mismo criterio que Crear Negocio / WhatsApp.
+window._agregarACotizacionDesdeFicha = function() {
+  var d = _fichaPadreActual;
+  var items = [{
+    nombre: _fichaNombreActual,
+    descripcionCatalogo: (d && d.Descripcion) || '',
+    precio: _fichaPrecioListaActual,
+    precioContado: _fichaPrecioContadoActual || _fichaPrecioListaActual,
+    cantidad: 1,
+    foto: fotoUrl(_fichaFotoRawActual) || '',
+    linkFolleto: (d && d.Link_Folleto) || '',
+    linkVideo: (d && d.Link_Web) || '',
+  }];
+  _listaModulosTildadosParaEnvio().forEach(function(m) {
+    items.push({ nombre: m.nombre, descripcionCatalogo: '', precio: m.precioLista, precioContado: m.precioContado, cantidad: 1, foto: '', linkFolleto: '', linkVideo: '' });
+  });
+  try { sessionStorage.setItem('tlc_items_pendientes_presupuesto', JSON.stringify(items)); } catch(e) {}
+  window.location.href = 'https://cahirth.github.io/Portal-TLC/presupuesto-editor.html?restaurarDraft=1';
+};
+
 async function _guardarSeguimientoVentas(origen) {
   _origenGuardadoActual = origen || null;
   var elResultado = document.getElementById('fi-lead-resultado');
@@ -1283,15 +1380,11 @@ async function _guardarSeguimientoVentas(origen) {
     foto: fotoUrl(_fichaFotoRawActual) || '',
     vendedor: (_sesionVendedor && _sesionVendedor.name) || '',
   }];
-  _fichaHijosDisponibles.forEach(function(h) {
-    var nombreHijo = h['Nombre de Dispositivo'] || '';
-    if (!_fichaModulosTildados.has(nombreHijo)) return;
-    var plHijo = parseFloat(h['Precio LISTA']);
-    var pcHijo = parseFloat(h['Precio CONTADO CNO']);
+  _listaModulosTildadosParaEnvio().forEach(function(m) {
     itemsParaApilar.push({
-      nombre: nombreHijo,
-      precio: isNaN(plHijo) ? 0 : plHijo,
-      precioContado: isNaN(pcHijo) ? (isNaN(plHijo) ? 0 : plHijo) : pcHijo,
+      nombre: m.nombre,
+      precio: m.precioLista,
+      precioContado: m.precioContado,
       foto: '',
       vendedor: (_sesionVendedor && _sesionVendedor.name) || '',
     });
