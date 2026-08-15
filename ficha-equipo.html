@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.15.6 (Fix de layout — "Ver Stock" vivía como un <button> aparte, afuera de #fi-btn-row, con su propio margen que lo mandaba SIEMPRE a una línea nueva, debajo de Folleto/Ficha Técnica Completa, aunque hubiera lugar de sobra al lado. Ahora se arma como parte del mismo string de botones que ya arma esa fila (misma clase .btn-link, con .stock agregada al esquema de color celeste de Folleto) — cuando el equipo tiene los 3 (Folleto, Ficha Técnica, Ver Stock), los 3 quedan en la misma fila. Pedido por Cristian con captura: "este botón siempre al lado de ficha técnica (stock)". Confirmado con test: el botón queda DENTRO de #fi-btn-row (no aparte), y el toggle de mostrar/ocultar el detalle de stock sigue funcionando igual.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.5 (Absorbe lo que hacía la pantalla intermedia de selector-dispositivos.html, ahora eliminada de ese flujo (ver selector-dispositivos.html v2026.08.15.1): (1) "Ver Stock" — botón nuevo junto a Folleto/Ficha Técnica, mismo criterio EXACTO que _toggleStockDetalle() del selector (lee el campo "Stock", muestra "✅ Disponible · N unidades" o "❌ Sin stock"). (2) "Agregar Cotización" — banner nuevo, visible solo con ?volverAPresupuesto=1 en la URL (mismo parámetro que ya usaba el selector para este puente con presupuesto-editor.html). A diferencia de la pantalla vieja, que solo mandaba el equipo elegido, este manda el Padre + CADA módulo tildado como una LISTA de ítems (sessionStorage nuevo: tlc_items_pendientes_presupuesto — ver presupuesto-editor.html v2026.08.14.2, que ahora sabe leer una lista además del ítem suelto de siempre) — no se pierde la selección de accesorios al armar la cotización, mismo criterio que ya usan Crear Negocio y WhatsApp desde esta misma ficha. Pedido por Cristian: "el botón agregar cotización, cuando es llamado por presupuesto editor, que vaya de una a Ficha, sería más ágil y sin tantos clicks" — confirmado que debía respetar los módulos tildados. Nueva función compartida _listaModulosTildadosParaEnvio(), reusada también por _guardarSeguimientoVentas (antes tenía esta lógica duplicada inline). Confirmado con test: Ver Stock muestra "3 unidades" correctamente; Agregar Cotización con un módulo tildado guarda 2 ítems (Padre + módulo) en el orden correcto, y el banner solo aparece con ?volverAPresupuesto=1.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.4 (Módulos "tildados por defecto" — nueva columna Tildado_Default (TRUE/FALSE) en las filas de los Hijos, en Lista_Precios: un módulo con Tildado_Default=TRUE (ej. "Mesa Eléctrica", casi siempre incluida) arranca YA tildado cuando se abre la ficha desde cero, sin que el vendedor tenga que acordarse de tocarlo cada vez — lo puede destildar igual si no aplica para ese cliente puntual. Si el link ya trae ?modulos=... explícito (compartido por un vendedor, ver v2026.08.15.3), ESE valor manda por sobre el default — no pisa una selección ya hecha a propósito. Pedido por Cristian: "algunos accesorios los quiero dejar tildados al arranque, ej. mesa eléctrica". Confirmado con test: sin URL explícita, el módulo con default TRUE arranca tildado y el precio ya lo refleja; con ?modulos= explícito, ese gana siempre.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.3 (3 pedidos de Cristian con captura: (1) BUG REAL — un módulo tildado (ej. "Mesa Eléctrica") no viajaba ni al Negocio ni al link de WhatsApp, aunque estuviera visiblemente marcado en pantalla — "si la mesa está tildada, debés respetarla y guardarla, tanto en negocios como en el envío por WhatsApp". _guardarSeguimientoVentas ahora arma la lista completa (Padre + cada módulo tildado) y apila cada uno como su propia línea en el Negocio, en vez de apilar solo el Padre. (2) Los dos botones de WhatsApp (_compartirFichaWsp y _compartirFichaWspPersonalizado) ahora agregan "&modulos=..." al link compartido con los nombres de los módulos tildados — y _cargarFicha los lee para precargar esos mismos checkboxes YA tildados (y bloqueados, en modo receptor) cuando el cliente abre el link, así ve exactamente lo mismo que el vendedor tenía en pantalla al compartir, precio y financiación incluidos. Confirmado con 3 tests: el link incluye el módulo, quien lo recibe lo ve ya tildado con el precio correcto (5.940+800=6.740), y el Negocio apila 2 ítems (Padre + módulo) en el orden correcto. (3) El ícono del FAB "Escanear QR" pasa del emoji 📷 al mismo ícono Font Awesome (fa-solid fa-qrcode) que usa el FAB de index.html — agregado el link de Font Awesome al <head>, que antes no estaba. Pedido: "usar la misma imagen de QR que usamos en index".) -->
@@ -74,6 +75,7 @@
             text-decoration:none; border:1px solid var(--border-color); color:var(--text-dark); background:#fff; }
         .btn-link.folleto { border-color:#93c5fd; color:var(--blue-tlc); background:#eff6ff; }
         .btn-link.video { border-color:#fca5a5; color:#dc2626; background:#fef2f2; }
+        .btn-link.stock { border-color:#93c5fd; color:var(--blue-tlc); background:#eff6ff; cursor:pointer; font:inherit; }
 
         .precio-lista-box { border-top:1px solid var(--border-color); margin-top:18px; padding-top:18px; }
         .precio-lista-label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
@@ -204,7 +206,6 @@
             <div class="descripcion-equipo" id="fi-descripcion"></div>
 
             <div class="btn-row" id="fi-btn-row"></div>
-            <button type="button" id="fi-btn-ver-stock" onclick="_toggleStockFicha()" style="display:none; margin:8px 0 0; padding:9px 14px; border-radius:8px; border:1px solid var(--blue-tlc); background:#eff6ff; color:var(--blue-tlc); font-size:12.5px; font-weight:700; cursor:pointer;">📦 Ver stock</button>
             <div id="fi-stock-detalle" style="display:none; margin-top:8px; padding:9px 14px; border-radius:8px; font-size:12.5px; font-weight:700;"></div>
 
             <!-- Agregar Cotización — solo visible cuando esta ficha se
@@ -850,15 +851,17 @@ async function _cargarFicha() {
         var botones = '';
         if (d.Link_Folleto) botones += '<a class="btn-link folleto" href="' + _esc(d.Link_Folleto) + '" target="_blank">📄 Folleto</a>';
         if (d.Link_Web) botones += '<a class="btn-link video" href="' + _esc(d.Link_Web) + '" target="_blank">📖 Ficha Técnica Completa</a>';
-        btnRow.innerHTML = botones;
-
         // "Ver Stock" — trasladado acá desde la pantalla intermedia de
         // selector-dispositivos.html (que se elimina, ver v2026.08.15.5).
-        // Mismo criterio exacto: si el campo "Stock" tiene un número,
-        // se muestra el botón; si no está cargado, ni aparece.
-        var btnStock = document.getElementById('fi-btn-ver-stock');
+        // Mismo criterio exacto: si el campo "Stock" tiene un número, se
+        // muestra el botón; si no está cargado, ni aparece. Va DENTRO de
+        // la misma fila que Folleto/Ficha Técnica (antes era un botón
+        // aparte con su propio margen, que lo mandaba a una línea
+        // nueva). Pedido por Cristian con captura: "este botón siempre
+        // al lado de ficha técnica (stock)".
         var stockNum = parseFloat(d['Stock']);
-        if (btnStock) btnStock.style.display = (!isNaN(stockNum)) ? 'inline-block' : 'none';
+        if (!isNaN(stockNum)) botones += '<button type="button" class="btn-link stock" onclick="_toggleStockFicha()">📦 Ver stock</button>';
+        btnRow.innerHTML = botones;
 
         var precioLista = parseFloat(d['Precio LISTA']);
         _fichaPrecioListaActual = !isNaN(precioLista) ? precioLista : 0;
