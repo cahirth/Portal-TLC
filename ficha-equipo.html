@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.15.1 (RE-AGREGADO el botón "📷 Escanear QR del visitante" que se había sacado en v2026.08.06.3 por quedar redundante con el flujo del FAB en index.html — vuelve a pedido de Cristian, describiendo el flujo real del stand: "si le estoy mostrando la ficha a un cliente desde ahí pum le escaneo y adentro, sino tengo que volver al home y volver a ir a la ficha". A diferencia del botón viejo (que no tenía guardado de Empresa+Contacto propio), este SÍ persiste dni/vip/categoria vía guardarEmpresaContactoQR (FotoMap.gs v185) — mismo comportamiento que index.html — y ADEMÁS precarga el formulario de seguimiento de ESTA ficha (Empresa/Cliente + Teléfono) y fuerza el pipeline FacoExtrema en el mismo paso, para que el vendedor solo tenga que tocar "Crear Negocio" o "Enviar WhatsApp" una vez, sin salir de la página. Reusa el mismo motor html5-qrcode y el mismo JSON de credencial que index.html — un solo lector de QR mantenido, no dos con lógica separada. Si el QR no trae teléfono, usa el mismo buscarContactoParaQR (v185) que ya se sumó a index.html para autocompletar desde un contacto ya cargado. _precargarContactoQR refactorizada para aceptar valores directos (telQr, nombreQr) en vez de un objeto URLSearchParams, así sirve a los dos orígenes (flujo por URL desde el home, y este escaneo inline) sin duplicar lógica. Confirmado con 4 tests: botón visible solo con sesión de vendedor activa, autocompleta teléfono de un contacto existente, guarda Empresa+Contacto con los campos ricos del QR, precarga el formulario y fuerza el pipeline — más toda la batería de tests previa, sin romper nada.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.14.4 (DIAGNÓSTICO — Cristian reportó "el precio de lista está clavado en 61800, no actualiza tildando accesorios". Probado el archivo real (v2026.08.14.3) contra un precios.json fresco suyo: el precio SÍ se actualiza bien (61.800 → correctamente sumando cada módulo tildado, confirmado con Kit Conectividad real). El código no tiene el bug — la sospecha es que en GitHub seguía publicada una versión anterior a v2026.08.14.2 (la que arreglaba justamente este comportamiento; antes de esa versión, el precio quedaba fijo A PROPÓSITO). Como este archivo no tenía NINGÚN log de versión visible en consola (a diferencia de presupuesto-editor.html, que sí lo tiene desde siempre), no había forma rápida de confirmar qué versión corría el navegador sin mirar el código fuente — agregado ahora. También agregado un chequeo defensivo: si calculo-financiacion.js no llegó a cargar (ej. no se subió a la misma carpeta que este archivo), ahora avisa clarito por consola y en pantalla en vez de fallar en silencio con un TypeError críptico.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.14.3 (Migrado a leer de Firebase RTDB primero (mismo patrón ya probado en selector-dispositivos.html: ~100-200ms, siempre fresco, no depende de que GitHub Pages termine de propagar el último cambio del Excel), con fallback automático a precios.json si Firebase falla o está vacío — nunca se rompe la ficha, en el peor caso vuelve al comportamiento de siempre. Agregado _MAPA_HEADERS_FIREBASE local (mismo criterio que selector-dispositivos.html, con "Pertenece_a" → "Pertenece a" sumado — ese campo faltaba en la tabla original porque hasta ahora nadie lo necesitaba desde Firebase, es nuevo de la arquitectura Padre-Hijo). También sumado ese mismo campo a selector-dispositivos.html por las dudas de que a futuro necesite Padre-Hijo también. Confirmado con 2 tests nuevos: (A) carga real desde un objeto crudo de Firebase con headers sanitizados (espacios→"_"), incluyendo que el Hijo se encuentre bien vía "Pertenece_a"; (B) con Firebase simulando estar caído, cae al fallback de precios.json sin ningún error visible para el usuario.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.14.2 (2 cambios: (1) El "Precio de Lista" del encabezado ahora se actualiza EN VIVO al tildar/destildar módulos (antes quedaba fijo mostrando solo el Padre) — pedido por Cristian: "quiero que el precio de lista también se actualice cuando tildo hijos". (2) Diagnóstico del reporte "agregué un hijo más y no lee el precio": confirmado que ficha-equipo.html sigue leyendo de precios.json (GitHub Pages), TODAVÍA NO de Firebase — el botón "Sincronizar precios a Firebase" del Excel solo ESCRIBE a Firebase, nada en el Portal lee de ahí por ahora. Agregado además un aviso por consola (console.warn) cuando un módulo tildado no tiene "Precio LISTA" cargado en el catálogo — antes este caso fallaba en silencio total (el módulo aparecía como checkbox pero no sumaba nada al precio, sin ninguna pista de por qué). Confirmado con test nuevo simulando exactamente ese escenario (módulo sin precio, tildado, no rompe el resto del cálculo y avisa por consola).) -->
@@ -92,6 +93,33 @@
         @media print { .modulos-grid { padding:10px 16px; } }
 
         .financiacion-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; padding:18px 24px; }
+
+        /* ── Escanear QR (stand FacoExtrema) — v2026.08.15 ──
+           Re-agregado a pedido de Cristian: "si le estoy mostrando la
+           ficha a un cliente desde ahí pum le escaneo y adentro, sino
+           tengo que volver al home" — el flujo del FAB en index.html
+           obliga a volver al home entre cada visitante. Mismo motor
+           (html5-qrcode) y mismo JSON de credencial que index.html,
+           para no mantener dos lectores de QR distintos. */
+        .btn-escanear-qr { display:flex; align-items:center; justify-content:center; gap:8px;
+            padding:11px 14px; border-radius:8px; border:1px dashed var(--blue-tlc); background:#eff6ff;
+            color:var(--blue-tlc); font-size:13px; font-weight:700; cursor:pointer; width:100%; }
+        .btn-escanear-qr:hover { background:#dbeafe; }
+        .qrf-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); display:none;
+            align-items:center; justify-content:center; z-index:9999; padding:16px; }
+        .qrf-modal-overlay.abierto { display:flex; }
+        .qrf-modal-card { background:#fff; width:100%; max-width:420px; border-radius:16px; padding:20px; }
+        .qrf-modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+        .qrf-modal-header h3 { font-size:16px; margin:0; color:var(--text-dark); }
+        .qrf-modal-close { width:32px; height:32px; border-radius:50%; background:var(--bg-muted); border:none; cursor:pointer; font-size:16px; }
+        #qrf-reader { width:100%; border-radius:12px; overflow:hidden; }
+        .qrf-scan-txt { font-size:13px; color:var(--text-muted); text-align:center; margin:10px 0; line-height:1.5; }
+        .qrf-dato-fila { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-color); gap:10px; }
+        .qrf-dato-fila:last-child { border-bottom:none; }
+        .qrf-dato-fila .lbl { color:var(--text-muted); font-size:13px; }
+        .qrf-dato-fila input { flex:1; min-width:0; text-align:right; font-weight:700; font-size:14px; border:none; border-bottom:1px dashed var(--border-color); background:transparent; padding:2px 0; color:var(--text-dark); }
+        .qrf-dato-fila input:focus { outline:none; border-bottom-color:var(--blue-tlc); }
+        .qrf-btn-usar { width:100%; margin-top:14px; padding:13px; border-radius:10px; border:none; background:var(--green-tlc); color:#fff; font-weight:800; font-size:14px; cursor:pointer; }
         .fin-card { border:1px solid var(--border-color); border-radius:10px; padding:14px; background:#fff; position:relative; }
         .fin-card-oculta { opacity:.35; }
         @media print { .fin-card-oculta { display:none; } }
@@ -185,6 +213,9 @@
     </div>
 
     <div class="wsp-bar" style="flex-direction:column;" id="fi-lead-bar">
+        <button type="button" class="btn-escanear-qr" id="fi-btn-escanear-qr" onclick="_abrirScannerQRFicha()">
+            📷 Escanear QR del visitante
+        </button>
         <div style="display:flex; gap:10px; width:100%;">
             <select id="fi-pipeline-select" onchange="_onCambiarPipelineFicha(this.value)"
                 style="flex:1; padding:10px 14px; border-radius:8px; border:1px solid var(--border-color); font-size:12px; outline:none; cursor:pointer; color:var(--text-muted);">
@@ -240,6 +271,25 @@
 
 </div>
 
+<div class="qrf-modal-overlay" id="qrf-modal">
+  <div class="qrf-modal-card">
+    <div class="qrf-modal-header">
+      <h3>📷 Escanear QR del visitante</h3>
+      <button class="qrf-modal-close" onclick="_cerrarScannerQRFicha()">✕</button>
+    </div>
+    <div id="qrf-paso-scan">
+      <div id="qrf-reader"></div>
+      <div id="qrf-reader-vacio" class="qrf-scan-txt">Apuntá la cámara al código QR de la credencial del visitante.</div>
+    </div>
+    <div id="qrf-paso-datos" style="display:none;">
+      <div class="qrf-scan-txt" style="margin-top:0;">Revisá los datos antes de usarlos — podés corregir cualquier campo.</div>
+      <div id="qrf-datos-render"></div>
+      <button type="button" class="qrf-btn-usar" onclick="_usarDatosQRFicha()">✅ Usar estos datos</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="calculo-financiacion.js"></script>
 <script>
 var FICHA_EQUIPO_VERSION = '2026.08.14.4';
@@ -508,17 +558,15 @@ window._toggleVarianteFinanciacion = function(key, mostrar) {
     if (!mostrar && idx === -1) _variantesOcultas.push(key);
 };
 
-// Contacto que llega precargado desde el flujo del QR de FacoExtrema
-// iniciado en el HOME (index.html) — el vendedor escaneó ahí, eligió
-// este equipo en selector-dispositivos.html, y llega acá con
-// ?qr_telefono=&qr_nombre= ya en la URL. Mismo criterio que
-// _escanearQRVisitante (empresa/contacto por nombre, sin CUIT), pero
-// SIN disparar WhatsApp solo — el navegador bloquearía la ventana por
-// no ser ya un click directo del usuario en esta página nueva. Se dea
-// todo listo y se resalta el botón para que sea un solo toque más.
-function _precargarContactoQR(params) {
-  var telQr = params.get('qr_telefono') || '';
-  var nombreQr = params.get('qr_nombre') || '';
+// Contacto que llega precargado desde el flujo del QR de FacoExtrema,
+// sea porque el vendedor escaneó en el HOME (index.html, con
+// ?qr_telefono=&qr_nombre= en la URL de acá) o porque escaneó ACÁ
+// MISMO con el botón "📷 Escanear QR del visitante" (v2026.08.15 —
+// pedido por Cristian: "si le estoy mostrando la ficha a un cliente
+// desde ahí pum le escaneo y adentro, sino tengo que volver al home").
+// Recibe los valores directos (no un objeto URLSearchParams) para
+// servir a los dos orígenes por igual.
+function _precargarContactoQR(telQr, nombreQr) {
   if (!telQr && !nombreQr) return;
 
   var elTel = document.getElementById('fi-telefono-destino');
@@ -543,6 +591,128 @@ function _precargarContactoQR(params) {
   var elLead = document.getElementById('fi-lead-resultado');
   if (elLead && elLead.parentNode) elLead.parentNode.insertBefore(elBanner, elLead);
 }
+
+// ── Escaneo INLINE (botón nuevo dentro de la ficha) — usa el mismo
+// motor html5-qrcode y el mismo JSON de credencial que index.html
+// (id/nombre/apellido/dni/email/telefono/vip/categoria), para no
+// mantener dos lectores de QR con lógica distinta. A diferencia del
+// flujo viejo (index.html → selector-dispositivos.html → acá), este
+// no necesita volver al home: guarda Empresa+Contacto (con
+// dni/vip/categoria, igual que hace index.html vía
+// guardarEmpresaContactoQR) Y precarga el formulario de seguimiento
+// de ESTA ficha en el mismo paso. ──
+var _qrfScanner = null;
+var _pipelinesFichaCache = null; // para poder forzar "FacoExtrema" también en el escaneo inline, sin recargar la lista
+
+window._abrirScannerQRFicha = function() {
+  document.getElementById('qrf-modal').classList.add('abierto');
+  document.getElementById('qrf-paso-scan').style.display = 'block';
+  document.getElementById('qrf-paso-datos').style.display = 'none';
+  _iniciarCamaraQRFicha();
+};
+
+window._cerrarScannerQRFicha = function() {
+  document.getElementById('qrf-modal').classList.remove('abierto');
+  _detenerCamaraQRFicha();
+};
+
+function _iniciarCamaraQRFicha() {
+  if (typeof Html5Qrcode === 'undefined') {
+    document.getElementById('qrf-reader-vacio').textContent = '⚠️ No se pudo cargar el lector de QR (revisá la conexión a internet).';
+    return;
+  }
+  try {
+    _qrfScanner = new Html5Qrcode('qrf-reader');
+    _qrfScanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: 220 },
+      function(textoLeido) { _detenerCamaraQRFicha(); _procesarQRFichaEscaneado(textoLeido); },
+      function() { /* frame sin QR, normal — se ignora a propósito */ }
+    ).then(function() {
+      document.getElementById('qrf-reader-vacio').style.display = 'none';
+    }).catch(function(err) {
+      document.getElementById('qrf-reader-vacio').textContent = '⚠️ No se pudo acceder a la cámara. ' + String(err);
+    });
+  } catch(e) {
+    document.getElementById('qrf-reader-vacio').textContent = '⚠️ Lector de QR no disponible acá.';
+  }
+}
+
+function _detenerCamaraQRFicha() {
+  if (_qrfScanner) {
+    try { _qrfScanner.stop().then(function(){ _qrfScanner.clear(); }).catch(function(){}); } catch(e) {}
+    _qrfScanner = null;
+  }
+}
+
+var _datosQRFichaActuales = null;
+
+function _procesarQRFichaEscaneado(textoLeido) {
+  var datos;
+  try { datos = JSON.parse(textoLeido); }
+  catch(e) { alert('El QR no tiene un JSON válido.'); _abrirScannerQRFicha(); return; }
+
+  var telefonoDetectado = datos.telefono || datos.tel || datos.phone || datos.celular || datos.movil || '';
+
+  _datosQRFichaActuales = {
+    id: datos.id, nombre: datos.nombre || '', apellido: datos.apellido || '',
+    dni: datos.dni || '', email: datos.email || '', telefono: telefonoDetectado,
+    vip: !!datos.vip, categoria: datos.categoria || '',
+  };
+
+  // Mismo criterio que index.html: si el QR no trae teléfono, buscar
+  // si este contacto ya existe con uno guardado, antes de mostrar los
+  // datos — así el vendedor lo ve completo, no vacío.
+  var promesaTelefono = telefonoDetectado ? Promise.resolve(null) : fetch(GAS_URL, {
+    method: 'POST', headers: {'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'buscarContactoParaQR', nombre: datos.nombre || '', apellido: datos.apellido || '', dni: datos.dni || '' })
+  }).then(function(r){ return r.json(); })
+    .then(function(r){ return (r.ok && r.encontrado && r.contacto.telefono) ? r.contacto.telefono : null; })
+    .catch(function(){ return null; });
+
+  promesaTelefono.then(function(telefonoExistente) {
+    if (telefonoExistente && !_datosQRFichaActuales.telefono) _datosQRFichaActuales.telefono = telefonoExistente;
+    _renderDatosQRFicha();
+    document.getElementById('qrf-paso-scan').style.display = 'none';
+    document.getElementById('qrf-paso-datos').style.display = 'block';
+  });
+}
+
+function _renderDatosQRFicha() {
+  var d = _datosQRFichaActuales;
+  var campo = function(etiqueta, clave, tipo) {
+    return '<div class="qrf-dato-fila"><span class="lbl">' + etiqueta + '</span>' +
+      '<input type="' + (tipo||'text') + '" value="' + _esc(d[clave]||'') + '" oninput="_datosQRFichaActuales[\'' + clave + '\']=this.value"></div>';
+  };
+  document.getElementById('qrf-datos-render').innerHTML =
+    campo('Nombre','nombre') + campo('Apellido','apellido') + campo('Teléfono','telefono','tel') + campo('Email','email','email');
+}
+
+// "Usar estos datos" — guarda Empresa+Contacto (mismo backend que
+// index.html, con dni/vip/categoria incluidos) Y precarga el
+// formulario de seguimiento de esta ficha en el mismo paso, para que
+// el vendedor solo tenga que tocar "Crear Negocio" o "Enviar
+// WhatsApp" una vez.
+window._usarDatosQRFicha = function() {
+  var d = _datosQRFichaActuales;
+  if (!d) return;
+  var nombreCompleto = [d.nombre, d.apellido].filter(Boolean).join(' ');
+
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+    accion:'guardarEmpresaContactoQR', id: d.id||'', nombre: d.nombre||'', apellido: d.apellido||'',
+    dni: d.dni||'', email: d.email||'', telefono: d.telefono||'', vip: !!d.vip, categoria: d.categoria||''
+  }) }).catch(function(){ /* no crítico para seguir con el flujo local */ });
+
+  _precargarContactoQR(d.telefono || '', nombreCompleto);
+
+  if (_pipelinesFichaCache) {
+    _forzarPipelineFacoExtrema(_pipelinesFichaCache);
+  } else {
+    _cargarPipelinesFicha().then(function(lista) { _pipelinesFichaCache = lista; _forzarPipelineFacoExtrema(lista); });
+  }
+
+  _cerrarScannerQRFicha();
+};
 
 async function _cargarFicha() {
     var params = new URLSearchParams(window.location.search);
@@ -578,12 +748,15 @@ async function _cargarFicha() {
         if (elPipelineWrap) elPipelineWrap.closest('div').style.display = 'none';
         var elBtnCrearNegocio = document.getElementById('fi-btn-crear-negocio');
         if (elBtnCrearNegocio) elBtnCrearNegocio.style.display = 'none';
+        var elBtnEscanearQR = document.getElementById('fi-btn-escanear-qr');
+        if (elBtnEscanearQR) elBtnEscanearQR.style.display = 'none';
     } else {
         var esFlujoQR = !!(params.get('qr_telefono') || params.get('qr_nombre'));
         _cargarPipelinesFicha().then(function(lista) {
+          _pipelinesFichaCache = lista;
           if (esFlujoQR) _forzarPipelineFacoExtrema(lista);
         });
-        _precargarContactoQR(params);
+        _precargarContactoQR(params.get('qr_telefono') || '', params.get('qr_nombre') || '');
     }
 
     // El fotoMap (Apps Script) es mucho más lento que precios.json (RTDB

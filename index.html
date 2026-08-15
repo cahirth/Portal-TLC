@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.15.1 (BUG REAL — el QR de FacoExtrema NUNCA trae teléfono en su JSON, y desde v2026.08.10.1 el teléfono es obligatorio para Guardar o Enviar por WhatsApp — esto bloqueaba SIEMPRE el flujo al re-escanear a alguien que ya había sido cargado antes con un teléfono real (tipeado a mano la primera vez), aunque el dato ya existiera en el sistema. _procesarQRFac ahora, cuando el QR no trae teléfono, llama a la acción nueva buscarContactoParaQR (FotoMap.gs v185) para ver si ese contacto ya existe con uno guardado, y si lo encuentra lo trae al campo ANTES de mostrar los datos — el vendedor lo ve completo, no aparece vacío y después cambia. Si el QR sí trae teléfono, no se hace ninguna búsqueda extra (no toca lo que ya andaba bien). Pedido por Cristian: "chequeá si el contacto ya existe y tiene el teléfono cargado, traerlo al campo escaneado". Confirmado con test: QR sin teléfono + contacto ya cargado → autocompleta; QR con teléfono → no busca, respeta el valor del QR.) -->
 <!-- Portal TLC | index.html | v2026.08.10.1 (Teléfono obligatorio y válido en el modal QR de FacoExtrema — antes se podía Guardar o Enviar por WhatsApp con el teléfono vacío o mal tipeado, sin ningún aviso. Ahora _guardarContactoQR valida con el mismo _formatearTelefonoWsp que usa ficha-equipo.html antes de dejar pasar cualquiera de los 2 botones — si no es un WhatsApp argentino válido, bloquea, muestra un popup con el motivo y un ejemplo de formato correcto (+549 11 4829 1441), y le pone el foco al campo Teléfono resaltado en rojo. Pedido por Cristian. Confirmado con test: sin teléfono bloquea, con uno inválido bloquea, con uno válido deja pasar sin avisos.) -->
 <!-- Portal TLC | index.html | v2026.08.09.2 (2 pedidos de Cristian: (1) "Regulatoria" y "Reportes" eran los ÚNICOS dos ítems del menú de Administración que no pasaban por NINGÚN chequeo de permiso — ni columna en el Sheet, ni bloqueo visual (opacidad/candado), ni el wrapper abrirModuloConPermiso/abrirUrlConPermiso — a diferencia de absolutamente todos los demás módulos. Se agregaron las columnas "Regulatoria" y "Reportes" a la lectura de permisos (mismo patrón que "Eventos"), se sumaron a aplicarPermisosMenu() para que se vean grises+candado si el usuario no tiene el permiso, y sus onclick pasan a usar abrirModuloConPermiso / la nueva abrirProximamenteConPermiso (para Regulatoria, que todavía no tiene vista real, solo un toast "próximamente" — antes ni siquiera ESE toast respetaba el permiso). (2) "Gestión Eventos / Congresos" pasa a ser el primer ítem del menú de Administración (antes estaba segundo, después de Reportes).) -->
 <!-- Portal TLC | index.html | v2026.08.09.1 (Modal del escáner QR de FacoExtrema: agregada instrucción fija visible MIENTRAS la cámara está activa escaneando — antes solo existía el texto de "antes de arrancar la cámara" (#qr-fac-reader-vacio: "Apuntá la cámara..."), que se ocultaba apenas el video en vivo arrancaba, dejando la pantalla de escaneo real sin ninguna guía visible (confirmado con captura de Cristian, cámara activa sin texto). Nueva instrucción ("📷 Centrá el QR de la credencial en el recuadro... no hace falta tocar nada, se lee solo") se muestra recién cuando la cámara arranca de verdad, y se oculta en los 3 casos de error (sin librería, sin permiso de cámara, excepción al iniciar) para no confundir cuando no hay video. Pedido por Cristian: "ponele instrucciones de uso para que el usuario sepa qué hacer".) -->
@@ -3546,12 +3547,43 @@ function _procesarQRFac(textoLeido) {
     vip: !!datos.vip, categoria: datos.categoria || '',
   };
 
-  _renderDatosQrFac();
-
   // Confirmación visual: tilde verde grande 1 segundo, después pasa a
   // mostrar los datos leídos.
   document.getElementById('qr-fac-paso-scan').style.display = 'none';
   document.getElementById('qr-fac-paso-ok').style.display = 'block';
+
+  // El QR de la credencial de FacoExtrema NUNCA trae teléfono (dato
+  // que el organizador no incluye) — y como el teléfono es
+  // obligatorio para poder Guardar o Enviar por WhatsApp (ver
+  // _guardarContactoQR más abajo), esto bloqueaba SIEMPRE el flujo en
+  // el segundo escaneo de la misma persona, aunque ya tuviera un
+  // teléfono real cargado a mano la primera vez. Ahora, si el QR no
+  // trae teléfono, se busca en paralelo (mismo criterio de matching
+  // que usa el backend al guardar: DNI primero, nombre completo como
+  // respaldo) si este contacto ya existe con uno guardado, y si lo
+  // encuentra, lo trae al campo ANTES de mostrarlo — así el vendedor
+  // ve el teléfono ya completo la primera vez, no un cambio brusco
+  // después. Pedido por Cristian: "chequeá si el contacto ya existe y
+  // tiene el teléfono cargado, traerlo al campo escaneado".
+  var promesaTelefono = telefonoDetectado
+    ? Promise.resolve(null)
+    : fetch(GAS_URL_QR, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ accion: 'buscarContactoParaQR', nombre: datos.nombre || '', apellido: datos.apellido || '', dni: datos.dni || '' })
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(r) { return (r.ok && r.encontrado && r.contacto.telefono) ? r.contacto.telefono : null; })
+        .catch(function() { return null; }); // sin conexión, etc. — no bloquea el flujo, el vendedor puede tipearlo a mano
+
+  promesaTelefono.then(function(telefonoExistente) {
+    if (telefonoExistente && !_datosQrFacActuales.telefono) {
+      _datosQrFacActuales.telefono = telefonoExistente;
+      console.log('[QR FacoExtrema] El QR no traía teléfono — recuperado de un contacto ya cargado:', telefonoExistente);
+    }
+    _renderDatosQrFac();
+  });
+
   setTimeout(function() {
     document.getElementById('qr-fac-paso-ok').style.display = 'none';
     document.getElementById('qr-fac-paso-datos').style.display = 'block';
