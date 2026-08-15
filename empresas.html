@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.15.1 (BUG REAL DE FONDO — "Negocios asociados" cruzaba las empresas contra historico.json (una foto de GitHub), no contra Firebase en vivo. El camino rápido de creación de negocio que usa ficha-equipo.html (soloRegistrarNegocio:true, el que se dispara al escanear QR y tocar "Crear Negocio" en el stand de FacoExtrema) NUNCA escribe a historico.json — solo guarda en Firebase RTDB directo (confirmado en FotoMap.gs, guardarPresupuestoEditor). Esos negocios eran invisibles acá, no por ningún filtro de pipeline (no existe ninguno en este archivo, confirmado con grep) sino porque ni siquiera estaban en la fuente que se leía — daba la sensación de "solo veo un pipeline" porque los de otros pipelines creados por el editor completo sí llegaban a historico.json. Reportado por Cristian: "chequeá si estás filtrando solo por uno... no se ven todos los negocios asociados a la empresa". Ahora se lee /cotizaciones directo de Firebase, mismo criterio que ya usaba esta función para /servicio_tecnico — consistente entre las dos fuentes, y siempre al día sin depender de cuándo corrió la última sincronización a GitHub. Confirmado con test: el objeto crudo de Firebase se convierte bien a array, y un negocio creado por el camino rápido (el escenario exacto reportado) ahora se puede cruzar normal por CUIT/razón social.) -->
 <!-- Portal TLC | empresas.html | v2026.08.13.2 (Estrategia cache-first, mismo criterio que ya usa eventos.html — si ya se cargó la lista de empresas antes en este navegador, se pinta AL INSTANTE (0ms) con lo último guardado, sin esperar al backend, y se actualiza sola en segundo plano cuando llega la respuesta real. Nueva función _cargarEmpresasCacheFirst, usada SOLO en el arranque inicial de la página — las otras 2 llamadas a _cargarEmpresas() (después de importar un Excel, después de crear una empresa) siguen esperando el dato fresco como siempre, no tiene sentido mostrarles la caché vieja justo después de una acción que la cambió. Pedido por Cristian: "quiero que quede rápido como quedó eventos, basta de esperar". Confirmado con test: pintado instantáneo desde caché, actualización silenciosa al llegar el dato real, y funcionamiento normal sin caché (primera vez).) -->
 <!-- Portal TLC | empresas.html | v2026.08.13.1 (Avatar con iniciales reales — antes decía "CH" fijo siempre, sin importar quién estuviera logueado (no leía la sesión para nada). Mismo patrón (sin costo de red, solo texto) que ya usan servicio.html/cotizaciones.html. Reportado por Cristian con captura: "este avatar en empresas no hace nada, es fijo para CH... o lo ponemos de verdad que lea el usuario". Confirmado con test: usuario distinto muestra sus propias iniciales.) -->
 <!-- Portal TLC | empresas.html | v2026.08.10.6 (Placeholder de carga con texto propio — antes decía solo "Cargando...", ahora "Cargando empresas y contactos..." con spinner (clase nueva, no existía en este archivo). Mismo criterio que ya usan servicio.html/cotizaciones.html. Pedido por Cristian. Confirmado con test.) -->
@@ -501,11 +502,28 @@ function _montoCot(c) {
 
 async function _cargarNegociosCruzados() {
   try {
+    // BUG REAL — las cotizaciones se traían de historico.json (una
+    // foto de GitHub), NO de Firebase en vivo. Y el camino rápido de
+    // creación de negocio que usa ficha-equipo.html
+    // (soloRegistrarNegocio:true — el que se dispara al escanear QR y
+    // tocar "Crear Negocio" en el stand) NUNCA escribe a
+    // historico.json, solo guarda en Firebase RTDB directo (ver
+    // FotoMap.gs, guardarPresupuestoEditor). Resultado: los negocios
+    // creados por ese camino (probablemente casi todos los de
+    // FacoExtrema) eran invisibles acá — no por un filtro de
+    // pipeline, sino porque ni siquiera estaban en la fuente que se
+    // leía. Reportado por Cristian: "me parece que estás filtrando
+    // solo por uno, no se ven todos los negocios asociados". Ahora se
+    // lee /cotizaciones directo de Firebase, mismo criterio que ya se
+    // usaba acá mismo para /servicio_tecnico (2 líneas más abajo) —
+    // consistente, y siempre al día sin depender de cuándo corrió la
+    // última sincronización a GitHub.
     var resultados = await Promise.all([
-      fetch(HISTORICO_URL + '?t=' + Date.now(), { cache:'no-store' }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
+      fetch(RTDB_URL + '/cotizaciones.json?t=' + Date.now(), { cache:'no-store' }).then(function(r){ return r.ok ? r.json() : {}; }).catch(function(){ return {}; }),
       fetch(RTDB_URL + '/servicio_tecnico.json', { cache:'no-store' }).then(function(r){ return r.ok ? r.json() : {}; }).catch(function(){ return {}; }),
     ]);
-    var cotizaciones = Array.isArray(resultados[0]) ? resultados[0] : [];
+    var cotizacionesRaw = resultados[0] || {};
+    var cotizaciones = Object.keys(cotizacionesRaw).map(function(k) { return cotizacionesRaw[k]; }).filter(function(c) { return c && typeof c === 'object'; });
     var tickets = resultados[1] || {};
 
     // Antes esto recorría TODAS las cotizaciones y TODOS los tickets
