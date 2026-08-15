@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.15.2 (2 pedidos de Cristian: (1) el botón "Escanear QR del visitante" pasa de ser un botón ancho dentro del formulario a un FAB flotante circular abajo-centro, mismo patrón visual que el FAB de index.html — "quiero el boton flotante del QR abajo en el medio igual que en el index". (2) BUG REAL — "el teléfono no aparece, es como que alguien lo pisa y lo borra": html5-qrcode puede disparar el callback de escaneo exitoso DOS VECES seguidas para el mismo código (la cámara sigue decodificando frames mientras el .stop() todavía no terminó, que es asíncrono) — sin guard, la segunda llamada reiniciaba _procesarQRFichaEscaneado desde cero, pisando el teléfono que la primera pasada ya había completado (del QR o recuperado vía buscarContactoParaQR) con un objeto nuevo otra vez vacío. Agregado un flag _qrfProcesando que ignora cualquier disparo del callback mientras uno ya se está procesando, reseteado cada vez que se abre el modal para el próximo escaneo. Mismo fix aplicado también en index.html (mismo patrón, mismo riesgo, aunque no reportado ahí todavía). Confirmado con test: 2 disparos seguidos del mismo QR solo procesan uno; un escaneo nuevo después de reabrir el modal sí se procesa normal — más toda la batería de tests previa, sin romper nada.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.1 (RE-AGREGADO el botón "📷 Escanear QR del visitante" que se había sacado en v2026.08.06.3 por quedar redundante con el flujo del FAB en index.html — vuelve a pedido de Cristian, describiendo el flujo real del stand: "si le estoy mostrando la ficha a un cliente desde ahí pum le escaneo y adentro, sino tengo que volver al home y volver a ir a la ficha". A diferencia del botón viejo (que no tenía guardado de Empresa+Contacto propio), este SÍ persiste dni/vip/categoria vía guardarEmpresaContactoQR (FotoMap.gs v185) — mismo comportamiento que index.html — y ADEMÁS precarga el formulario de seguimiento de ESTA ficha (Empresa/Cliente + Teléfono) y fuerza el pipeline FacoExtrema en el mismo paso, para que el vendedor solo tenga que tocar "Crear Negocio" o "Enviar WhatsApp" una vez, sin salir de la página. Reusa el mismo motor html5-qrcode y el mismo JSON de credencial que index.html — un solo lector de QR mantenido, no dos con lógica separada. Si el QR no trae teléfono, usa el mismo buscarContactoParaQR (v185) que ya se sumó a index.html para autocompletar desde un contacto ya cargado. _precargarContactoQR refactorizada para aceptar valores directos (telQr, nombreQr) en vez de un objeto URLSearchParams, así sirve a los dos orígenes (flujo por URL desde el home, y este escaneo inline) sin duplicar lógica. Confirmado con 4 tests: botón visible solo con sesión de vendedor activa, autocompleta teléfono de un contacto existente, guarda Empresa+Contacto con los campos ricos del QR, precarga el formulario y fuerza el pipeline — más toda la batería de tests previa, sin romper nada.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.14.4 (DIAGNÓSTICO — Cristian reportó "el precio de lista está clavado en 61800, no actualiza tildando accesorios". Probado el archivo real (v2026.08.14.3) contra un precios.json fresco suyo: el precio SÍ se actualiza bien (61.800 → correctamente sumando cada módulo tildado, confirmado con Kit Conectividad real). El código no tiene el bug — la sospecha es que en GitHub seguía publicada una versión anterior a v2026.08.14.2 (la que arreglaba justamente este comportamiento; antes de esa versión, el precio quedaba fijo A PROPÓSITO). Como este archivo no tenía NINGÚN log de versión visible en consola (a diferencia de presupuesto-editor.html, que sí lo tiene desde siempre), no había forma rápida de confirmar qué versión corría el navegador sin mirar el código fuente — agregado ahora. También agregado un chequeo defensivo: si calculo-financiacion.js no llegó a cargar (ej. no se subió a la misma carpeta que este archivo), ahora avisa clarito por consola y en pantalla en vez de fallar en silencio con un TypeError críptico.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.14.3 (Migrado a leer de Firebase RTDB primero (mismo patrón ya probado en selector-dispositivos.html: ~100-200ms, siempre fresco, no depende de que GitHub Pages termine de propagar el último cambio del Excel), con fallback automático a precios.json si Firebase falla o está vacío — nunca se rompe la ficha, en el peor caso vuelve al comportamiento de siempre. Agregado _MAPA_HEADERS_FIREBASE local (mismo criterio que selector-dispositivos.html, con "Pertenece_a" → "Pertenece a" sumado — ese campo faltaba en la tabla original porque hasta ahora nadie lo necesitaba desde Firebase, es nuevo de la arquitectura Padre-Hijo). También sumado ese mismo campo a selector-dispositivos.html por las dudas de que a futuro necesite Padre-Hijo también. Confirmado con 2 tests nuevos: (A) carga real desde un objeto crudo de Firebase con headers sanitizados (espacios→"_"), incluyendo que el Hijo se encuentre bien vía "Pertenece_a"; (B) con Firebase simulando estar caído, cae al fallback de precios.json sin ningún error visible para el usuario.) -->
@@ -100,11 +101,19 @@
            tengo que volver al home" — el flujo del FAB en index.html
            obliga a volver al home entre cada visitante. Mismo motor
            (html5-qrcode) y mismo JSON de credencial que index.html,
-           para no mantener dos lectores de QR distintos. */
-        .btn-escanear-qr { display:flex; align-items:center; justify-content:center; gap:8px;
-            padding:11px 14px; border-radius:8px; border:1px dashed var(--blue-tlc); background:#eff6ff;
-            color:var(--blue-tlc); font-size:13px; font-weight:700; cursor:pointer; width:100%; }
-        .btn-escanear-qr:hover { background:#dbeafe; }
+           para no mantener dos lectores de QR distintos.
+           FAB flotante abajo-centro — mismo patrón visual que el FAB
+           de index.html (.fab-qr), en vez del botón ancho que tenía
+           antes dentro del formulario. Pedido por Cristian: "quiero
+           el boton flotante del QR abajo en el medio igual que en el
+           index". */
+        .fab-qr-ficha { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); width:58px; height:58px;
+            border-radius:50%; background:var(--blue-tlc); border:none; color:#fff; font-size:24px;
+            display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:900;
+            box-shadow:0 6px 20px rgba(26,75,140,.4); }
+        .fab-qr-ficha:active { transform:translateX(-50%) scale(.92); }
+        .fab-qr-ficha-label { position:fixed; bottom:2px; left:50%; transform:translateX(-50%); font-size:9px;
+            color:var(--text-muted); z-index:900; background:var(--bg-body); padding:0 6px; }
         .qrf-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); display:none;
             align-items:center; justify-content:center; z-index:9999; padding:16px; }
         .qrf-modal-overlay.abierto { display:flex; }
@@ -213,9 +222,6 @@
     </div>
 
     <div class="wsp-bar" style="flex-direction:column;" id="fi-lead-bar">
-        <button type="button" class="btn-escanear-qr" id="fi-btn-escanear-qr" onclick="_abrirScannerQRFicha()">
-            📷 Escanear QR del visitante
-        </button>
         <div style="display:flex; gap:10px; width:100%;">
             <select id="fi-pipeline-select" onchange="_onCambiarPipelineFicha(this.value)"
                 style="flex:1; padding:10px 14px; border-radius:8px; border:1px solid var(--border-color); font-size:12px; outline:none; cursor:pointer; color:var(--text-muted);">
@@ -270,6 +276,9 @@
     </div>
 
 </div>
+
+<button type="button" class="fab-qr-ficha" id="fi-btn-escanear-qr" onclick="_abrirScannerQRFicha()" title="Escanear QR del visitante">📷</button>
+<div class="fab-qr-ficha-label" id="fi-btn-escanear-qr-label">Escanear QR</div>
 
 <div class="qrf-modal-overlay" id="qrf-modal">
   <div class="qrf-modal-card">
@@ -602,12 +611,14 @@ function _precargarContactoQR(telQr, nombreQr) {
 // guardarEmpresaContactoQR) Y precarga el formulario de seguimiento
 // de ESTA ficha en el mismo paso. ──
 var _qrfScanner = null;
+var _qrfProcesando = false; // ver comentario en _iniciarCamaraQRFicha
 var _pipelinesFichaCache = null; // para poder forzar "FacoExtrema" también en el escaneo inline, sin recargar la lista
 
 window._abrirScannerQRFicha = function() {
   document.getElementById('qrf-modal').classList.add('abierto');
   document.getElementById('qrf-paso-scan').style.display = 'block';
   document.getElementById('qrf-paso-datos').style.display = 'none';
+  _qrfProcesando = false;
   _iniciarCamaraQRFicha();
 };
 
@@ -626,7 +637,24 @@ function _iniciarCamaraQRFicha() {
     _qrfScanner.start(
       { facingMode: 'environment' },
       { fps: 10, qrbox: 220 },
-      function(textoLeido) { _detenerCamaraQRFicha(); _procesarQRFichaEscaneado(textoLeido); },
+      function(textoLeido) {
+        // BUG REAL — html5-qrcode puede disparar este callback DOS
+        // VECES seguidas para el mismo código (la cámara sigue
+        // decodificando frames mientras _qrfScanner.stop() todavía
+        // no terminó, que es asíncrono). Sin este guard, la segunda
+        // llamada volvía a arrancar _procesarQRFichaEscaneado desde
+        // cero — pisando el teléfono que la primera pasada ya había
+        // completado (por venir en el QR, o recuperado vía
+        // buscarContactoParaQR) con un objeto nuevo, otra vez vacío.
+        // Reportado por Cristian: "el teléfono no aparece, es como
+        // que alguien lo pisa y lo borra" — coincide exacto con este
+        // patrón. Confirmado con test: 2 disparos seguidos del mismo
+        // QR solo procesan el primero.
+        if (_qrfProcesando) return;
+        _qrfProcesando = true;
+        _detenerCamaraQRFicha();
+        _procesarQRFichaEscaneado(textoLeido);
+      },
       function() { /* frame sin QR, normal — se ignora a propósito */ }
     ).then(function() {
       document.getElementById('qrf-reader-vacio').style.display = 'none';
@@ -750,6 +778,8 @@ async function _cargarFicha() {
         if (elBtnCrearNegocio) elBtnCrearNegocio.style.display = 'none';
         var elBtnEscanearQR = document.getElementById('fi-btn-escanear-qr');
         if (elBtnEscanearQR) elBtnEscanearQR.style.display = 'none';
+        var elBtnEscanearQRLabel = document.getElementById('fi-btn-escanear-qr-label');
+        if (elBtnEscanearQRLabel) elBtnEscanearQRLabel.style.display = 'none';
     } else {
         var esFlujoQR = !!(params.get('qr_telefono') || params.get('qr_nombre'));
         _cargarPipelinesFicha().then(function(lista) {

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.15.2 (BUG REAL preventivo — mismo guard contra doble disparo del callback de escaneo que se agregó en ficha-equipo.html v2026.08.15.2 (html5-qrcode puede llamar al callback de éxito 2 veces seguidas para el mismo código, mientras stop() todavía no terminó de verdad). Acá no estaba reportado como bug todavía, pero corre el mismo riesgo — se blindó preventivamente antes de que pase.) -->
 <!-- Portal TLC | index.html | v2026.08.15.1 (BUG REAL — el QR de FacoExtrema NUNCA trae teléfono en su JSON, y desde v2026.08.10.1 el teléfono es obligatorio para Guardar o Enviar por WhatsApp — esto bloqueaba SIEMPRE el flujo al re-escanear a alguien que ya había sido cargado antes con un teléfono real (tipeado a mano la primera vez), aunque el dato ya existiera en el sistema. _procesarQRFac ahora, cuando el QR no trae teléfono, llama a la acción nueva buscarContactoParaQR (FotoMap.gs v185) para ver si ese contacto ya existe con uno guardado, y si lo encuentra lo trae al campo ANTES de mostrar los datos — el vendedor lo ve completo, no aparece vacío y después cambia. Si el QR sí trae teléfono, no se hace ninguna búsqueda extra (no toca lo que ya andaba bien). Pedido por Cristian: "chequeá si el contacto ya existe y tiene el teléfono cargado, traerlo al campo escaneado". Confirmado con test: QR sin teléfono + contacto ya cargado → autocompleta; QR con teléfono → no busca, respeta el valor del QR.) -->
 <!-- Portal TLC | index.html | v2026.08.10.1 (Teléfono obligatorio y válido en el modal QR de FacoExtrema — antes se podía Guardar o Enviar por WhatsApp con el teléfono vacío o mal tipeado, sin ningún aviso. Ahora _guardarContactoQR valida con el mismo _formatearTelefonoWsp que usa ficha-equipo.html antes de dejar pasar cualquiera de los 2 botones — si no es un WhatsApp argentino válido, bloquea, muestra un popup con el motivo y un ejemplo de formato correcto (+549 11 4829 1441), y le pone el foco al campo Teléfono resaltado en rojo. Pedido por Cristian. Confirmado con test: sin teléfono bloquea, con uno inválido bloquea, con uno válido deja pasar sin avisos.) -->
 <!-- Portal TLC | index.html | v2026.08.09.2 (2 pedidos de Cristian: (1) "Regulatoria" y "Reportes" eran los ÚNICOS dos ítems del menú de Administración que no pasaban por NINGÚN chequeo de permiso — ni columna en el Sheet, ni bloqueo visual (opacidad/candado), ni el wrapper abrirModuloConPermiso/abrirUrlConPermiso — a diferencia de absolutamente todos los demás módulos. Se agregaron las columnas "Regulatoria" y "Reportes" a la lectura de permisos (mismo patrón que "Eventos"), se sumaron a aplicarPermisosMenu() para que se vean grises+candado si el usuario no tiene el permiso, y sus onclick pasan a usar abrirModuloConPermiso / la nueva abrirProximamenteConPermiso (para Regulatoria, que todavía no tiene vista real, solo un toast "próximamente" — antes ni siquiera ESE toast respetaba el permiso). (2) "Gestión Eventos / Congresos" pasa a ser el primer ítem del menú de Administración (antes estaba segundo, después de Reportes).) -->
@@ -3452,12 +3453,15 @@ var GAS_URL_QR = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKC
 var _datosQrFacActuales = null;
 var _qrFacScanner = null;
 
+var _qrFacProcesando = false; // ver comentario en el callback de escaneo, más abajo
+
 window._abrirModalQR = function() {
   document.getElementById('qr-modal').classList.add('abierto');
   document.getElementById('qr-fac-paso-scan').style.display = 'block';
   document.getElementById('qr-fac-paso-ok').style.display = 'none';
   document.getElementById('qr-fac-paso-datos').style.display = 'none';
   document.getElementById('qr-scan-instruccion-activa').style.display = 'none';
+  _qrFacProcesando = false;
   _datosQrFacActuales = null;
   _iniciarCamaraQRFac();
 };
@@ -3479,6 +3483,11 @@ function _iniciarCamaraQRFac() {
       { facingMode: 'environment' },
       { fps: 10, qrbox: 230 },
       function(textoLeido) {
+        // Mismo guard que ficha-equipo.html — html5-qrcode puede
+        // disparar este callback dos veces seguidas para el mismo
+        // código antes de que stop() termine de verdad.
+        if (_qrFacProcesando) return;
+        _qrFacProcesando = true;
         _detenerCamaraQRFac();
         _procesarQRFac(textoLeido);
       },
