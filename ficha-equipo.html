@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.15.3 (3 pedidos de Cristian con captura: (1) BUG REAL — un módulo tildado (ej. "Mesa Eléctrica") no viajaba ni al Negocio ni al link de WhatsApp, aunque estuviera visiblemente marcado en pantalla — "si la mesa está tildada, debés respetarla y guardarla, tanto en negocios como en el envío por WhatsApp". _guardarSeguimientoVentas ahora arma la lista completa (Padre + cada módulo tildado) y apila cada uno como su propia línea en el Negocio, en vez de apilar solo el Padre. (2) Los dos botones de WhatsApp (_compartirFichaWsp y _compartirFichaWspPersonalizado) ahora agregan "&modulos=..." al link compartido con los nombres de los módulos tildados — y _cargarFicha los lee para precargar esos mismos checkboxes YA tildados (y bloqueados, en modo receptor) cuando el cliente abre el link, así ve exactamente lo mismo que el vendedor tenía en pantalla al compartir, precio y financiación incluidos. Confirmado con 3 tests: el link incluye el módulo, quien lo recibe lo ve ya tildado con el precio correcto (5.940+800=6.740), y el Negocio apila 2 ítems (Padre + módulo) en el orden correcto. (3) El ícono del FAB "Escanear QR" pasa del emoji 📷 al mismo ícono Font Awesome (fa-solid fa-qrcode) que usa el FAB de index.html — agregado el link de Font Awesome al <head>, que antes no estaba. Pedido: "usar la misma imagen de QR que usamos en index".) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.2 (2 pedidos de Cristian: (1) el botón "Escanear QR del visitante" pasa de ser un botón ancho dentro del formulario a un FAB flotante circular abajo-centro, mismo patrón visual que el FAB de index.html — "quiero el boton flotante del QR abajo en el medio igual que en el index". (2) BUG REAL — "el teléfono no aparece, es como que alguien lo pisa y lo borra": html5-qrcode puede disparar el callback de escaneo exitoso DOS VECES seguidas para el mismo código (la cámara sigue decodificando frames mientras el .stop() todavía no terminó, que es asíncrono) — sin guard, la segunda llamada reiniciaba _procesarQRFichaEscaneado desde cero, pisando el teléfono que la primera pasada ya había completado (del QR o recuperado vía buscarContactoParaQR) con un objeto nuevo otra vez vacío. Agregado un flag _qrfProcesando que ignora cualquier disparo del callback mientras uno ya se está procesando, reseteado cada vez que se abre el modal para el próximo escaneo. Mismo fix aplicado también en index.html (mismo patrón, mismo riesgo, aunque no reportado ahí todavía). Confirmado con test: 2 disparos seguidos del mismo QR solo procesan uno; un escaneo nuevo después de reabrir el modal sí se procesa normal — más toda la batería de tests previa, sin romper nada.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.1 (RE-AGREGADO el botón "📷 Escanear QR del visitante" que se había sacado en v2026.08.06.3 por quedar redundante con el flujo del FAB en index.html — vuelve a pedido de Cristian, describiendo el flujo real del stand: "si le estoy mostrando la ficha a un cliente desde ahí pum le escaneo y adentro, sino tengo que volver al home y volver a ir a la ficha". A diferencia del botón viejo (que no tenía guardado de Empresa+Contacto propio), este SÍ persiste dni/vip/categoria vía guardarEmpresaContactoQR (FotoMap.gs v185) — mismo comportamiento que index.html — y ADEMÁS precarga el formulario de seguimiento de ESTA ficha (Empresa/Cliente + Teléfono) y fuerza el pipeline FacoExtrema en el mismo paso, para que el vendedor solo tenga que tocar "Crear Negocio" o "Enviar WhatsApp" una vez, sin salir de la página. Reusa el mismo motor html5-qrcode y el mismo JSON de credencial que index.html — un solo lector de QR mantenido, no dos con lógica separada. Si el QR no trae teléfono, usa el mismo buscarContactoParaQR (v185) que ya se sumó a index.html para autocompletar desde un contacto ya cargado. _precargarContactoQR refactorizada para aceptar valores directos (telQr, nombreQr) en vez de un objeto URLSearchParams, así sirve a los dos orígenes (flujo por URL desde el home, y este escaneo inline) sin duplicar lógica. Confirmado con 4 tests: botón visible solo con sesión de vendedor activa, autocompleta teléfono de un contacto existente, guarda Empresa+Contacto con los campos ricos del QR, precarga el formulario y fuerza el pipeline — más toda la batería de tests previa, sin romper nada.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.14.4 (DIAGNÓSTICO — Cristian reportó "el precio de lista está clavado en 61800, no actualiza tildando accesorios". Probado el archivo real (v2026.08.14.3) contra un precios.json fresco suyo: el precio SÍ se actualiza bien (61.800 → correctamente sumando cada módulo tildado, confirmado con Kit Conectividad real). El código no tiene el bug — la sospecha es que en GitHub seguía publicada una versión anterior a v2026.08.14.2 (la que arreglaba justamente este comportamiento; antes de esa versión, el precio quedaba fijo A PROPÓSITO). Como este archivo no tenía NINGÚN log de versión visible en consola (a diferencia de presupuesto-editor.html, que sí lo tiene desde siempre), no había forma rápida de confirmar qué versión corría el navegador sin mirar el código fuente — agregado ahora. También agregado un chequeo defensivo: si calculo-financiacion.js no llegó a cargar (ej. no se subió a la misma carpeta que este archivo), ahora avisa clarito por consola y en pantalla en vez de fallar en silencio con un TypeError críptico.) -->
@@ -16,6 +17,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ficha Técnica — TLC SRL</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <meta property="og:title" content="Ficha Técnica — Tecnología Láser Corneal">
     <meta property="og:description" content="Características, precio y financiación disponible. Tocá para ver el detalle completo.">
     <meta property="og:image" content="https://cahirth.github.io/Portal-TLC/icons/og-image.png">
@@ -277,7 +279,7 @@
 
 </div>
 
-<button type="button" class="fab-qr-ficha" id="fi-btn-escanear-qr" onclick="_abrirScannerQRFicha()" title="Escanear QR del visitante">📷</button>
+<button type="button" class="fab-qr-ficha" id="fi-btn-escanear-qr" onclick="_abrirScannerQRFicha()" title="Escanear QR del visitante"><i class="fa-solid fa-qrcode"></i></button>
 <div class="fab-qr-ficha-label" id="fi-btn-escanear-qr-label">Escanear QR</div>
 
 <div class="qrf-modal-overlay" id="qrf-modal">
@@ -837,7 +839,20 @@ async function _cargarFicha() {
         _fichaHijosDisponibles = lista.filter(function(x) {
             return x['Pertenece a'] && String(x['Pertenece a']).trim() === String(d['Nombre de Dispositivo']).trim();
         });
-        _fichaModulosTildados = new Set(); // arranca con todo destildado, cada vez que se carga una ficha nueva
+        // BUG REAL — si el vendedor tildaba un módulo (ej. "Mesa
+        // Eléctrica") ANTES de compartir por WhatsApp, ese estado se
+        // perdía por completo: el link que recibía el cliente
+        // arrancaba siempre con todo destildado, mostrando un precio
+        // y una financiación distintos a lo que el vendedor le mostró
+        // en persona. Ahora, si el link trae ?modulos=... (agregado
+        // por _compartirFichaWsp/_compartirFichaWspPersonalizado al
+        // armar el mensaje), esos módulos arrancan YA tildados —
+        // coincide con lo que el vendedor tenía en pantalla al
+        // compartir. Reportado por Cristian: "si la mesa está
+        // tildada, debés respetarla".
+        var modulosParam = params.get('modulos') || '';
+        var modulosPrecargados = modulosParam ? modulosParam.split(',').map(function(s){ return decodeURIComponent(s); }) : [];
+        _fichaModulosTildados = new Set(modulosPrecargados);
         _renderModulosOpcionales();
 
         _renderFinanciacion();
@@ -1231,6 +1246,54 @@ async function _guardarSeguimientoVentas(origen) {
 
   if (elResultado) { elResultado.textContent = '⏳ Guardando seguimiento en Ventas...'; elResultado.style.color = '#64748b'; }
 
+  // BUG REAL — el Negocio (y el presupuesto que sale de ahí) SIEMPRE
+  // apilaba solo el equipo Padre, sin importar qué módulos tuviera
+  // tildados el vendedor en pantalla — "Mesa Eléctrica" quedaba
+  // afuera del negocio aunque estuviera tildada y visible en la
+  // ficha. Ahora se arma la lista completa (Padre + cada módulo
+  // tildado) y se apila cada uno como su propia línea — mismo
+  // criterio que usa presupuesto-editor.html para cualquier otro
+  // ítem. Reportado por Cristian: "si la mesa está tildada, debés
+  // respetarla y guardarla, tanto en negocios como en el envío por
+  // WhatsApp".
+  var itemsParaApilar = [{
+    nombre: _fichaNombreActual,
+    precio: _fichaPrecioListaActual,
+    precioContado: _fichaPrecioContadoActual || _fichaPrecioListaActual,
+    foto: fotoUrl(_fichaFotoRawActual) || '',
+    vendedor: (_sesionVendedor && _sesionVendedor.name) || '',
+  }];
+  _fichaHijosDisponibles.forEach(function(h) {
+    var nombreHijo = h['Nombre de Dispositivo'] || '';
+    if (!_fichaModulosTildados.has(nombreHijo)) return;
+    var plHijo = parseFloat(h['Precio LISTA']);
+    var pcHijo = parseFloat(h['Precio CONTADO CNO']);
+    itemsParaApilar.push({
+      nombre: nombreHijo,
+      precio: isNaN(plHijo) ? 0 : plHijo,
+      precioContado: isNaN(pcHijo) ? (isNaN(plHijo) ? 0 : plHijo) : pcHijo,
+      foto: '',
+      vendedor: (_sesionVendedor && _sesionVendedor.name) || '',
+    });
+  });
+
+  // Apila TODOS los ítems (Padre + módulos), uno por uno y en orden —
+  // a propósito SIN Promise.all: apilarFichaTecnica lee-modifica-
+  // escribe el negocio completo en cada llamada, así que si dos
+  // llamadas corrieran en paralelo, la segunda podría pisar lo que
+  // acababa de guardar la primera (perdiendo esa línea).
+  async function _apilarTodosLosItems(idCot) {
+    var totalFinal = 0;
+    for (var i = 0; i < itemsParaApilar.length; i++) {
+      var respItem = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ accion: 'apilarFichaTecnica', idCot: idCot, ficha: itemsParaApilar[i] }) });
+      var rItem = await respItem.json();
+      if (!rItem.ok) return { ok: false, error: rItem.error };
+      totalFinal = rItem.total;
+    }
+    return { ok: true, total: totalFinal, cantidadItems: itemsParaApilar.length };
+  }
+
   try {
     // v2026.08.01 — FIX de velocidad: antes, CADA click (WhatsApp y
     // Crear Negocio) repetía las 3 llamadas completas al backend
@@ -1251,22 +1314,13 @@ async function _guardarSeguimientoVentas(origen) {
         _mostrarResultadoConNegocio(elResultado, tituloRepetido, '#06d6a0', _negocioActualFicha.idCot, false);
         return;
       }
-      var respApilarDirecto = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({
-          accion: 'apilarFichaTecnica',
-          idCot: _negocioActualFicha.idCot,
-          ficha: {
-            nombre: _fichaNombreActual,
-            precio: _fichaPrecioListaActual,
-            precioContado: _fichaPrecioContadoActual || _fichaPrecioListaActual,
-            foto: fotoUrl(_fichaFotoRawActual) || '',
-            vendedor: (_sesionVendedor && _sesionVendedor.name) || '',
-          },
-        }) });
-      var rApilarDirecto = await respApilarDirecto.json();
+      var rApilarDirecto = await _apilarTodosLosItems(_negocioActualFicha.idCot);
       if (rApilarDirecto.ok) {
         _fichaYaApiladaFicha = true;
-        _mostrarResultadoConNegocio(elResultado, '📎 Ficha sumada al negocio de ' + empresaTexto + ' (' + rApilarDirecto.total + ' fichas enviadas)', '#06d6a0', _negocioActualFicha.idCot, false);
+        var tituloDirecto = '📎 Ficha sumada al negocio de ' + empresaTexto +
+          (itemsParaApilar.length > 1 ? ' (equipo + ' + (itemsParaApilar.length - 1) + ' módulo' + (itemsParaApilar.length > 2 ? 's' : '') + ')' : '') +
+          ' (' + rApilarDirecto.total + ' fichas enviadas)';
+        _mostrarResultadoConNegocio(elResultado, tituloDirecto, '#06d6a0', _negocioActualFicha.idCot, false);
         return;
       }
       // Si por lo que sea falló (ej. alguien borró el negocio mientras
@@ -1336,23 +1390,14 @@ async function _guardarSeguimientoVentas(origen) {
     }
 
     if (rBuscar.ok && rBuscar.idCot) {
-      var respApilar = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({
-          accion: 'apilarFichaTecnica',
-          idCot: rBuscar.idCot,
-          ficha: {
-            nombre: _fichaNombreActual,
-            precio: _fichaPrecioListaActual,
-            precioContado: _fichaPrecioContadoActual || _fichaPrecioListaActual, // ← v2026.07.30 — antes no viajaba, el Descuento en modalidad Contado quedaba siempre en 0%
-            foto: fotoUrl(_fichaFotoRawActual) || '',
-            vendedor: (_sesionVendedor && _sesionVendedor.name) || '',
-          },
-        }) });
-      var rApilar = await respApilar.json();
+      var rApilar = await _apilarTodosLosItems(rBuscar.idCot);
       if (!rApilar.ok) { if (elResultado) { elResultado.textContent = '⚠️ No se pudo apilar la ficha: ' + (rApilar.error||'error desconocido'); elResultado.style.color = '#f8961e'; } return; }
       _negocioActualFicha = { idCot: rBuscar.idCot, razonSocial: empresaTexto };
       _fichaYaApiladaFicha = true;
-      _mostrarResultadoConNegocio(elResultado, '📎 Ficha sumada al negocio existente de ' + empresaTexto + ' (' + rApilar.total + ' fichas enviadas)', '#06d6a0', rBuscar.idCot, false);
+      var tituloExistente = '📎 Ficha sumada al negocio existente de ' + empresaTexto +
+        (itemsParaApilar.length > 1 ? ' (equipo + ' + (itemsParaApilar.length - 1) + ' módulo' + (itemsParaApilar.length > 2 ? 's' : '') + ')' : '') +
+        ' (' + rApilar.total + ' fichas enviadas)';
+      _mostrarResultadoConNegocio(elResultado, tituloExistente, '#06d6a0', rBuscar.idCot, false);
       return;
     }
 
@@ -1408,6 +1453,7 @@ function _compartirFichaWsp(e) {
     e.preventDefault();
     var link = 'https://ir.tlcsrl.com.ar/ficha-equipo.html?nombre=' + encodeURIComponent(_fichaNombreActual) + '&modo=cliente';
     if (_variantesOcultas.length) link += '&ocultar=' + encodeURIComponent(_variantesOcultas.join(','));
+    if (_fichaModulosTildados.size) link += '&modulos=' + Array.from(_fichaModulosTildados).map(encodeURIComponent).join(',');
     var msg = encodeURIComponent('Te comparto la ficha técnica de ' + _fichaNombreActual + ' — TLC SRL: ' + link);
     var telRaw = (document.getElementById('fi-telefono-destino') || {}).value || '';
     var telWsp = _formatearTelefonoWsp(telRaw);
@@ -1449,6 +1495,7 @@ function _compartirFichaWspPersonalizado(nombrePila) {
   }
   var link = 'https://ir.tlcsrl.com.ar/ficha-equipo.html?nombre=' + encodeURIComponent(_fichaNombreActual) + '&modo=cliente';
   if (_variantesOcultas.length) link += '&ocultar=' + encodeURIComponent(_variantesOcultas.join(','));
+  if (_fichaModulosTildados.size) link += '&modulos=' + Array.from(_fichaModulosTildados).map(encodeURIComponent).join(',');
   var msg = encodeURIComponent('¡Hola ' + nombrePila + '! Un gusto saludarte en Faco Extrema. Te envío la ficha técnica del ' + _fichaNombreActual + ' que estuvimos viendo en el stand de TLC: ' + link);
   var url = 'https://wa.me/' + telWsp + '?text=' + msg;
   window.open(url, '_blank');
