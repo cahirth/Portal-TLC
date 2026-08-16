@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.15.10 ("Precio final" para productos con IVA ya incluido — nueva columna "IVA_Incluido" (TRUE/FALSE) en la fila del Padre, en Lista_Precios. Con TRUE, el encabezado saca el "+ IVA 10,5%" (que sugiere que hay que sumar algo más) y aclara "Precio final (IVA incluido)" en su lugar — el número mostrado ya es el precio final real. Sin la columna marcada, sigue mostrando "+ IVA 10,5%" exactamente igual que siempre. Pedido por Cristian con captura de VOLK V20LC (lupas): "solo en las lupas Volk el IVA ya está incluido, quitar +IVA y dejar explícito precio final" — se implementó con una columna genérica en vez de hardcodear "Volk"/"Lupas", para que sirva para cualquier otra marca/categoría que en el futuro tenga el mismo caso. Confirmado con test: con IVA_Incluido=TRUE se saca el "+ IVA" y aparece "Precio final (IVA incluido)"; sin la columna, un equipo normal sigue mostrando "+ IVA 10,5%" sin ningún cambio.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.9 (Layout de "Módulos y Accesorios Opcionales" — pasó de una lista vertical (1 accesorio por línea) a un grid multi-columna (auto-fill, mínimo 150px por celda) — varios accesorios entran en la misma línea, ajustándose solo según el ancho de pantalla disponible (celular angosto: 1-2 por línea; desktop: varios más). Agregado borde sutil por defecto a cada celda (antes solo aparecía en hover) para que se note la separación entre accesorios ahora que están en grid y no en lista. Pedido por Cristian con captura: "poné los accesorios en la misma línea, a lo sumo en 2 líneas". Confirmado que ningún test se rompió (cambio puramente visual, no toca la lógica de tildado/dependencias/miniaturas).) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.8 (Miniatura junto a cada accesorio en "Módulos y Accesorios Opcionales" — lee el mismo campo "Foto" y usa la misma función fotoUrl() que ya usa el Padre (Drive/lh3/Fotos-webp), no un campo nuevo. Si el Hijo no tiene foto cargada, no se dibuja nada (el checkbox no se corre de lugar). Pedido por Cristian: "podemos cargar imagen pequeña al lado de cada accesorio, que lo lea del link foto". Confirmado con test usando la forma REAL de Firebase (headers sanitizados, espacios→"_") — "Foto" no necesitó agregarse a _MAPA_HEADERS_FIREBASE porque no tiene espacios para sanitizar, funciona igual desde GitHub y desde Firebase sin tocar nada más; y confirmado que un accesorio sin foto no rompe nada.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.7 (Dependencias entre módulos — nueva columna "Requiere_Modulo" en Lista_Precios (texto, el nombre EXACTO de otro Hijo del mismo Padre). Al tildar un módulo que tiene esta columna cargada (ej. "ICGA" con Requiere_Modulo="FFA"), el módulo requerido se tilda automáticamente Y queda bloqueado (checkbox disabled, con la nota "(requerido por ICGA)" al lado) mientras el que lo pide siga tildado — evita quedar con una combinación sin sentido técnico (ICGA sin FFA). Al destildar el que lo pide, el requerido se LIBERA (sigue tildado, pero ya se puede destildar por separado) — no se destilda solo, porque el vendedor puede seguir queriéndolo aparte. Pedido por Cristian: "en Apollo y en Sunkingdom... cuando tildo ICGA debe estar tildado FFA también". Confirmado con 5 tests: tilda solo, queda bloqueado con la nota visible, el precio ya incluye los dos, se libera al destildar el que lo pide (sin autodestildarse), y después se puede destildar libremente.) -->
@@ -1061,13 +1062,24 @@ function _renderFinanciacion() {
     // Headline de precio — se actualiza acá (no en _cargarFicha) para
     // reflejar Padre + Hijos tildados en vivo, cada vez que cambia la
     // selección.
+    //
+    // "IVA_Incluido" — columna nueva en Lista_Precios (TRUE/FALSE, en
+    // la fila del Padre). Algunos productos (ej. lupas Volk) ya
+    // vienen con el IVA adentro del precio publicado — mostrarles
+    // "+ IVA 10,5%" al lado sugiere que hay que sumar algo más, cuando
+    // en realidad el precio ya ES el final. Con esta columna en TRUE,
+    // se saca el "+ IVA 10,5%" y se aclara "Precio final (IVA
+    // incluido)" en su lugar. Pedido por Cristian: "solo en las lupas
+    // Volk el IVA ya está incluido, quitar +IVA y dejar explícito
+    // precio final".
+    var ivaIncluido = _fichaPadreActual && (_fichaPadreActual['IVA_Incluido'] === true || String(_fichaPadreActual['IVA_Incluido'] || '').trim().toUpperCase() === 'TRUE');
     var elPrecioLista = document.getElementById('fi-precio-lista');
     var elPrecioListaIva = document.getElementById('fi-precio-lista-iva');
     if (elPrecioLista) {
         elPrecioLista.textContent = (precioListaCombinado > 0) ? _fmtMoneda(precioListaCombinado, 'USD') : 'Consultar';
     }
     if (elPrecioListaIva) {
-        elPrecioListaIva.textContent = (precioListaCombinado > 0) ? '+ IVA 10,5%' : '';
+        elPrecioListaIva.textContent = (precioListaCombinado <= 0) ? '' : (ivaIncluido ? 'Precio final (IVA incluido)' : '+ IVA 10,5%');
     }
 
     // Tarjeta de Contado — igual en los dos caminos (siempre fue
