@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.15.5 (BUG REAL — abrirDetalle() e _abrirDetalleDesdeResultado() armaban su PROPIA lista filtrada por separado de lo que se ve en pantalla, y NO le aplicaban _ordenarDispositivos() (el toggle Nombre/Precio de v2026.08.15.4) — el índice "idx" viene de la posición VISUAL donde el vendedor tocó, así que si ese orden no coincidía con el de la lista recalculada acá adentro, agarraba OTRO equipo. Con "Nombre" pasaba casi desapercibido porque el catálogo ya está cargado casi alfabético en el Excel; con "Precio" se notaba siempre, porque el orden por precio es bien distinto al de las filas. Reportado por Cristian: "no indexa bien la lista en $ y llama a un equipo desfasado". Arreglado en los DOS lugares (abrirDetalle y _abrirDetalleDesdeResultado, que también renderizaba sin ordenar) — ahora los dos aplican el mismo _ordenarDispositivos() que ve el vendedor en pantalla antes de indexar. Confirmado con test reproduciendo el escenario exacto: ordenar por Precio, tocar la 2da tarjeta visible, confirmar que abre ESE equipo y no el de la posición 2 del orden viejo.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.15.4 (Toggle Nombre/Precio — nueva función compartida _ordenarDispositivos(), aplicada tanto en la navegación por categoría (filtrar → renderLista) como en el buscador universal (_ejecutarBusqueda), un solo estado global (_ordenActual). En rigor, antes NO había ningún orden explícito — la lista salía en el orden de fila del Excel, que por casualidad parecía alfabético porque así está cargado el catálogo hoy. Orden por Precio usa Precio LISTA (con Precio CONTADO CNO como respaldo si falta) — los equipos sin ningún precio cargado van al final, no se cuelan arriba por un NaN mal comparado. Pedido por Cristian: "los filtros ordenan por nombre, podremos ordenar tbien por precio?". Confirmado con test: orden alfabético real, orden numérico correcto de menor a mayor con el caso sin precio al final, y que la función no muta el array original.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.15.3 (BUG REAL — Uncaught TypeError reportado por Cristian con stack trace exacto: "(s || '').toLowerCase is not a function", en sinAcentos() al filtrar por subcategoría. Causa: (s || '') solo protege contra valores FALSY (undefined/null/''/0/false) — cualquier valor TRUTHY que no sea string (un número, un booleano true, un array, un objeto) pasa de largo igual, y esos tipos no tienen .toLowerCase(). Cambiado a String(s || ''), que colapsa falsy a '' exactamente igual que antes Y convierte cualquier otro tipo a su representación de texto antes de intentar .toLowerCase() — ya no puede explotar sin importar qué tipo de dato le llegue. Confirmado con test reproduciendo el error real con varios tipos (número, booleano, array, objeto) — ninguno rompe más, y los casos de siempre (undefined/null/0/string con acentos) dan exactamente el mismo resultado que antes del fix, sin ningún cambio de comportamiento.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.15.2 (Agregado un log de versión PROPIO de este archivo en consola (independiente de PORTAL_TLC_VERSION, que es compartido por todo el Portal) — sin esto no había forma de confirmar si ESTE archivo puntual ya estaba actualizado en producción, aunque la consola mostrara un PORTAL_TLC_VERSION reciente. Mismo criterio que ya se agregó en ficha-equipo.html y calculo-financiacion.js. Reportado por Cristian: seguía viendo la pantalla intermedia al elegir un equipo, aunque el fix de v2026.08.15.1 (saltar directo a la ficha) ya estaba confirmado con test — la sospecha es que ese archivo todavía no se había vuelto a subir a GitHub.) -->
@@ -3044,11 +3045,15 @@ function _abrirDetalleDesdeResultado(idxGlobal, subcat) {
     // Activar vista-lista para que abrirDetalle pueda funcionar
     _mostrarVista('lista');
 
-    // Renderizar la lista con todos los equipos de la subcat para que el overlay funcione
-    const listaBase = dispositivos.filter(item =>
+    // Renderizar la lista con todos los equipos de la subcat para que
+    // el overlay funcione — con el MISMO orden que ve el vendedor en
+    // pantalla (_ordenarDispositivos), para que el índice de abajo
+    // coincida con lo que abrirDetalle() calcula internamente (ver
+    // fix ahí, mismo motivo: "no indexa bien la lista en $").
+    const listaBase = _ordenarDispositivos(dispositivos.filter(item =>
         item['Categoria'] === catActual &&
         (subcatActual === 'TODAS' || (item['Sub Categoria'] || '').trim() === subcatActual)
-    );
+    ));
     renderLista(listaBase);
 
     // Encontrar el índice dentro de la lista filtrada
@@ -3223,7 +3228,20 @@ function abrirDetalle(idx) {
     // filtrar(): con texto, busca en TODO el catálogo. Reportado por
     // Cristian con captura: "el filtro falla cuando busco un equipo
     // que no esté en esa categoría, lo selecciono y no abre".
-    const filtrados = dispositivos.filter(d => {
+    // BUG REAL — esta lista se armaba filtrando dispositivos de nuevo
+    // acá, PERO SIN aplicar el orden elegido (_ordenarDispositivos) —
+    // el mismo que sí se le aplica a lo que realmente se ve en
+    // pantalla (ver filtrar()/renderLista). El índice "idx" viene de
+    // la POSICIÓN VISUAL en la que el vendedor tocó, así que si el
+    // orden visual (por Precio, o incluso por Nombre si el catálogo
+    // no está cargado en orden alfabético exacto) no coincidía con el
+    // orden de esta lista recalculada acá, "filtrados[idx]" agarraba
+    // OTRO equipo — el clásico "toco uno y me abre otro". Con
+    // "Nombre" pasaba casi desapercibido porque el catálogo ya está
+    // cargado casi alfabético en el Excel; con "Precio" se notaba
+    // siempre. Reportado por Cristian: "no indexa bien la lista en $
+    // y llama a un equipo desfasado".
+    const filtrados = _ordenarDispositivos(dispositivos.filter(d => {
         const nombre = sinAcentos(d['Nombre de Dispositivo']);
         const desc   = sinAcentos(d['Descripcion']);
         const subcat = sinAcentos(d['Sub Categoria'] || '');
@@ -3238,7 +3256,7 @@ function abrirDetalle(idx) {
             if (dSub !== subcatActual) return false;
         }
         return true;
-    });
+    }));
 
     dispositivoActual = filtrados[idx];
     if (!dispositivoActual) return;
