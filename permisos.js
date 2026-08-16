@@ -1,14 +1,29 @@
-// Portal TLC | permisos.js | v2026.08.13.1 | Validación de acceso a módulos secundarios
-// FIX: el fetch al Sheet de Google no tenía ningún límite de tiempo —
-// si Google tardaba de más o no respondía (pasa de vez en cuando con
-// el endpoint gviz, no es una API pensada para alta disponibilidad),
-// el await se quedaba esperando PARA SIEMPRE, colgando la página
-// entera en TODOS los módulos que usan esta función (empresas.html,
-// eventos.html, servicio.html, cotizaciones.html — los 4 la cargan).
-// Ahora corta sola a los 4 segundos y sigue de largo (fail-open, mismo
-// criterio que ya tenía el resto de la función). Reportado por
-// Cristian: "a veces no carga, da error de timeout... comparalos, y
-// acordate que ayer miraba un excel de permisos en gsheet".
+// Portal TLC | permisos.js | v2026.08.16.1 | Validación de acceso a módulos secundarios
+// BUG REAL DE FONDO — validarAccesoModulo hacía un pedido de red EN
+// VIVO a Google Sheets (gviz) en CADA carga de página, en los 4
+// módulos que lo usan (empresas.html, eventos.html, servicio.html,
+// cotizaciones.html), esperado con await ANTES de pintar cualquier
+// cosa — el timeout de 4s (v2026.08.13.1) evitaba que se colgara para
+// siempre, pero el caso NORMAL (Google responde bien) igual tenía que
+// esperar el viaje completo cada vez, sin excepción. Esto anulaba
+// cualquier estrategia de "caché-first" que tuviera el módulo en sí
+// (ver eventos.html) — no importaba qué tan rápido estuviera el
+// tablero en caché, esta validación corría primero e igual bloqueaba
+// todo. Reportado por Cristian: "siempre lento, lento, lento... si lo
+// refresco anda bien, pero de una no anda" — el "de una no anda"
+// coincide con esto exacto (cada carga NUEVA paga el viaje completo);
+// el "si refresco anda bien" es muy probablemente el caché HTTP propio
+// del navegador sirviendo la MISMA URL pedida segundos antes, no algo
+// que el código estuviera haciendo a propósito.
+//
+// FIX: el resultado (permitido/no permitido) se guarda en
+// sessionStorage por 10 minutos, por combinación de módulo+email. Si
+// ya se validó ese mismo acceso hace menos de 10 minutos EN ESTA
+// PESTAÑA, no se vuelve a pedir nada — resuelve al instante. Se
+// vuelve a pedir solo si pasaron los 10 minutos, o al abrir una
+// pestaña nueva (sessionStorage no persiste entre pestañas ni al
+// cerrar el navegador, a propósito — para que un cambio de permisos
+// en el Sheet no tarde demasiado en reflejarse).
 // ══════════════════════════════════════════════════════════════════
 // Se carga DESPUÉS de version.js en cualquier módulo que necesite
 // controlar acceso por columna de la solapa "Vendedores" (empresas.html
@@ -48,7 +63,29 @@ async function validarAccesoModulo(columnaSheet) {
     const email = payload.account && payload.account.username;
     if (!email) { window.location.href = 'index.html'; return false; }
 
-    // 2) Consulta directa al Sheet publicado (mismo endpoint gviz que
+    // 2) Caché — si ya se validó este mismo acceso (módulo + email)
+    // hace menos de 10 minutos EN ESTA PESTAÑA, se resuelve al
+    // instante sin pedir nada a Google. Ver comentario de v2026.08.16.1
+    // arriba para la explicación completa del problema que esto
+    // resuelve.
+    const TTL_PERMISOS_MS = 10 * 60 * 1000; // 10 minutos
+    const claveCache = 'permiso_cache_' + columnaSheet + '_' + email.toLowerCase().trim();
+    try {
+      const cacheRaw = sessionStorage.getItem(claveCache);
+      if (cacheRaw) {
+        const cache = JSON.parse(cacheRaw);
+        if (cache && typeof cache.permitido === 'boolean' && (Date.now() - cache.ts) < TTL_PERMISOS_MS) {
+          if (!cache.permitido) {
+            alert('🔒 No tienes permiso para acceder a este módulo');
+            window.location.href = 'index.html';
+            return false;
+          }
+          return true;
+        }
+      }
+    } catch(eCacheGet) { /* sessionStorage no disponible o corrupto — se sigue de largo y se pide fresco */ }
+
+    // 3) Consulta directa al Sheet publicado (mismo endpoint gviz que
     // usa index.html — sin pasar por el GAS, lectura pública).
     //
     // TIMEOUT REAL — antes este fetch no tenía ningún límite de
@@ -98,6 +135,8 @@ async function validarAccesoModulo(columnaSheet) {
     const permitido = fila
       ? (fila.c[colIdx]?.v === true || fila.c[colIdx]?.v === 'TRUE' || fila.c[colIdx]?.v === 'true' || fila.c[colIdx]?.v === 1)
       : false; // email no encontrado en Vendedores → sin acceso
+
+    try { sessionStorage.setItem(claveCache, JSON.stringify({ permitido: permitido, ts: Date.now() })); } catch(eCacheSet) { /* no crítico — solo significa que la próxima carga vuelve a pedir */ }
 
     if (!permitido) {
       alert('🔒 No tienes permiso para acceder a este módulo');
