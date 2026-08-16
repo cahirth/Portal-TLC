@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.15.4 (Toggle Nombre/Precio — nueva función compartida _ordenarDispositivos(), aplicada tanto en la navegación por categoría (filtrar → renderLista) como en el buscador universal (_ejecutarBusqueda), un solo estado global (_ordenActual). En rigor, antes NO había ningún orden explícito — la lista salía en el orden de fila del Excel, que por casualidad parecía alfabético porque así está cargado el catálogo hoy. Orden por Precio usa Precio LISTA (con Precio CONTADO CNO como respaldo si falta) — los equipos sin ningún precio cargado van al final, no se cuelan arriba por un NaN mal comparado. Pedido por Cristian: "los filtros ordenan por nombre, podremos ordenar tbien por precio?". Confirmado con test: orden alfabético real, orden numérico correcto de menor a mayor con el caso sin precio al final, y que la función no muta el array original.) -->
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.15.3 (BUG REAL — Uncaught TypeError reportado por Cristian con stack trace exacto: "(s || '').toLowerCase is not a function", en sinAcentos() al filtrar por subcategoría. Causa: (s || '') solo protege contra valores FALSY (undefined/null/''/0/false) — cualquier valor TRUTHY que no sea string (un número, un booleano true, un array, un objeto) pasa de largo igual, y esos tipos no tienen .toLowerCase(). Cambiado a String(s || ''), que colapsa falsy a '' exactamente igual que antes Y convierte cualquier otro tipo a su representación de texto antes de intentar .toLowerCase() — ya no puede explotar sin importar qué tipo de dato le llegue. Confirmado con test reproduciendo el error real con varios tipos (número, booleano, array, objeto) — ninguno rompe más, y los casos de siempre (undefined/null/0/string con acentos) dan exactamente el mismo resultado que antes del fix, sin ningún cambio de comportamiento.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.15.2 (Agregado un log de versión PROPIO de este archivo en consola (independiente de PORTAL_TLC_VERSION, que es compartido por todo el Portal) — sin esto no había forma de confirmar si ESTE archivo puntual ya estaba actualizado en producción, aunque la consola mostrara un PORTAL_TLC_VERSION reciente. Mismo criterio que ya se agregó en ficha-equipo.html y calculo-financiacion.js. Reportado por Cristian: seguía viendo la pantalla intermedia al elegir un equipo, aunque el fix de v2026.08.15.1 (saltar directo a la ficha) ya estaba confirmado con test — la sospecha es que ese archivo todavía no se había vuelto a subir a GitHub.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.15.1 (ELIMINADA la pantalla intermedia de detalle (Folleto/Ver Stock/Ver Ficha/cantidad/modalidad) — abrirDetalle() ahora va SIEMPRE directo a ficha-equipo.html (antes esto solo pasaba para el flujo de QR de FacoExtrema), que absorbe "Ver Stock" y "Agregar Cotización" (ver ficha-equipo.html v2026.08.15.5). Pedido por Cristian: "hay un modal intermedio que lo quiero trasladar todo a ficha técnica y borrarlo... sería más ágil y sin tantos clicks". EXCEPCIÓN: el puente viejo con cotizaciones.html (?agregarA=ID, flujo HubSpot) sigue usando la pantalla vieja sin tocar — ficha-equipo.html todavía no tiene un equivalente para ESE puente puntual, solo se migró el de presupuesto-editor.html (?volverAPresupuesto=1, que ahora se reenvía a la ficha). El código de la pantalla vieja NO se borró (queda como código muerto para los demás casos) — a propósito, para no arriesgar una limpieza grande de una sola vez; es un paso 2 aparte si se decide sacarlo del todo. Confirmado con 3 tests: click normal salta directo a la ficha; con ?volverAPresupuesto=1 también salta, y la URL final lleva ese mismo parámetro; con ?agregarA=ID NO salta, cae en la pantalla vieja sin tocar.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.14.6 (Los Hijos (módulos/accesorios vinculados a un Padre vía "Pertenece a") ya no aparecen como productos independientes en la lista general del catálogo — antes se veían como cualquier otro equipo (ej. "Kit Conectividad", "Módulo Angiografía" listados sueltos, comprables por su cuenta), lo cual no tiene sentido en el esquema Padre-Hijo: son accesorios que solo deberían elegirse como checkbox dentro de la ficha de su equipo. Pedido por Cristian con captura: "no quiero ver los hijos en la lista de precios". Nueva función _esHijoDeOtroProducto(), aplicada en los DOS lugares donde se arma la lista visible (carga inicial de cargarTodo() y el polling automático cada 10 min) — antes el polling ni siquiera filtraba productos sin nombre, quedaba menos protegido que la carga inicial; ahora los dos caminos son consistentes entre sí. Confirmado con test usando el catálogo real: detecta correctamente los 9 Hijos que ya existen hoy (5 de HUVITZ HOCT-1F OCTavius + 4 de HUVITZ HOCT-1 OCTavius — Cristian ya extendió el esquema a un segundo equipo), sin tocar ninguno de los 146 productos restantes.) -->
@@ -1205,6 +1207,18 @@
             <input type="text" id="buscador" placeholder="Buscar equipos, marcas o modelos..."
                 oninput="busquedaUniversal(this.value)"
                 style="width:100%; background:#1c2541; border:1px solid #222e50; border-radius:10px; padding:10px 16px 10px 40px; color:#f8fafc; font-size:14px; outline:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:14px center;">
+            <!-- Orden Nombre/Precio — pedido por Cristian: "los filtros
+                 ordenan por nombre, podremos ordenar tbien por precio?".
+                 Se aplica tanto acá (navegación por categoría, ver
+                 filtrar()) como en el buscador universal
+                 (_ejecutarBusqueda) — un solo estado global, un solo
+                 lugar para elegir. -->
+            <div style="display:flex; gap:6px; margin-top:8px;">
+                <button type="button" id="btn-orden-nombre" onclick="_setOrdenDispositivos('nombre')"
+                    style="flex:1; padding:6px 10px; border-radius:8px; border:1px solid #3a86ff; background:#3a86ff; color:#fff; font-size:11.5px; font-weight:700; cursor:pointer;">🔤 Nombre</button>
+                <button type="button" id="btn-orden-precio" onclick="_setOrdenDispositivos('precio')"
+                    style="flex:1; padding:6px 10px; border-radius:8px; border:1px solid #222e50; background:transparent; color:#94a3b8; font-size:11.5px; font-weight:700; cursor:pointer;">💲 Precio</button>
+            </div>
         </div>
         <div class="lista" id="lista">
             <div class="loading"><div class="spinner"></div><p>Cargando dispositivos...</p></div>
@@ -2505,8 +2519,18 @@ function renderLista(items) {
 }
 
 // ─── FILTROS Y BÚSQUEDA ───────────────────────────────────────────────────────
+// BUG REAL — (s || '') solo protege contra valores FALSY (undefined,
+// null, '', 0, false). Cualquier valor TRUTHY que no sea string —un
+// número (ej. "Descripcion" con un valor numérico por error de carga
+// en el Excel), un booleano true, un array, un objeto— sigue de largo
+// sin convertirse a '', y .toLowerCase() explota porque esos tipos no
+// tienen ese método. String(s || '') cubre los dos casos: colapsa
+// falsy a '' igual que antes, Y convierte cualquier otro tipo a su
+// representación de texto antes de intentar .toLowerCase(). Reportado
+// por Cristian: "Uncaught TypeError: (s || '').toLowerCase is not a
+// function".
 function sinAcentos(s) {
-    return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
 // ─── SISTEMA DE CATEGORÍAS ────────────────────────────────────────────────────
@@ -2921,13 +2945,13 @@ function _ejecutarBusqueda(q) {
         return;
     }
 
-    const resultados = base.filter(d => {
+    const resultados = _ordenarDispositivos(base.filter(d => {
         const nombre = sinAcentos((d['Nombre de Dispositivo'] || '').toLowerCase());
         const desc   = sinAcentos((d['Descripcion'] || '').toLowerCase());
         const subcat = sinAcentos((d['Sub Categoria'] || '').toLowerCase());
         const marca  = sinAcentos((d['Marca'] || '').toLowerCase());
         return nombre.includes(qClean) || desc.includes(qClean) || subcat.includes(qClean) || marca.includes(qClean);
-    });
+    }));
 
     // Ocultar el grid de la pantalla actual y mostrar resultados inline
     if (grid) grid.style.display = 'none';
@@ -3032,6 +3056,53 @@ function _abrirDetalleDesdeResultado(idxGlobal, subcat) {
     if (idxEnLista >= 0) abrirDetalle(idxEnLista);
 }
 
+// ─── ORDEN (Nombre / Precio) ────────────────────────────────────────────────
+// Pedido por Cristian: "los filtros ordenan por nombre, podremos
+// ordenar tbien por precio?" — en rigor, ANTES no había ningún orden
+// explícito: la lista salía en el orden de fila del Excel, que
+// coincidencia casi parecía alfabético porque así está cargado el
+// catálogo. Ahora hay un toggle real, aplicado tanto en la navegación
+// por categoría (filtrar → renderLista) como en el buscador universal
+// (_ejecutarBusqueda) — un solo estado global compartido.
+var _ordenActual = 'nombre'; // 'nombre' | 'precio'
+
+function _ordenarDispositivos(lista) {
+    var copia = lista.slice();
+    if (_ordenActual === 'precio') {
+        copia.sort(function(a, b) {
+            var pa = parseFloat(a['Precio LISTA'] || a['Precio CONTADO CNO']);
+            var pb = parseFloat(b['Precio LISTA'] || b['Precio CONTADO CNO']);
+            var naN_a = isNaN(pa), naN_b = isNaN(pb);
+            if (naN_a && naN_b) return 0;
+            if (naN_a) return 1;  // sin precio cargado → al final, no arriba
+            if (naN_b) return -1;
+            return pa - pb; // menor a mayor
+        });
+    } else {
+        copia.sort(function(a, b) {
+            return sinAcentos(a['Nombre de Dispositivo']).localeCompare(sinAcentos(b['Nombre de Dispositivo']));
+        });
+    }
+    return copia;
+}
+
+window._setOrdenDispositivos = function(tipo) {
+    _ordenActual = (tipo === 'precio') ? 'precio' : 'nombre';
+    var btnNombre = document.getElementById('btn-orden-nombre');
+    var btnPrecio = document.getElementById('btn-orden-precio');
+    var activo   = 'flex:1; padding:6px 10px; border-radius:8px; border:1px solid #3a86ff; background:#3a86ff; color:#fff; font-size:11.5px; font-weight:700; cursor:pointer;';
+    var inactivo = 'flex:1; padding:6px 10px; border-radius:8px; border:1px solid #222e50; background:transparent; color:#94a3b8; font-size:11.5px; font-weight:700; cursor:pointer;';
+    if (btnNombre) btnNombre.style.cssText = (_ordenActual === 'nombre') ? activo : inactivo;
+    if (btnPrecio) btnPrecio.style.cssText = (_ordenActual === 'precio') ? activo : inactivo;
+
+    // Re-renderizar lo que esté visible ahora mismo — la navegación
+    // normal (filtrar) o, si hay texto en el buscador universal, esos
+    // resultados también.
+    var qBuscador = (document.getElementById('buscador')?.value || document.getElementById('buscador-cats')?.value || document.getElementById('buscador-subcats')?.value || '').trim();
+    if (qBuscador) { _ejecutarBusqueda(qBuscador); }
+    else { filtrar(); }
+};
+
 function filtrar() {
     const q = sinAcentos((document.getElementById('buscador')?.value || '').trim());
     const filtrados = dispositivos.filter(d => {
@@ -3063,7 +3134,7 @@ function filtrar() {
         }
         return true;
     });
-    renderLista(filtrados);
+    renderLista(_ordenarDispositivos(filtrados));
 }
 
 // ─── DETALLE ─────────────────────────────────────────────────────────────────
