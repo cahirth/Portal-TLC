@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.16.1 (BUG REAL — "porque no se cargan las fotos?" (captura de Cristian: 5 de 6 productos de una categoría nueva con el cuadro gris de "pendiente"). Causa: la resolución de fotos vía FotoMap.gs (para productos con "Foto" en formato "Fotos/archivo.png", que necesitan buscarse por nombre de archivo en vez de tener una URL directa de Drive) se ejecutaba UNA sola vez, apuntando a los [data-foto-key] que existieran en el DOM en ESE momento — pero la lista arranca vacía hasta elegir categoría, así que casi siempre encontraba CERO imágenes para resolver. Cuando el vendedor navegaba a una categoría real y renderLista() pintaba las tarjetas de verdad, nadie volvía a intentar resolver esas fotos — quedaban en "pending" (cuadro gris) para siempre, salvo que su "Foto" fuera ya una URL directa de Drive (no depende de FotoMap, por eso algunos productos SÍ se veían bien). Fix: _fotoMapPromise guarda la promesa (se pide UNA sola vez, no se repite el fetch — sigue siendo el paso más lento del arranque) y la nueva función _resolverFotosPendientesConFotoMap() se llama de nuevo al FINAL de CADA renderLista(), reintentando contra lo que esté en el DOM en ese momento — sin importar cuándo se haya pintado esa lista respecto a cuándo terminó de cargar FotoMap. Confirmado con test reproduciendo el escenario exacto: FotoMap ya resuelto ANTES de que exista ninguna tarjeta en el DOM, la tarjeta se pinta después, la foto igual se resuelve — antes quedaba pegada en gris para siempre en ese mismo escenario.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.15.5 (BUG REAL — abrirDetalle() e _abrirDetalleDesdeResultado() armaban su PROPIA lista filtrada por separado de lo que se ve en pantalla, y NO le aplicaban _ordenarDispositivos() (el toggle Nombre/Precio de v2026.08.15.4) — el índice "idx" viene de la posición VISUAL donde el vendedor tocó, así que si ese orden no coincidía con el de la lista recalculada acá adentro, agarraba OTRO equipo. Con "Nombre" pasaba casi desapercibido porque el catálogo ya está cargado casi alfabético en el Excel; con "Precio" se notaba siempre, porque el orden por precio es bien distinto al de las filas. Reportado por Cristian: "no indexa bien la lista en $ y llama a un equipo desfasado". Arreglado en los DOS lugares (abrirDetalle y _abrirDetalleDesdeResultado, que también renderizaba sin ordenar) — ahora los dos aplican el mismo _ordenarDispositivos() que ve el vendedor en pantalla antes de indexar. Confirmado con test reproduciendo el escenario exacto: ordenar por Precio, tocar la 2da tarjeta visible, confirmar que abre ESE equipo y no el de la posición 2 del orden viejo.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.15.4 (Toggle Nombre/Precio — nueva función compartida _ordenarDispositivos(), aplicada tanto en la navegación por categoría (filtrar → renderLista) como en el buscador universal (_ejecutarBusqueda), un solo estado global (_ordenActual). En rigor, antes NO había ningún orden explícito — la lista salía en el orden de fila del Excel, que por casualidad parecía alfabético porque así está cargado el catálogo hoy. Orden por Precio usa Precio LISTA (con Precio CONTADO CNO como respaldo si falta) — los equipos sin ningún precio cargado van al final, no se cuelan arriba por un NaN mal comparado. Pedido por Cristian: "los filtros ordenan por nombre, podremos ordenar tbien por precio?". Confirmado con test: orden alfabético real, orden numérico correcto de menor a mayor con el caso sin precio al final, y que la función no muta el array original.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.15.3 (BUG REAL — Uncaught TypeError reportado por Cristian con stack trace exacto: "(s || '').toLowerCase is not a function", en sinAcentos() al filtrar por subcategoría. Causa: (s || '') solo protege contra valores FALSY (undefined/null/''/0/false) — cualquier valor TRUTHY que no sea string (un número, un booleano true, un array, un objeto) pasa de largo igual, y esos tipos no tienen .toLowerCase(). Cambiado a String(s || ''), que colapsa falsy a '' exactamente igual que antes Y convierte cualquier otro tipo a su representación de texto antes de intentar .toLowerCase() — ya no puede explotar sin importar qué tipo de dato le llegue. Confirmado con test reproduciendo el error real con varios tipos (número, booleano, array, objeto) — ninguno rompe más, y los casos de siempre (undefined/null/0/string con acentos) dan exactamente el mismo resultado que antes del fix, sin ningún cambio de comportamiento.) -->
@@ -2055,6 +2056,31 @@ async function cargarFotoMap() {
     }
 }
 
+// Se pide UNA sola vez (evita repetir el fetch, que es el más lento de
+// todo el arranque — ver comentario más abajo) y se guarda la
+// PROMESA, no el resultado — así cualquier código que la necesite
+// puede encadenar un .then() sin importar si FotoMap ya terminó de
+// cargar o todavía está en camino.
+const _fotoMapPromise = cargarFotoMap();
+
+// Prueba la key WebP primero, luego la original como fallback.
+// Reusable: se llama tanto en el arranque como al final de CADA
+// renderLista() — ver el bug real explicado ahí.
+function _resolverFotosPendientesConFotoMap() {
+    _fotoMapPromise.then(() => {
+        document.querySelectorAll('[data-foto-key]').forEach(img => {
+            const keyWebP    = img.dataset.fotoKey;
+            const keyFallback = img.dataset.fotoKeyFallback || keyWebP?.replace(/\.webp$/i, '.png') || '';
+            const url = fotoMap[keyWebP] || fotoMap[keyFallback];
+            if (url) {
+                img.src = url;
+                img.classList.remove('foto-pending');
+                img.onerror = null;
+            }
+        });
+    });
+}
+
 // ════════════════════════════════════════════════════════════
 // CARGA INSTANTÁNEA DE PRECIOS
 // Prioridad: sessionStorage (0ms) → precios.json estático (~50ms) → Sheets (~1500ms)
@@ -2359,21 +2385,27 @@ async function cargarTodo() {
         _leerParametrosNegocioDesdeURL();
 
         // FotoMap en background — actualiza imágenes sin re-renderizar
-        // Prueba la key WebP primero, luego la original como fallback
-        cargarFotoMap().then(() => {
-            document.querySelectorAll('[data-foto-key]').forEach(img => {
-                const keyWebP    = img.dataset.fotoKey;
-                const keyFallback = img.dataset.fotoKeyFallback || keyWebP?.replace(/\.webp$/i, '.png') || '';
-                const url = fotoMap[keyWebP] || fotoMap[keyFallback];
-                if (url) {
-                    img.src = url;
-                    img.classList.remove('foto-pending');
-                    img.onerror = null;
-                }
-            });
-            // Actualizar solo el grid de categorías sin cambiar la vista actual
-            if (!catActual) renderCategorias();
-        });
+        // BUG REAL — esto se ejecutaba UNA sola vez acá, apuntando a
+        // los [data-foto-key] que existieran en el DOM en ESE momento
+        // — pero la lista arranca vacía (línea de arriba:
+        // "renderLista([])... vacía hasta que se elija categoría"),
+        // así que casi siempre encontraba CERO imágenes para resolver.
+        // Cuando el vendedor navegaba a una categoría real y
+        // renderLista() pintaba las tarjetas de verdad, nadie volvía
+        // a intentar resolver esas fotos — quedaban en "pending"
+        // (el cuadrado gris) PARA SIEMPRE, salvo que su campo "Foto"
+        // fuera una URL directa de Drive (no necesita FotoMap). Ahora
+        // _resolverFotosPendientesConFotoMap() se llama de nuevo al
+        // final de CADA renderLista() — la promesa de FotoMap se pide
+        // una sola vez (no se repite el fetch), pero la resolución
+        // contra el DOM se reintenta cada vez que se pinta una lista
+        // nueva. Reportado por Cristian con captura: "porque no se
+        // cargan las fotos?" — 5 de 6 productos de una categoría
+        // nueva (Lámpara de Hendidura) quedaban con el cuadro gris.
+        _resolverFotosPendientesConFotoMap();
+        if (!catActual) {
+            _fotoMapPromise.then(() => renderCategorias());
+        }
 
     } catch(e) {
         document.getElementById('lista').innerHTML =
@@ -2517,6 +2549,12 @@ function renderLista(items) {
             ${pills ? `<div class="card-pills">${pills}</div>` : ''}
         </div>`;
     }).join('');
+
+    // Ver el comentario largo en el arranque (donde se define
+    // _fotoMapPromise) — esto es lo que hace que las fotos de rutas
+    // relativas (Fotos/archivo.png) se resuelvan sin importar CUÁNDO
+    // se haya pintado esta lista, no solo la primera vez.
+    _resolverFotosPendientesConFotoMap();
 }
 
 // ─── FILTROS Y BÚSQUEDA ───────────────────────────────────────────────────────
