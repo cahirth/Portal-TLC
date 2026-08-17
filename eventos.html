@@ -11,6 +11,7 @@
 <!-- Portal TLC | eventos.html | v2026.08.10.8 (Sacado el botón hamburguesa (☰) del header y todo el panel de "Menú" mobile que abría — quedó totalmente redundante: el selector de evento, el switch Tablero/Lista y "Cambiar tema" que tenía adentro ya están visibles directo en el header/topbar (el sol 🌙 y el propio switch). Pedido por Cristian con captura, circulado en amarillo: "borrá ese menú". Confirmado con test: el evento sigue abriendo bien, el dropdown de eventos sigue funcionando, sin el botón ni el overlay.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.7 (Rediseño de navegación — se eliminó la pantalla intermedia "elegir evento" (ev-vista-selector), el módulo entra DIRECTO al tablero del último evento usado (guardado en localStorage), o el primero de la lista si no hay ninguno guardado, o el ?id= de la URL si viene por deep-link. Mismo patrón que cotizaciones.html: "+ Crear nuevo evento..." pasa a ser una opción más del desplegable de eventos, no un botón aparte en una pantalla separada. Se sacó también "Todos los eventos" del menú de 3 puntos y del menú mobile (redundante ahora, cambiar de evento se hace desde el desplegable de arriba) y se limpiaron _renderListaEventos/_volverASelectorEventos (código muerto de la pantalla eliminada — esta última se dejó como alias de "salir del módulo" para no romper sus usos existentes como fallback de error). Si no hay NINGÚN evento cargado, muestra un mensaje amigable con botón para crear el primero, en vez de un tablero roto. Pedido por Cristian: "podés borrarla y aparecer directamente [en el tablero]". Confirmado con test en los 3 escenarios: primera vez (abre el primero de la lista), con último evento guardado (abre ese), y sin ningún evento (mensaje amigable).) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.6 (Cero carga automática de imágenes — Cristian identificó bien la causa: eventos es el único de los 3 tableros del Portal con muchas imágenes en alta resolución, y con pocas tarjetas visibles en pantalla el "loading=lazy" del navegador no ayuda mucho (todo entra en viewport igual). Antes: portada en la tarjeta cerrada del tablero y miniaturas en la lista de adjuntos del detalle SÍ tenían <img src="..."> — el navegador las pedía apenas se pintaba, aunque fuera "lazy". Ahora NINGUNA imagen se pide hasta que el usuario toca un ícono — ni la portada de la tarjeta cerrada, ni los adjuntos del detalle. El ícono (🖼️) reemplaza la miniatura; al tocarlo recién ahí se abre la imagen real en el visor ampliado (que ya la pedía on-demand desde antes). Pedido por Cristian: "que abras de una el texto... a los adjuntos ni los abras, solamente cuando el usuario cliquea uno". Confirmado con test: cero <img> en el tablero y en el detalle hasta el click, y clickear el ícono sí dispara el pedido de la imagen real.) -->
+<!-- Portal TLC | eventos.html | v2026.08.16.4 (BUG REAL — con las 3 capturas nuevas de Cristian (secuencia: 1ra apertura sin texto → 2da apertura responsiva y con texto completo → 1 segundo después, cortado) se identificaron 2 causas independientes del "se rompe después de 1 segundo", las dos con el mismo patrón de fondo: _renderOverlayTarjeta() reconstruye el MODAL COMPLETO (título, descripción, checklists, notas, adjuntos — todo) cada vez que se llama, y dos disparadores de fondo lo estaban llamando de nuevo sobre un modal que el vendedor ya estaba mirando: (1) cuando terminaba de cargar la lista de responsables (_cargarInternosEv) — ahora solo actualiza el <select> puntual (_actualizarSelectResponsableEv, nueva), sin tocar el resto del modal. (2) cuando terminaba el refresco de fondo del detalle de la tarjeta, AUNQUE ya hubiera un caché válido mostrado — ahora ese refresco actualiza el dato en memoria y en localStorage (para la PRÓXIMA apertura) pero YA NO vuelve a pintar el modal actual. Cualquiera de los dos (o los dos juntos, si coincidían cerca de 1 segundo) explica el "se corta" — al eliminar los repintados innecesarios, ninguno de los dos puede volver a pasar. Agregado también un log de versión PROPIO de este archivo en consola (no tenía ninguno, ni siquiera el compartido PORTAL_TLC_VERSION) — para poder confirmar de una vez si el "sigue con Sin Texto" de la imagen 1 es un archivo desactualizado en producción o un bug real distinto, mismo criterio que ya se usó en varios otros archivos del Portal. Confirmado con test: con caché válido, el refresco de fondo actualiza el dato pero deja en 1 el conteo de renders completos del modal — antes de este fix, hubiera sido 2.) -->
 <!-- Portal TLC | eventos.html | v2026.08.16.3 (BUG REAL DE FONDO en las listas de comprobación — el intento anterior (v2026.08.16.2, ensanchar el @media de 480px a 600px) no alcanzaba porque medía el ancho de TODA LA PANTALLA, pero el checklist vive adentro de ".ev-overlay-col-principal", una columna que se achica cuando aparece el panel de chat al lado (desde los 960px de ancho de pantalla) — un breakpoint fijo de pantalla completa no tiene forma de saber cuánto espacio le queda a ESA columna puntual. Reportado por Cristian con 2 capturas más, una de ellas CON el chat abierto al lado en escritorio: "empieza responsivo en 2 renglones y al segundo se pone así" seguía pasando incluso en pantallas anchas. Fix real: se reemplaza el @media de ancho de pantalla por flex-wrap intrínseco al contenedor (".ev-check-add-row-chico { flex-wrap:wrap }" + "> input { flex:1 1 180px }") — cada elemento se acomoda solo al espacio que tiene disponible EN ESE MOMENTO, sin ningún número mágico de por medio, funciona igual en un celular angosto que en la columna apretada de escritorio con el chat abierto. Las propiedades puramente cosméticas (tamaño de letra, padding) SÍ se mantienen atadas al ancho real de pantalla vía @media — para eso tiene sentido depender del dispositivo, no del contenedor — separadas con su propio comentario explicando por qué.) -->
 <!-- Portal TLC | eventos.html | v2026.08.16.2 (Ensanchado el breakpoint responsive de las listas de comprobación (v2026.08.16.1) de 480px a 600px — INTENTO INSUFICIENTE, ver v2026.08.16.3 para el fix real. Cristian reportó con captura: "empieza responsivo en 2 renglones y al segundo se pone así" (el input "Agregar ítem" + botón "+ Agregar" volvían a quedar lado a lado). Revisado a fondo: no hay ningún estilo inline ni conflicto de especificidad CSS que le gane a la regla del media query (confirmado con grep sobre el HTML real de .ev-check-add-row-chico) — las media queries no deberían "vencerse" solas con el tiempo, así que la explicación más probable es que el ancho disponible quedaba justo pegado al corte de 480px, y algún cambio mínimo de layout entre el primer render (caché) y el segundo (datos frescos) empujaba el ancho apenas por encima. 600px da mucho más margen de sobra. Nota honesta: esto no está confirmado al 100% con evidencia directa del navegador de Cristian — es el ajuste más razonable disponible sin poder inspeccionar en vivo; pendiente de confirmación real.) -->
 <!-- Portal TLC | eventos.html | v2026.08.16.1 (2 pedidos de Cristian: (1) BUG REAL — "la primera vez que abro una ficha del tablero aparece Sin Texto, salgo y vuelvo a entrar y está OK". Causa: si el pedido de ev_obtenerTarjetaEv fallaba (más probable justo después de que el tablero recién terminó su propia carga, con la conexión más ocupada), no había reintento — se pintaba directo con los datos LIVIANOS del tablero, que a propósito no traen el texto de los ítems (recortados para que el tablero cargue rápido, ver FotoMap.gs v179), mostrando el placeholder "(sin texto)" aunque el ítem sí tuviera contenido real guardado. Ahora, si el primer intento falla, se reintenta automáticamente una vez antes de rendirse. Además, blindaje extra: si el caché guardado de una tarjeta (localStorage) tiene items sin la clave "texto" siquiera (formato recortado, no solo vacío), se descarta y se pide fresco en vez de mostrarlo de entrada. Confirmado con 2 tests: reproduce el escenario exacto (1er pedido falla, reintenta, termina con el texto real) y confirma que un caché recortado se descarta en vez de usarse tal cual. (2) Responsive real para las listas de comprobación — el archivo no tenía NINGUNA @media query (confirmado con grep). Agregado un bloque @media (max-width:480px) que apila la fila de "Agregar ítem" (antes input+botón lado a lado, apretados con el placeholder largo), deja que el título del checklist haga wrap si es largo, agranda un toque el texto de los ítems para mejor lectura/toque en celular, y apila Categoría/Fecha límite (antes 2 columnas apretadas) en una sola columna. Pedido: "hacer las listas de comprobación responsivas".) -->
@@ -513,6 +514,16 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 </div>
 
 <script>
+// Log de versión PROPIO de este archivo — hasta ahora eventos.html no
+// tenía NINGUNO (ni siquiera el compartido PORTAL_TLC_VERSION), así
+// que no había forma de confirmar en consola si el archivo correcto
+// ya había llegado a producción. Mismo criterio que ya se agregó en
+// ficha-equipo.html / calculo-financiacion.js / selector-
+// dispositivos.html, después de perder tiempo varias veces
+// diagnosticando bugs que en realidad eran "el archivo todavía no se
+// volvió a subir".
+console.log("%c TLC Eventos v2026.08.16.4 ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
 var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY = 'tlc_tema';
@@ -1328,9 +1339,19 @@ window._onTocarTarjetaEv = function(event, idTarjeta) {
 
 async function _abrirTarjeta(idTarjeta) {
   TARJETA_ACTUAL_ID = idTarjeta;
+  // BUG REAL — esto disparaba un _renderOverlayTarjeta() COMPLETO
+  // (reconstruye título, descripción, checklists, notas, adjuntos —
+  // TODO) apenas terminaba de cargar la lista de responsables, aunque
+  // lo único que hacía falta actualizar era el <select> del
+  // responsable. Si esta carga tardaba justo alrededor de 1 segundo
+  // (o coincidía con el refresco de datos de la tarjeta, ver más
+  // abajo), el vendedor veía el checklist reconstruirse de la nada
+  // sobre lo que ya estaba mirando — una de las 2 causas reales
+  // detrás de "empieza responsivo y al segundo se rompe". Ahora solo
+  // se actualiza el <select> puntual, sin tocar el resto del modal.
   if (!_internosCacheEv) {
     _cargarInternosEv().then(function() {
-      if (TARJETA_ACTUAL_ID === idTarjeta) _renderOverlayTarjeta();
+      if (TARJETA_ACTUAL_ID === idTarjeta) _actualizarSelectResponsableEv();
     });
   }
 
@@ -1387,7 +1408,7 @@ async function _abrirTarjeta(idTarjeta) {
   // de rendirse — la mayoría de estos son baches cortos de red, no
   // errores de verdad. Reportado por Cristian: "la primera vez que
   // abro una ficha del tablero aparece Sin Texto".
-  function _pedirDetalleTarjetaEv(reintentando) {
+  function _pedirDetalleTarjetaEv(reintentando, repintarAlTerminar) {
     return fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'ev_obtenerTarjetaEv', id_evento:EVENTO_ACTUAL.id, id_tarjeta:idTarjeta }) })
       .then(function(resp) { return resp.json(); })
@@ -1397,20 +1418,30 @@ async function _abrirTarjeta(idTarjeta) {
         t.mensajes = r.tarjeta.mensajes || [];
         t.checklists = r.tarjeta.checklists || [];
         try { localStorage.setItem(claveCacheTarjeta, JSON.stringify({ notas:t.notas, mensajes:t.mensajes, checklists:t.checklists })); } catch(eLs) {}
-        // Solo repinta si esta tarjeta sigue siendo la que está abierta
-        // (si el usuario ya cerró o abrió otra mientras tanto, no hace
-        // falta tocar nada).
-        if (TARJETA_ACTUAL_ID === idTarjeta) _renderOverlayTarjeta();
+        // BUG REAL — esto repintaba el modal COMPLETO (checklists
+        // incluidos) cada vez que este refresco de fondo terminaba,
+        // AUNQUE ya hubiera un caché válido mostrado en pantalla. El
+        // vendedor veía el checklist reconstruirse de la nada
+        // ~1 segundo después de abrir la tarjeta — la otra causa real
+        // detrás de "empieza responsivo y al segundo se rompe" (junto
+        // con el mismo problema en la carga de responsables, ver
+        // arriba). Ahora solo se repinta cuando hacía falta de
+        // verdad: si NO había nada mostrado todavía (primera vez, sin
+        // caché). Si ya había caché válido, el dato se actualiza en
+        // memoria y en localStorage igual — para la PRÓXIMA vez que se
+        // abra esta tarjeta — pero sin tocar el modal que el vendedor
+        // ya está mirando (y quizás editando) en este momento.
+        if (repintarAlTerminar && TARJETA_ACTUAL_ID === idTarjeta) _renderOverlayTarjeta();
       })
       .catch(function(e) {
         if (!reintentando) {
           console.warn('[Eventos] Falló el detalle de la tarjeta, reintentando una vez:', e);
-          return _pedirDetalleTarjetaEv(true);
+          return _pedirDetalleTarjetaEv(true, repintarAlTerminar);
         }
         throw e; // ya reintentó una vez y volvió a fallar — ahí sí se rinde
       });
   }
-  var pedido = _pedirDetalleTarjetaEv(false);
+  var pedido = _pedirDetalleTarjetaEv(false, !cacheado);
 
   if (!cacheado) {
     // Sin caché — no hay nada que mostrar todavía, así que sí hay que
@@ -1420,10 +1451,11 @@ async function _abrirTarjeta(idTarjeta) {
     // texto de los ítems.
     try { await pedido; } catch(e) { _renderOverlayTarjeta(); }
   } else {
-    // Con caché ya mostrado, la actualización de fondo no debe
-    // interrumpir — si falla incluso con el reintento, se queda con
-    // lo que ya se estaba viendo.
-    pedido.catch(function(e) { console.warn('[Eventos] No se pudo refrescar la tarjeta en segundo plano (tras reintentar):', e); });
+    // Con caché ya mostrado, la actualización de fondo solo refresca
+    // el DATO (arriba) — nunca vuelve a tocar el modal actual, ni
+    // siquiera si tiene éxito. Si falla incluso con el reintento, no
+    // pasa nada — se queda con el dato que ya tenía en caché.
+    pedido.catch(function(e) { console.warn('[Eventos] No se pudo refrescar la tarjeta en segundo plano (tras reintentar) — se queda con el caché anterior:', e); });
   }
 
   // El overlay arranca con display:none — medir scrollHeight de un
@@ -1451,6 +1483,21 @@ async function _cargarInternosEv() {
     var r = await resp.json();
     _internosCacheEv = (r.ok && Array.isArray(r.internos)) ? r.internos : [];
   } catch(e) { _internosCacheEv = []; }
+}
+
+// Actualiza SOLO el <select> de "Responsable Principal" — reemplaza
+// al _renderOverlayTarjeta() completo que se llamaba antes apenas
+// cargaban los internos (ver comentario en _abrirTarjeta). No toca
+// checklists, notas ni nada más del modal.
+function _actualizarSelectResponsableEv() {
+  var t = _tarjetaActual();
+  if (!t) return;
+  var sel = document.getElementById('ev-t-resp');
+  if (!sel) return;
+  var opcionesResp = (_internosCacheEv || []).map(function(p) {
+    return '<option value="' + p.email + '"' + (t.responsable_email === p.email ? ' selected' : '') + '>' + _esc(p.nombre) + '</option>';
+  }).join('');
+  sel.innerHTML = '<option value="">Sin asignar</option>' + opcionesResp;
 }
 
 function _renderOverlayTarjeta() {
