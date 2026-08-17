@@ -11,6 +11,7 @@
 <!-- Portal TLC | eventos.html | v2026.08.10.8 (Sacado el botón hamburguesa (☰) del header y todo el panel de "Menú" mobile que abría — quedó totalmente redundante: el selector de evento, el switch Tablero/Lista y "Cambiar tema" que tenía adentro ya están visibles directo en el header/topbar (el sol 🌙 y el propio switch). Pedido por Cristian con captura, circulado en amarillo: "borrá ese menú". Confirmado con test: el evento sigue abriendo bien, el dropdown de eventos sigue funcionando, sin el botón ni el overlay.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.7 (Rediseño de navegación — se eliminó la pantalla intermedia "elegir evento" (ev-vista-selector), el módulo entra DIRECTO al tablero del último evento usado (guardado en localStorage), o el primero de la lista si no hay ninguno guardado, o el ?id= de la URL si viene por deep-link. Mismo patrón que cotizaciones.html: "+ Crear nuevo evento..." pasa a ser una opción más del desplegable de eventos, no un botón aparte en una pantalla separada. Se sacó también "Todos los eventos" del menú de 3 puntos y del menú mobile (redundante ahora, cambiar de evento se hace desde el desplegable de arriba) y se limpiaron _renderListaEventos/_volverASelectorEventos (código muerto de la pantalla eliminada — esta última se dejó como alias de "salir del módulo" para no romper sus usos existentes como fallback de error). Si no hay NINGÚN evento cargado, muestra un mensaje amigable con botón para crear el primero, en vez de un tablero roto. Pedido por Cristian: "podés borrarla y aparecer directamente [en el tablero]". Confirmado con test en los 3 escenarios: primera vez (abre el primero de la lista), con último evento guardado (abre ese), y sin ningún evento (mensaje amigable).) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.6 (Cero carga automática de imágenes — Cristian identificó bien la causa: eventos es el único de los 3 tableros del Portal con muchas imágenes en alta resolución, y con pocas tarjetas visibles en pantalla el "loading=lazy" del navegador no ayuda mucho (todo entra en viewport igual). Antes: portada en la tarjeta cerrada del tablero y miniaturas en la lista de adjuntos del detalle SÍ tenían <img src="..."> — el navegador las pedía apenas se pintaba, aunque fuera "lazy". Ahora NINGUNA imagen se pide hasta que el usuario toca un ícono — ni la portada de la tarjeta cerrada, ni los adjuntos del detalle. El ícono (🖼️) reemplaza la miniatura; al tocarlo recién ahí se abre la imagen real en el visor ampliado (que ya la pedía on-demand desde antes). Pedido por Cristian: "que abras de una el texto... a los adjuntos ni los abras, solamente cuando el usuario cliquea uno". Confirmado con test: cero <img> en el tablero y en el detalle hasta el click, y clickear el ícono sí dispara el pedido de la imagen real.) -->
+<!-- Portal TLC | eventos.html | v2026.08.16.1 (2 pedidos de Cristian: (1) BUG REAL — "la primera vez que abro una ficha del tablero aparece Sin Texto, salgo y vuelvo a entrar y está OK". Causa: si el pedido de ev_obtenerTarjetaEv fallaba (más probable justo después de que el tablero recién terminó su propia carga, con la conexión más ocupada), no había reintento — se pintaba directo con los datos LIVIANOS del tablero, que a propósito no traen el texto de los ítems (recortados para que el tablero cargue rápido, ver FotoMap.gs v179), mostrando el placeholder "(sin texto)" aunque el ítem sí tuviera contenido real guardado. Ahora, si el primer intento falla, se reintenta automáticamente una vez antes de rendirse. Además, blindaje extra: si el caché guardado de una tarjeta (localStorage) tiene items sin la clave "texto" siquiera (formato recortado, no solo vacío), se descarta y se pide fresco en vez de mostrarlo de entrada. Confirmado con 2 tests: reproduce el escenario exacto (1er pedido falla, reintenta, termina con el texto real) y confirma que un caché recortado se descarta en vez de usarse tal cual. (2) Responsive real para las listas de comprobación — el archivo no tenía NINGUNA @media query (confirmado con grep). Agregado un bloque @media (max-width:480px) que apila la fila de "Agregar ítem" (antes input+botón lado a lado, apretados con el placeholder largo), deja que el título del checklist haga wrap si es largo, agranda un toque el texto de los ítems para mejor lectura/toque en celular, y apila Categoría/Fecha límite (antes 2 columnas apretadas) en una sola columna. Pedido: "hacer las listas de comprobación responsivas".) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.5 (_abrirTarjeta ahora también trae el checklist completo (con el texto de cada ítem) al abrir una tarjeta puntual — el tablero manda los checklists recortados desde v180 de FotoMap.gs (solo id+hecho, sin texto, para la barra de progreso), el texto real se completa recién acá. Parte de la 2da ronda de optimización de rendimiento tras probar Cristian desde el celular (LTE) y seguir viendo demoras/errores de conexión — ver también el fetchAll en paralelo de FotoMap.gs v180. Confirmado con test: la barra de progreso del tablero funciona bien con los datos livianos, y al abrir la tarjeta el checklist se completa con el texto real.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.4 (2 pedidos de Cristian sobre rendimiento: (1) Vista Lista por defecto en vez de Tablero (PC y celular), es más liviana de pintar — VISTA_ACTUAL_EV arranca en 'list', y _abrirEvento aplica el toggle correcto (visibilidad + botón activo) después de renderizar. De paso, el switch de vista del menú mobile (misma clase que el de escritorio pero sin el mismo id) nunca sincronizaba su botón activo — el selector de _cambiarVistaEv pasa de #ev-view-switch a .ev-view-switch para cubrir ambos. (2) Adjuntos con miniatura real para imágenes (antes solo mostraban un ícono genérico 🖼️, nunca la imagen en sí) — con loading="lazy" para que abrir la tarjeta no espere a que carguen todos los adjuntos, se pintan progresivamente a medida que entran en pantalla. PDF/XLSX siguen con ícono, no aplica. Confirmado con test: vista Lista activa por defecto en ambos switches, tablero oculto, miniatura de imagen con lazy load, PDF con ícono normal.) -->
 <!-- Portal TLC | eventos.html | v2026.08.10.3 (Rendimiento — Cristian confirmó "en listas abre más rápido que en tarjetas" (se refería a abrir el EVENTO). Como ev_obtenerEvento ahora manda notas/mensajes vacíos (ver FotoMap.gs v179), _abrirTarjeta pasa a traer el detalle completo de esa tarjeta puntual (ev_obtenerTarjetaEv) recién al abrirla, ANTES de renderizar el modal — si falla la conexión, abre igual con notas/mensajes vacíos en vez de trabarse. Confirmado con test de punta a punta: el tablero arranca con notas/mensajes vacíos, y al abrir una tarjeta se completan con los datos reales, visibles en el chat y en las notas del modal.) -->
@@ -363,6 +364,27 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 .ev-card-portada img { width:100%; height:100%; object-fit:cover; display:block; }
 .ev-card-portada-icono { display:flex; align-items:center; justify-content:center; background:var(--panel-darker);
   cursor:pointer; font-size:22px; border-bottom:1px solid var(--border-glow); }
+
+/* ── Responsive — listas de comprobación en pantalla chica ──
+   Este archivo no tenía NINGUNA @media query (confirmado con grep) —
+   el checklist ya usaba flexbox razonable (min-width:0, flex-shrink:0
+   en checkbox/botón) así que no se rompía del todo, pero en celulares
+   angostos quedaba todo apretado: el título del checklist + el
+   contador + el botón de borrar peleando por espacio en una sola
+   fila, y la fila de "Agregar ítem" (input + botón lado a lado) muy
+   ajustada con el placeholder largo. Pedido por Cristian: "hacer las
+   listas de comprobación responsivas". */
+@media (max-width: 480px) {
+  .ev-checklist-grupo { padding:10px; }
+  .ev-checklist-grupo-header { flex-wrap:wrap; row-gap:4px; }
+  .ev-checklist-titulo-input { font-size:12px; min-width:120px; }
+  .ev-check-item-fila { gap:6px; padding:6px 0; }
+  .ev-check-item-texto-fija { font-size:13px; } /* un toque más grande que el título, mejor para tocar/leer en celular */
+  .ev-check-add-row-chico { flex-direction:column; gap:6px; }
+  .ev-check-add-row-chico > input,
+  .ev-check-add-row-chico > button { width:100%; }
+  .ev-det-grid { grid-template-columns:1fr; } /* Categoría/Fecha límite apiladas en vez de 2 columnas apretadas */
+}
 </style>
 </head>
 <body>
@@ -1300,6 +1322,18 @@ async function _abrirTarjeta(idTarjeta) {
     if (crudo) cacheado = JSON.parse(crudo);
   } catch(eCache) { cacheado = null; }
 
+  // Blindaje extra — si por lo que sea el caché guardado tiene la
+  // FORMA recortada del tablero (ítems con "hecho" pero sin la clave
+  // "texto" siquiera, no solo con texto vacío), se descarta y se trata
+  // como si no hubiera caché — mejor esperar el pedido real que
+  // mostrar de entrada algo que se sabe incompleto.
+  if (cacheado && Array.isArray(cacheado.checklists)) {
+    var pareceRecortado = cacheado.checklists.some(function(grupo) {
+      return Array.isArray(grupo.items) && grupo.items.some(function(it) { return it && !('texto' in it); });
+    });
+    if (pareceRecortado) cacheado = null;
+  }
+
   if (cacheado) {
     t.notas = cacheado.notas || [];
     t.mensajes = cacheado.mensajes || [];
@@ -1307,30 +1341,57 @@ async function _abrirTarjeta(idTarjeta) {
     _renderOverlayTarjeta(); // instantáneo, con lo último guardado
   }
 
-  var pedido = fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'ev_obtenerTarjetaEv', id_evento:EVENTO_ACTUAL.id, id_tarjeta:idTarjeta }) })
-    .then(function(resp) { return resp.json(); })
-    .then(function(r) {
-      if (!r.ok) throw new Error(r.error || 'Error desconocido');
-      t.notas = r.tarjeta.notas || [];
-      t.mensajes = r.tarjeta.mensajes || [];
-      t.checklists = r.tarjeta.checklists || [];
-      try { localStorage.setItem(claveCacheTarjeta, JSON.stringify({ notas:t.notas, mensajes:t.mensajes, checklists:t.checklists })); } catch(eLs) {}
-      // Solo repinta si esta tarjeta sigue siendo la que está abierta
-      // (si el usuario ya cerró o abrió otra mientras tanto, no hace
-      // falta tocar nada).
-      if (TARJETA_ACTUAL_ID === idTarjeta) _renderOverlayTarjeta();
-    });
+  // BUG REAL — "aparece Sin Texto la primera vez, salgo y vuelvo a
+  // entrar y está OK": si este pedido fallaba o tardaba de más (más
+  // probable justo después de que el tablero recién terminó su propia
+  // carga, con la conexión más ocupada), no había ningún reintento —
+  // se pintaba directo con los datos LIVIANOS del tablero, que a
+  // propósito NO traen el texto de los ítems del checklist (se
+  // recortan para que el tablero cargue rápido, ver ev_obtenerEvento
+  // / FotoMap.gs v179) — de ahí el "(sin texto)" que vio Cristian, con
+  // ítems que sí tenían contenido real guardado. Al "salir y volver a
+  // entrar" se disparaba un pedido NUEVO, que esa vez sí funcionaba.
+  // Ahora, si el primer intento falla, se reintenta UNA vez más antes
+  // de rendirse — la mayoría de estos son baches cortos de red, no
+  // errores de verdad. Reportado por Cristian: "la primera vez que
+  // abro una ficha del tablero aparece Sin Texto".
+  function _pedirDetalleTarjetaEv(reintentando) {
+    return fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'ev_obtenerTarjetaEv', id_evento:EVENTO_ACTUAL.id, id_tarjeta:idTarjeta }) })
+      .then(function(resp) { return resp.json(); })
+      .then(function(r) {
+        if (!r.ok) throw new Error(r.error || 'Error desconocido');
+        t.notas = r.tarjeta.notas || [];
+        t.mensajes = r.tarjeta.mensajes || [];
+        t.checklists = r.tarjeta.checklists || [];
+        try { localStorage.setItem(claveCacheTarjeta, JSON.stringify({ notas:t.notas, mensajes:t.mensajes, checklists:t.checklists })); } catch(eLs) {}
+        // Solo repinta si esta tarjeta sigue siendo la que está abierta
+        // (si el usuario ya cerró o abrió otra mientras tanto, no hace
+        // falta tocar nada).
+        if (TARJETA_ACTUAL_ID === idTarjeta) _renderOverlayTarjeta();
+      })
+      .catch(function(e) {
+        if (!reintentando) {
+          console.warn('[Eventos] Falló el detalle de la tarjeta, reintentando una vez:', e);
+          return _pedirDetalleTarjetaEv(true);
+        }
+        throw e; // ya reintentó una vez y volvió a fallar — ahí sí se rinde
+      });
+  }
+  var pedido = _pedirDetalleTarjetaEv(false);
 
   if (!cacheado) {
     // Sin caché — no hay nada que mostrar todavía, así que sí hay que
-    // esperar. Si falla, igual hace falta UN render (con lo liviano
-    // que ya había) para no dejar el modal vacío.
+    // esperar. Si falla incluso DESPUÉS del reintento, igual hace
+    // falta UN render (con lo liviano que ya había) para no dejar el
+    // modal vacío — mejor mostrar algo que nada, aunque le falte el
+    // texto de los ítems.
     try { await pedido; } catch(e) { _renderOverlayTarjeta(); }
   } else {
     // Con caché ya mostrado, la actualización de fondo no debe
-    // interrumpir — si falla, se queda con lo que ya se estaba viendo.
-    pedido.catch(function(e) { console.warn('[Eventos] No se pudo refrescar la tarjeta en segundo plano:', e); });
+    // interrumpir — si falla incluso con el reintento, se queda con
+    // lo que ya se estaba viendo.
+    pedido.catch(function(e) { console.warn('[Eventos] No se pudo refrescar la tarjeta en segundo plano (tras reintentar):', e); });
   }
 
   // El overlay arranca con display:none — medir scrollHeight de un
