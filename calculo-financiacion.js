@@ -1,4 +1,21 @@
 // ============================================================
+// Portal TLC | calculo-financiacion.js | v2026.08.16.3
+// CORREGIDO — validado número a número contra una cotización REAL de
+// InverLease (COAS SRL, 27/03/2026): Leasing pasa del esquema
+// "Maxicanon 15%" a "0% adelanto + N cánones en garantía". Los
+// cánones en garantía se depositan al firmar pero NO restan del
+// capital a financiar (solo prepagan los últimos 2 cánones del
+// cronograma, timing de pago, no cambia el cálculo). Nuevos campos en
+// el resultado de calcularLeasing36: canonesGarantia, montoGarantia,
+// opcionCompra, comisionEstructuracionPct. La tasa (TNA) sigue
+// leyéndose del encabezado de la columna en el Excel — NO está
+// hardcodeada acá, así que si InverLease actualizó su tasa (de 3,5%
+// a ~6,41% real, confirmado por Cristian), hay que actualizar el
+// texto del encabezado en el Excel, no este archivo. Pedido por
+// Cristian, comparando la cotización real: "cambiar al esquema real
+// (0% adelanto + cánones en garantía)" / comisión "como línea aparte
+// en la tarjeta".
+// ============================================================
 // Portal TLC | calculo-financiacion.js | v2026.08.16.2
 // CORREGIDO — Leasing (36 pesos y USD) había quedado calculando
 // Maxicanon/cánones sobre el precio de LISTA + IVA 10,5% (v2026.08.16.1),
@@ -130,8 +147,18 @@
   var ANTICIPO_TLC6_PCT = 35;   // TLC 6 cuotas — pesos Y dólares, mismo %
   var ANTICIPO_TLC12_PCT = 50;  // TLC 12 cuotas — pesos Y dólares, mismo %
 
-  var LEASING36_MAXICANON_PCT = 15;   // % del valor del bien, se paga como adelanto
-  var LEASING36_CANONES_A_PAGAR = 35; // + 1 canon en garantía + 1 opción de compra (VR) — no suman al cronograma de 35, van aparte
+  // CORREGIDO — validado contra una cotización REAL de InverLease
+  // (27/03/2026, COAS SRL): el esquema real es Maxicanon/Adelanto =
+  // USD 0, no 15%. En su lugar hay N cánones EN GARANTÍA, que se
+  // depositan al firmar el contrato pero NO restan del capital a
+  // financiar — solo prepagan los últimos N cánones del cronograma
+  // (ver nota (*) de la cotización real). Pedido por Cristian, tras
+  // comparar número a número contra la cotización real: "cambiar al
+  // esquema real (0% adelanto + cánones en garantía)".
+  var LEASING36_MAXICANON_PCT = 0;    // ya no se usa como adelanto real — dejado en 0 por si algún día vuelve a cambiar
+  var LEASING36_CANONES_A_PAGAR = 35; // 34 cánones fijos + 1 opción de compra (VR) al finalizar, mismo valor — validado que un solo cálculo a n=35 da EXACTO el cánon real (USD 6.605) con la tasa real de InverLease.
+  var LEASING36_CANONES_GARANTIA = 2; // se depositan al firmar, cancelan los ÚLTIMOS 2 cánones del cronograma — no cambian el capital a financiar ni el cánon calculado, es solo timing de pago.
+  var LEASING36_COMISION_ESTRUCTURACION_PCT = 3; // + IVA aparte — NO se resta del capital a financiar, es un cargo aparte que paga el cliente.
   var LEASING36_PLAZO_MESES = 36;
 
   // Leasing 36 (pesos Y dólares) solo se ofrece si el total con IVA
@@ -255,15 +282,19 @@
   function calcularLeasing36(base, tnaPct) {
     var i = (tnaPct / 100) / 12;
     var n = LEASING36_CANONES_A_PAGAR;
-    var maxicanon = base * LEASING36_MAXICANON_PCT / 100;
+    var maxicanon = base * LEASING36_MAXICANON_PCT / 100; // siempre 0 con el esquema real — se deja el cálculo por si algún día vuelve a usarse
     var capitalFinanciar = base - maxicanon;
     var canon = capitalFinanciar * i / (1 - Math.pow(1 + i, -n));
     return {
       maxicanon: maxicanon,
       canon: canon,
       canones: n,
-      garantia: canon,
-      vr: canon,
+      canonesGarantia: LEASING36_CANONES_GARANTIA,           // cantidad (2)
+      montoGarantia: canon * LEASING36_CANONES_GARANTIA,     // monto total (2 × cánon) — se deposita al firmar, cancela los ÚLTIMOS 2 cánones, NO resta del capital
+      opcionCompra: canon,                                    // valor residual / opción de compra al finalizar, mismo valor que un cánon
+      comisionEstructuracionPct: LEASING36_COMISION_ESTRUCTURACION_PCT, // 3% + IVA — cargo APARTE, no se resta del capital a financiar
+      garantia: canon, // deprecado, se deja por compatibilidad — usar montoGarantia
+      vr: canon,       // deprecado, se deja por compatibilidad — usar opcionCompra
       tna: tnaPct,
       plazoMeses: LEASING36_PLAZO_MESES,
     };
@@ -328,7 +359,7 @@
   }
 
   var CalculoFinanciacion = {
-    VERSION: '2026.08.16.2',
+    VERSION: '2026.08.16.3',
     leerConfigFinanciacion: leerConfigFinanciacion,
     calcularTLC6: calcularTLC6,
     calcularTLC12: calcularTLC12,
