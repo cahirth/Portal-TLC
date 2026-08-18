@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.16.4 ("+ IVA 10,5%" también al lado del precio de oferta FacoExtrema, no solo del viejo tachado — antes solo aparecía junto al precio anterior, dejando el precio nuevo (el que realmente importa) sin esa aclaración. Nuevo span fi-precio-oferta-faco-iva, mismo criterio de IVA_Incluido que ya usa el precio de lista normal (si el equipo tiene IVA incluido, dice "Precio final (IVA incluido)" en vez de "+ IVA 10,5%"). Pedido por Cristian con captura: "agrega el +IVA 10.5% al lado del 19990". Confirmado con test actualizado, más toda la batería previa (oferta en Hijos, IVA incluido, dependencias) sigue en verde.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.3 (Oferta FacoExtrema extendida a los Hijos — la columna "Precio_Oferta_FacoExtrema" ahora también se chequea en la fila de cada módulo/accesorio, no solo en el Padre. Si un módulo tildado la tiene cargada (y es menor a su precio de lista), aporta SU oferta al precio nuevo en vez de su precio normal — y esto solo BASTA para activar el tachado/badge, aunque el Padre no tenga ninguna oferta propia. Si el Padre Y algún módulo tienen oferta, las dos se combinan. Un módulo con oferta cargada pero SIN tildar no participa de nada (como es lógico). Pedido por Cristian: "chequeá los hijos también, los precios oferta facoextrema, si no está en blanco sumar esos precios y que aparezca en rojo el nuevo precio de lista". Confirmado con 3 tests nuevos: oferta solo en un Hijo (Padre sin oferta) activa todo igual, combinando su precio normal + la oferta del Hijo; oferta en Padre Y Hijo se suman las dos; y un módulo con oferta sin tildar no afecta nada — más toda la batería previa (oferta simple, IVA incluido, dependencias, etc.) sigue en verde.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.2 (Oferta FacoExtrema — nueva columna "Precio_Oferta_FacoExtrema" en la fila del Padre, en Lista_Precios. Con un número válido (y menor al precio de lista), el encabezado "Precio de Lista" tacha el precio viejo en rojo y muestra al lado el precio nuevo (más grande, en rojo), con el cartel "LIMITADO FACOEXTREMA" debajo. El precio de oferta sigue sumando los módulos tildados igual que el precio normal (Padre-en-oferta + módulos sin descuento propio) — no es un número fijo que ignore la selección del vendedor. Alcance acotado a propósito: solo el encabezado, NO toca la financiación de abajo (Contado/TLC6/TLC12/Leasing) — esos tienen su propia lógica de descuentos aparte, y Cristian no pidió tocarlos; se puede extender después si hace falta. Pedido por Cristian con captura (mockup dibujado a mano sobre la ficha real): "las ofertas y rebajas para facoextrema... taches en rojo el precio viejo y pongas el precio nuevo más grande y diga limitado FACOEXTREMA". Confirmado con test: reproduce el caso real (ELI EZER ERK-9100, 5.940→4.990, con Mesa Eléctrica tildada por default sumando 800 en los dos precios) — el viejo queda tachado en 6.740, el nuevo en 5.790, badge visible; y un equipo sin la columna cargada se comporta exactamente igual que antes, sin tachado ni badge.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.1 (Textos de botones más honestos — "Crear Negocio" pasa a "Crear / Sumar Negocio": el botón en realidad puede terminar SUMANDO esta ficha a un negocio ya existente (si hay uno reciente con la misma empresa, regla de 7 días) en vez de crear uno nuevo siempre, y el texto viejo no lo avisaba. Agregado también un tooltip (title=) en los dos botones, y una línea corta arriba de ellos explicando que "Enviar por WhatsApp" TAMBIÉN guarda el seguimiento en Ventas como efecto secundario (antes esto pasaba en silencio, sin que el texto del botón lo sugiriera). Pedido por Cristian: "podemos explicar bien el texto de los botones... Crear Negocio también es agregar al negocio". Confirmado que ningún código depende del texto literal viejo del botón (solo aparecía en comentarios) — la batería de tests que interactúa con estos botones (incluida la que reemplaza el texto de WhatsApp por el nombre del contacto) sigue pasando sin cambios.) -->
@@ -238,6 +239,7 @@
                          MISMA fila que el precio tachado, no debajo —
                          pedido por Cristian con captura. -->
                     <span id="fi-precio-oferta-faco" style="display:none; font-size:32px; font-weight:900; color:#dc2626;"></span>
+                    <span id="fi-precio-oferta-faco-iva" style="display:none; font-size:14px; font-weight:700; color:var(--text-muted);"></span>
                 </div>
                 <div id="fi-badge-oferta-faco" style="display:none; margin-top:6px; padding:3px 10px; border-radius:6px; background:#dc2626; color:#fff; font-size:11px; font-weight:800; letter-spacing:.3px; width:fit-content;">LIMITADO FACOEXTREMA</div>
             </div>
@@ -339,7 +341,7 @@
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="calculo-financiacion.js"></script>
 <script>
-var FICHA_EQUIPO_VERSION = '2026.08.16.3';
+var FICHA_EQUIPO_VERSION = '2026.08.16.4';
 console.log("%c TLC Ficha Equipo v" + FICHA_EQUIPO_VERSION + " ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 console.log('%c ¿Precio de Lista no se actualiza al tildar módulos? %c → confirmá que esta versión sea la última (ver changelog arriba del archivo) y que calculo-financiacion.js esté subido en la MISMA carpeta.', 'color:#f8961e;font-weight:bold;', 'color:inherit;font-weight:normal;');
 
@@ -1136,6 +1138,7 @@ function _renderFinanciacion() {
     // nuevo precio de lista".
     var hayOfertaFaco = (padreTieneOferta || algunHijoTieneOferta) && precioListaCombinado > 0;
     var elPrecioOfertaFaco = document.getElementById('fi-precio-oferta-faco');
+    var elPrecioOfertaFacoIva = document.getElementById('fi-precio-oferta-faco-iva');
     var elBadgeOfertaFaco = document.getElementById('fi-badge-oferta-faco');
     if (hayOfertaFaco) {
         if (elPrecioLista) {
@@ -1148,10 +1151,19 @@ function _renderFinanciacion() {
             elPrecioOfertaFaco.textContent = _fmtMoneda(precioListaCombinadoOferta, 'USD');
             elPrecioOfertaFaco.style.display = 'inline';
         }
+        // "+ IVA 10,5%" también al lado del precio nuevo, no solo del
+        // viejo tachado — mismo criterio de IVA_Incluido que ya usa el
+        // precio de lista normal. Pedido por Cristian con captura:
+        // "agrega el +IVA 10.5% al lado del 19990".
+        if (elPrecioOfertaFacoIva) {
+            elPrecioOfertaFacoIva.textContent = ivaIncluido ? 'Precio final (IVA incluido)' : '+ IVA 10,5%';
+            elPrecioOfertaFacoIva.style.display = 'inline';
+        }
         if (elBadgeOfertaFaco) elBadgeOfertaFaco.style.display = 'block';
     } else {
         if (elPrecioLista) { elPrecioLista.style.textDecoration = ''; elPrecioLista.style.color = ''; }
         if (elPrecioOfertaFaco) elPrecioOfertaFaco.style.display = 'none';
+        if (elPrecioOfertaFacoIva) elPrecioOfertaFacoIva.style.display = 'none';
         if (elBadgeOfertaFaco) elBadgeOfertaFaco.style.display = 'none';
     }
 
