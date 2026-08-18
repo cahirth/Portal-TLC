@@ -1,4 +1,16 @@
 // ============================================================
+// Portal TLC | calculo-financiacion.js | v2026.08.16.1
+// Leasing (36 pesos y USD) ahora calcula el Maxicanon y los cánones
+// sobre el precio CON IVA (10,5%), no el neto — a diferencia de
+// Contado/TLC6/TLC12 (que muestran el neto y aclaran "+ IVA 10,5%"
+// aparte, porque esa diferencia la paga el cliente por fuera), en
+// Leasing lo que se financia de verdad es la factura completa
+// (precio + IVA). El umbral de USD 15.000 para habilitar Leasing ya
+// usaba el total con IVA (superaUmbralLeasing) — ahora el CÁLCULO en
+// sí también, no solo el chequeo de umbral. Pedido por Cristian: "el
+// tema del leasing, el precio base es el precio descontado más IVA,
+// diez coma cinco".
+// ============================================================
 // Portal TLC | calculo-financiacion.js | v2026.08.14.4
 // Agregado un log de versión PROPIO en consola (independiente del de
 // ficha-equipo.html) — hasta ahora este archivo no tenía ninguna
@@ -275,18 +287,26 @@
       // esta columna en particular.
       resultado.tlc12_usd = calcularTLC12(baseNetoUSD, 0);
     }
+    // Leasing — a diferencia de Contado/TLC6/TLC12 (que muestran el
+    // precio NETO y aclaran "+ IVA 10,5%" aparte, porque el cliente
+    // paga esa diferencia por fuera), en Leasing el monto que se
+    // financia de verdad es la FACTURA COMPLETA — precio + IVA — así
+    // que la base para calcular Maxicanon y cánones es totalConIvaUSD
+    // (ya calculado arriba, mismo 10,5%), no baseNetoUSD. Pedido por
+    // Cristian: "el tema del leasing, el precio base es el precio
+    // descontado más IVA, diez coma cinco".
     if (cfg.leasing36_pesos.habilitado && tcOficial && superaUmbralLeasing(totalConIvaUSD)) {
-      resultado.leasing36_pesos = calcularLeasing36(baseNetoUSD * tcOficial, cfg.leasing36_pesos.tna);
+      resultado.leasing36_pesos = calcularLeasing36(totalConIvaUSD * tcOficial, cfg.leasing36_pesos.tna);
     }
     if (cfg.leasing36_usd.habilitado && superaUmbralLeasing(totalConIvaUSD)) {
-      resultado.leasing36_usd = calcularLeasing36(baseNetoUSD, cfg.leasing36_usd.tna);
+      resultado.leasing36_usd = calcularLeasing36(totalConIvaUSD, cfg.leasing36_usd.tna);
     }
 
     return resultado;
   }
 
   var CalculoFinanciacion = {
-    VERSION: '2026.08.14.4',
+    VERSION: '2026.08.16.1',
     leerConfigFinanciacion: leerConfigFinanciacion,
     calcularTLC6: calcularTLC6,
     calcularTLC12: calcularTLC12,
