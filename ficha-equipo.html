@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.16.3 (Oferta FacoExtrema extendida a los Hijos — la columna "Precio_Oferta_FacoExtrema" ahora también se chequea en la fila de cada módulo/accesorio, no solo en el Padre. Si un módulo tildado la tiene cargada (y es menor a su precio de lista), aporta SU oferta al precio nuevo en vez de su precio normal — y esto solo BASTA para activar el tachado/badge, aunque el Padre no tenga ninguna oferta propia. Si el Padre Y algún módulo tienen oferta, las dos se combinan. Un módulo con oferta cargada pero SIN tildar no participa de nada (como es lógico). Pedido por Cristian: "chequeá los hijos también, los precios oferta facoextrema, si no está en blanco sumar esos precios y que aparezca en rojo el nuevo precio de lista". Confirmado con 3 tests nuevos: oferta solo en un Hijo (Padre sin oferta) activa todo igual, combinando su precio normal + la oferta del Hijo; oferta en Padre Y Hijo se suman las dos; y un módulo con oferta sin tildar no afecta nada — más toda la batería previa (oferta simple, IVA incluido, dependencias, etc.) sigue en verde.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.2 (Oferta FacoExtrema — nueva columna "Precio_Oferta_FacoExtrema" en la fila del Padre, en Lista_Precios. Con un número válido (y menor al precio de lista), el encabezado "Precio de Lista" tacha el precio viejo en rojo y muestra al lado el precio nuevo (más grande, en rojo), con el cartel "LIMITADO FACOEXTREMA" debajo. El precio de oferta sigue sumando los módulos tildados igual que el precio normal (Padre-en-oferta + módulos sin descuento propio) — no es un número fijo que ignore la selección del vendedor. Alcance acotado a propósito: solo el encabezado, NO toca la financiación de abajo (Contado/TLC6/TLC12/Leasing) — esos tienen su propia lógica de descuentos aparte, y Cristian no pidió tocarlos; se puede extender después si hace falta. Pedido por Cristian con captura (mockup dibujado a mano sobre la ficha real): "las ofertas y rebajas para facoextrema... taches en rojo el precio viejo y pongas el precio nuevo más grande y diga limitado FACOEXTREMA". Confirmado con test: reproduce el caso real (ELI EZER ERK-9100, 5.940→4.990, con Mesa Eléctrica tildada por default sumando 800 en los dos precios) — el viejo queda tachado en 6.740, el nuevo en 5.790, badge visible; y un equipo sin la columna cargada se comporta exactamente igual que antes, sin tachado ni badge.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.1 (Textos de botones más honestos — "Crear Negocio" pasa a "Crear / Sumar Negocio": el botón en realidad puede terminar SUMANDO esta ficha a un negocio ya existente (si hay uno reciente con la misma empresa, regla de 7 días) en vez de crear uno nuevo siempre, y el texto viejo no lo avisaba. Agregado también un tooltip (title=) en los dos botones, y una línea corta arriba de ellos explicando que "Enviar por WhatsApp" TAMBIÉN guarda el seguimiento en Ventas como efecto secundario (antes esto pasaba en silencio, sin que el texto del botón lo sugiriera). Pedido por Cristian: "podemos explicar bien el texto de los botones... Crear Negocio también es agregar al negocio". Confirmado que ningún código depende del texto literal viejo del botón (solo aparecía en comentarios) — la batería de tests que interactúa con estos botones (incluida la que reemplaza el texto de WhatsApp por el nombre del contacto) sigue pasando sin cambios.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.15.10 ("Precio final" para productos con IVA ya incluido — nueva columna "IVA_Incluido" (TRUE/FALSE) en la fila del Padre, en Lista_Precios. Con TRUE, el encabezado saca el "+ IVA 10,5%" (que sugiere que hay que sumar algo más) y aclara "Precio final (IVA incluido)" en su lugar — el número mostrado ya es el precio final real. Sin la columna marcada, sigue mostrando "+ IVA 10,5%" exactamente igual que siempre. Pedido por Cristian con captura de VOLK V20LC (lupas): "solo en las lupas Volk el IVA ya está incluido, quitar +IVA y dejar explícito precio final" — se implementó con una columna genérica en vez de hardcodear "Volk"/"Lupas", para que sirva para cualquier otra marca/categoría que en el futuro tenga el mismo caso. Confirmado con test: con IVA_Incluido=TRUE se saca el "+ IVA" y aparece "Precio final (IVA incluido)"; sin la columna, un equipo normal sigue mostrando "+ IVA 10,5%" sin ningún cambio.) -->
@@ -338,7 +339,7 @@
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="calculo-financiacion.js"></script>
 <script>
-var FICHA_EQUIPO_VERSION = '2026.08.16.2';
+var FICHA_EQUIPO_VERSION = '2026.08.16.3';
 console.log("%c TLC Ficha Equipo v" + FICHA_EQUIPO_VERSION + " ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 console.log('%c ¿Precio de Lista no se actualiza al tildar módulos? %c → confirmá que esta versión sea la última (ver changelog arriba del archivo) y que calculo-financiacion.js esté subido en la MISMA carpeta.', 'color:#f8961e;font-weight:bold;', 'color:inherit;font-weight:normal;');
 
@@ -1055,6 +1056,16 @@ function _renderFinanciacion() {
     // tarjeta de Contado.
     var precioListaCombinado = _fichaPrecioListaActual;
     var precioContadoCombinado = _fichaPrecioContadoActual;
+    // Combinado EN OFERTA — arranca igual que el normal, pero cada
+    // módulo tildado (y el Padre, más abajo) puede aportar su propio
+    // "Precio_Oferta_FacoExtrema" en vez del precio de lista normal,
+    // si lo tiene cargado. Pedido por Cristian: "chequeá los hijos
+    // también, los precios oferta FacoExtrema, si no está en blanco
+    // sumar esos precios".
+    var ofertaPadreNum = _fichaPadreActual ? parseFloat(_fichaPadreActual['Precio_Oferta_FacoExtrema']) : NaN;
+    var padreTieneOferta = !isNaN(ofertaPadreNum) && ofertaPadreNum > 0 && ofertaPadreNum < _fichaPrecioListaActual;
+    var precioListaCombinadoOferta = padreTieneOferta ? ofertaPadreNum : _fichaPrecioListaActual;
+    var algunHijoTieneOferta = false;
     _fichaHijosDisponibles.forEach(function(h) {
         var nombre = h['Nombre de Dispositivo'] || '';
         if (!_fichaModulosTildados.has(nombre)) return;
@@ -1071,6 +1082,19 @@ function _renderFinanciacion() {
             console.warn('[ficha-equipo] El módulo "' + nombre + '" está tildado pero no tiene "Precio LISTA" válido en el catálogo — no se sumó al total.');
         }
         if (!isNaN(pc)) precioContadoCombinado += pc;
+
+        // Oferta del módulo — mismo criterio que el Padre: si tiene
+        // Precio_Oferta_FacoExtrema cargado (y menor a su precio de
+        // lista), se suma ESE número al combinado en oferta; si no,
+        // aporta su precio de lista normal (sin descuento propio).
+        var ofertaHijoNum = parseFloat(h['Precio_Oferta_FacoExtrema']);
+        var hijoTieneOferta = !isNaN(ofertaHijoNum) && ofertaHijoNum > 0 && !isNaN(pl) && ofertaHijoNum < pl;
+        if (hijoTieneOferta) {
+            precioListaCombinadoOferta += ofertaHijoNum;
+            algunHijoTieneOferta = true;
+        } else if (!isNaN(pl)) {
+            precioListaCombinadoOferta += pl;
+        }
     });
 
     // Headline de precio — se actualiza acá (no en _cargarFicha) para
@@ -1096,26 +1120,24 @@ function _renderFinanciacion() {
         elPrecioListaIva.textContent = (precioListaCombinado <= 0) ? '' : (ivaIncluido ? 'Precio final (IVA incluido)' : '+ IVA 10,5%');
     }
 
-    // Oferta FacoExtrema — columna nueva "Precio_Oferta_FacoExtrema"
-    // en la fila del Padre, en Lista_Precios. Si tiene un número
-    // válido (y menor al precio de lista combinado), el precio de
-    // lista se tacha en rojo y al lado aparece el precio nuevo, más
-    // grande, con el cartel "LIMITADO FACOEXTREMA" debajo — solo el
-    // encabezado "Precio de Lista", no toca la financiación de abajo
-    // (Contado/TLC6/TLC12/Leasing tienen su propia lógica de
-    // descuentos, aparte). El precio de oferta también suma los
-    // módulos tildados, igual que el precio de lista normal — es
-    // Padre-en-oferta + módulos, no un número fijo que ignore la
-    // selección. Pedido por Cristian: "las ofertas y rebajas para
-    // facoextrema... taches en rojo el precio viejo y pongas el
-    // precio nuevo más grande y diga limitado FACOEXTREMA".
-    var ofertaFacoNum = _fichaPadreActual ? parseFloat(_fichaPadreActual['Precio_Oferta_FacoExtrema']) : NaN;
-    var hayOfertaFaco = !isNaN(ofertaFacoNum) && ofertaFacoNum > 0 && precioListaCombinado > 0 && ofertaFacoNum < _fichaPrecioListaActual;
+    // Oferta FacoExtrema — columnas "Precio_Oferta_FacoExtrema" en
+    // Lista_Precios, tanto en la fila del Padre como en la de
+    // cualquier Hijo (ver cálculo de precioListaCombinadoOferta más
+    // arriba, junto al loop de módulos). Si el Padre y/o algún módulo
+    // tildado tiene una oferta cargada, el precio de lista se tacha en
+    // rojo y al lado aparece el precio nuevo (combinando la oferta de
+    // cada uno que la tenga, y el precio normal de los que no) — más
+    // grande, en rojo — con el cartel "LIMITADO FACOEXTREMA" debajo.
+    // Alcance acotado a propósito: solo el encabezado, no toca la
+    // financiación de abajo (Contado/TLC6/TLC12/Leasing tienen su
+    // propia lógica de descuentos, aparte). Pedido por Cristian:
+    // "chequeá los hijos también, los precios oferta facoextrema, si
+    // no está en blanco sumar esos precios y que aparezca en rojo el
+    // nuevo precio de lista".
+    var hayOfertaFaco = (padreTieneOferta || algunHijoTieneOferta) && precioListaCombinado > 0;
     var elPrecioOfertaFaco = document.getElementById('fi-precio-oferta-faco');
     var elBadgeOfertaFaco = document.getElementById('fi-badge-oferta-faco');
     if (hayOfertaFaco) {
-        var extraModulosFaco = precioListaCombinado - _fichaPrecioListaActual; // lo que suman los módulos tildados, sin tocar
-        var ofertaCombinada = ofertaFacoNum + extraModulosFaco;
         if (elPrecioLista) {
             elPrecioLista.style.textDecoration = 'line-through';
             elPrecioLista.style.textDecorationColor = '#dc2626';
@@ -1123,7 +1145,7 @@ function _renderFinanciacion() {
             elPrecioLista.style.color = '#94a3b8';
         }
         if (elPrecioOfertaFaco) {
-            elPrecioOfertaFaco.textContent = _fmtMoneda(ofertaCombinada, 'USD');
+            elPrecioOfertaFaco.textContent = _fmtMoneda(precioListaCombinadoOferta, 'USD');
             elPrecioOfertaFaco.style.display = 'inline';
         }
         if (elBadgeOfertaFaco) elBadgeOfertaFaco.style.display = 'block';
