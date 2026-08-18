@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.16.4 (BUG REAL — confirmado con el log de versión que el archivo SÍ estaba actualizado (v2026.08.16.3), así que el "sigue igual" de Cristian era un bug de código de verdad, no un tema de deploy. Causa: _sumarDefaultTildados (v2026.08.16.2) buscaba los módulos/Hijos en el array `dispositivos` — pero ESE array nunca tiene Hijos, se filtran a propósito desde v2026.08.14.6 (_esHijoDeOtroProducto, "no quiero ver los hijos en la lista de precios") para que no aparezcan como productos sueltos. La suma daba siempre 0 aunque el código corriera perfecto — el test anterior no lo detectó porque tenía los Hijos metidos directo en `dispositivos`, sin reflejar el filtrado real. Fix: nuevo array _catalogoCompleto (sin filtrar, con Hijos incluidos), guardado en los mismos 2 lugares donde se arma `dispositivos` (carga inicial y polling cada 10 min) — _sumarDefaultTildados ahora busca ahí. Test corregido para reflejar la arquitectura real (Hijos SOLO en _catalogoCompleto, dispositivos sin ellos como en producción) — con esa corrección, confirma el mismo caso exacto (50.500→50.900) que antes pasaba en falso.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.16.3 (Cristian reportó "sigue igual, esa diferencia" sobre el fix de precio con default tildados (v2026.08.16.2) — encontrado el motivo: el log de versión propio en consola (agregado en v2026.08.15.2) quedó HARDCODEADO como string suelto, y me olvidé de actualizarlo en cada bump siguiente — para cuando llegó este reporte, la consola seguía mostrando "v2026.08.15.1" pese a que el archivo real ya iba por v2026.08.16.2, así que no servía para confirmar nada. Convertido a una constante con nombre (_VERSION_ARCHIVO_SELECTOR) — actualizar ahí en cada entrega, un solo lugar bien visible en vez de un string perdido dentro del console.log. De paso, mismo arreglo preventivo en eventos.html y empresas.html, que tenían el mismo patrón de riesgo (coincidían con la versión real por ahora, pero se iban a desactualizar en la próxima vuelta si no se corregía). El fix de precio en sí (v2026.08.16.2) no se tocó — está bien, confirmado con el mismo test de antes, sigue en verde.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.16.2 (Precio de la tarjeta ahora incluye los módulos con Tildado_Default — antes mostraba SOLO el precio del Padre, mientras que ficha-equipo.html arranca con los módulos que tengan Tildado_Default=TRUE ya sumados al headline (v2026.08.15.4) — dos precios distintos para el mismo equipo según desde dónde lo mires. Pedido por Cristian con 2 capturas (selector vs ficha, HUVITZ HOCT-1 OCTavius: USD 50.500 vs USD 50.900 — la diferencia son los USD 400 de "Mesa Eléctrica"): "quiero que aparezca el precio de lista de imagen 2, hay una diferencia". Nueva función compartida _sumarDefaultTildados(d, precioBase, campoHijo), aplicada en los 2 lugares que arman tarjetas (renderLista y el buscador universal) — mismo criterio EXACTO de matcheo que ya usa ficha-equipo.html (Tildado_Default === true ó "TRUE" como string). El precio Contado de la tarjeta también se ajusta usando el campo Contado de cada módulo (no mezcla Lista con Contado). Confirmado con 4 tests: reproduce el caso exacto reportado (50.500→50.900), el Contado usa su propio campo, un equipo sin módulos default no cambia, y "Consultar" (sin precio de base) no se rompe.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.16.1 (BUG REAL — "porque no se cargan las fotos?" (captura de Cristian: 5 de 6 productos de una categoría nueva con el cuadro gris de "pendiente"). Causa: la resolución de fotos vía FotoMap.gs (para productos con "Foto" en formato "Fotos/archivo.png", que necesitan buscarse por nombre de archivo en vez de tener una URL directa de Drive) se ejecutaba UNA sola vez, apuntando a los [data-foto-key] que existieran en el DOM en ESE momento — pero la lista arranca vacía hasta elegir categoría, así que casi siempre encontraba CERO imágenes para resolver. Cuando el vendedor navegaba a una categoría real y renderLista() pintaba las tarjetas de verdad, nadie volvía a intentar resolver esas fotos — quedaban en "pending" (cuadro gris) para siempre, salvo que su "Foto" fuera ya una URL directa de Drive (no depende de FotoMap, por eso algunos productos SÍ se veían bien). Fix: _fotoMapPromise guarda la promesa (se pide UNA sola vez, no se repite el fetch — sigue siendo el paso más lento del arranque) y la nueva función _resolverFotosPendientesConFotoMap() se llama de nuevo al FINAL de CADA renderLista(), reintentando contra lo que esté en el DOM en ese momento — sin importar cuándo se haya pintado esa lista respecto a cuándo terminó de cargar FotoMap. Confirmado con test reproduciendo el escenario exacto: FotoMap ya resuelto ANTES de que exista ninguna tarjeta en el DOM, la tarjeta se pinta después, la foto igual se resuelve — antes quedaba pegada en gris para siempre en ese mismo escenario.) -->
@@ -1588,7 +1589,7 @@ const APP_VERSION = PORTAL_TLC_VERSION; console.log("%c TLC Portal v" + APP_VERS
 // Ahora es una constante con nombre bien visible — actualizar ACÁ en
 // cada entrega, un solo lugar, no un string perdido en medio de un
 // console.log.
-const _VERSION_ARCHIVO_SELECTOR = '2026.08.16.3';
+const _VERSION_ARCHIVO_SELECTOR = '2026.08.16.4';
 console.log("%c TLC Selector Dispositivos v" + _VERSION_ARCHIVO_SELECTOR + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 
@@ -1631,6 +1632,11 @@ function _boolSheet(v) {
     return v === true || v === 'TRUE' || v === 'true' || v === 1;
 }
 let dispositivos = [];
+// Catálogo COMPLETO, sin el filtrado de Hijos que sí tiene
+// `dispositivos` (ver _esHijoDeOtroProducto, v2026.08.14.6) — lo
+// necesita _sumarDefaultTildados para poder encontrar los módulos y
+// sumarlos al precio de la tarjeta (ver v2026.08.16.2/.4).
+let _catalogoCompleto = [];
 let dispositivoActual = null;
 let modalidadActual = null;
 let cantidadActual = 1;
@@ -2364,6 +2370,11 @@ async function cargarTodo() {
         ]);
 
         dispositivos = dispRows.filter(d => d['Nombre de Dispositivo']?.toString().trim() && !_esHijoDeOtroProducto(d));
+        // Catálogo SIN filtrar (con Hijos incluidos) — dispositivos ya
+        // no los tiene desde v2026.08.14.6, pero _sumarDefaultTildados
+        // los necesita para sumar los módulos con Tildado_Default al
+        // precio de la tarjeta (ver v2026.08.16.2).
+        _catalogoCompleto = dispRows;
 
         // currentUserRol ya viene seteado desde mostrarApp() — validado por el
         // GAS en el login OTP contra la hoja Vendedores. No se recalcula acá.
@@ -2517,7 +2528,14 @@ function _sumarDefaultTildados(d, precioBase, campoHijo) {
     if (!tieneValor(precioBase)) return precioBase; // sin precio de base ("Consultar"), no hay nada que sumarle
     var nombrePadre = d['Nombre de Dispositivo'] || '';
     var extra = 0;
-    dispositivos.forEach(function(h) {
+    // BUG REAL — buscaba en `dispositivos`, pero ese array NUNCA tiene
+    // Hijos (se filtran a propósito desde v2026.08.14.6, para que no
+    // aparezcan como productos sueltos en la lista) — la suma daba
+    // siempre 0 aunque el código estuviera corriendo perfecto.
+    // Reportado por Cristian, confirmando primero que el archivo
+    // estaba actualizado (versión en consola correcta) antes de sospechar
+    // de esto. _catalogoCompleto sí conserva los Hijos.
+    (_catalogoCompleto.length ? _catalogoCompleto : dispositivos).forEach(function(h) {
         if (h['Pertenece a'] !== nombrePadre) return;
         var v = h['Tildado_Default'];
         var esDefault = v === true || String(v || '').trim().toUpperCase() === 'TRUE';
@@ -6054,6 +6072,7 @@ setInterval(() => {
             if (!data || !data.length) return;
             _guardarCachePrecios(data, 'firebase');
             dispositivos = data.filter(d => d['Nombre de Dispositivo']?.toString().trim() && !_esHijoDeOtroProducto(d));
+            _catalogoCompleto = data;
             console.log('[Precios] 🔄 Polling Firebase: actualizado en background — ' + data.length + ' items');
             if (typeof renderLista === 'function' && subcatActual) {
                 const filtered = dispositivos.filter(d =>
