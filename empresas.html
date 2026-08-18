@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.16.2 (Sobre v2026.08.16.1 ("carga al toque"): Cristian reportó con captura que seguía viendo "0 negocios" en la lista, aunque el detalle de una ficha sí lo mostraba bien — patrón típico de un archivo desactualizado en producción, así que se agregó un log de versión PROPIO de este archivo en consola (independiente de PORTAL_TLC_VERSION, compartido por todo el Portal) para poder confirmarlo de una vez, mismo criterio que ya se usó en otros archivos del Portal. Además, mejora real: nuevo caché de negocios en localStorage (emp_cache_negocios_por_empresa, mismo criterio que emp_cache_lista) — antes, aunque el cruce se disparara apenas arrancaba la página, la PRIMERA vez que se veía la lista igual tocaba esperar el viaje a Firebase antes de ver los conteos reales; si el vendedor se movía de pantalla antes de que terminara, veía "0 negocios" en la lista pero el conteo correcto en la ficha (el síntoma exacto reportado: "ahora los carga en la siguiente pantalla"). Con este caché, de la SEGUNDA visita en adelante los conteos aparecen al instante junto con el resto de la lista — la única espera real queda para la primera vez que se usa el módulo. Confirmado con test: con caché de una visita anterior, el conteo real se ve en la lista ANTES de que termine ningún pedido de red.) -->
 <!-- Portal TLC | empresas.html | v2026.08.16.1 (Los contadores de "Negocios" en la lista ya no arrancan en 0 hasta abrir una ficha — desde v2026.08.10.5 (cuando la fuente era historico.json, pesada y lenta) el cruce se difería a propósito hasta que alguien abriera la primera ficha de empresa, para no cargar la lista con ese cálculo. Con v2026.08.15.1 ya se migró a Firebase (rápido) y el cruce ya corre en una sola pasada agrupada (no más O(empresas × cotizaciones)) — la razón original para diferirlo ya no aplica. Ahora _asegurarNegociosCargados() se dispara solo, apenas termina de cargar la lista, sin esperar a que se abra ninguna ficha — y como esa función ya se encargaba de repintar la lista sola al terminar (sin tocar nada ahí), los conteos reales aparecen solos, segundos después del primer pintado instantáneo. Pedido por Cristian con captura: "primera carga, trae el contador de negocios en cero... estaría bueno que los contadores carguen al toque". Confirmado con test de punta a punta: sin abrir ninguna ficha, se pide /cotizaciones.json automáticamente al arrancar, y la tarjeta de la lista termina mostrando el conteo real (2 negocios) en vez de 0.) -->
 <!-- Portal TLC | empresas.html | v2026.08.15.1 (BUG REAL DE FONDO — "Negocios asociados" cruzaba las empresas contra historico.json (una foto de GitHub), no contra Firebase en vivo. El camino rápido de creación de negocio que usa ficha-equipo.html (soloRegistrarNegocio:true, el que se dispara al escanear QR y tocar "Crear Negocio" en el stand de FacoExtrema) NUNCA escribe a historico.json — solo guarda en Firebase RTDB directo (confirmado en FotoMap.gs, guardarPresupuestoEditor). Esos negocios eran invisibles acá, no por ningún filtro de pipeline (no existe ninguno en este archivo, confirmado con grep) sino porque ni siquiera estaban en la fuente que se leía — daba la sensación de "solo veo un pipeline" porque los de otros pipelines creados por el editor completo sí llegaban a historico.json. Reportado por Cristian: "chequeá si estás filtrando solo por uno... no se ven todos los negocios asociados a la empresa". Ahora se lee /cotizaciones directo de Firebase, mismo criterio que ya usaba esta función para /servicio_tecnico — consistente entre las dos fuentes, y siempre al día sin depender de cuándo corrió la última sincronización a GitHub. Confirmado con test: el objeto crudo de Firebase se convierte bien a array, y un negocio creado por el camino rápido (el escenario exacto reportado) ahora se puede cruzar normal por CUIT/razón social.) -->
 <!-- Portal TLC | empresas.html | v2026.08.13.2 (Estrategia cache-first, mismo criterio que ya usa eventos.html — si ya se cargó la lista de empresas antes en este navegador, se pinta AL INSTANTE (0ms) con lo último guardado, sin esperar al backend, y se actualiza sola en segundo plano cuando llega la respuesta real. Nueva función _cargarEmpresasCacheFirst, usada SOLO en el arranque inicial de la página — las otras 2 llamadas a _cargarEmpresas() (después de importar un Excel, después de crear una empresa) siguen esperando el dato fresco como siempre, no tiene sentido mostrarles la caché vieja justo después de una acción que la cambió. Pedido por Cristian: "quiero que quede rápido como quedó eventos, basta de esperar". Confirmado con test: pintado instantáneo desde caché, actualización silenciosa al llegar el dato real, y funcionamiento normal sin caché (primera vez).) -->
@@ -364,6 +365,14 @@
 <script>
 const APP_VERSION = (typeof PORTAL_TLC_VERSION !== 'undefined') ? PORTAL_TLC_VERSION : '?';
 console.log("%c TLC Empresas v" + APP_VERSION + " ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+// Log PROPIO de este archivo, independiente de PORTAL_TLC_VERSION
+// (compartido por todo el Portal) — sin esto, la consola podía mostrar
+// un PORTAL_TLC_VERSION "actualizado" aunque ESTE archivo puntual
+// siguiera siendo una copia vieja sin re-subir. Mismo criterio que ya
+// se agregó en varios otros archivos del Portal, después de perder
+// tiempo diagnosticando bugs que en realidad eran "el archivo correcto
+// todavía no llegó a producción".
+console.log("%c TLC Empresas (archivo) v2026.08.16.2 ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 // ══════════════════════════════════════════════════════════════════
 // Empresas y Contactos conectados a Firebase (empresas/{id},
 // contactos/{id}) vía GAS. "Negocios asociados" todavía sin cruzar
@@ -492,6 +501,41 @@ var RTDB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
 // usuario abre 2 fichas rápido, antes de que termine el primero.
 var _negociosCargadosPromise = null;
 var _negociosYaCalculados = false; // el backend siempre manda negocios:[] de arranque (nunca undefined), así que hace falta una bandera aparte para saber si YA se calculó el cruce real o todavía no
+
+// Caché de negocios por empresa (localStorage) — mismo criterio que ya
+// usa emp_cache_lista para la lista de empresas. Sin esto, incluso
+// disparando el cruce apenas arranca la página (ver v2026.08.16.1),
+// la PRIMERA vez que alguien entra igual tiene que esperar el viaje a
+// Firebase antes de ver los conteos reales — "los carga en la
+// siguiente pantalla" porque para cuando el pedido termina, el
+// vendedor ya se movió. Con este caché, de la SEGUNDA visita en
+// adelante los conteos aparecen al instante (mismo pintado inicial
+// que ya tiene la lista de empresas), y se refrescan solos atrás con
+// el dato fresco — la única vez que hay que esperar de verdad es la
+// primera, sin caché todavía. Pedido por Cristian con captura: "quiero
+// que los cargue en esta pantalla, ahora los carga en la siguiente".
+var NEGOCIOS_CACHE_KEY = 'emp_cache_negocios_por_empresa';
+function _aplicarNegociosDesdeCache() {
+  try {
+    var crudo = localStorage.getItem(NEGOCIOS_CACHE_KEY);
+    if (!crudo) return false;
+    var mapa = JSON.parse(crudo);
+    if (!mapa || typeof mapa !== 'object') return false;
+    var algunaAsignada = false;
+    EMPRESAS.forEach(function(e) {
+      if (mapa[e.id]) { e.negocios = mapa[e.id]; algunaAsignada = true; }
+    });
+    return algunaAsignada;
+  } catch(eCache) { return false; }
+}
+function _guardarNegociosEnCache() {
+  try {
+    var mapa = {};
+    EMPRESAS.forEach(function(e) { mapa[e.id] = e.negocios || []; });
+    localStorage.setItem(NEGOCIOS_CACHE_KEY, JSON.stringify(mapa));
+  } catch(eLs) { /* no crítico — sin caché, simplemente se vuelve a esperar el pedido real la próxima vez */ }
+}
+
 function _asegurarNegociosCargados() {
   if (!_negociosCargadosPromise) _negociosCargadosPromise = _cargarNegociosCruzados().then(function() { _negociosYaCalculados = true; });
   return _negociosCargadosPromise;
@@ -593,6 +637,8 @@ async function _cargarNegociosCruzados() {
       negocios.sort(function(a, b) { return new Date(b.fecha||0) - new Date(a.fecha||0); });
       e.negocios = negocios;
     });
+
+    _guardarNegociosEnCache();
 
     // Repintar lo que ya esté en pantalla con los conteos reales
     _renderListaEmpresas(document.getElementById('buscador-empresas').value);
@@ -1434,6 +1480,18 @@ var _volverANegocioId = null;
   // último bloque). Pedido por Cristian con captura: "primera carga,
   // trae el contador de negocios en cero... estaría bueno que los
   // contadores carguen al toque".
+  //
+  // Si ya hay un caché de negocios guardado de una visita anterior, se
+  // aplica y se repinta AL INSTANTE, antes de esperar el pedido real —
+  // sin esto, aunque el pedido se dispare apenas arranca, el vendedor
+  // igual llega a ver "0 negocios" un rato mientras viaja a Firebase.
+  // Reportado por Cristian con captura: "quiero que los cargue en esta
+  // pantalla, ahora los carga en la siguiente" (para cuando el pedido
+  // terminaba, ya se había movido a otra pantalla).
+  if (_aplicarNegociosDesdeCache()) {
+    _negociosYaCalculados = true;
+    _renderListaEmpresas(document.getElementById('buscador-empresas').value);
+  }
   _asegurarNegociosCargados();
   if (empresaId) _abrirDetalleEmpresa(empresaId);
   if (_volverANegocioId) {
