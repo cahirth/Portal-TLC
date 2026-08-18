@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.16.3 (BUG REAL — "aparecen 1 seg y se borran en la lista de empresas". Causa: el refresco de fondo de la LISTA de empresas (_cargarEmpresasCacheFirst, independiente del cruce de negocios) corre en paralelo y, cuando termina, REEMPLAZA el array EMPRESAS entero con la respuesta fresca del backend — que SIEMPRE trae "negocios: []" de fábrica (el backend no calcula esto, se hace acá en el cliente). Si ese refresco terminaba DESPUÉS de que ya se habían mostrado los conteos reales (desde el caché de v2026.08.16.2, o desde el cruce en vivo), los pisaba con ceros de nuevo. Fix: nuevo _negociosPorEmpresaId — mapa persistente que vive AFUERA del array EMPRESAS y sobrevive a cualquier reemplazo, reaplicado con _reaplicarNegociosPersistentes() en los 3 lugares donde EMPRESAS se reasigna desde cero (_cargarEmpresas, y las 2 reasignaciones dentro de _cargarEmpresasCacheFirst). _cargarNegociosCruzados y _aplicarNegociosDesdeCache ahora escriben en este mapa persistente además de en e.negocios directo. Confirmado con test reproduciendo el escenario exacto en 3 pasos: conteo visible desde el caché, sigue visible después de que la lista se refresca de fondo con negocios:[] de fábrica, y sigue visible después de que también termina el cruce en vivo.) -->
 <!-- Portal TLC | empresas.html | v2026.08.16.2 (Sobre v2026.08.16.1 ("carga al toque"): Cristian reportó con captura que seguía viendo "0 negocios" en la lista, aunque el detalle de una ficha sí lo mostraba bien — patrón típico de un archivo desactualizado en producción, así que se agregó un log de versión PROPIO de este archivo en consola (independiente de PORTAL_TLC_VERSION, compartido por todo el Portal) para poder confirmarlo de una vez, mismo criterio que ya se usó en otros archivos del Portal. Además, mejora real: nuevo caché de negocios en localStorage (emp_cache_negocios_por_empresa, mismo criterio que emp_cache_lista) — antes, aunque el cruce se disparara apenas arrancaba la página, la PRIMERA vez que se veía la lista igual tocaba esperar el viaje a Firebase antes de ver los conteos reales; si el vendedor se movía de pantalla antes de que terminara, veía "0 negocios" en la lista pero el conteo correcto en la ficha (el síntoma exacto reportado: "ahora los carga en la siguiente pantalla"). Con este caché, de la SEGUNDA visita en adelante los conteos aparecen al instante junto con el resto de la lista — la única espera real queda para la primera vez que se usa el módulo. Confirmado con test: con caché de una visita anterior, el conteo real se ve en la lista ANTES de que termine ningún pedido de red.) -->
 <!-- Portal TLC | empresas.html | v2026.08.16.1 (Los contadores de "Negocios" en la lista ya no arrancan en 0 hasta abrir una ficha — desde v2026.08.10.5 (cuando la fuente era historico.json, pesada y lenta) el cruce se difería a propósito hasta que alguien abriera la primera ficha de empresa, para no cargar la lista con ese cálculo. Con v2026.08.15.1 ya se migró a Firebase (rápido) y el cruce ya corre en una sola pasada agrupada (no más O(empresas × cotizaciones)) — la razón original para diferirlo ya no aplica. Ahora _asegurarNegociosCargados() se dispara solo, apenas termina de cargar la lista, sin esperar a que se abra ninguna ficha — y como esa función ya se encargaba de repintar la lista sola al terminar (sin tocar nada ahí), los conteos reales aparecen solos, segundos después del primer pintado instantáneo. Pedido por Cristian con captura: "primera carga, trae el contador de negocios en cero... estaría bueno que los contadores carguen al toque". Confirmado con test de punta a punta: sin abrir ninguna ficha, se pide /cotizaciones.json automáticamente al arrancar, y la tarjeta de la lista termina mostrando el conteo real (2 negocios) en vez de 0.) -->
 <!-- Portal TLC | empresas.html | v2026.08.15.1 (BUG REAL DE FONDO — "Negocios asociados" cruzaba las empresas contra historico.json (una foto de GitHub), no contra Firebase en vivo. El camino rápido de creación de negocio que usa ficha-equipo.html (soloRegistrarNegocio:true, el que se dispara al escanear QR y tocar "Crear Negocio" en el stand de FacoExtrema) NUNCA escribe a historico.json — solo guarda en Firebase RTDB directo (confirmado en FotoMap.gs, guardarPresupuestoEditor). Esos negocios eran invisibles acá, no por ningún filtro de pipeline (no existe ninguno en este archivo, confirmado con grep) sino porque ni siquiera estaban en la fuente que se leía — daba la sensación de "solo veo un pipeline" porque los de otros pipelines creados por el editor completo sí llegaban a historico.json. Reportado por Cristian: "chequeá si estás filtrando solo por uno... no se ven todos los negocios asociados a la empresa". Ahora se lee /cotizaciones directo de Firebase, mismo criterio que ya usaba esta función para /servicio_tecnico — consistente entre las dos fuentes, y siempre al día sin depender de cuándo corrió la última sincronización a GitHub. Confirmado con test: el objeto crudo de Firebase se convierte bien a array, y un negocio creado por el camino rápido (el escenario exacto reportado) ahora se puede cruzar normal por CUIT/razón social.) -->
@@ -422,7 +423,7 @@ async function _cargarEmpresas() {
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarEmpresas' }) });
     var r = await resp.json();
-    if (r.ok) { EMPRESAS = r.empresas || []; try { localStorage.setItem('emp_cache_lista', JSON.stringify(EMPRESAS)); } catch(eLs) {} }
+    if (r.ok) { EMPRESAS = r.empresas || []; _reaplicarNegociosPersistentes(); try { localStorage.setItem('emp_cache_lista', JSON.stringify(EMPRESAS)); } catch(eLs) {} }
     else console.warn('Error listando empresas:', r.error);
   } catch(e) { console.warn('Error de conexión al listar empresas:', e); }
   _cargando = false;
@@ -458,6 +459,7 @@ async function _cargarEmpresasCacheFirst() {
 
   if (cacheado && Array.isArray(cacheado)) {
     EMPRESAS = cacheado;
+    _reaplicarNegociosPersistentes();
     _renderListaEmpresas();
   }
 
@@ -467,6 +469,7 @@ async function _cargarEmpresasCacheFirst() {
     .then(function(r) {
       if (!r.ok) throw new Error(r.error || 'Error desconocido');
       EMPRESAS = r.empresas || [];
+      _reaplicarNegociosPersistentes();
       try { localStorage.setItem('emp_cache_lista', JSON.stringify(EMPRESAS)); } catch(eLs) {}
       _renderListaEmpresas();
     });
@@ -502,6 +505,26 @@ var RTDB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
 var _negociosCargadosPromise = null;
 var _negociosYaCalculados = false; // el backend siempre manda negocios:[] de arranque (nunca undefined), así que hace falta una bandera aparte para saber si YA se calculó el cruce real o todavía no
 
+// BUG REAL — "aparecen 1 seg y se borran". El refresco de fondo de la
+// LISTA de empresas (línea de más abajo, _cargarEmpresasCacheFirst)
+// corre en paralelo, totalmente independiente del cruce de negocios —
+// cuando termina (no importa si antes o después del cruce), REEMPLAZA
+// el array EMPRESAS entero con la respuesta fresca del backend, que
+// SIEMPRE trae "negocios: []" de fábrica (el backend no calcula esto,
+// se hace acá en el cliente). Si ese refresco terminaba DESPUÉS de que
+// ya se habían mostrado los conteos reales, los pisaba con ceros de
+// nuevo — el "se borran" que reportó Cristian. Fix: _negociosPorEmpresaId
+// es la fuente de verdad de VERDAD, vive AFUERA del array EMPRESAS y
+// sobrevive a cualquier reemplazo — se reaplica con
+// _reaplicarNegociosPersistentes() cada vez que EMPRESAS se reasigna
+// desde cero, en los 3 lugares donde eso pasa.
+var _negociosPorEmpresaId = {};
+function _reaplicarNegociosPersistentes() {
+  EMPRESAS.forEach(function(e) {
+    if (_negociosPorEmpresaId[e.id]) e.negocios = _negociosPorEmpresaId[e.id];
+  });
+}
+
 // Caché de negocios por empresa (localStorage) — mismo criterio que ya
 // usa emp_cache_lista para la lista de empresas. Sin esto, incluso
 // disparando el cruce apenas arranca la página (ver v2026.08.16.1),
@@ -521,6 +544,7 @@ function _aplicarNegociosDesdeCache() {
     if (!crudo) return false;
     var mapa = JSON.parse(crudo);
     if (!mapa || typeof mapa !== 'object') return false;
+    _negociosPorEmpresaId = mapa; // fuente de verdad persistente — no solo esta vez, para cualquier reemplazo futuro de EMPRESAS también
     var algunaAsignada = false;
     EMPRESAS.forEach(function(e) {
       if (mapa[e.id]) { e.negocios = mapa[e.id]; algunaAsignada = true; }
@@ -530,9 +554,7 @@ function _aplicarNegociosDesdeCache() {
 }
 function _guardarNegociosEnCache() {
   try {
-    var mapa = {};
-    EMPRESAS.forEach(function(e) { mapa[e.id] = e.negocios || []; });
-    localStorage.setItem(NEGOCIOS_CACHE_KEY, JSON.stringify(mapa));
+    localStorage.setItem(NEGOCIOS_CACHE_KEY, JSON.stringify(_negociosPorEmpresaId));
   } catch(eLs) { /* no crítico — sin caché, simplemente se vuelve a esperar el pedido real la próxima vez */ }
 }
 
@@ -636,6 +658,7 @@ async function _cargarNegociosCruzados() {
 
       negocios.sort(function(a, b) { return new Date(b.fecha||0) - new Date(a.fecha||0); });
       e.negocios = negocios;
+      _negociosPorEmpresaId[e.id] = negocios;
     });
 
     _guardarNegociosEnCache();
