@@ -116,7 +116,7 @@
   var ANTICIPO_TLC6_PCT = 35;   // TLC 6 cuotas — pesos Y dólares, mismo %
   var ANTICIPO_TLC12_PCT = 50;  // TLC 12 cuotas — pesos Y dólares, mismo %
 
-  var LEASING36_MAXICANON_PCT = 15;   // % del valor del bien, se paga como adelanto
+  var LEASING36_MAXICANON_PCT = 10;   // % del valor del bien, se paga como adelanto
   var LEASING36_CANONES_A_PAGAR = 35; // + 1 canon en garantía + 1 opción de compra (VR) — no suman al cronograma de 35, van aparte
   var LEASING36_PLAZO_MESES = 36;
 
