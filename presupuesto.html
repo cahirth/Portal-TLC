@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto.html | v2026.08.16.1 (BUG REAL DE CENTRADO — Cristian pidió "que en hoja A4 salga centrado y sin saltos de página". Encontradas 2 causas: (1) la regla @media print pisaba ".page{margin:0 auto}" (el "auto" es lo que centra en pantalla) con "margin:0" — sin el auto, .page (max-width:780px) quedaba pegado al borde izquierdo del área imprimible. Restaurado a "margin:0 auto". (2) El mecanismo de "una sola hoja" (v2026.08.10.1) usaba transform:scale() con un ancho en porcentaje mayor a 100% para compensar — pero cuando el ancho de un elemento con margin:auto supera el 100% de su contenedor, CSS resuelve los márgenes automáticos a 0 (caso "over-constrained" de la spec), rompiendo el centrado apenas hacía falta achicar. Reemplazado transform:scale()+width-compensado por zoom — reacomoda el layout de verdad (no es solo un efecto visual), así el margin:0 auto restaurado en (1) lo sigue centrando sin ningún truco de ancho aparte. Confirmado con test: 3 escenarios (entra sin achicar, necesita achicarse ~0.667, caso extremo que toca el piso 0.55) — el zoom se aplica/no se aplica correctamente según haga falta, respeta el piso mínimo, y se resetea después de imprimir. Sobre "sin saltos de página": revisado que no queda ningún page-break FORZADO en el archivo (solo page-break-inside:avoid, defensivo) — el mecanismo de una sola hoja ya se encarga de esto, ahora además centrado.) -->
 <!-- Portal TLC | presupuesto.html | v2026.08.10.1 (Rediseño para que el PDF entre SIEMPRE en una sola hoja, sin importar cuántos ítems tenga el presupuesto — pedido por Cristian: "cuando guarda PDF, rediseñar para que entre en una sola página". Dos partes: (1) Compactado general en @media print — menos margen entre secciones (20-24px → 10px), menos padding en celdas de tabla, @page con márgenes más ajustados (22/22/32/22 en vez de 40/28/45/28) — soluciona la mayoría de los casos (presupuestos de pocos ítems) sin tocar el tamaño de letra. (2) Ajuste automático de escala vía beforeprint/afterprint — mide el alto real del contenido justo antes de imprimir y, si no entra en una hoja A4, aplica transform:scale() lo justo y necesario (con piso de 0.55 para no volverlo ilegible en un caso extremo) — esto SÍ garantiza una sola hoja para cualquier cantidad de ítems, el compactado de CSS por sí solo no podía garantizarlo. Confirmado con test (scrollHeight mockeado, jsdom no calcula layout real): escala correctamente cuando no entra, no toca nada cuando sí entra, respeta el piso en un caso extremo, y se resetea después de imprimir.) -->
 <!-- Portal TLC | presupuesto.html | v2026.08.06.1 (BUG REAL: el Anticipo de TLC 6/12 mostraba "Anticipo 23500%" cuando el vendedor cargaba el anticipo en USD desde el toggle nuevo del editor (presupuesto-editor.html v2026.08.06.2+) — el texto pegaba mp.anticipoPct crudo con "%", y ese campo puede contener un MONTO en USD en vez de un porcentaje según mp.anticipoTipo. Corregido calculando el % real a partir de los montos (anticipo / (anticipo + saldo en cuotas)) en vez de leer el campo crudo — funciona para presupuestos viejos y nuevos por igual, sin depender de que exista mp.anticipoTipo. Reportado por Cristian con captura del PDF real: "Anticipo 23500%, está mal, debes poner 44,xx%, calculalo".) -->
 <!-- Portal TLC | presupuesto.html | v2026.07.28.10 (Botón "Enviar por WhatsApp": si el negocio tiene más de un contacto con teléfono, ahora abre un selector preguntando a quién enviárselo, en vez de mandar siempre al contacto "principal" nomás. Lee los contactos de la raíz del negocio (contacto + contactosAdicionales, ver FotoMap.gs v146 y cotizaciones.html v2026.08.04.7). Pedido por Cristian.) -->
@@ -33,7 +34,13 @@
   /* .badge-novalido sacada — ahora la leyenda va como subtítulo en itálica bajo la numeración, ver bloque del encabezado */
   @media print {
     body{background:white;}
-    .page{margin:0;box-shadow:none;padding:0 24px;}
+    /* BUG REAL — margin:0 pisaba el "margin:20px auto" de la regla
+       base (.page), que es justo lo que centra horizontalmente en
+       pantalla. En impresión, sin el "auto", .page (max-width:780px)
+       quedaba pegado al borde izquierdo del área imprimible en vez de
+       centrado, dejando todo el aire de sobra a la derecha. Pedido
+       por Cristian: "que en hoja A4 salga centrado". */
+    .page{margin:0 auto;box-shadow:none;padding:0 24px;}
     .no-print{display:none!important;}
     /* El header YA NO se repite con position:fixed — esa técnica
        depende de calcular bien su altura real contra el margen
@@ -144,19 +151,28 @@
   window.addEventListener('beforeprint', function() {
     var el = document.getElementById('page-root');
     if (!el) return;
-    el.style.transform = '';
-    el.style.width = '';
+    el.style.zoom = '';
     var alto = el.scrollHeight;
     if (alto > ALTO_UTIL_A4_PX) {
       var factor = Math.max(ALTO_UTIL_A4_PX / alto, ESCALA_MINIMA);
-      el.style.transformOrigin = 'top left';
-      el.style.transform = 'scale(' + factor.toFixed(3) + ')';
-      el.style.width = (100 / factor).toFixed(2) + '%';
+      // BUG REAL — la técnica anterior (transform:scale + width en
+      // porcentaje >100% para compensar) rompía el centrado: cuando
+      // el ancho de un elemento con margin:auto supera el 100% de su
+      // contenedor, CSS resuelve los márgenes automáticos a 0 (caso
+      // "over-constrained" de la spec) — el centrado dejaba de
+      // funcionar apenas se necesitaba achicar. "zoom" en cambio
+      // reacomoda el layout de verdad (no es solo un efecto visual
+      // como transform) — el elemento queda genuinamente más angosto
+      // en el flujo normal, así que el margin:0 auto (ya restaurado
+      // arriba) lo sigue centrando sin ningún truco extra. Pedido por
+      // Cristian: "que en hoja A4 salga centrado y sin saltos de
+      // página".
+      el.style.zoom = factor;
     }
   });
   window.addEventListener('afterprint', function() {
     var el = document.getElementById('page-root');
-    if (el) { el.style.transform = ''; el.style.width = ''; }
+    if (el) el.style.zoom = '';
   });
 
   // ── Botón "Volver" del header ──────────────────────────────────
