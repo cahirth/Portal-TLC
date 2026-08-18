@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.16.2 (Precio de la tarjeta ahora incluye los módulos con Tildado_Default — antes mostraba SOLO el precio del Padre, mientras que ficha-equipo.html arranca con los módulos que tengan Tildado_Default=TRUE ya sumados al headline (v2026.08.15.4) — dos precios distintos para el mismo equipo según desde dónde lo mires. Pedido por Cristian con 2 capturas (selector vs ficha, HUVITZ HOCT-1 OCTavius: USD 50.500 vs USD 50.900 — la diferencia son los USD 400 de "Mesa Eléctrica"): "quiero que aparezca el precio de lista de imagen 2, hay una diferencia". Nueva función compartida _sumarDefaultTildados(d, precioBase, campoHijo), aplicada en los 2 lugares que arman tarjetas (renderLista y el buscador universal) — mismo criterio EXACTO de matcheo que ya usa ficha-equipo.html (Tildado_Default === true ó "TRUE" como string). El precio Contado de la tarjeta también se ajusta usando el campo Contado de cada módulo (no mezcla Lista con Contado). Confirmado con 4 tests: reproduce el caso exacto reportado (50.500→50.900), el Contado usa su propio campo, un equipo sin módulos default no cambia, y "Consultar" (sin precio de base) no se rompe.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.16.1 (BUG REAL — "porque no se cargan las fotos?" (captura de Cristian: 5 de 6 productos de una categoría nueva con el cuadro gris de "pendiente"). Causa: la resolución de fotos vía FotoMap.gs (para productos con "Foto" en formato "Fotos/archivo.png", que necesitan buscarse por nombre de archivo en vez de tener una URL directa de Drive) se ejecutaba UNA sola vez, apuntando a los [data-foto-key] que existieran en el DOM en ESE momento — pero la lista arranca vacía hasta elegir categoría, así que casi siempre encontraba CERO imágenes para resolver. Cuando el vendedor navegaba a una categoría real y renderLista() pintaba las tarjetas de verdad, nadie volvía a intentar resolver esas fotos — quedaban en "pending" (cuadro gris) para siempre, salvo que su "Foto" fuera ya una URL directa de Drive (no depende de FotoMap, por eso algunos productos SÍ se veían bien). Fix: _fotoMapPromise guarda la promesa (se pide UNA sola vez, no se repite el fetch — sigue siendo el paso más lento del arranque) y la nueva función _resolverFotosPendientesConFotoMap() se llama de nuevo al FINAL de CADA renderLista(), reintentando contra lo que esté en el DOM en ese momento — sin importar cuándo se haya pintado esa lista respecto a cuándo terminó de cargar FotoMap. Confirmado con test reproduciendo el escenario exacto: FotoMap ya resuelto ANTES de que exista ninguna tarjeta en el DOM, la tarjeta se pinta después, la foto igual se resuelve — antes quedaba pegada en gris para siempre en ese mismo escenario.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.15.5 (BUG REAL — abrirDetalle() e _abrirDetalleDesdeResultado() armaban su PROPIA lista filtrada por separado de lo que se ve en pantalla, y NO le aplicaban _ordenarDispositivos() (el toggle Nombre/Precio de v2026.08.15.4) — el índice "idx" viene de la posición VISUAL donde el vendedor tocó, así que si ese orden no coincidía con el de la lista recalculada acá adentro, agarraba OTRO equipo. Con "Nombre" pasaba casi desapercibido porque el catálogo ya está cargado casi alfabético en el Excel; con "Precio" se notaba siempre, porque el orden por precio es bien distinto al de las filas. Reportado por Cristian: "no indexa bien la lista en $ y llama a un equipo desfasado". Arreglado en los DOS lugares (abrirDetalle y _abrirDetalleDesdeResultado, que también renderizaba sin ordenar) — ahora los dos aplican el mismo _ordenarDispositivos() que ve el vendedor en pantalla antes de indexar. Confirmado con test reproduciendo el escenario exacto: ordenar por Precio, tocar la 2da tarjeta visible, confirmar que abre ESE equipo y no el de la posición 2 del orden viejo.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.15.4 (Toggle Nombre/Precio — nueva función compartida _ordenarDispositivos(), aplicada tanto en la navegación por categoría (filtrar → renderLista) como en el buscador universal (_ejecutarBusqueda), un solo estado global (_ordenActual). En rigor, antes NO había ningún orden explícito — la lista salía en el orden de fila del Excel, que por casualidad parecía alfabético porque así está cargado el catálogo hoy. Orden por Precio usa Precio LISTA (con Precio CONTADO CNO como respaldo si falta) — los equipos sin ningún precio cargado van al final, no se cuelan arriba por un NaN mal comparado. Pedido por Cristian: "los filtros ordenan por nombre, podremos ordenar tbien por precio?". Confirmado con test: orden alfabético real, orden numérico correcto de menor a mayor con el caso sin precio al final, y que la función no muta el array original.) -->
@@ -2491,6 +2492,33 @@ function fotoKeyFromRaw(fotoRaw) {
     return { original: nombre, webp: nombreWebP };
 }
 
+// ─── PRECIO CON MÓDULOS TILDADOS POR DEFECTO ───────────────────────────────
+// El precio de la tarjeta del selector mostraba SOLO el precio del
+// Padre, mientras que ficha-equipo.html arranca con los módulos que
+// tengan "Tildado_Default" TRUE ya sumados al headline (ver
+// ficha-equipo.html v2026.08.15.4) — dos precios distintos para el
+// mismo equipo, según desde dónde lo mires. Pedido por Cristian con 2
+// capturas (selector vs ficha, HUVITZ HOCT-1 OCTavius: USD 50.500 vs
+// USD 50.900, la diferencia son los USD 400 de "Mesa Eléctrica"):
+// "quiero que aparezca el precio de lista de imagen 2, hay una
+// diferencia". Mismo criterio EXACTO de matcheo que usa
+// ficha-equipo.html (Tildado_Default === true ó "TRUE" como string).
+function _sumarDefaultTildados(d, precioBase, campoHijo) {
+    campoHijo = campoHijo || 'Precio LISTA';
+    if (!tieneValor(precioBase)) return precioBase; // sin precio de base ("Consultar"), no hay nada que sumarle
+    var nombrePadre = d['Nombre de Dispositivo'] || '';
+    var extra = 0;
+    dispositivos.forEach(function(h) {
+        if (h['Pertenece a'] !== nombrePadre) return;
+        var v = h['Tildado_Default'];
+        var esDefault = v === true || String(v || '').trim().toUpperCase() === 'TRUE';
+        if (!esDefault) return;
+        var val = parseFloat(h[campoHijo]);
+        if (!isNaN(val)) extra += val;
+    });
+    return (parseFloat(precioBase) || 0) + extra;
+}
+
 // ─── RENDER LISTA ─────────────────────────────────────────────────────────────
 function renderLista(items) {
     const lista = document.getElementById('lista');
@@ -2507,7 +2535,7 @@ function renderLista(items) {
             return primera.length > 60 ? primera.substring(0,57) + '…' : primera;
         })();
         const oferta   = d['Oferta'] === true || d['Oferta'] === 'TRUE';
-        const precio   = d['Precio LISTA'] || d['Precio CONTADO CNO'];
+        const precio   = _sumarDefaultTildados(d, d['Precio LISTA'] || d['Precio CONTADO CNO']);
         const foto     = fotoUrl(d['Foto'] || '');
         const precioStr = tieneValor(precio) ? 'Lista: ' + fmtUSD(precio) : 'Consultar';
 
@@ -3017,8 +3045,8 @@ function _ejecutarBusqueda(q) {
     // Render de cards igual que renderLista pero desde búsqueda universal
     resDiv.innerHTML = resultados.map((d, idx) => {
         const oferta    = d['Oferta'] === true || d['Oferta'] === 'TRUE';
-        const precio    = d['Precio LISTA'] || d['Precio CONTADO CNO'];
-        const precioCNO = d['Precio CONTADO CNO'];
+        const precio    = _sumarDefaultTildados(d, d['Precio LISTA'] || d['Precio CONTADO CNO']);
+        const precioCNO = _sumarDefaultTildados(d, d['Precio CONTADO CNO'], 'Precio CONTADO CNO');
         const foto      = fotoUrl(d['Foto'] || '');
         const precioStr = tieneValor(precio) ? fmtUSD(precio) : 'Consultar';
         const subcat    = d['Sub Categoria'] || '';
