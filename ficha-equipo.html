@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.16.6 (Leasing pasa a usar el precio CONTADO combinado como base (precioContadoCombinado), no el de Lista — corrigiendo lo hecho en v2026.08.16.5, que sin querer le había dado a Leasing la misma base de Lista que TLC6/TLC12. Ver calculo-financiacion.js v2026.08.16.2. Pedido por Cristian: "baseneto en leasing tanto sea en $ o USD es el precio contado+iva10,5%, chequear". Confirmado con 4 tests en calculo-financiacion.js (Leasing usa Contado+IVA, no Lista+IVA; Pesos aplica el TC sobre esa misma base; TLC6/TLC12 sin cambios; y compatibilidad hacia atrás si no se pasa el nuevo parámetro), más toda la batería de ficha-equipo.html (oferta FacoExtrema, IVA, Hijos) sigue en verde.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.5 (BUG REAL — "cuando hay oferta facoextrema, todas las financiaciones de abajo se calculan con el precio de lista, no con el precio de facoextrema... TLC 6$/12$/6usd/12usd". Causa: calcularTodosLosModos() siempre recibía precioListaCombinado (el normal), nunca precioListaCombinadoOferta. Ahora, si hay oferta activa (hayOfertaFaco), TODA la financiación usa esa base en su lugar — una sola variable (basePlanFinanciacion) alimenta el motor. Además, 2 pedidos sobre las leyendas de IVA: (1) las tarjetas normales (Contado ya lo tenía aparte, TLC6/TLC12) ahora dicen "+ IVA 10,5%" en su descripción — antes no lo aclaraban, aunque el precio de lista de arriba sí. (2) Leasing tiene un cartelito propio "+ IVA 21% sobre los cánones" — distinto del 10,5% del equipo (que YA está adentro de la base de cálculo del cánon, ver calculo-financiacion.js v2026.08.16.1, no es un cargo aparte para leasing). Pedido con la voz medio cortada, pero se entiende: "el tema del leasing, el precio base es el precio descontado más IVA, diez coma cinco... las cuotas de leasing llevan el veintiuno... poner abajo de todo un cartelito que diga más IVA, veintiuno por ciento". Confirmado con 2 tests: la financiación con oferta activa usa 5.250 de adelanto (35% de 15.000, el precio de oferta) en vez de 7.000 (35% de 20.000, el de lista); y las leyendas de IVA aparecen correctas en cada tipo de tarjeta, sin duplicar el 10,5% en Leasing.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.4 ("+ IVA 10,5%" también al lado del precio de oferta FacoExtrema, no solo del viejo tachado — antes solo aparecía junto al precio anterior, dejando el precio nuevo (el que realmente importa) sin esa aclaración. Nuevo span fi-precio-oferta-faco-iva, mismo criterio de IVA_Incluido que ya usa el precio de lista normal (si el equipo tiene IVA incluido, dice "Precio final (IVA incluido)" en vez de "+ IVA 10,5%"). Pedido por Cristian con captura: "agrega el +IVA 10.5% al lado del 19990". Confirmado con test actualizado, más toda la batería previa (oferta en Hijos, IVA incluido, dependencias) sigue en verde.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.3 (Oferta FacoExtrema extendida a los Hijos — la columna "Precio_Oferta_FacoExtrema" ahora también se chequea en la fila de cada módulo/accesorio, no solo en el Padre. Si un módulo tildado la tiene cargada (y es menor a su precio de lista), aporta SU oferta al precio nuevo en vez de su precio normal — y esto solo BASTA para activar el tachado/badge, aunque el Padre no tenga ninguna oferta propia. Si el Padre Y algún módulo tienen oferta, las dos se combinan. Un módulo con oferta cargada pero SIN tildar no participa de nada (como es lógico). Pedido por Cristian: "chequeá los hijos también, los precios oferta facoextrema, si no está en blanco sumar esos precios y que aparezca en rojo el nuevo precio de lista". Confirmado con 3 tests nuevos: oferta solo en un Hijo (Padre sin oferta) activa todo igual, combinando su precio normal + la oferta del Hijo; oferta en Padre Y Hijo se suman las dos; y un módulo con oferta sin tildar no afecta nada — más toda la batería previa (oferta simple, IVA incluido, dependencias, etc.) sigue en verde.) -->
@@ -342,7 +343,7 @@
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="calculo-financiacion.js"></script>
 <script>
-var FICHA_EQUIPO_VERSION = '2026.08.16.5';
+var FICHA_EQUIPO_VERSION = '2026.08.16.6';
 console.log("%c TLC Ficha Equipo v" + FICHA_EQUIPO_VERSION + " ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 console.log('%c ¿Precio de Lista no se actualiza al tildar módulos? %c → confirmá que esta versión sea la última (ver changelog arriba del archivo) y que calculo-financiacion.js esté subido en la MISMA carpeta.', 'color:#f8961e;font-weight:bold;', 'color:inherit;font-weight:normal;');
 
@@ -1204,7 +1205,13 @@ function _renderFinanciacion() {
         // TLC 6$/12$/6usd/12usd. Si existe oferta facoextrema, se
         // tiene que calcular por ahí".
         var basePlanFinanciacion = hayOfertaFaco ? precioListaCombinadoOferta : precioListaCombinado;
-        var modos = window.CalculoFinanciacion.calcularTodosLosModos(d, basePlanFinanciacion, tcOficial);
+        // Leasing usa una base DISTINTA — el precio CONTADO combinado
+        // (no el de Lista), + IVA 10,5% se suma adentro del motor.
+        // Corregido por Cristian: "baseneto en leasing tanto sea en $
+        // o USD es el precio contado+iva10,5%, chequear" — antes
+        // recibía la misma base que TLC6/TLC12 (de Lista), dando un
+        // Maxicanon/cánones más altos de lo que correspondía.
+        var modos = window.CalculoFinanciacion.calcularTodosLosModos(d, basePlanFinanciacion, tcOficial, precioContadoCombinado);
         var ETIQUETAS_MODOS = {
             tlc6_pesos:      { titulo: 'TLC $ — 6 cuotas',        moneda: '$' },
             tlc6_usd:        { titulo: 'TLC USD — 6 cuotas',      moneda: 'USD' },

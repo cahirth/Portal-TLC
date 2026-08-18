@@ -1,4 +1,18 @@
 // ============================================================
+// Portal TLC | calculo-financiacion.js | v2026.08.16.2
+// CORREGIDO — Leasing (36 pesos y USD) había quedado calculando
+// Maxicanon/cánones sobre el precio de LISTA + IVA 10,5% (v2026.08.16.1),
+// pero la base correcta es el precio CONTADO + IVA 10,5% — Contado ya
+// viene descontado respecto a Lista, así que usar Lista daba un
+// Maxicanon/cánones más altos de lo que correspondía. Nuevo 4to
+// parámetro opcional en calcularTodosLosModos(filaPadre, baseNetoUSD,
+// tcOficial, baseLeasingNetoUSD) — si no se pasa, cae en baseNetoUSD
+// como antes (compatibilidad). ficha-equipo.html ahora pasa
+// precioContadoCombinado ahí. TLC6/TLC12 no se tocaron, siguen sobre
+// el precio de Lista (baseNetoUSD), como corresponde. Pedido por
+// Cristian: "baseneto en leasing tanto sea en $ o USD es el precio
+// contado+iva10,5%, chequear".
+// ============================================================
 // Portal TLC | calculo-financiacion.js | v2026.08.16.1
 // Leasing (36 pesos y USD) ahora calcula el Maxicanon y los cánones
 // sobre el precio CON IVA (10,5%), no el neto — a diferencia de
@@ -116,7 +130,7 @@
   var ANTICIPO_TLC6_PCT = 35;   // TLC 6 cuotas — pesos Y dólares, mismo %
   var ANTICIPO_TLC12_PCT = 50;  // TLC 12 cuotas — pesos Y dólares, mismo %
 
-  var LEASING36_MAXICANON_PCT = 10;   // % del valor del bien, se paga como adelanto
+  var LEASING36_MAXICANON_PCT = 15;   // % del valor del bien, se paga como adelanto
   var LEASING36_CANONES_A_PAGAR = 35; // + 1 canon en garantía + 1 opción de compra (VR) — no suman al cronograma de 35, van aparte
   var LEASING36_PLAZO_MESES = 36;
 
@@ -266,8 +280,16 @@
   // sumados los Hijos tildados en baseNetoUSD) y el TC oficial del
   // momento, devuelve TODOS los modos habilitados ya calculados, listos
   // para pintar. baseNetoUSD = precio Padre + Σ precios de Hijos
-  // tildados, siempre en USD (moneda interna del catálogo). ──
-  function calcularTodosLosModos(filaPadre, baseNetoUSD, tcOficial) {
+  // tildados, siempre en USD (moneda interna del catálogo) — usado
+  // para TLC6/TLC12 (sobre el precio de LISTA). baseLeasingNetoUSD es
+  // OPCIONAL — el precio CONTADO combinado, específico para Leasing.
+  // Si no se pasa, se usa baseNetoUSD como antes (compatibilidad).
+  // CORREGIDO — Leasing se había calculado sobre el precio de LISTA +
+  // IVA, pero la base correcta es el precio CONTADO + IVA 10,5%
+  // (Contado ya viene descontado respecto a Lista). Pedido por
+  // Cristian: "baseneto en leasing tanto sea en $ o USD es el precio
+  // contado+iva10,5%, chequear". ──
+  function calcularTodosLosModos(filaPadre, baseNetoUSD, tcOficial, baseLeasingNetoUSD) {
     var cfg = leerConfigFinanciacion(filaPadre);
     var resultado = {};
     var totalConIvaUSD = baseNetoUSD * 1.105; // mismo IVA 10,5% que usa el resto del Portal para estas tarjetas informativas
@@ -287,26 +309,26 @@
       // esta columna en particular.
       resultado.tlc12_usd = calcularTLC12(baseNetoUSD, 0);
     }
-    // Leasing — a diferencia de Contado/TLC6/TLC12 (que muestran el
-    // precio NETO y aclaran "+ IVA 10,5%" aparte, porque el cliente
-    // paga esa diferencia por fuera), en Leasing el monto que se
-    // financia de verdad es la FACTURA COMPLETA — precio + IVA — así
-    // que la base para calcular Maxicanon y cánones es totalConIvaUSD
-    // (ya calculado arriba, mismo 10,5%), no baseNetoUSD. Pedido por
-    // Cristian: "el tema del leasing, el precio base es el precio
-    // descontado más IVA, diez coma cinco".
-    if (cfg.leasing36_pesos.habilitado && tcOficial && superaUmbralLeasing(totalConIvaUSD)) {
-      resultado.leasing36_pesos = calcularLeasing36(totalConIvaUSD * tcOficial, cfg.leasing36_pesos.tna);
+    // Leasing — base = precio CONTADO (no Lista) + IVA 10,5%. A
+    // diferencia de Contado/TLC6/TLC12 (que muestran el precio NETO y
+    // aclaran "+ IVA 10,5%" aparte, porque el cliente paga esa
+    // diferencia por fuera), en Leasing el monto que se financia de
+    // verdad es la FACTURA COMPLETA sobre el precio Contado — precio
+    // Contado + IVA — no el precio de Lista + IVA.
+    var baseLeasing = (typeof baseLeasingNetoUSD === 'number' && !isNaN(baseLeasingNetoUSD) && baseLeasingNetoUSD > 0) ? baseLeasingNetoUSD : baseNetoUSD;
+    var totalConIvaLeasingUSD = baseLeasing * 1.105;
+    if (cfg.leasing36_pesos.habilitado && tcOficial && superaUmbralLeasing(totalConIvaLeasingUSD)) {
+      resultado.leasing36_pesos = calcularLeasing36(totalConIvaLeasingUSD * tcOficial, cfg.leasing36_pesos.tna);
     }
-    if (cfg.leasing36_usd.habilitado && superaUmbralLeasing(totalConIvaUSD)) {
-      resultado.leasing36_usd = calcularLeasing36(totalConIvaUSD, cfg.leasing36_usd.tna);
+    if (cfg.leasing36_usd.habilitado && superaUmbralLeasing(totalConIvaLeasingUSD)) {
+      resultado.leasing36_usd = calcularLeasing36(totalConIvaLeasingUSD, cfg.leasing36_usd.tna);
     }
 
     return resultado;
   }
 
   var CalculoFinanciacion = {
-    VERSION: '2026.08.16.1',
+    VERSION: '2026.08.16.2',
     leerConfigFinanciacion: leerConfigFinanciacion,
     calcularTLC6: calcularTLC6,
     calcularTLC12: calcularTLC12,
