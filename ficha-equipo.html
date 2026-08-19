@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.16.8 (2 ajustes a la tarjeta de Leasing: (1) se sacó la TNA de la vista — pedido por Cristian: "elimina la tna, no quiero que se vea". (2) Nueva fila "Adelanto (aprox.)" — InverLease en rigor no tiene adelanto real (ver v2026.08.16.3/.7), pero se agrega una SIMULACIÓN aproximada: 2 cánones en garantía + comisión de estructuración (3%), con un desglose chico abajo explicando de dónde sale el número y aclarando que es aproximado. Pedido por Cristian: "necesito que pongas el adelanto porque asi no va, adelanto = 2 canones+3%, expresalo asi, es una simulacion aprox". Ver calculo-financiacion.js v2026.08.16.4 (nuevos campos adelantoAprox y comisionMonto). Aparte, se confirmó que una captura previa de Cristian mostrando "undefined" en varios campos correspondía a una versión ANTERIOR de calculo-financiacion.js (con el Maxicanon 15% viejo, antes de v2026.08.16.3) — no un bug nuevo, el motor actual ya reproduce exacto la cotización real de InverLease. Confirmado con test actualizado.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.7 (Leasing pasa al esquema REAL de InverLease — validado número a número contra una cotización real (COAS SRL, 27/03/2026). "Maxicanon" desaparece de la tarjeta (siempre era 0 en la realidad); en su lugar se muestran "N cánones en garantía" (monto, se depositan al firmar y cancelan los últimos 2 cánones — no restan del capital) y una fila nueva "Opción de compra" (mismo valor que un cánon). Se agregó también "+ Comisión de estructuración 3% + IVA" como cartelito aparte (cargo que NO se resta del capital, lo paga el cliente por fuera). Ver calculo-financiacion.js v2026.08.16.3 para el detalle del cálculo. IMPORTANTE: la tasa real de InverLease es ~6,41% TNA, no el 3,5% que estaba cargado — Cristian tiene que actualizar el texto del encabezado de la columna en el Excel ("Habilitar_Leasing36_USD (TNA: 3,5%)" → 6,41%), la tasa se lee de ahí, no está en este archivo. Pedido por Cristian comparando la cotización real de InverLease contra nuestra tarjeta: "el adelanto nuestro incluye el 3% de gastos, pero no me dan las cuentas exactas" → confirmado: "cambiar al esquema real (0% adelanto + cánones en garantía)" / comisión "como línea aparte en la tarjeta". Confirmado con test que reproduce la cotización real: cánon exacto USD 6.605, garantía exacta USD 13.210.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.6 (Leasing pasa a usar el precio CONTADO combinado como base (precioContadoCombinado), no el de Lista — corrigiendo lo hecho en v2026.08.16.5, que sin querer le había dado a Leasing la misma base de Lista que TLC6/TLC12. Ver calculo-financiacion.js v2026.08.16.2. Pedido por Cristian: "baseneto en leasing tanto sea en $ o USD es el precio contado+iva10,5%, chequear". Confirmado con 4 tests en calculo-financiacion.js (Leasing usa Contado+IVA, no Lista+IVA; Pesos aplica el TC sobre esa misma base; TLC6/TLC12 sin cambios; y compatibilidad hacia atrás si no se pasa el nuevo parámetro), más toda la batería de ficha-equipo.html (oferta FacoExtrema, IVA, Hijos) sigue en verde.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.5 (BUG REAL — "cuando hay oferta facoextrema, todas las financiaciones de abajo se calculan con el precio de lista, no con el precio de facoextrema... TLC 6$/12$/6usd/12usd". Causa: calcularTodosLosModos() siempre recibía precioListaCombinado (el normal), nunca precioListaCombinadoOferta. Ahora, si hay oferta activa (hayOfertaFaco), TODA la financiación usa esa base en su lugar — una sola variable (basePlanFinanciacion) alimenta el motor. Además, 2 pedidos sobre las leyendas de IVA: (1) las tarjetas normales (Contado ya lo tenía aparte, TLC6/TLC12) ahora dicen "+ IVA 10,5%" en su descripción — antes no lo aclaraban, aunque el precio de lista de arriba sí. (2) Leasing tiene un cartelito propio "+ IVA 21% sobre los cánones" — distinto del 10,5% del equipo (que YA está adentro de la base de cálculo del cánon, ver calculo-financiacion.js v2026.08.16.1, no es un cargo aparte para leasing). Pedido con la voz medio cortada, pero se entiende: "el tema del leasing, el precio base es el precio descontado más IVA, diez coma cinco... las cuotas de leasing llevan el veintiuno... poner abajo de todo un cartelito que diga más IVA, veintiuno por ciento". Confirmado con 2 tests: la financiación con oferta activa usa 5.250 de adelanto (35% de 15.000, el precio de oferta) en vez de 7.000 (35% de 20.000, el de lista); y las leyendas de IVA aparecen correctas en cada tipo de tarjeta, sin duplicar el 10,5% en Leasing.) -->
@@ -344,7 +345,7 @@
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="calculo-financiacion.js"></script>
 <script>
-var FICHA_EQUIPO_VERSION = '2026.08.16.7';
+var FICHA_EQUIPO_VERSION = '2026.08.16.8';
 console.log("%c TLC Ficha Equipo v" + FICHA_EQUIPO_VERSION + " ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 console.log('%c ¿Precio de Lista no se actualiza al tildar módulos? %c → confirmá que esta versión sea la última (ver changelog arriba del archivo) y que calculo-financiacion.js esté subido en la MISMA carpeta.', 'color:#f8961e;font-weight:bold;', 'color:inherit;font-weight:normal;');
 
@@ -1228,16 +1229,21 @@ function _renderFinanciacion() {
             var oculta = _variantesOcultas.indexOf(key) !== -1;
             if (_modoReceptor && oculta) return;
             var esLeasing = key.indexOf('leasing36') === 0;
-            // Esquema real de Leasing (validado contra cotización real
-            // de InverLease, COAS SRL) — ya NO hay Maxicanon/adelanto
-            // (siempre 0), en su lugar se muestran los cánones en
-            // garantía (se depositan al firmar, cancelan los ÚLTIMOS
-            // 2 cánones — no restan del capital). Pedido por Cristian:
-            // "cambiar al esquema real (0% adelanto + cánones en
-            // garantía)".
+            // Adelanto — SIMULACIÓN aproximada (InverLease en rigor no
+            // tiene adelanto real, ver v2026.08.16.3), calculada como
+            // 2 cánones en garantía + comisión de estructuración (3%).
+            // Pedido por Cristian: "necesito que pongas el adelanto
+            // porque asi no va, adelanto = 2 canones+3%, expresalo
+            // asi, es una simulacion aprox".
             var filaAdelanto = esLeasing
-                ? '<div class="fin-row"><span>' + r.canonesGarantia + ' cánones en garantía</span><span class="val">' + _fmtMoneda(r.montoGarantia, et.moneda) + '</span></div>'
+                ? '<div class="fin-row"><span>Adelanto (aprox.)</span><span class="val">' + _fmtMoneda(r.adelantoAprox, et.moneda) + '</span></div>'
                 : '<div class="fin-row"><span>Adelanto</span><span class="val">' + _fmtMoneda(r.anticipo, et.moneda) + '</span></div>';
+            // Desglose del Adelanto — se muestra abajo, chico, para que
+            // quede claro de dónde sale el número (no es un dato real
+            // de InverLease sino nuestra aproximación).
+            var filaAdelantoDesglose = esLeasing
+                ? '<div class="fin-desc" style="margin-top:-4px;">' + r.canonesGarantia + ' cánones en garantía (' + _fmtMoneda(r.montoGarantia, et.moneda) + ') + comisión ' + r.comisionEstructuracionPct + '% (' + _fmtMoneda(r.comisionMonto, et.moneda) + ') — simulación aprox.</div>'
+                : '';
             var filaCuota = esLeasing
                 ? '<div class="fin-row"><span>' + r.canones + ' cánones</span><span class="val">' + _fmtMoneda(r.canon, et.moneda) + '</span></div>'
                 : '<div class="fin-row"><span>' + r.cuotas + ' cuotas</span><span class="val">' + _fmtMoneda(r.cuota, et.moneda) + '</span></div>';
@@ -1251,9 +1257,11 @@ function _renderFinanciacion() {
             // que hace falta aclararlo acá, igual que ya se aclara en
             // el precio de lista de arriba. Pedido por Cristian:
             // "tiene que tener una leyenda que diga más IVA, diez con
-            // más cinco".
+            // más cinco". La TNA de Leasing se sacó de la vista —
+            // pedido por Cristian: "elimina la tna, no quiero que se
+            // vea".
             var desc = esLeasing
-                ? 'TNA ' + r.tna + '% · Al finalizar el plazo'
+                ? 'Al finalizar el plazo'
                 : (r.tna > 0 ? 'TNA ' + r.tna + '% sobre el saldo · + IVA 10,5%' : 'Sin recargo financiero · + IVA 10,5%');
             // Cartelito aparte para Leasing — el cánon de arriba YA
             // está calculado sobre el precio CON IVA 10,5% (ver
@@ -1276,7 +1284,7 @@ function _renderFinanciacion() {
             tarjetas += '<div class="fin-card' + (oculta ? ' fin-card-oculta' : '') + '" data-key="' + key + '">' +
                 _checkboxVariante(key, !oculta) +
                 '<div class="fin-titulo">' + et.titulo + '</div>' +
-                filaAdelanto + filaCuota + filaOpcionCompra +
+                filaAdelanto + filaAdelantoDesglose + filaCuota + filaOpcionCompra +
                 '<div class="fin-desc">' + desc + '</div>' +
                 cartelitoLeasingIva21 +
                 cartelitoComisionLeasing +

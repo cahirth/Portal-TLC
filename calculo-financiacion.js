@@ -1,4 +1,14 @@
 // ============================================================
+// Portal TLC | calculo-financiacion.js | v2026.08.16.4
+// Nuevo campo adelantoAprox en calcularLeasing36 — una SIMULACIÓN
+// aproximada de "Adelanto" (2 cánones en garantía + comisión de
+// estructuración), aclarada como tal en la tarjeta. InverLease en
+// rigor no tiene adelanto (ver v2026.08.16.3), pero Cristian pidió
+// mostrar esta aproximación de todos modos: "necesito que pongas el
+// adelanto porque asi no va, adelanto = 2 canones+3%, expresalo asi,
+// es una simulacion aprox". También nuevo comisionMonto (el número en
+// USD/$ de la comisión, no solo el %).
+// ============================================================
 // Portal TLC | calculo-financiacion.js | v2026.08.16.3
 // CORREGIDO — validado número a número contra una cotización REAL de
 // InverLease (COAS SRL, 27/03/2026): Leasing pasa del esquema
@@ -285,14 +295,25 @@
     var maxicanon = base * LEASING36_MAXICANON_PCT / 100; // siempre 0 con el esquema real — se deja el cálculo por si algún día vuelve a usarse
     var capitalFinanciar = base - maxicanon;
     var canon = capitalFinanciar * i / (1 - Math.pow(1 + i, -n));
+    var montoGarantia = canon * LEASING36_CANONES_GARANTIA;
+    var comisionMonto = base * LEASING36_COMISION_ESTRUCTURACION_PCT / 100;
     return {
       maxicanon: maxicanon,
       canon: canon,
       canones: n,
       canonesGarantia: LEASING36_CANONES_GARANTIA,           // cantidad (2)
-      montoGarantia: canon * LEASING36_CANONES_GARANTIA,     // monto total (2 × cánon) — se deposita al firmar, cancela los ÚLTIMOS 2 cánones, NO resta del capital
+      montoGarantia: montoGarantia,                          // monto total (2 × cánon) — se deposita al firmar, cancela los ÚLTIMOS 2 cánones, NO resta del capital
       opcionCompra: canon,                                    // valor residual / opción de compra al finalizar, mismo valor que un cánon
       comisionEstructuracionPct: LEASING36_COMISION_ESTRUCTURACION_PCT, // 3% + IVA — cargo APARTE, no se resta del capital a financiar
+      comisionMonto: comisionMonto,                           // monto de la comisión (sin su IVA — ese se aclara aparte)
+      // "Adelanto" simulado — NO es un concepto real de InverLease
+      // (que no tiene adelanto, ver v2026.08.16.3), es una
+      // aproximación de cuánto necesita tener el cliente a mano al
+      // firmar: los 2 cánones en garantía + la comisión de
+      // estructuración. Pedido por Cristian: "necesito que pongas el
+      // adelanto porque asi no va, adelanto = 2 canones+3%, expresalo
+      // asi, es una simulacion aprox".
+      adelantoAprox: montoGarantia + comisionMonto,
       garantia: canon, // deprecado, se deja por compatibilidad — usar montoGarantia
       vr: canon,       // deprecado, se deja por compatibilidad — usar opcionCompra
       tna: tnaPct,
@@ -359,7 +380,7 @@
   }
 
   var CalculoFinanciacion = {
-    VERSION: '2026.08.16.3',
+    VERSION: '2026.08.16.4',
     leerConfigFinanciacion: leerConfigFinanciacion,
     calcularTLC6: calcularTLC6,
     calcularTLC12: calcularTLC12,
