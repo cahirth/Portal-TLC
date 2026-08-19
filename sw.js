@@ -80,7 +80,21 @@ self.addEventListener('notificationclick', function(event) {
 //      CACHE_NAME bumpeado — fuerza limpieza de la caché vieja al
 //      activarse esta versión. Reportado por Cristian: "seguimos con
 //      lentitud extrema, no puede ser".
-const CACHE_NAME = 'portal-tlc-v18';
+// v19: BUG DE FONDO otra vez — mismo patrón que v17/v18, esta vez con
+//      calculo-financiacion.js. No estaba en HTML_LOCAL, así que caía
+//      en la rama "Assets externos → Cache-first" de abajo: una vez
+//      cacheado, quedaba servido PARA SIEMPRE sin importar cuántas
+//      versiones nuevas se subieran al servidor — el archivo real en
+//      GitHub ya estaba actualizado (confirmado abriéndolo directo en
+//      el navegador), pero el Portal seguía ejecutando una copia de
+//      hacía días. Cristian tuvo que borrar manualmente los datos del
+//      sitio para destrabarse. CACHE_NAME bumpeado — fuerza la
+//      limpieza de la caché vieja en TODOS los dispositivos que ya
+//      hayan visitado el Portal antes, sin que cada vendedor tenga que
+//      borrar nada a mano. Reportado por Cristian: "esta version esta
+//      sirviendo, decime como hago para que se actualice" (después de
+//      confirmar que el archivo en el servidor sí estaba al día).
+const CACHE_NAME = 'portal-tlc-v19';
 
 const HTML_LOCAL = [
     './',
@@ -94,6 +108,7 @@ const HTML_LOCAL = [
     './presupuesto-editor.html',
     './remito-ingreso.html',
     './ficha-equipo.html',
+    './calculo-financiacion.js',
     './manifest.json',
     './version.js',
     './permisos.js',
