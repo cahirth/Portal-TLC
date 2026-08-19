@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.19.2 (2 correcciones sobre "Ver Stock" (v2026.08.19.1): (1) ahora muestra TODOS los Hijos disponibles, tildados o no — antes solo mostraba los tildados, dejando afuera módulos que también podían tener stock relevante. (2) Cada línea con stock ≥1 se pinta en verde y con letra un toque más grande (15px/800), INDIVIDUALMENTE — antes el color/tamaño era uniforme para todo el recuadro según si TODO tenía stock o no; ahora cada ítem se distingue solo, sin depender del estado de los demás. El recuadro general pasó a un fondo neutro (gris clarito) ya que el color relevante ahora vive en cada línea, no en el conjunto. Pedido por Cristian: "1) mostrame todo, padre e hijos 2) cuando stock >= 1 pinta esa linea en verde y un toque mas grande la letra". Confirmado con test actualizado: el módulo NO tildado (Biometría) ahora aparece, y cada línea (Padre y Hijos) tiene su propio color/tamaño según su propio stock, sin importar si están tildados.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.1 ("Ver Stock" ahora también muestra el stock de cada módulo/Hijo TILDADO, no solo el del Padre — una línea por cada uno (✅/❌ + cantidad), con el color general del recuadro reflejando si falta stock en algo, no solo en el Padre. Antes solo leía d['Stock'] del Padre, ignorando los módulos por completo. Pedido por Cristian: "quiero leer stock en los hijos tbien, ahora lee solo los padres, para el sky y apollo mas que nada, pero aplica a toda la lista" — el fix es genérico (cualquier equipo con módulos tildados), no algo puntual para esos 2 equipos. selector-dispositivos.html tiene una función equivalente pero es código muerto a propósito desde v2026.08.15.1 (solo vive para el puente viejo de HubSpot) — no se tocó. Confirmado con 2 tests: un equipo modular con 2 módulos tildados (uno con stock, otro sin) más uno NO tildado (que no debe aparecer); y un equipo simple sin módulos tildados sigue comportándose exactamente igual que antes.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.10 (Nueva leyenda debajo de las tarjetas de Leasing: "Esta es una simulación aproximada, sujeta a evaluación y aprobación crediticia de la financiera. Los valores finales pueden variar." — texto confirmado EXACTO con Cristian, con captura de la tarjeta real, antes de bumpear. Pedido: "agregá una leyensa abajo de los leasing que es una Simulacion y sera expuesto a calificacion crediticia". Confirmado con test.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.9 (Se sacó el cartelito aparte "+ Comisión de estructuración X% + IVA" de la tarjeta de Leasing — quedaba redundante con el desglose del Adelanto de arriba, que ya menciona la comisión del 3% con su monto. Pedido por Cristian, tras confirmar que el cánon ya coincide EXACTO con InverLease (USD 6.605): "esta excelente, pero saca el texto de abajo de la comision de estructuracion 3%". La comisión sigue calculándose igual (comisionMonto en calculo-financiacion.js no se tocó) — solo se sacó el cartelito duplicado de la vista.) -->
@@ -348,7 +349,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.19.1';
+var FICHA_EQUIPO_VERSION = '2026.08.19.2';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -596,11 +597,21 @@ function _esc(s) { var d=document.createElement('div'); d.textContent=String(s==
 // EXTENDIDO — antes solo mostraba el stock del Padre; para equipos
 // modulares como MICRO CLEAR SKY o Apollo el stock real está repartido
 // entre los módulos/Hijos, no concentrado en la fila del Padre. Ahora
-// muestra una línea por cada módulo TILDADO además del Padre — mismo
-// criterio en toda la lista, no algo puntual para esos dos equipos.
-// Pedido por Cristian: "quiero leer stock en los hijos tbien, ahora
-// lee solo los padres, para el sky y apollo mas que nada, pero aplica
-// a toda la lista".
+// muestra una línea por CADA Hijo disponible (tildado o no) además
+// del Padre — mismo criterio en toda la lista, no algo puntual para
+// esos dos equipos. Pedido por Cristian: "quiero leer stock en los
+// hijos tbien, ahora lee solo los padres, para el sky y apollo mas
+// que nada, pero aplica a toda la lista".
+//
+// CORRECCIÓN (2 pedidos juntos): (1) antes solo mostraba los Hijos
+// TILDADOS — ahora muestra TODOS los Hijos disponibles, tildados o
+// no, para tener el panorama completo de stock del equipo entero.
+// (2) cada línea con stock ≥1 se pinta en verde y con letra un toque
+// más grande, INDIVIDUALMENTE (no todo el recuadro de una, como
+// antes) — así se distingue de un vistazo cuáles ítems puntuales
+// tienen stock. Pedido por Cristian: "1) mostrame todo, padre e
+// hijos 2) cuando stock >= 1 pinta esa linea en verde y un toque mas
+// grande la letra".
 window._toggleStockFicha = function() {
     var wrap = document.getElementById('fi-stock-detalle');
     if (wrap.style.display !== 'none') { wrap.style.display = 'none'; return; }
@@ -609,23 +620,22 @@ window._toggleStockFicha = function() {
 
     var lineaStock = function(nombre, fila) {
         var stockNum = parseFloat(fila['Stock']);
-        var hayStock = !isNaN(stockNum) && stockNum > 0;
+        var hayStock = !isNaN(stockNum) && stockNum >= 1;
         var icono = hayStock ? '✅' : '❌';
         var texto = hayStock ? (stockNum + (stockNum === 1 ? ' unidad' : ' unidades')) : 'Sin stock';
-        return { nombre: nombre, hayStock: hayStock, html: '<div>' + icono + ' <b>' + _esc(nombre) + '</b> — ' + texto + '</div>' };
+        var estiloLinea = hayStock
+            ? 'color:#16a34a; font-size:15px; font-weight:800;'
+            : 'color:#64748b; font-size:12.5px; font-weight:700;';
+        return { hayStock: hayStock, html: '<div style="' + estiloLinea + ' padding:2px 0;">' + icono + ' ' + _esc(nombre) + ' — ' + texto + '</div>' };
     };
 
     var lineas = [lineaStock(d['Nombre de Dispositivo'] || 'Equipo', d)];
     _fichaHijosDisponibles.forEach(function(h) {
-        var nombreHijo = h['Nombre de Dispositivo'] || '';
-        if (!_fichaModulosTildados.has(nombreHijo)) return;
-        lineas.push(lineaStock(nombreHijo, h));
+        lineas.push(lineaStock(h['Nombre de Dispositivo'] || '', h));
     });
 
-    var todosConStock = lineas.every(function(l) { return l.hayStock; });
-    wrap.style.background = todosConStock ? '#f0fdf4' : '#fef2f2';
-    wrap.style.border = '1px solid ' + (todosConStock ? '#16a34a' : '#dc2626');
-    wrap.style.color = todosConStock ? '#16a34a' : '#dc2626';
+    wrap.style.background = '#f8fafc';
+    wrap.style.border = '1px solid #e2e8f0';
     wrap.innerHTML = lineas.map(function(l) { return l.html; }).join('');
     wrap.style.display = 'block';
 };
