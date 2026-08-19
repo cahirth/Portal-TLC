@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.19.1 (Nuevo FAB "Escanear QR" (bottom-center) — permite escanear la credencial de un visitante de FacoExtrema y guardar la Empresa+Contacto DIRECTO desde la lista, sin pasar por "Nuevo Contacto" de una empresa puntual (eso ya lo cubría el botón que existía adentro de ese formulario, "Flujo A" — este es nuevo, alta rápida sin abrir ninguna empresa antes). Reusa el scanner compartido que ya existía en este archivo (_abrirScannerQR) y el mismo backend que ya usa ficha-equipo.html (guardarEmpresaContactoQR) — crea/actualiza Empresa+Contacto en Firebase directo. Al terminar, refresca la lista sola (_cargarEmpresas(), ya existente) para que la nueva empresa aparezca al toque. Pedido por Cristian: "agrega al modulo empresas el QR de facoextrema abajo centrado en la pantalla, para guardar una empresa en ese modulo directamente". Sin ícono de Font Awesome (este archivo no lo carga) — usa emoji 📷, consistente con el resto de los íconos del archivo. Confirmado con test: el FAB existe, un escaneo simulado manda los datos correctos al backend sin pasar por ningún formulario, avisa la confirmación, y refresca la lista sola.) -->
 <!-- Portal TLC | empresas.html | v2026.08.16.3 (BUG REAL — "aparecen 1 seg y se borran en la lista de empresas". Causa: el refresco de fondo de la LISTA de empresas (_cargarEmpresasCacheFirst, independiente del cruce de negocios) corre en paralelo y, cuando termina, REEMPLAZA el array EMPRESAS entero con la respuesta fresca del backend — que SIEMPRE trae "negocios: []" de fábrica (el backend no calcula esto, se hace acá en el cliente). Si ese refresco terminaba DESPUÉS de que ya se habían mostrado los conteos reales (desde el caché de v2026.08.16.2, o desde el cruce en vivo), los pisaba con ceros de nuevo. Fix: nuevo _negociosPorEmpresaId — mapa persistente que vive AFUERA del array EMPRESAS y sobrevive a cualquier reemplazo, reaplicado con _reaplicarNegociosPersistentes() en los 3 lugares donde EMPRESAS se reasigna desde cero (_cargarEmpresas, y las 2 reasignaciones dentro de _cargarEmpresasCacheFirst). _cargarNegociosCruzados y _aplicarNegociosDesdeCache ahora escriben en este mapa persistente además de en e.negocios directo. Confirmado con test reproduciendo el escenario exacto en 3 pasos: conteo visible desde el caché, sigue visible después de que la lista se refresca de fondo con negocios:[] de fábrica, y sigue visible después de que también termina el cruce en vivo.) -->
 <!-- Portal TLC | empresas.html | v2026.08.16.2 (Sobre v2026.08.16.1 ("carga al toque"): Cristian reportó con captura que seguía viendo "0 negocios" en la lista, aunque el detalle de una ficha sí lo mostraba bien — patrón típico de un archivo desactualizado en producción, así que se agregó un log de versión PROPIO de este archivo en consola (independiente de PORTAL_TLC_VERSION, compartido por todo el Portal) para poder confirmarlo de una vez, mismo criterio que ya se usó en otros archivos del Portal. Además, mejora real: nuevo caché de negocios en localStorage (emp_cache_negocios_por_empresa, mismo criterio que emp_cache_lista) — antes, aunque el cruce se disparara apenas arrancaba la página, la PRIMERA vez que se veía la lista igual tocaba esperar el viaje a Firebase antes de ver los conteos reales; si el vendedor se movía de pantalla antes de que terminara, veía "0 negocios" en la lista pero el conteo correcto en la ficha (el síntoma exacto reportado: "ahora los carga en la siguiente pantalla"). Con este caché, de la SEGUNDA visita en adelante los conteos aparecen al instante junto con el resto de la lista — la única espera real queda para la primera vez que se usa el módulo. Confirmado con test: con caché de una visita anterior, el conteo real se ve en la lista ANTES de que termine ningún pedido de red.) -->
 <!-- Portal TLC | empresas.html | v2026.08.16.1 (Los contadores de "Negocios" en la lista ya no arrancan en 0 hasta abrir una ficha — desde v2026.08.10.5 (cuando la fuente era historico.json, pesada y lenta) el cruce se difería a propósito hasta que alguien abriera la primera ficha de empresa, para no cargar la lista con ese cálculo. Con v2026.08.15.1 ya se migró a Firebase (rápido) y el cruce ya corre en una sola pasada agrupada (no más O(empresas × cotizaciones)) — la razón original para diferirlo ya no aplica. Ahora _asegurarNegociosCargados() se dispara solo, apenas termina de cargar la lista, sin esperar a que se abra ninguna ficha — y como esa función ya se encargaba de repintar la lista sola al terminar (sin tocar nada ahí), los conteos reales aparecen solos, segundos después del primer pintado instantáneo. Pedido por Cristian con captura: "primera carga, trae el contador de negocios en cero... estaría bueno que los contadores carguen al toque". Confirmado con test de punta a punta: sin abrir ninguna ficha, se pide /cotizaciones.json automáticamente al arrancar, y la tarjeta de la lista termina mostrando el conteo real (2 negocios) en vez de 0.) -->
@@ -375,7 +376,7 @@ console.log("%c TLC Empresas v" + APP_VERSION + " ", "background:#3a86ff;color:w
 // todavía no llegó a producción". Guardado como constante con nombre
 // (no un string suelto dentro del console.log) — actualizar ACÁ en
 // cada entrega.
-const _VERSION_ARCHIVO_EMPRESAS = '2026.08.16.2';
+const _VERSION_ARCHIVO_EMPRESAS = '2026.08.19.1';
 console.log("%c TLC Empresas (archivo) v" + _VERSION_ARCHIVO_EMPRESAS + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 // ══════════════════════════════════════════════════════════════════
 // Empresas y Contactos conectados a Firebase (empresas/{id},
@@ -1001,9 +1002,35 @@ window._editarContacto = function(contactoId) {
   document.getElementById('form-contacto').scrollIntoView({ behavior:'smooth', block:'center' });
 };
 
-// ── Escáner QR — credenciales de Faco Extrema (Flujo A: Alta rápida
-//    de Empresa/Contacto). Autocompleta Nombre, Email, Teléfono y DNI
-//    directo desde la credencial. Pedido por Cristian. ──
+// ── FAB "Escanear QR" (bottom-center) — Alta DIRECTA de Empresa desde
+//    la lista, sin pasar por "Nuevo Contacto" de una empresa puntual
+//    (eso ya lo cubre _escanearQRContacto, "Flujo A"). Mismo backend
+//    que ficha-equipo.html (guardarEmpresaContactoQR) — crea/actualiza
+//    la Empresa+Contacto en Firebase directo, sin necesidad de tener
+//    ninguna empresa abierta antes. Pedido por Cristian: "agrega al
+//    modulo empresas el QR de facoextrema abajo centrado en la
+//    pantalla, para guardar una empresa en ese modulo directamente".
+window._abrirScannerQREmpresasDirecto = function() {
+  _abrirScannerQR(function(datos) {
+    var nombreCompleto = ((datos.nombre||'') + ' ' + (datos.apellido||'')).trim() || 'Sin nombre';
+    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+      accion:'guardarEmpresaContactoQR', id: datos.id||'', nombre: datos.nombre||'', apellido: datos.apellido||'',
+      dni: datos.dni||'', email: datos.email||'', telefono: datos.telefono||'', vip: !!datos.vip, categoria: datos.categoria||''
+    }) }).then(function(r){ return r.json(); }).then(function(r) {
+      if (!r || !r.ok) { alert('No se pudo guardar la empresa. Probá de nuevo.'); return; }
+      alert('✅ "' + nombreCompleto + '" guardado como empresa/contacto.');
+      // Refrescar la lista para que aparezca al toque, sin tener que
+      // salir y volver a entrar al módulo — _cargarEmpresas() ya
+      // repinta sola al terminar (mismo criterio que "después de
+      // crear una empresa nueva", más arriba en este archivo).
+      _cargarEmpresas();
+    }).catch(function() {
+      alert('Error de conexión al guardar. Probá de nuevo.');
+    });
+  });
+};
+
+
 window._escanearQRContacto = function() {
   _abrirScannerQR(function(datos) {
     var nombreCompleto = ((datos.nombre||'') + ' ' + (datos.apellido||'')).trim();
@@ -1605,7 +1632,31 @@ var _volverANegocioId = null;
   @keyframes iaPulso { 0%,100%{opacity:1;} 50%{opacity:.5;} }
 </style>
 
+<style>
+  /* ── FAB de Escanear QR FacoExtrema — bottom-center ──────────────
+     Mismo patrón visual que ya usa ficha-equipo.html (.fab-qr-ficha),
+     para reconocerlo de un vistazo en cualquier módulo del Portal.
+     A diferencia del "Flujo A" que ya existía (botón "📷 Escanear QR"
+     adentro del formulario de Nuevo Contacto, que requiere primero
+     entrar a una empresa puntual y abrir ese formulario), este FAB
+     está SIEMPRE visible en la lista y guarda la Empresa+Contacto
+     DIRECTO, sin pasos intermedios — mismo backend
+     (guardarEmpresaContactoQR) que ya usa ficha-equipo.html. Pedido
+     por Cristian: "agrega al modulo empresas el QR de facoextrema
+     abajo centrado en la pantalla, para guardar una empresa en ese
+     modulo directamente". */
+  .fab-qr-empresas { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); width:58px; height:58px;
+      border-radius:50%; background:#3a86ff; border:none; color:#fff; font-size:24px;
+      display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:900;
+      box-shadow:0 6px 20px rgba(58,134,255,.4); }
+  .fab-qr-empresas:active { transform:translateX(-50%) scale(.92); }
+  .fab-qr-empresas-label { position:fixed; bottom:2px; left:50%; transform:translateX(-50%); font-size:9px;
+      color:#64748b; z-index:900; background:#f1f5f9; padding:0 6px; border-radius:4px; }
+</style>
 <button id="ia-btn-flotante" onclick="_iaTogglePanel()" title="Asistente IA">💬</button>
+
+<button type="button" class="fab-qr-empresas" id="emp-btn-escanear-qr" onclick="_abrirScannerQREmpresasDirecto()" title="Escanear QR y guardar empresa">📷</button>
+<div class="fab-qr-empresas-label">Escanear QR</div>
 
 <div id="ia-panel">
   <div id="ia-panel-header">
