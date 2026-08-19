@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.19.1 ("Ver Stock" ahora también muestra el stock de cada módulo/Hijo TILDADO, no solo el del Padre — una línea por cada uno (✅/❌ + cantidad), con el color general del recuadro reflejando si falta stock en algo, no solo en el Padre. Antes solo leía d['Stock'] del Padre, ignorando los módulos por completo. Pedido por Cristian: "quiero leer stock en los hijos tbien, ahora lee solo los padres, para el sky y apollo mas que nada, pero aplica a toda la lista" — el fix es genérico (cualquier equipo con módulos tildados), no algo puntual para esos 2 equipos. selector-dispositivos.html tiene una función equivalente pero es código muerto a propósito desde v2026.08.15.1 (solo vive para el puente viejo de HubSpot) — no se tocó. Confirmado con 2 tests: un equipo modular con 2 módulos tildados (uno con stock, otro sin) más uno NO tildado (que no debe aparecer); y un equipo simple sin módulos tildados sigue comportándose exactamente igual que antes.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.10 (Nueva leyenda debajo de las tarjetas de Leasing: "Esta es una simulación aproximada, sujeta a evaluación y aprobación crediticia de la financiera. Los valores finales pueden variar." — texto confirmado EXACTO con Cristian, con captura de la tarjeta real, antes de bumpear. Pedido: "agregá una leyensa abajo de los leasing que es una Simulacion y sera expuesto a calificacion crediticia". Confirmado con test.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.9 (Se sacó el cartelito aparte "+ Comisión de estructuración X% + IVA" de la tarjeta de Leasing — quedaba redundante con el desglose del Adelanto de arriba, que ya menciona la comisión del 3% con su monto. Pedido por Cristian, tras confirmar que el cánon ya coincide EXACTO con InverLease (USD 6.605): "esta excelente, pero saca el texto de abajo de la comision de estructuracion 3%". La comisión sigue calculándose igual (comisionMonto en calculo-financiacion.js no se tocó) — solo se sacó el cartelito duplicado de la vista.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.8 (2 ajustes a la tarjeta de Leasing: (1) se sacó la TNA de la vista — pedido por Cristian: "elimina la tna, no quiero que se vea". (2) Nueva fila "Adelanto (aprox.)" — InverLease en rigor no tiene adelanto real (ver v2026.08.16.3/.7), pero se agrega una SIMULACIÓN aproximada: 2 cánones en garantía + comisión de estructuración (3%), con un desglose chico abajo explicando de dónde sale el número y aclarando que es aproximado. Pedido por Cristian: "necesito que pongas el adelanto porque asi no va, adelanto = 2 canones+3%, expresalo asi, es una simulacion aprox". Ver calculo-financiacion.js v2026.08.16.4 (nuevos campos adelantoAprox y comisionMonto). Aparte, se confirmó que una captura previa de Cristian mostrando "undefined" en varios campos correspondía a una versión ANTERIOR de calculo-financiacion.js (con el Maxicanon 15% viejo, antes de v2026.08.16.3) — no un bug nuevo, el motor actual ya reproduce exacto la cotización real de InverLease. Confirmado con test actualizado.) -->
@@ -347,7 +348,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.16.10';
+var FICHA_EQUIPO_VERSION = '2026.08.19.1';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -591,19 +592,41 @@ function _esc(s) { var d=document.createElement('div'); d.textContent=String(s==
 // "Ver Stock" — mismo criterio EXACTO que _toggleStockDetalle() de
 // selector-dispositivos.html (trasladado acá al eliminar la pantalla
 // intermedia, ver v2026.08.15.5).
+//
+// EXTENDIDO — antes solo mostraba el stock del Padre; para equipos
+// modulares como MICRO CLEAR SKY o Apollo el stock real está repartido
+// entre los módulos/Hijos, no concentrado en la fila del Padre. Ahora
+// muestra una línea por cada módulo TILDADO además del Padre — mismo
+// criterio en toda la lista, no algo puntual para esos dos equipos.
+// Pedido por Cristian: "quiero leer stock en los hijos tbien, ahora
+// lee solo los padres, para el sky y apollo mas que nada, pero aplica
+// a toda la lista".
 window._toggleStockFicha = function() {
     var wrap = document.getElementById('fi-stock-detalle');
     if (wrap.style.display !== 'none') { wrap.style.display = 'none'; return; }
     var d = _fichaPadreActual;
     if (!d) return;
-    var stockNum = parseFloat(d['Stock']);
-    var hayStock = !isNaN(stockNum) && stockNum > 0;
-    wrap.style.background = hayStock ? '#f0fdf4' : '#fef2f2';
-    wrap.style.border = '1px solid ' + (hayStock ? '#16a34a' : '#dc2626');
-    wrap.style.color = hayStock ? '#16a34a' : '#dc2626';
-    wrap.textContent = hayStock
-        ? ('✅ Disponible · ' + stockNum + (stockNum === 1 ? ' unidad' : ' unidades'))
-        : '❌ Sin stock';
+
+    var lineaStock = function(nombre, fila) {
+        var stockNum = parseFloat(fila['Stock']);
+        var hayStock = !isNaN(stockNum) && stockNum > 0;
+        var icono = hayStock ? '✅' : '❌';
+        var texto = hayStock ? (stockNum + (stockNum === 1 ? ' unidad' : ' unidades')) : 'Sin stock';
+        return { nombre: nombre, hayStock: hayStock, html: '<div>' + icono + ' <b>' + _esc(nombre) + '</b> — ' + texto + '</div>' };
+    };
+
+    var lineas = [lineaStock(d['Nombre de Dispositivo'] || 'Equipo', d)];
+    _fichaHijosDisponibles.forEach(function(h) {
+        var nombreHijo = h['Nombre de Dispositivo'] || '';
+        if (!_fichaModulosTildados.has(nombreHijo)) return;
+        lineas.push(lineaStock(nombreHijo, h));
+    });
+
+    var todosConStock = lineas.every(function(l) { return l.hayStock; });
+    wrap.style.background = todosConStock ? '#f0fdf4' : '#fef2f2';
+    wrap.style.border = '1px solid ' + (todosConStock ? '#16a34a' : '#dc2626');
+    wrap.style.color = todosConStock ? '#16a34a' : '#dc2626';
+    wrap.innerHTML = lineas.map(function(l) { return l.html; }).join('');
     wrap.style.display = 'block';
 };
 function _fmtMoneda(n, moneda) {
