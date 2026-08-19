@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.16.1 (2 arreglos sobre permisos: (1) el pie de versión mostraba un texto FIJO "v2026.07.05.7" en el HTML — ya existía código (línea ~2100) que intentaba actualizarlo buscando un elemento con id="footer-version-idx", pero el <p> real nunca tenía ese id, así que el código nunca lo encontraba y quedaba pegado desde julio, aunque el archivo real se hubiera actualizado decenas de veces desde entonces. Agregado el id que faltaba. (2) cargarPermisosUsuario() se quedaba muda cuando una columna de permisos no matcheaba exacto con el Sheet (a diferencia de permisos.js, que sí avisa) — agregado el mismo aviso por consola, más un log de diagnóstico con el valor CRUDO leído para Servicio Tecnico y Administracion puntualmente. Reportado por Cristian: "no me habilita administracion ni servicio" — con este diagnóstico se confirma que "Administracion" directamente no existe como columna en el Sheet (según la captura que mandó, solo tiene Internos/Empresas/Ventas/Servicio Tecnico/Regulatoria) — no es un bug, es un módulo sin construir/sin columna cargada todavía. Para "Servicio Tecnico" específicamente, que sí está tildado en su fila, hace falta que revise el nuevo log de consola para confirmar si el problema es de nombre de columna o de valor cargado. Confirmado con 4 tests: el pie de versión se actualiza solo, avisa de columnas faltantes, no avisa de las que sí existen, y el log de diagnóstico muestra el valor crudo real.) -->
 <!-- Portal TLC | index.html | v2026.08.15.2 (BUG REAL preventivo — mismo guard contra doble disparo del callback de escaneo que se agregó en ficha-equipo.html v2026.08.15.2 (html5-qrcode puede llamar al callback de éxito 2 veces seguidas para el mismo código, mientras stop() todavía no terminó de verdad). Acá no estaba reportado como bug todavía, pero corre el mismo riesgo — se blindó preventivamente antes de que pase.) -->
 <!-- Portal TLC | index.html | v2026.08.15.1 (BUG REAL — el QR de FacoExtrema NUNCA trae teléfono en su JSON, y desde v2026.08.10.1 el teléfono es obligatorio para Guardar o Enviar por WhatsApp — esto bloqueaba SIEMPRE el flujo al re-escanear a alguien que ya había sido cargado antes con un teléfono real (tipeado a mano la primera vez), aunque el dato ya existiera en el sistema. _procesarQRFac ahora, cuando el QR no trae teléfono, llama a la acción nueva buscarContactoParaQR (FotoMap.gs v185) para ver si ese contacto ya existe con uno guardado, y si lo encuentra lo trae al campo ANTES de mostrar los datos — el vendedor lo ve completo, no aparece vacío y después cambia. Si el QR sí trae teléfono, no se hace ninguna búsqueda extra (no toca lo que ya andaba bien). Pedido por Cristian: "chequeá si el contacto ya existe y tiene el teléfono cargado, traerlo al campo escaneado". Confirmado con test: QR sin teléfono + contacto ya cargado → autocompleta; QR con teléfono → no busca, respeta el valor del QR.) -->
 <!-- Portal TLC | index.html | v2026.08.10.1 (Teléfono obligatorio y válido en el modal QR de FacoExtrema — antes se podía Guardar o Enviar por WhatsApp con el teléfono vacío o mal tipeado, sin ningún aviso. Ahora _guardarContactoQR valida con el mismo _formatearTelefonoWsp que usa ficha-equipo.html antes de dejar pasar cualquiera de los 2 botones — si no es un WhatsApp argentino válido, bloquea, muestra un popup con el motivo y un ejemplo de formato correcto (+549 11 4829 1441), y le pone el foco al campo Teléfono resaltado en rojo. Pedido por Cristian. Confirmado con test: sin teléfono bloquea, con uno inválido bloquea, con uno válido deja pasar sin avisos.) -->
@@ -532,7 +533,7 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
         <div class="header-title-block">
             <h1 id="txt-main-title">Portal TLC</h1>
             <p id="txt-sub-title" style="font-size:11px; color:var(--text-muted);">Menú Principal</p>
-            <p style="font-size:9px; color:var(--text-muted); opacity:.6; margin-top:1px;">v2026.07.05.7</p>
+            <p id="footer-version-idx" style="font-size:9px; color:var(--text-muted); opacity:.6; margin-top:1px;">v2026.07.05.7</p>
         </div>
         <!-- Campanita de notificaciones -->
         <div style="position:relative;" id="campana-wrap">
@@ -1501,10 +1502,26 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
             const reportesIdx = cols.indexOf('Reportes');
             const comisionesIdx = cols.indexOf('Ver Comisiones');
 
+            // DIAGNÓSTICO — a diferencia de permisos.js (que sí avisa
+            // por consola cuando no encuentra una columna), esta
+            // función se quedaba muda: si un nombre de columna no
+            // matcheaba EXACTO con el encabezado real del Sheet
+            // (typo, tilde de más/menos, espacio extra), simplemente
+            // bloqueaba el módulo sin ninguna pista de por qué.
+            // Reportado por Cristian: "no me habilita administracion
+            // ni servicio" — sin este aviso, no había forma rápida de
+            // saber si era un problema de nombre de columna o del
+            // valor cargado en su fila. Mismo criterio que ya usa
+            // permisos.js.
+            [['Servicio Tecnico', servicioIdx], ['Administracion', adminIdx], ['Comercio Exterior', comexIdx], ['Tareas', tareasIdx], ['Eventos', eventosIdx], ['Regulatoria', regulatoriaIdx], ['Reportes', reportesIdx], ['Ver Comisiones', comisionesIdx]].forEach(([nombre, idx]) => {
+                if (idx === -1) console.warn('[index.html] Columna "' + nombre + '" no encontrada en Vendedores (encabezados reales: ' + cols.join(' | ') + ') — el módulo queda bloqueado para todos hasta que se cargue esa columna.');
+            });
+
             const fila = rows.find(r => {
                 const v = r.c[emailIdx]?.v || '';
                 return v.toLowerCase().trim() === email.toLowerCase().trim();
             });
+            if (!fila) console.warn('[index.html] Email "' + email + '" no encontrado en la solapa Vendedores — se aplica acceso mínimo.');
 
             if (fila) {
                 const bool = (idx) => {
@@ -1512,6 +1529,12 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
                     const v = fila.c[idx]?.v;
                     return v === true || v === 'TRUE' || v === 'true' || v === 1;
                 };
+                // Log del valor CRUDO leído para Servicio Técnico y
+                // Administración puntualmente — para diagnosticar de
+                // una si el problema es "no encuentra la columna" vs
+                // "la encuentra pero el valor cargado en la fila de
+                // este usuario no da true".
+                console.log('[index.html] Diagnóstico permisos de "' + email + '" — Servicio Tecnico: idx=' + servicioIdx + ', valor crudo=' + JSON.stringify(servicioIdx !== -1 ? fila.c[servicioIdx]?.v : 'columna no encontrada') + ' | Administracion: idx=' + adminIdx + ', valor crudo=' + JSON.stringify(adminIdx !== -1 ? fila.c[adminIdx]?.v : 'columna no encontrada'));
                 userPermisos = {
                     rol:           fila.c[rolIdx]?.v || 'Vend_Externo',
                     ventas:        bool(ventasIdx),
