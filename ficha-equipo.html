@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.16.9 (Se sacó el cartelito aparte "+ Comisión de estructuración X% + IVA" de la tarjeta de Leasing — quedaba redundante con el desglose del Adelanto de arriba, que ya menciona la comisión del 3% con su monto. Pedido por Cristian, tras confirmar que el cánon ya coincide EXACTO con InverLease (USD 6.605): "esta excelente, pero saca el texto de abajo de la comision de estructuracion 3%". La comisión sigue calculándose igual (comisionMonto en calculo-financiacion.js no se tocó) — solo se sacó el cartelito duplicado de la vista.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.8 (2 ajustes a la tarjeta de Leasing: (1) se sacó la TNA de la vista — pedido por Cristian: "elimina la tna, no quiero que se vea". (2) Nueva fila "Adelanto (aprox.)" — InverLease en rigor no tiene adelanto real (ver v2026.08.16.3/.7), pero se agrega una SIMULACIÓN aproximada: 2 cánones en garantía + comisión de estructuración (3%), con un desglose chico abajo explicando de dónde sale el número y aclarando que es aproximado. Pedido por Cristian: "necesito que pongas el adelanto porque asi no va, adelanto = 2 canones+3%, expresalo asi, es una simulacion aprox". Ver calculo-financiacion.js v2026.08.16.4 (nuevos campos adelantoAprox y comisionMonto). Aparte, se confirmó que una captura previa de Cristian mostrando "undefined" en varios campos correspondía a una versión ANTERIOR de calculo-financiacion.js (con el Maxicanon 15% viejo, antes de v2026.08.16.3) — no un bug nuevo, el motor actual ya reproduce exacto la cotización real de InverLease. Confirmado con test actualizado.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.7 (Leasing pasa al esquema REAL de InverLease — validado número a número contra una cotización real (COAS SRL, 27/03/2026). "Maxicanon" desaparece de la tarjeta (siempre era 0 en la realidad); en su lugar se muestran "N cánones en garantía" (monto, se depositan al firmar y cancelan los últimos 2 cánones — no restan del capital) y una fila nueva "Opción de compra" (mismo valor que un cánon). Se agregó también "+ Comisión de estructuración 3% + IVA" como cartelito aparte (cargo que NO se resta del capital, lo paga el cliente por fuera). Ver calculo-financiacion.js v2026.08.16.3 para el detalle del cálculo. IMPORTANTE: la tasa real de InverLease es ~6,41% TNA, no el 3,5% que estaba cargado — Cristian tiene que actualizar el texto del encabezado de la columna en el Excel ("Habilitar_Leasing36_USD (TNA: 3,5%)" → 6,41%), la tasa se lee de ahí, no está en este archivo. Pedido por Cristian comparando la cotización real de InverLease contra nuestra tarjeta: "el adelanto nuestro incluye el 3% de gastos, pero no me dan las cuentas exactas" → confirmado: "cambiar al esquema real (0% adelanto + cánones en garantía)" / comisión "como línea aparte en la tarjeta". Confirmado con test que reproduce la cotización real: cánon exacto USD 6.605, garantía exacta USD 13.210.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.6 (Leasing pasa a usar el precio CONTADO combinado como base (precioContadoCombinado), no el de Lista — corrigiendo lo hecho en v2026.08.16.5, que sin querer le había dado a Leasing la misma base de Lista que TLC6/TLC12. Ver calculo-financiacion.js v2026.08.16.2. Pedido por Cristian: "baseneto en leasing tanto sea en $ o USD es el precio contado+iva10,5%, chequear". Confirmado con 4 tests en calculo-financiacion.js (Leasing usa Contado+IVA, no Lista+IVA; Pesos aplica el TC sobre esa misma base; TLC6/TLC12 sin cambios; y compatibilidad hacia atrás si no se pasa el nuevo parámetro), más toda la batería de ficha-equipo.html (oferta FacoExtrema, IVA, Hijos) sigue en verde.) -->
@@ -342,10 +343,31 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="calculo-financiacion.js"></script>
 <script>
-var FICHA_EQUIPO_VERSION = '2026.08.16.8';
+// Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
+// usarla como "cache-buster" del motor — ver más abajo.
+var FICHA_EQUIPO_VERSION = '2026.08.16.9';
+</script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+// CACHE-BUSTING REAL — el problema recurrente no era que
+// calculo-financiacion.js no se subiera; el archivo en el servidor
+// SIEMPRE tenía la versión correcta (confirmado abriéndolo directo).
+// El problema son las 2-3 capas de caché de por medio (Service
+// Worker, caché HTTP del navegador, CDN de GitHub Pages) — cualquiera
+// de ellas puede quedarse sirviendo una copia vieja del mismo nombre
+// de archivo, sin forma de que el navegador se dé cuenta de que
+// cambió. La solución de fondo: agregarle un parámetro ?v=... que
+// cambia en CADA bump de versión — para el navegador, cada versión es
+// literalmente una URL DISTINTA, así que no hay copia vieja posible
+// de confundir con la nueva. Reportado por Cristian, después de
+// varias vueltas confirmando que el archivo SÍ estaba subido
+// correctamente y aun así la consola mostraba versiones viejas:
+// "esta version esta sirviendo, decime como hago para que se
+// actualice".
+document.write('<script src="calculo-financiacion.js?v=' + FICHA_EQUIPO_VERSION + '"><\/script>');
+</script>
+<script>
 console.log("%c TLC Ficha Equipo v" + FICHA_EQUIPO_VERSION + " ", "background:#1a4b8c;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 console.log('%c ¿Precio de Lista no se actualiza al tildar módulos? %c → confirmá que esta versión sea la última (ver changelog arriba del archivo) y que calculo-financiacion.js esté subido en la MISMA carpeta.', 'color:#f8961e;font-weight:bold;', 'color:inherit;font-weight:normal;');
 
@@ -1274,20 +1296,17 @@ function _renderFinanciacion() {
             var cartelitoLeasingIva21 = esLeasing
                 ? '<div style="margin-top:6px; padding:4px 8px; border-radius:6px; background:#fff7ed; color:#c2410c; font-size:10.5px; font-weight:700; text-align:center;">+ IVA 21% sobre los cánones</div>'
                 : '';
-            // Comisión de estructuración — cargo APARTE, NO se resta
-            // del capital a financiar (así viene en la cotización
-            // real de InverLease: "3% más IVA"). Pedido por Cristian:
-            // mostrarla "como línea aparte en la tarjeta".
-            var cartelitoComisionLeasing = esLeasing
-                ? '<div style="margin-top:4px; padding:4px 8px; border-radius:6px; background:#f1f5f9; color:#475569; font-size:10.5px; font-weight:700; text-align:center;">+ Comisión de estructuración ' + r.comisionEstructuracionPct + '% + IVA</div>'
-                : '';
+            // El cartelito aparte de "+ Comisión de estructuración X%
+            // + IVA" se sacó — quedaba redundante con el desglose del
+            // Adelanto de arriba, que ya menciona la comisión del 3%.
+            // Pedido por Cristian: "esta excelente, pero saca el texto
+            // de abajo de la comision de estructuracion 3%".
             tarjetas += '<div class="fin-card' + (oculta ? ' fin-card-oculta' : '') + '" data-key="' + key + '">' +
                 _checkboxVariante(key, !oculta) +
                 '<div class="fin-titulo">' + et.titulo + '</div>' +
                 filaAdelanto + filaAdelantoDesglose + filaCuota + filaOpcionCompra +
                 '<div class="fin-desc">' + desc + '</div>' +
                 cartelitoLeasingIva21 +
-                cartelitoComisionLeasing +
             '</div>';
         });
     } else {
