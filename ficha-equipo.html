@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.16.10 (Nueva leyenda debajo de las tarjetas de Leasing: "Esta es una simulación aproximada, sujeta a evaluación y aprobación crediticia de la financiera. Los valores finales pueden variar." — texto confirmado EXACTO con Cristian, con captura de la tarjeta real, antes de bumpear. Pedido: "agregá una leyensa abajo de los leasing que es una Simulacion y sera expuesto a calificacion crediticia". Confirmado con test.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.9 (Se sacó el cartelito aparte "+ Comisión de estructuración X% + IVA" de la tarjeta de Leasing — quedaba redundante con el desglose del Adelanto de arriba, que ya menciona la comisión del 3% con su monto. Pedido por Cristian, tras confirmar que el cánon ya coincide EXACTO con InverLease (USD 6.605): "esta excelente, pero saca el texto de abajo de la comision de estructuracion 3%". La comisión sigue calculándose igual (comisionMonto en calculo-financiacion.js no se tocó) — solo se sacó el cartelito duplicado de la vista.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.8 (2 ajustes a la tarjeta de Leasing: (1) se sacó la TNA de la vista — pedido por Cristian: "elimina la tna, no quiero que se vea". (2) Nueva fila "Adelanto (aprox.)" — InverLease en rigor no tiene adelanto real (ver v2026.08.16.3/.7), pero se agrega una SIMULACIÓN aproximada: 2 cánones en garantía + comisión de estructuración (3%), con un desglose chico abajo explicando de dónde sale el número y aclarando que es aproximado. Pedido por Cristian: "necesito que pongas el adelanto porque asi no va, adelanto = 2 canones+3%, expresalo asi, es una simulacion aprox". Ver calculo-financiacion.js v2026.08.16.4 (nuevos campos adelantoAprox y comisionMonto). Aparte, se confirmó que una captura previa de Cristian mostrando "undefined" en varios campos correspondía a una versión ANTERIOR de calculo-financiacion.js (con el Maxicanon 15% viejo, antes de v2026.08.16.3) — no un bug nuevo, el motor actual ya reproduce exacto la cotización real de InverLease. Confirmado con test actualizado.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.16.7 (Leasing pasa al esquema REAL de InverLease — validado número a número contra una cotización real (COAS SRL, 27/03/2026). "Maxicanon" desaparece de la tarjeta (siempre era 0 en la realidad); en su lugar se muestran "N cánones en garantía" (monto, se depositan al firmar y cancelan los últimos 2 cánones — no restan del capital) y una fila nueva "Opción de compra" (mismo valor que un cánon). Se agregó también "+ Comisión de estructuración 3% + IVA" como cartelito aparte (cargo que NO se resta del capital, lo paga el cliente por fuera). Ver calculo-financiacion.js v2026.08.16.3 para el detalle del cálculo. IMPORTANTE: la tasa real de InverLease es ~6,41% TNA, no el 3,5% que estaba cargado — Cristian tiene que actualizar el texto del encabezado de la columna en el Excel ("Habilitar_Leasing36_USD (TNA: 3,5%)" → 6,41%), la tasa se lee de ahí, no está en este archivo. Pedido por Cristian comparando la cotización real de InverLease contra nuestra tarjeta: "el adelanto nuestro incluye el 3% de gastos, pero no me dan las cuentas exactas" → confirmado: "cambiar al esquema real (0% adelanto + cánones en garantía)" / comisión "como línea aparte en la tarjeta". Confirmado con test que reproduce la cotización real: cánon exacto USD 6.605, garantía exacta USD 13.210.) -->
@@ -346,7 +347,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.16.9';
+var FICHA_EQUIPO_VERSION = '2026.08.16.10';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -1296,6 +1297,14 @@ function _renderFinanciacion() {
             var cartelitoLeasingIva21 = esLeasing
                 ? '<div style="margin-top:6px; padding:4px 8px; border-radius:6px; background:#fff7ed; color:#c2410c; font-size:10.5px; font-weight:700; text-align:center;">+ IVA 21% sobre los cánones</div>'
                 : '';
+            // Leyenda de simulación + sujeta a evaluación crediticia —
+            // confirmado el texto EXACTO con Cristian antes de
+            // bumpear, con captura de la tarjeta real. Pedido:
+            // "agregá una leyenda abajo de los leasing que es una
+            // Simulacion y sera expuesto a calificacion crediticia".
+            var leyendaSimulacionLeasing = esLeasing
+                ? '<div style="margin-top:6px; font-size:9.5px; color:var(--text-muted); text-align:center; line-height:1.3;">Esta es una simulación aproximada, sujeta a evaluación y aprobación crediticia de la financiera. Los valores finales pueden variar.</div>'
+                : '';
             // El cartelito aparte de "+ Comisión de estructuración X%
             // + IVA" se sacó — quedaba redundante con el desglose del
             // Adelanto de arriba, que ya menciona la comisión del 3%.
@@ -1307,6 +1316,7 @@ function _renderFinanciacion() {
                 filaAdelanto + filaAdelantoDesglose + filaCuota + filaOpcionCompra +
                 '<div class="fin-desc">' + desc + '</div>' +
                 cartelitoLeasingIva21 +
+                leyendaSimulacionLeasing +
             '</div>';
         });
     } else {
