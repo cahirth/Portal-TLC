@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.19.3 (El FAB de QR ya no guarda directo al escanear — ahora abre un modal de revisión, mismo estilo EXACTO que el paso 2 del modal de QR de index.html (#qr-fac-paso-datos): todos los campos editables (Nombre/Apellido/Email/Teléfono/DNI/Categoría), badge VIP si corresponde, y un botón "Guardar" explícito abajo — nada se guarda hasta que el vendedor confirma. Si el DNI o email escaneado ya coincide con un contacto EXISTENTE en EMPRESAS que tenga teléfono cargado, se precarga ESE teléfono automáticamente (con un aviso visual de dónde salió), más confiable que lo que traiga el QR. Pedido por Cristian: "abrir el modal que se escanea igual a index, si es un contacto existente y tiene telefono cargado en empresas, mostrarlo en el modal, todos campos editables, boton abajo del modal Guardar". Confirmado con test actualizado: el modal se abre (no guarda directo), el teléfono se precarga del contacto existente cuando el QR no lo trae, se puede editar cualquier campo antes de confirmar, y recién al tocar Guardar se manda todo (con las ediciones incluidas) y se refresca la lista.) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.2 (El FAB de QR (v2026.08.19.1) ahora usa el mismo ícono/imagen EXACTA que el FAB de QR de index.html — fondo degradado azul→violeta, borde oscuro, ícono fa-qrcode de Font Awesome — en vez del emoji 📷 que tenía antes. Agregado Font Awesome a este archivo (no lo cargaba) solo para esto. Pedido por Cristian: "ponele la misma imagen que el index al qr de empresas".) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.1 (Nuevo FAB "Escanear QR" (bottom-center) — permite escanear la credencial de un visitante de FacoExtrema y guardar la Empresa+Contacto DIRECTO desde la lista, sin pasar por "Nuevo Contacto" de una empresa puntual (eso ya lo cubría el botón que existía adentro de ese formulario, "Flujo A" — este es nuevo, alta rápida sin abrir ninguna empresa antes). Reusa el scanner compartido que ya existía en este archivo (_abrirScannerQR) y el mismo backend que ya usa ficha-equipo.html (guardarEmpresaContactoQR) — crea/actualiza Empresa+Contacto en Firebase directo. Al terminar, refresca la lista sola (_cargarEmpresas(), ya existente) para que la nueva empresa aparezca al toque. Pedido por Cristian: "agrega al modulo empresas el QR de facoextrema abajo centrado en la pantalla, para guardar una empresa en ese modulo directamente". Confirmado con test: el FAB existe, un escaneo simulado manda los datos correctos al backend sin pasar por ningún formulario, avisa la confirmación, y refresca la lista sola.) -->
 <!-- Portal TLC | empresas.html | v2026.08.16.3 (BUG REAL — "aparecen 1 seg y se borran en la lista de empresas". Causa: el refresco de fondo de la LISTA de empresas (_cargarEmpresasCacheFirst, independiente del cruce de negocios) corre en paralelo y, cuando termina, REEMPLAZA el array EMPRESAS entero con la respuesta fresca del backend — que SIEMPRE trae "negocios: []" de fábrica (el backend no calcula esto, se hace acá en el cliente). Si ese refresco terminaba DESPUÉS de que ya se habían mostrado los conteos reales (desde el caché de v2026.08.16.2, o desde el cruce en vivo), los pisaba con ceros de nuevo. Fix: nuevo _negociosPorEmpresaId — mapa persistente que vive AFUERA del array EMPRESAS y sobrevive a cualquier reemplazo, reaplicado con _reaplicarNegociosPersistentes() en los 3 lugares donde EMPRESAS se reasigna desde cero (_cargarEmpresas, y las 2 reasignaciones dentro de _cargarEmpresasCacheFirst). _cargarNegociosCruzados y _aplicarNegociosDesdeCache ahora escriben en este mapa persistente además de en e.negocios directo. Confirmado con test reproduciendo el escenario exacto en 3 pasos: conteo visible desde el caché, sigue visible después de que la lista se refresca de fondo con negocios:[] de fábrica, y sigue visible después de que también termina el cruce en vivo.) -->
@@ -382,7 +383,7 @@ console.log("%c TLC Empresas v" + APP_VERSION + " ", "background:#3a86ff;color:w
 // todavía no llegó a producción". Guardado como constante con nombre
 // (no un string suelto dentro del console.log) — actualizar ACÁ en
 // cada entrega.
-const _VERSION_ARCHIVO_EMPRESAS = '2026.08.19.2';
+const _VERSION_ARCHIVO_EMPRESAS = '2026.08.19.3';
 console.log("%c TLC Empresas (archivo) v" + _VERSION_ARCHIVO_EMPRESAS + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 // ══════════════════════════════════════════════════════════════════
 // Empresas y Contactos conectados a Firebase (empresas/{id},
@@ -1016,23 +1017,96 @@ window._editarContacto = function(contactoId) {
 //    ninguna empresa abierta antes. Pedido por Cristian: "agrega al
 //    modulo empresas el QR de facoextrema abajo centrado en la
 //    pantalla, para guardar una empresa en ese modulo directamente".
+//
+// EXTENDIDO — antes guardaba directo, sin mostrar nada. Ahora abre un
+// modal de revisión (mismo estilo EXACTO que el paso 2 del modal de
+// QR de index.html), con todos los campos editables por si el QR leyó
+// algo mal, y un botón "Guardar" explícito abajo — nada se guarda
+// hasta que el vendedor confirma. Si el DNI o el email escaneado ya
+// coincide con un contacto EXISTENTE en EMPRESAS que tenga teléfono
+// cargado, se precarga ESE teléfono (más confiable que lo que
+// devuelva el QR, que a veces no trae el campo o viene incompleto).
+// Pedido por Cristian: "abrir el modal que se escanea igual a index,
+// si es un contacto existente y tiene telefono cargado en empresas,
+// mostrarlo en el modal, todos campos editables, boton abajo del
+// modal Guardar".
+var _datosQrEmpActuales = null;
+
+function _buscarTelefonoContactoExistente(datos) {
+    var dniQr = String(datos.dni || '').trim();
+    var emailQr = String(datos.email || '').trim().toLowerCase();
+    if (!dniQr && !emailQr) return '';
+    for (var i = 0; i < EMPRESAS.length; i++) {
+        var contactos = EMPRESAS[i].contactos || [];
+        for (var j = 0; j < contactos.length; j++) {
+            var c = contactos[j];
+            var matchDni = dniQr && String(c.dni || '').trim() === dniQr;
+            var matchEmail = emailQr && String(c.email || '').trim().toLowerCase() === emailQr;
+            if ((matchDni || matchEmail) && c.telefono) return c.telefono;
+        }
+    }
+    return '';
+}
+
 window._abrirScannerQREmpresasDirecto = function() {
   _abrirScannerQR(function(datos) {
-    var nombreCompleto = ((datos.nombre||'') + ' ' + (datos.apellido||'')).trim() || 'Sin nombre';
-    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
-      accion:'guardarEmpresaContactoQR', id: datos.id||'', nombre: datos.nombre||'', apellido: datos.apellido||'',
-      dni: datos.dni||'', email: datos.email||'', telefono: datos.telefono||'', vip: !!datos.vip, categoria: datos.categoria||''
-    }) }).then(function(r){ return r.json(); }).then(function(r) {
-      if (!r || !r.ok) { alert('No se pudo guardar la empresa. Probá de nuevo.'); return; }
-      alert('✅ "' + nombreCompleto + '" guardado como empresa/contacto.');
-      // Refrescar la lista para que aparezca al toque, sin tener que
-      // salir y volver a entrar al módulo — _cargarEmpresas() ya
-      // repinta sola al terminar (mismo criterio que "después de
-      // crear una empresa nueva", más arriba en este archivo).
-      _cargarEmpresas();
-    }).catch(function() {
-      alert('Error de conexión al guardar. Probá de nuevo.');
-    });
+    var telefonoExistente = _buscarTelefonoContactoExistente(datos);
+    var yaTeniaTelefono = !datos.telefono && !!telefonoExistente;
+    if (yaTeniaTelefono) datos.telefono = telefonoExistente;
+    _datosQrEmpActuales = datos;
+    _renderDatosQrEmpresas(yaTeniaTelefono);
+    document.getElementById('emp-qr-datos-modal').classList.add('abierto');
+  });
+};
+
+window._cerrarModalQREmpresas = function() {
+  document.getElementById('emp-qr-datos-modal').classList.remove('abierto');
+  _datosQrEmpActuales = null;
+};
+
+// Todos los campos editables — mismo criterio que index.html: por si
+// el QR leyó algo mal, cada input actualiza _datosQrEmpActuales al
+// tipear, así "Guardar" siempre usa el valor final, editado o no.
+function _renderDatosQrEmpresas(telefonoPrecargadoDeEmpresas) {
+  var d = _datosQrEmpActuales;
+  var campo = function(etiqueta, clave, tipo) {
+    return '<div class="qr-dato-fila">' +
+      '<span class="qr-lbl">' + etiqueta + '</span>' +
+      '<input type="' + (tipo || 'text') + '" class="qr-dato-input" value="' + _escQr(d[clave] || '') + '" ' +
+        'oninput="_datosQrEmpActuales[\'' + clave + '\']=this.value">' +
+    '</div>';
+  };
+  document.getElementById('emp-qr-datos-render').innerHTML =
+    campo('Nombre', 'nombre') +
+    campo('Apellido', 'apellido') +
+    campo('Email', 'email', 'email') +
+    campo('Teléfono', 'telefono', 'tel') +
+    campo('DNI', 'dni') +
+    campo('Categoría', 'categoria') +
+    (telefonoPrecargadoDeEmpresas ? '<div class="qr-dato-nota">📞 Teléfono precargado desde un contacto ya guardado</div>' : '') +
+    (d.vip ? '<div style="text-align:right;margin-top:6px;"><span class="qr-badge-vip">VIP</span></div>' : '');
+}
+
+function _escQr(s) { var div = document.createElement('div'); div.textContent = String(s == null ? '' : s); return div.innerHTML; }
+
+window._guardarContactoQREmpresas = function() {
+  var datos = _datosQrEmpActuales;
+  if (!datos) return;
+  var nombreCompleto = ((datos.nombre||'') + ' ' + (datos.apellido||'')).trim() || 'Sin nombre';
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+    accion:'guardarEmpresaContactoQR', id: datos.id||'', nombre: datos.nombre||'', apellido: datos.apellido||'',
+    dni: datos.dni||'', email: datos.email||'', telefono: datos.telefono||'', vip: !!datos.vip, categoria: datos.categoria||''
+  }) }).then(function(r){ return r.json(); }).then(function(r) {
+    if (!r || !r.ok) { alert('No se pudo guardar la empresa. Probá de nuevo.'); return; }
+    _cerrarModalQREmpresas();
+    alert('✅ "' + nombreCompleto + '" guardado como empresa/contacto.');
+    // Refrescar la lista para que aparezca al toque, sin tener que
+    // salir y volver a entrar al módulo — _cargarEmpresas() ya
+    // repinta sola al terminar (mismo criterio que "después de
+    // crear una empresa nueva", más arriba en este archivo).
+    _cargarEmpresas();
+  }).catch(function() {
+    alert('Error de conexión al guardar. Probá de nuevo.');
   });
 };
 
@@ -1657,11 +1731,59 @@ var _volverANegocioId = null;
   .fab-qr-empresas-label { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); font-size:9px;
       color:#64748b; z-index:900; font-weight:700; text-transform:uppercase; letter-spacing:.4px; pointer-events:none; }
   @media (min-width:600px) { .fab-qr-empresas, .fab-qr-empresas-label { bottom:24px; } }
+
+  /* ── Modal "datos leídos" del QR — mismo estilo EXACTO que el paso
+     2 del modal de QR de index.html (#qr-fac-paso-datos), adaptado a
+     las variables de color de este archivo (--panel-darker en vez de
+     --bg-dark, que acá no existe). Reusa el scanner de cámara que ya
+     existe (_abrirScannerQR) para el paso de escaneo en sí — este
+     modal es solo el paso de REVISAR/EDITAR antes de guardar. Pedido
+     por Cristian: "abrir el modal que se escanea igual a index...
+     todos campos editables, boton abajo del modal Guardar". */
+  .qr-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); display:none; align-items:center;
+      justify-content:center; z-index:9500; padding:16px; }
+  .qr-modal-overlay.abierto { display:flex; }
+  .qr-modal-card { background:var(--panel-dark); width:100%; max-width:440px; border-radius:20px; padding:24px 20px 26px;
+      max-height:88vh; overflow-y:auto; animation:qrAparecer .22s ease; }
+  @keyframes qrAparecer { from{transform:scale(.94);opacity:0;} to{transform:scale(1);opacity:1;} }
+  .qr-modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .qr-modal-header h2 { font-size:19px; margin:0; display:flex; align-items:center; gap:8px; color:var(--text-main); }
+  .qr-modal-close { width:36px; height:36px; border-radius:50%; background:var(--panel-darker); border:none;
+      color:var(--text-muted); font-size:19px; cursor:pointer; flex-shrink:0; }
+  .qr-datos-leidos { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:12px; padding:16px 18px; margin-bottom:18px; }
+  .qr-dato-fila { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 0;
+      border-bottom:1px solid var(--border-glow); font-size:15.5px; color:var(--text-main); }
+  .qr-dato-fila:last-child { border-bottom:none; }
+  .qr-dato-fila .qr-lbl { color:var(--text-muted); font-size:13.5px; flex-shrink:0; }
+  .qr-dato-input { flex:1; min-width:0; text-align:right; font-weight:700; font-size:15px; color:var(--text-main);
+      background:transparent; border:none; border-bottom:1px dashed var(--border-glow); padding:2px 0; font-family:inherit; }
+  .qr-dato-input:focus { outline:none; border-bottom-color:var(--accent-blue); }
+  .qr-badge-vip { background:var(--accent-orange); color:#0a1424; font-size:10.5px; font-weight:800; padding:3px 9px;
+      border-radius:20px; text-transform:uppercase; }
+  .qr-dato-nota { font-size:11.5px; color:var(--accent-green); margin-top:-8px; margin-bottom:14px; }
+  .qr-botonera { display:flex; gap:10px; }
+  .qr-botonera button { flex:1; padding:15px; border-radius:12px; border:1px solid var(--border-glow); background:var(--panel-darker);
+      color:var(--text-main); font-size:15px; font-weight:700; cursor:pointer; }
+  .qr-btn-guardar { border-color:var(--accent-green) !important; color:var(--accent-green) !important; }
 </style>
 <button id="ia-btn-flotante" onclick="_iaTogglePanel()" title="Asistente IA">💬</button>
 
 <button type="button" class="fab-qr-empresas" id="emp-btn-escanear-qr" onclick="_abrirScannerQREmpresasDirecto()" title="Escanear QR y guardar empresa"><i class="fa-solid fa-qrcode"></i></button>
 <div class="fab-qr-empresas-label">Escanear QR</div>
+
+<div class="qr-modal-overlay" id="emp-qr-datos-modal">
+  <div class="qr-modal-card">
+    <div class="qr-modal-header">
+      <h2>📷 Datos escaneados</h2>
+      <button class="qr-modal-close" onclick="_cerrarModalQREmpresas()">✕</button>
+    </div>
+    <div class="qr-datos-leidos" id="emp-qr-datos-render"></div>
+    <div class="qr-botonera">
+      <button onclick="_cerrarModalQREmpresas()">Cancelar</button>
+      <button class="qr-btn-guardar" onclick="_guardarContactoQREmpresas()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
 
 <div id="ia-panel">
   <div id="ia-panel-header">
