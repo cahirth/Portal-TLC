@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.19.1 (Tope de 5 en "Mis Pendientes Críticos" del Radar (home) — antes 90%/75% no tenían ningún límite (solo "resto" estaba topeado en 8), así que un vendedor con muchos negocios avanzados a la vez podía saturar el panel entero. Ahora el tope es GLOBAL: máximo 5 tarjetas en total, priorizando 90% primero (por monto desc), después 75%, después el resto — si sobra lugar dentro de los 5. Pedido por Cristian, aclarando el pedido de filtro por vendedor en cotizaciones.html: "con los últimos cinco más importantes al noventa por ciento, está bien, no hace falta ver todos". Confirmado con test: con 9 pendientes simulados (3 al 90%, 4 al 75%, 2 en otros estados), muestra exactamente 5 — los 3 del 90% primero, después los 2 de mayor monto al 75%.) -->
 <!-- Portal TLC | index.html | v2026.08.16.1 (2 arreglos sobre permisos: (1) el pie de versión mostraba un texto FIJO "v2026.07.05.7" en el HTML — ya existía código (línea ~2100) que intentaba actualizarlo buscando un elemento con id="footer-version-idx", pero el <p> real nunca tenía ese id, así que el código nunca lo encontraba y quedaba pegado desde julio, aunque el archivo real se hubiera actualizado decenas de veces desde entonces. Agregado el id que faltaba. (2) cargarPermisosUsuario() se quedaba muda cuando una columna de permisos no matcheaba exacto con el Sheet (a diferencia de permisos.js, que sí avisa) — agregado el mismo aviso por consola, más un log de diagnóstico con el valor CRUDO leído para Servicio Tecnico y Administracion puntualmente. Reportado por Cristian: "no me habilita administracion ni servicio" — con este diagnóstico se confirma que "Administracion" directamente no existe como columna en el Sheet (según la captura que mandó, solo tiene Internos/Empresas/Ventas/Servicio Tecnico/Regulatoria) — no es un bug, es un módulo sin construir/sin columna cargada todavía. Para "Servicio Tecnico" específicamente, que sí está tildado en su fila, hace falta que revise el nuevo log de consola para confirmar si el problema es de nombre de columna o de valor cargado. Confirmado con 4 tests: el pie de versión se actualiza solo, avisa de columnas faltantes, no avisa de las que sí existen, y el log de diagnóstico muestra el valor crudo real.) -->
 <!-- Portal TLC | index.html | v2026.08.15.2 (BUG REAL preventivo — mismo guard contra doble disparo del callback de escaneo que se agregó en ficha-equipo.html v2026.08.15.2 (html5-qrcode puede llamar al callback de éxito 2 veces seguidas para el mismo código, mientras stop() todavía no terminó de verdad). Acá no estaba reportado como bug todavía, pero corre el mismo riesgo — se blindó preventivamente antes de que pase.) -->
 <!-- Portal TLC | index.html | v2026.08.15.1 (BUG REAL — el QR de FacoExtrema NUNCA trae teléfono en su JSON, y desde v2026.08.10.1 el teléfono es obligatorio para Guardar o Enviar por WhatsApp — esto bloqueaba SIEMPRE el flujo al re-escanear a alguien que ya había sido cargado antes con un teléfono real (tipeado a mano la primera vez), aunque el dato ya existiera en el sistema. _procesarQRFac ahora, cuando el QR no trae teléfono, llama a la acción nueva buscarContactoParaQR (FotoMap.gs v185) para ver si ese contacto ya existe con uno guardado, y si lo encuentra lo trae al campo ANTES de mostrar los datos — el vendedor lo ve completo, no aparece vacío y después cambia. Si el QR sí trae teléfono, no se hace ninguna búsqueda extra (no toca lo que ya andaba bien). Pedido por Cristian: "chequeá si el contacto ya existe y tiene el teléfono cargado, traerlo al campo escaneado". Confirmado con test: QR sin teléfono + contacto ya cargado → autocompleta; QR con teléfono → no busca, respeta el valor del QR.) -->
@@ -1831,6 +1832,14 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
             contMetricas.style.display = 'grid';
 
             // ── Pendientes: 90% arriba, 75% en medio, resto al final ───
+            // Tope global de 5 (no por categoría) — antes solo "resto"
+            // tenía tope (8), pero 90%/75% podían mostrar CUALQUIER
+            // cantidad sin límite, saturando el home si un vendedor
+            // tenía muchos negocios avanzados a la vez. Pedido por
+            // Cristian: "con los últimos cinco más importantes al
+            // noventa por ciento, está bien, no hace falta ver
+            // todos".
+            const TOPE_PENDIENTES_RADAR = 5;
             const prio90  = activas.filter(c => c.estado === '90%')
                 .sort((a, b) => _radarMonto(b) - _radarMonto(a));
             const prio75  = activas.filter(c => c.estado === '75%')
@@ -1841,8 +1850,8 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
             const ordenadas = [
                 ...prio90.map(c  => ({ c, prio: 'prio-90' })),
                 ...prio75.map(c  => ({ c, prio: 'prio-75' })),
-                ...resto.slice(0, 8).map(c => ({ c, prio: 'prio-resto' })), // tope para no saturar el home
-            ];
+                ...resto.map(c   => ({ c, prio: 'prio-resto' })),
+            ].slice(0, TOPE_PENDIENTES_RADAR);
 
             if (!ordenadas.length) {
                 contPendientes.innerHTML = '<div class="radar-empty">Sin pendientes activos. 🎉</div>';
