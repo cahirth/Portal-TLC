@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.2 (Nuevo Dashboard de Negocios (botón "📊 Dashboard" junto al selector de pipeline) — KPIs básicos (cantidad de negocios, monto total, equipos distintos) + ranking de los equipos más pedidos (cuántos negocios distintos incluyen cada uno), con barras simples en CSS, sin librería nueva. Nuevo botón "⬇️ Excel" — exporta la lista YA FILTRADA en pantalla (respeta vendedor/pipeline/etapa/búsqueda activos) a un .xlsx real vía SheetJS (agregada al head), con columnas ID/Cliente/Vendedor/Pipeline/Estado/Equipos/Monto/Fecha. Los dos operan sobre TODOS los pipelines por defecto — si se quiere solo FacoExtrema, se filtra por ese pipeline primero y después se abre el Dashboard o se exporta. Forma de pago quedó afuera a propósito, confirmado con Cristian — ese dato vive en el presupuesto de cada negocio (no en la lista ya cargada) y pedirlo uno por uno sería lento. Pedido por Cristian: "En el pipeline de Facoextrema podemos exportar los negocios? Y podés hacer un dashboard de los negocios, cuantificar equipos... y hacer un gráfico y ranking de los más pedidos?". Confirmado con test: KPIs correctos, ranking ordenado por cantidad de negocios que incluyen cada equipo, y el export arma las filas exactas con el pipeline resuelto a su nombre real.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.1 (BUG REAL — "a veces los pipeline tardan en cargarse... la abrís y no hay nada... tarda un rato, se arregla solo". Causa: el <select id="select-pipeline"> arrancaba con CERO <option> en el HTML crudo, y solo se llenaba cuando _cargarPipelines() (un POST al backend GAS — /config no tiene lectura pública en Firebase, así que no se puede leer directo como el resto — puede tardar) terminaba, sin await, en paralelo con el resto del arranque. Fix en 2 capas: (1) el select ahora arranca con 2 opciones fijas en el HTML crudo ("Ver Todos los Pipelines" / "Pipeline General"), nunca vacío, aunque el backend todavía no respondió. (2) Nuevo caché de la lista real en localStorage (tlc_cache_pipelines, mismo criterio que ya usan empresas.html/eventos.html) — de la segunda visita en adelante, la lista REAL de pipelines aparece al instante, sin esperar el viaje lento, que igual sigue corriendo atrás para traer el dato fresco. Confirmado con 2 tests: sin caché el select nunca queda vacío, y con caché de una visita anterior la lista real se ve ANTES de que termine el pedido lento simulado.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.06.2 (Modal "Enviar Orden de Preparación", con captura de Cristian: label "Fecha límite de despacho" → "Fecha límite de envío"; Fecha límite y Técnico responsable ahora son obligatorios para crear la orden (antes se podía crear sin cargar ninguno de los dos) — asterisco visual + validación con aviso antes de pegarle al backend.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.06.1 (Fix robusto del picker de reacciones: ver detalle completo en servicio.html v2026.08.06.3 — mismo mecanismo (_abrirReaccionPicker), un solo picker global con position:fixed en vez de uno por mensaje que quedaba cortado por el overflow-y:auto del contenedor.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.04.19 (Mismo rediseño de reacciones que servicio.html: ícono "🙂" que despliega los 3 emojis en vez de tenerlos siempre visibles sueltos.) -->
@@ -8,6 +10,10 @@
 <script src="version.js"></script>
 <script src="permisos.js"></script>
 <script src="adjuntos.js"></script>
+<!-- SheetJS — solo para el botón "Exportar Excel" del Dashboard de
+     negocios. Pedido por Cristian: "podemos exportar los negocios?...
+     Excel (.xlsx)". -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>TLC — Cotizaciones</title>
@@ -715,11 +721,38 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
         <select id="select-pipeline" onchange="_onCambiarPipeline(this.value)"
             style="flex:1; padding:8px 10px; background:#0f1a30; border:1px solid #3a86ff33;
                    border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer;">
+            <!-- Opciones fijas por defecto, para que el select NUNCA
+                 se vea vacío al abrir — antes tenía CERO <option> acá
+                 y dependía 100% de que _cargarPipelines() (un viaje
+                 al backend GAS, que puede tardar) terminara para
+                 mostrar cualquier cosa. _renderSelectPipeline()
+                 reemplaza este contenido apenas tiene la lista real
+                 (o la del caché, ver más abajo), pero mientras tanto
+                 esto ya deja ver algo con sentido. Reportado por
+                 Cristian: "a veces los pipeline tardan en cargarse...
+                 la abrís y no hay nada". -->
+            <option value="TODOS">🌐 Ver Todos los Pipelines</option>
+            <option value="GENERAL">🏢 Pipeline General</option>
         </select>
         <button onclick="_abrirConfigPipeline()" title="Configurar pipeline"
             style="flex-shrink:0; width:34px; height:34px; border-radius:8px; background:#0f1a30;
                    border:1px solid #3a86ff33; color:#94a3b8; font-size:14px; cursor:pointer;">⚙️</button>
     </div>
+
+    <!-- DASHBOARD + EXPORTAR — pedido por Cristian: "¿podemos exportar
+         los negocios? Y podés hacer un dashboard de los negocios,
+         cuantificar equipos... y hacer un gráfico y ranking de los
+         más pedidos?". Ambos operan sobre la lista YA FILTRADA en
+         pantalla (respeta vendedor/pipeline/etapa/búsqueda activos) —
+         si querés Facoextrema solo, filtrá por ese pipeline primero. -->
+    <button onclick="_abrirDashboardNegocios()" title="Dashboard de negocios"
+        style="flex-shrink:0; padding:8px 12px; border-radius:8px; background:#0f1a30;
+               border:1px solid #3a86ff33; color:#3a86ff; font-size:12px; font-weight:700; cursor:pointer;
+               display:flex; align-items:center; gap:5px;">📊 Dashboard</button>
+    <button onclick="_exportarNegociosExcel()" title="Exportar a Excel"
+        style="flex-shrink:0; padding:8px 12px; border-radius:8px; background:#0f1a30;
+               border:1px solid #06d6a033; color:#06d6a0; font-size:12px; font-weight:700; cursor:pointer;
+               display:flex; align-items:center; gap:5px;">⬇️ Excel</button>
 
     <!-- BUSCADOR -->
     <div class="buscador-wrap" id="buscador-wrap" style="display:none;">
@@ -827,6 +860,13 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
 // ═══════════════════════════════════════════════════════════════════
 const APP_VERSION = PORTAL_TLC_VERSION;
 console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
+// Log PROPIO de este archivo, independiente de PORTAL_TLC_VERSION
+// (compartido por todo el Portal) — mismo criterio que ya se agregó
+// en varios otros archivos, para poder confirmar en 10 segundos si
+// ESTE archivo puntual está actualizado, sin depender de la versión
+// compartida (que puede estar al día aunque este archivo no lo esté).
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.2';
+console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 const HISTORICO_URL = 'https://raw.githubusercontent.com/cahirth/Portal-TLC/main/historico.json';
@@ -847,6 +887,31 @@ const RTDB_COTIZACIONES_URL = 'https://portal-tlc-default-rtdb.firebaseio.com/co
 var PIPELINES = [];              // [{ id, nombre }, ...] — leídos de /config/pipelines
 var pipelineActual = localStorage.getItem('tlc_pipeline_actual') || 'TODOS';
 
+// Caché de la lista de pipelines en localStorage — mismo criterio
+// "cache-first" que ya usan empresas.html/eventos.html. Como
+// _cargarPipelines() pasa por el backend GAS (no por Firebase directo
+// — /config no tiene lectura pública, ver comentario arriba) y puede
+// tardar, sin este caché CADA carga de la página mostraba el select
+// vacío/con los 2 valores fijos hasta que ese viaje lento terminara.
+// Con el caché, de la segunda visita en adelante se ve la lista REAL
+// al instante, y se refresca sola atrás con el dato fresco. Reportado
+// por Cristian: "a veces los pipeline tardan en cargarse... la abrís
+// y no hay nada... tarda un rato, se arregla solo".
+var PIPELINES_CACHE_KEY = 'tlc_cache_pipelines';
+function _aplicarPipelinesDesdeCache() {
+    try {
+        const crudo = localStorage.getItem(PIPELINES_CACHE_KEY);
+        if (!crudo) return false;
+        const lista = JSON.parse(crudo);
+        if (!Array.isArray(lista)) return false;
+        PIPELINES = lista;
+        return true;
+    } catch(eCache) { return false; }
+}
+function _guardarPipelinesEnCache() {
+    try { localStorage.setItem(PIPELINES_CACHE_KEY, JSON.stringify(PIPELINES)); } catch(eLs) { /* no crítico */ }
+}
+
 async function _cargarPipelines() {
     try {
         const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
@@ -854,6 +919,7 @@ async function _cargarPipelines() {
         const r = await resp.json();
         PIPELINES = (r.ok && Array.isArray(r.pipelines)) ? r.pipelines : [];
         PIPELINES.sort(function(a, b) { return a.nombre.localeCompare(b.nombre, 'es', { sensitivity:'base' }); });
+        _guardarPipelinesEnCache();
     } catch(e) { PIPELINES = []; }
     _renderSelectPipeline();
 }
@@ -1863,6 +1929,12 @@ async function init() {
     _configurarDropdownVendedor();
 
     await cargar();
+    // Si hay pipelines cacheados de una visita anterior, se muestran
+    // AL INSTANTE (antes de esperar el viaje lento al backend GAS) —
+    // _cargarPipelines() de todos modos se sigue llamando después,
+    // para traer el dato fresco y refrescar el select solo si cambió
+    // algo.
+    if (_aplicarPipelinesDesdeCache()) _renderSelectPipeline();
     _cargarPipelines();
     _getPrecios(); // cargar precios.json en background para folletos/videos
     _inicializarAvatarCot(); // poblar avatar con datos del usuario logueado
@@ -3349,6 +3421,108 @@ async function _guardarNotaInline(id) {
 function _monto(c) {
     return parseFloat((c.totales||{}).total_con_iva || c.totalConIva || c.montoUSD || 0);
 }
+
+// ── Dashboard de Negocios — ranking de equipos más pedidos + KPIs
+//    básicos, sobre la lista YA FILTRADA en pantalla (cotFiltradas).
+//    Pedido por Cristian: "podés hacer un dashboard de los negocios,
+//    cuantificar equipos... y hacer un gráfico y ranking de los más
+//    pedidos?". Forma de pago quedó afuera a propósito (ver
+//    changelog) — ese dato vive en el presupuesto de cada negocio,
+//    no en esta lista, y pedirlo uno por uno sería lento.
+window._abrirDashboardNegocios = function() {
+    var lista = cotFiltradas || [];
+
+    // Conteo de equipos — una cuenta por cada línea del carrito de
+    // cada negocio, sin importar cantidad (si querés pesar por
+    // cantidad real, habría que sumar it.cantidad, pero el pedido fue
+    // "los más pedidos", que es cuántos NEGOCIOS distintos lo
+    // incluyeron, no unidades).
+    var conteoEquipos = {};
+    var totalUSD = 0;
+    lista.forEach(function(c) {
+        totalUSD += _monto(c);
+        (c.carrito || []).forEach(function(it) {
+            var nombre = (it.nombre || '').trim();
+            if (!nombre) return;
+            conteoEquipos[nombre] = (conteoEquipos[nombre] || 0) + 1;
+        });
+    });
+
+    var ranking = Object.keys(conteoEquipos)
+        .map(function(nombre) { return { nombre: nombre, cantidad: conteoEquipos[nombre] }; })
+        .sort(function(a, b) { return b.cantidad - a.cantidad; })
+        .slice(0, 15); // top 15 — más que eso no aporta en un dashboard chico
+
+    // ── Resumen (KPIs) ──
+    document.getElementById('dash-negocios-resumen').innerHTML =
+        '<div style="flex:1;min-width:100px;background:#0a1424;border-radius:10px;padding:10px;text-align:center;">' +
+            '<div style="font-size:18px;font-weight:800;color:#3a86ff;">' + lista.length + '</div>' +
+            '<div style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;">Negocios</div></div>' +
+        '<div style="flex:1;min-width:100px;background:#0a1424;border-radius:10px;padding:10px;text-align:center;">' +
+            '<div style="font-size:14px;font-weight:800;color:#06d6a0;">USD ' + Math.round(totalUSD).toLocaleString('es-AR') + '</div>' +
+            '<div style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;">Monto total</div></div>' +
+        '<div style="flex:1;min-width:100px;background:#0a1424;border-radius:10px;padding:10px;text-align:center;">' +
+            '<div style="font-size:18px;font-weight:800;color:#f8961e;">' + Object.keys(conteoEquipos).length + '</div>' +
+            '<div style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;">Equipos distintos</div></div>';
+
+    // ── Ranking — barras simples en CSS (sin librería nueva), ancho
+    //    proporcional al máximo del top 15. ──
+    var elRanking = document.getElementById('dash-negocios-ranking');
+    if (!ranking.length) {
+        elRanking.innerHTML = '<div style="color:#64748b;font-size:12.5px;text-align:center;padding:20px 0;">No hay negocios con equipos cargados en este filtro.</div>';
+    } else {
+        var maxCantidad = ranking[0].cantidad;
+        elRanking.innerHTML = ranking.map(function(r, i) {
+            var pct = Math.max(6, Math.round((r.cantidad / maxCantidad) * 100));
+            return '<div style="margin-bottom:9px;">' +
+                '<div style="display:flex;justify-content:space-between;font-size:12px;color:#f1f5f9;margin-bottom:3px;">' +
+                    '<span>' + (i+1) + '. ' + _escCot(r.nombre) + '</span>' +
+                    '<span style="font-weight:700;color:#3a86ff;">' + r.cantidad + '</span></div>' +
+                '<div style="background:#0a1424;border-radius:6px;height:8px;overflow:hidden;">' +
+                    '<div style="background:linear-gradient(90deg,#3a86ff,#06d6a0);height:100%;width:' + pct + '%;"></div></div>' +
+            '</div>';
+        }).join('');
+    }
+
+    document.getElementById('modal-dashboard-negocios').style.display = 'flex';
+};
+
+window._cerrarDashboardNegocios = function() {
+    document.getElementById('modal-dashboard-negocios').style.display = 'none';
+};
+
+// ── Exportar Excel — misma lista YA FILTRADA en pantalla
+//    (cotFiltradas). Pedido por Cristian: "podemos exportar los
+//    negocios?... Excel (.xlsx)". Usa SheetJS (cargado arriba en el
+//    <head>) para generar el archivo real en el navegador, sin pasar
+//    por ningún backend.
+window._exportarNegociosExcel = function() {
+    var lista = cotFiltradas || [];
+    if (!lista.length) { alert('No hay negocios para exportar con el filtro actual.'); return; }
+    if (typeof XLSX === 'undefined') { alert('No se pudo cargar el generador de Excel — revisá tu conexión y probá de nuevo.'); return; }
+
+    var filas = lista.map(function(c) {
+        var pipelineObj = PIPELINES.find(function(p) { return p.id === c.pipeline_id; });
+        return {
+            'ID Cotización': c.idCot || c.id_cotizacion || c.id || '',
+            'Cliente': c.razonSocial || c.cliente || '',
+            'Vendedor': c.vendedor || '',
+            'Pipeline': pipelineObj ? pipelineObj.nombre : (c.pipeline_id ? c.pipeline_id : 'General'),
+            'Estado': c.estado || '',
+            'Equipos': (c.carrito || []).map(function(it) { return it.nombre; }).join(' · '),
+            'Monto (USD)': Math.round(_monto(c)),
+            'Fecha': c.fechaCreacion || c.fecha || '',
+        };
+    });
+
+    var hoja = XLSX.utils.json_to_sheet(filas);
+    hoja['!cols'] = [ { wch: 18 }, { wch: 26 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 45 }, { wch: 12 }, { wch: 14 } ];
+    var libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, 'Negocios');
+    var fechaArchivo = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(libro, 'TLC-Negocios-' + fechaArchivo + '.xlsx');
+};
+
 function _monto_iva(c) {
     return parseFloat((c.totales||{}).iva_total || c.ivaTotal || 0);
 }
@@ -4587,6 +4761,28 @@ window._confirmarOrdenPreparacion = async function() {
       <button onclick="_cerrarModalOrdenPreparacion()" style="background:none;border:1px solid #1e3050;color:#94a3b8;border-radius:9px;padding:10px 16px;font-size:12.5px;cursor:pointer;">Cancelar</button>
       <button id="op-btn-confirmar" onclick="_confirmarOrdenPreparacion()" style="flex:1;background:#06d6a0;color:#0a1424;border:none;border-radius:9px;padding:10px;font-size:12.5px;font-weight:800;cursor:pointer;">Crear orden</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Dashboard de Negocios — ranking de equipos más pedidos, con
+     gráfico de barras simple (CSS, sin librería nueva) + tabla.
+     Opera sobre cotFiltradas (la lista YA filtrada en pantalla, misma
+     que ve el vendedor — respeta vendedor/pipeline/etapa/búsqueda
+     activos). Pedido por Cristian: "podés hacer un dashboard de los
+     negocios, cuantificar equipos... y hacer un gráfico y ranking de
+     los más pedidos?". Forma de pago quedó afuera a propósito —
+     confirmado con Cristian, ese dato vive en el presupuesto de cada
+     negocio (no en la lista ya cargada) y pedirlo uno por uno sería
+     lento. ── -->
+<div id="modal-dashboard-negocios" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#0f1a30;border:1px solid #1e3050;border-radius:16px;padding:22px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:15px;font-weight:800;color:#f1f5f9;">📊 Dashboard de Negocios</div>
+      <button onclick="_cerrarDashboardNegocios()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div id="dash-negocios-resumen" style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;"></div>
+    <div style="font-size:11px;font-weight:700;color:#3a86ff;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">🏆 Equipos más pedidos</div>
+    <div id="dash-negocios-ranking"></div>
   </div>
 </div>
 </body>
