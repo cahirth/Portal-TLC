@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.9 (BUG REAL de layout en pantallas angostas — los botones "📊 Dashboard" y "⬇️ Excel" tenían flex-shrink:0 (nunca se achican), dejándole muy poco espacio al selector de pipeline (que sí se comprime hasta min-width) — el nombre del pipeline quedaba cortado, pegado contra el botón Dashboard. Fix: el TEXTO de esos 2 botones (no el ícono) se esconde en pantallas ≤700px vía media query, liberando espacio real; de paso, el selector de pipeline pasó de flex:0 1 210px a flex:1 1 210px (ahora también puede crecer, no solo achicarse) con min-width subido de 150 a 170px. Reportado por Cristian con captura: "entonces queda tapado por el boton del dashboard, chequealo". No pude verificar esto visualmente desde acá (jsdom no calcula layout real) — avisame si en el celular sigue viéndose mal.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.8 (Segunda vuelta sobre "los que tienen mas de 1 linea no se abren" — el fix anterior (v2026.08.19.7, flex-wrap + word-break) no alcanzó: Cristian confirmó "andan todos excepto los que tienen mas de 1 linea que son 2 o 3". Causa real más probable: el header de cada fila (número+nombre+contador) usaba display:flex, un layout que con nombres de 2-3 líneas podía desalinear visualmente el contador o correr la fila fuera de donde el navegador registraba el click — el click en sí funcionaba a nivel DOM, pero visualmente el vendedor tocaba otra cosa. Rediseñado SIN flex — todo en un párrafo de bloque normal (número, nombre y "(cantidad)" en el mismo texto fluido), imposible de desalinear sin importar cuántas líneas ocupe. De paso, escapado más robusto del nombre para el onclick: antes solo neutralizaba comillas simples — un nombre real con comilla DOBLE (común en specs con medidas en pulgadas) rompía el atributo onclick="..." entero, dejando HTML inválido. Ahora también neutraliza comillas dobles (a entidad HTML) y barras invertidas. Confirmado con test usando CLICK REAL (dispatchEvent, no solo llamar la función) sobre una fila de nombre largo real (la de la captura de Cristian) y sobre una fila con comilla doble adentro del nombre — las dos funcionan de punta a punta.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.7 (Fix de layout en el ranking del Dashboard — "los que tienen mas de 1 renglon no se abren". Diagnóstico: el click en sí funciona bien a nivel DOM (confirmado con un test que dispara un evento click real, no solo llamando la función), pero nombres largos SIN espacios (ej. "IR/RF/AF/Mcolor/BV") podían desbordar el ancho del modal en vez de ajustarse — en el celular, eso corre visualmente la zona clickeable real fuera de lo que se ve en pantalla. Agregado word-break:break-word + flex-wrap:wrap + min-width:0 en el span del nombre, para que cualquier texto largo se ajuste siempre al ancho disponible. No pude probar esto en un celular real desde acá — si sigue sin abrir después de este fix, avisame con el nombre exacto del equipo que falla, para seguir buscando.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.6 (2 correcciones más sobre "no trae todos los equipos que aparecen en el tablero": (1) BUG REAL — el ranking del Dashboard tenía un tope fijo de 15 ítems (slice(0,15)) — con más de 15 equipos distintos entre los negocios filtrados, los que no entraban en el top 15 por cantidad quedaban invisibles, aunque estuvieran bien contados y se vieran perfecto en el tablero. Sacado el tope — el modal ya scrollea (overflow-y:auto), no hace falta cortar la lista. (2) La vista de Lista (no el Kanban) también tenía el mismo patrón incompleto que ya se había corregido en el Dashboard/Export — solo miraba c.carrito, no c.productos (formato viejo) — corregido para que las 3 vistas (Lista/Kanban/Dashboard/Export) miren siempre los mismos 2 campos. Confirmado con test: con 20 equipos distintos simulados, el ranking ahora muestra los 20, incluyendo el que antes quedaba afuera del top 15.) -->
@@ -55,6 +56,15 @@
         .filtros-superior-unificada { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 16px; }
         .filtros-wrap { display:flex; gap:6px; flex-wrap:wrap; }
         .buscador-wrap { flex:1 1 220px; min-width:180px; }
+
+        /* En pantallas angostas, el texto de "Dashboard"/"Excel" se
+           esconde (queda solo el ícono) — libera espacio real para
+           que el nombre del pipeline no quede cortado/tapado.
+           Reportado por Cristian con captura. */
+        @media (max-width: 700px) {
+            .btn-texto-angosto { display: none; }
+            #btn-dashboard-negocios, #btn-exportar-excel-negocios { padding: 8px 10px !important; }
+        }
         .buscador-wrap input { width:100%; }
         .filtros-wrap::-webkit-scrollbar { display:none; }
         .filtro-btn { flex-shrink:0; padding:5px 12px; border-radius:16px; border:1px solid #222e50; background:#1c2541; color:#94a3b8; font-size:11px; cursor:pointer; transition:all .15s; white-space:nowrap; }
@@ -723,10 +733,11 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
     </div>
 
     <!-- PIPELINE / CAMPAÑA -->
-    <div id="pipeline-selector-wrap" style="display:none; gap:6px; flex:0 1 210px; min-width:150px;">
+    <div id="pipeline-selector-wrap" style="display:none; gap:6px; flex:1 1 210px; min-width:170px;">
         <select id="select-pipeline" onchange="_onCambiarPipeline(this.value)"
-            style="flex:1; padding:8px 10px; background:#0f1a30; border:1px solid #3a86ff33;
-                   border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer;">
+            style="flex:1; min-width:0; padding:8px 10px; background:#0f1a30; border:1px solid #3a86ff33;
+                   border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer;
+                   text-overflow:ellipsis; white-space:nowrap; overflow:hidden;">
             <!-- Opciones fijas por defecto, para que el select NUNCA
                  se vea vacío al abrir — antes tenía CERO <option> acá
                  y dependía 100% de que _cargarPipelines() (un viaje
@@ -750,15 +761,25 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
          cuantificar equipos... y hacer un gráfico y ranking de los
          más pedidos?". Ambos operan sobre la lista YA FILTRADA en
          pantalla (respeta vendedor/pipeline/etapa/búsqueda activos) —
-         si querés Facoextrema solo, filtrá por ese pipeline primero. -->
-    <button onclick="_abrirDashboardNegocios()" title="Dashboard de negocios"
+         si querés Facoextrema solo, filtrá por ese pipeline primero.
+
+         BUG REAL — en pantallas angostas, estos 2 botones (con
+         flex-shrink:0, nunca se achican) le dejaban muy poco lugar al
+         selector de pipeline, que sí se comprime — el nombre del
+         pipeline quedaba cortado, pegado contra el botón Dashboard.
+         Ahora el texto de cada botón (no el ícono) se oculta en
+         pantallas chicas vía media query, liberando espacio real para
+         que el selector de pipeline se pueda leer. Reportado por
+         Cristian con captura: "entonces queda tapado por el boton del
+         dashboard". -->
+    <button id="btn-dashboard-negocios" onclick="_abrirDashboardNegocios()" title="Dashboard de negocios"
         style="flex-shrink:0; padding:8px 12px; border-radius:8px; background:#0f1a30;
                border:1px solid #3a86ff33; color:#3a86ff; font-size:12px; font-weight:700; cursor:pointer;
-               display:flex; align-items:center; gap:5px;">📊 Dashboard</button>
-    <button onclick="_exportarNegociosExcel()" title="Exportar a Excel"
+               display:flex; align-items:center; gap:5px;">📊 <span class="btn-texto-angosto">Dashboard</span></button>
+    <button id="btn-exportar-excel-negocios" onclick="_exportarNegociosExcel()" title="Exportar a Excel"
         style="flex-shrink:0; padding:8px 12px; border-radius:8px; background:#0f1a30;
                border:1px solid #06d6a033; color:#06d6a0; font-size:12px; font-weight:700; cursor:pointer;
-               display:flex; align-items:center; gap:5px;">⬇️ Excel</button>
+               display:flex; align-items:center; gap:5px;">⬇️ <span class="btn-texto-angosto">Excel</span></button>
 
     <!-- BUSCADOR -->
     <div class="buscador-wrap" id="buscador-wrap" style="display:none;">
@@ -888,7 +909,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.8';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.9';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
