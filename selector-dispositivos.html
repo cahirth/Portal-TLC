@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.19.1 (Nuevo botón "⬇️ Excel" en la vista de lista de equipos (junto a los de ordenar por Nombre/Precio) — exporta el stock de la lista YA VISIBLE en pantalla (respeta categoría/subcategoría/búsqueda activos) a un .xlsx real vía SheetJS (agregada al head), con columnas Nombre/Categoría/Sub Categoría/Marca/Stock/Disponible. Mismo criterio y estilo que el botón "⬇️ Excel" ya agregado en cotizaciones.html. Pedido por Cristian: "quiero bajar en un excel los stocks de cada categoria, ejemplo lupas, podes diseñar un boton como el excel de cotizaciones". Confirmado con test: exporta solo la categoría activa (no mezcla con otras), cada fila trae el Stock real y Disponible Sí/No, el nombre del archivo menciona la categoría exportada, y sin resultados avisa en vez de generar un Excel vacío.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.16.4 (BUG REAL — confirmado con el log de versión que el archivo SÍ estaba actualizado (v2026.08.16.3), así que el "sigue igual" de Cristian era un bug de código de verdad, no un tema de deploy. Causa: _sumarDefaultTildados (v2026.08.16.2) buscaba los módulos/Hijos en el array `dispositivos` — pero ESE array nunca tiene Hijos, se filtran a propósito desde v2026.08.14.6 (_esHijoDeOtroProducto, "no quiero ver los hijos en la lista de precios") para que no aparezcan como productos sueltos. La suma daba siempre 0 aunque el código corriera perfecto — el test anterior no lo detectó porque tenía los Hijos metidos directo en `dispositivos`, sin reflejar el filtrado real. Fix: nuevo array _catalogoCompleto (sin filtrar, con Hijos incluidos), guardado en los mismos 2 lugares donde se arma `dispositivos` (carga inicial y polling cada 10 min) — _sumarDefaultTildados ahora busca ahí. Test corregido para reflejar la arquitectura real (Hijos SOLO en _catalogoCompleto, dispositivos sin ellos como en producción) — con esa corrección, confirma el mismo caso exacto (50.500→50.900) que antes pasaba en falso.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.16.3 (Cristian reportó "sigue igual, esa diferencia" sobre el fix de precio con default tildados (v2026.08.16.2) — encontrado el motivo: el log de versión propio en consola (agregado en v2026.08.15.2) quedó HARDCODEADO como string suelto, y me olvidé de actualizarlo en cada bump siguiente — para cuando llegó este reporte, la consola seguía mostrando "v2026.08.15.1" pese a que el archivo real ya iba por v2026.08.16.2, así que no servía para confirmar nada. Convertido a una constante con nombre (_VERSION_ARCHIVO_SELECTOR) — actualizar ahí en cada entrega, un solo lugar bien visible en vez de un string perdido dentro del console.log. De paso, mismo arreglo preventivo en eventos.html y empresas.html, que tenían el mismo patrón de riesgo (coincidían con la versión real por ahora, pero se iban a desactualizar en la próxima vuelta si no se corregía). El fix de precio en sí (v2026.08.16.2) no se tocó — está bien, confirmado con el mismo test de antes, sigue en verde.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.16.2 (Precio de la tarjeta ahora incluye los módulos con Tildado_Default — antes mostraba SOLO el precio del Padre, mientras que ficha-equipo.html arranca con los módulos que tengan Tildado_Default=TRUE ya sumados al headline (v2026.08.15.4) — dos precios distintos para el mismo equipo según desde dónde lo mires. Pedido por Cristian con 2 capturas (selector vs ficha, HUVITZ HOCT-1 OCTavius: USD 50.500 vs USD 50.900 — la diferencia son los USD 400 de "Mesa Eléctrica"): "quiero que aparezca el precio de lista de imagen 2, hay una diferencia". Nueva función compartida _sumarDefaultTildados(d, precioBase, campoHijo), aplicada en los 2 lugares que arman tarjetas (renderLista y el buscador universal) — mismo criterio EXACTO de matcheo que ya usa ficha-equipo.html (Tildado_Default === true ó "TRUE" como string). El precio Contado de la tarjeta también se ajusta usando el campo Contado de cada módulo (no mezcla Lista con Contado). Confirmado con 4 tests: reproduce el caso exacto reportado (50.500→50.900), el Contado usa su propio campo, un equipo sin módulos default no cambia, y "Consultar" (sin precio de base) no se rompe.) -->
@@ -21,6 +22,11 @@
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<!-- SheetJS — solo para el botón "Exportar stock a Excel". Pedido por
+     Cristian: "quiero bajar en un excel los stocks de cada categoria,
+     ejemplo lupas, podes diseñar un boton como el excel de
+     cotizaciones". -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>TLC — Dispositivos</title>
@@ -1223,6 +1229,13 @@
                     style="flex:1; padding:6px 10px; border-radius:8px; border:1px solid #3a86ff; background:#3a86ff; color:#fff; font-size:11.5px; font-weight:700; cursor:pointer;">🔤 Nombre</button>
                 <button type="button" id="btn-orden-precio" onclick="_setOrdenDispositivos('precio')"
                     style="flex:1; padding:6px 10px; border-radius:8px; border:1px solid #222e50; background:transparent; color:#94a3b8; font-size:11.5px; font-weight:700; cursor:pointer;">💲 Precio</button>
+                <!-- Exportar stock — misma lista visible en pantalla
+                     (respeta categoría/subcategoría/búsqueda activos),
+                     mismo botón que ya existe en cotizaciones.html.
+                     Pedido por Cristian: "quiero bajar en un excel los
+                     stocks de cada categoria, ejemplo lupas". -->
+                <button type="button" onclick="_exportarStockCategoriaExcel()" title="Exportar stock a Excel"
+                    style="flex-shrink:0; padding:6px 12px; border-radius:8px; border:1px solid #06d6a033; background:transparent; color:#06d6a0; font-size:11.5px; font-weight:700; cursor:pointer;">⬇️ Excel</button>
             </div>
         </div>
         <div class="lista" id="lista">
@@ -1589,7 +1602,7 @@ const APP_VERSION = PORTAL_TLC_VERSION; console.log("%c TLC Portal v" + APP_VERS
 // Ahora es una constante con nombre bien visible — actualizar ACÁ en
 // cada entrega, un solo lugar, no un string perdido en medio de un
 // console.log.
-const _VERSION_ARCHIVO_SELECTOR = '2026.08.16.4';
+const _VERSION_ARCHIVO_SELECTOR = '2026.08.19.1';
 console.log("%c TLC Selector Dispositivos v" + _VERSION_ARCHIVO_SELECTOR + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 
@@ -3233,6 +3246,56 @@ function filtrar() {
         return true;
     });
     renderLista(_ordenarDispositivos(filtrados));
+}
+
+// ── Exportar stock a Excel — misma lista visible en pantalla (respeta
+//    categoría/subcategoría/búsqueda activos), mismo criterio que ya
+//    usa el botón "⬇️ Excel" de cotizaciones.html. Pedido por
+//    Cristian: "quiero bajar en un excel los stocks de cada
+//    categoria, ejemplo lupas, podes diseñar un boton como el excel
+//    de cotizaciones".
+function _exportarStockCategoriaExcel() {
+    if (typeof XLSX === 'undefined') { alert('No se pudo cargar el generador de Excel — revisá tu conexión y probá de nuevo.'); return; }
+
+    // Misma lógica EXACTA que filtrar() — para que el export coincida
+    // 1 a 1 con lo que se ve en pantalla en ese momento.
+    const q = sinAcentos((document.getElementById('buscador')?.value || '').trim());
+    const filtrados = dispositivos.filter(d => {
+        const nombre = sinAcentos(d['Nombre de Dispositivo']);
+        const desc   = sinAcentos(d['Descripcion']);
+        const subcat = sinAcentos(d['Sub Categoria'] || '');
+        const marca  = sinAcentos(d['Marca'] || '');
+        if (q) return nombre.includes(q) || desc.includes(q) || subcat.includes(q) || marca.includes(q);
+        if (!catActual) return true;
+        if (d['Categoria'] !== catActual) return false;
+        if (subcatActual !== 'TODAS') {
+            const dSub = (d['Sub Categoria'] || '').trim();
+            if (dSub !== subcatActual) return false;
+        }
+        return true;
+    });
+
+    if (!filtrados.length) { alert('No hay equipos para exportar con el filtro actual.'); return; }
+
+    const filas = _ordenarDispositivos(filtrados).map(function(d) {
+        const stockNum = parseFloat(d['Stock']);
+        return {
+            'Nombre de Dispositivo': d['Nombre de Dispositivo'] || '',
+            'Categoría': d['Categoria'] || '',
+            'Sub Categoría': d['Sub Categoria'] || '',
+            'Marca': d['Marca'] || '',
+            'Stock': !isNaN(stockNum) ? stockNum : 0,
+            'Disponible': (!isNaN(stockNum) && stockNum >= 1) ? 'Sí' : 'No',
+        };
+    });
+
+    const hoja = XLSX.utils.json_to_sheet(filas);
+    hoja['!cols'] = [ { wch: 38 }, { wch: 16 }, { wch: 20 }, { wch: 14 }, { wch: 9 }, { wch: 11 } ];
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, 'Stock');
+    const nombreCat = (subcatActual !== 'TODAS' ? subcatActual : (catActual || 'Catalogo')).replace(/[^a-zA-Z0-9]+/g, '-');
+    const fechaArchivo = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(libro, 'TLC-Stock-' + nombreCat + '-' + fechaArchivo + '.xlsx');
 }
 
 // ─── DETALLE ─────────────────────────────────────────────────────────────────
