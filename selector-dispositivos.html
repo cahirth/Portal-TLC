@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | selector-dispositivos.html | v2026.08.19.2 (3 correcciones sobre el botón de export de stock (v2026.08.19.1): (1) el botón se renombra de "Excel" a "Stock", mismo ícono ⬇️. (2) Agregadas 2 columnas al Excel: "Precio Lista (USD)" y "Precio Contado (USD)", separadas. (3) BUG DE FONDO — la franja sticky de "vista-lista" (buscador + Nombre/Precio/Stock) tenía el fondo y los estilos de los botones fijos en modo OSCURO desde siempre, sin integrarse nunca al sistema de temas del Portal — quedaba oscura aunque el resto de la pantalla estuviera en modo claro. Agregado id="lista-header-sticky" + overrides de tema claro para el fondo y el buscador; _setOrdenDispositivos() ahora elige colores según el tema activo (antes usaba un esquema fijo, lo que iba a chocar con un simple override CSS por !important al tener estado activo/inactivo dinámico). Reportado por Cristian con captura: "fijate que queda un modo oscuro esa parte, y estoy en modo claro... el boton que se llame stock y la flecha de download dejala, agrega al excel precio de lista y de contado en 2 columnas". Confirmado con 2 tests: el export trae Precio Lista/Contado en columnas separadas con el valor real, y _setOrdenDispositivos da colores claros en modo claro (sin romper el estado activo, que sigue azul) y colores oscuros en modo oscuro (regresión).) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.19.1 (Nuevo botón "⬇️ Excel" en la vista de lista de equipos (junto a los de ordenar por Nombre/Precio) — exporta el stock de la lista YA VISIBLE en pantalla (respeta categoría/subcategoría/búsqueda activos) a un .xlsx real vía SheetJS (agregada al head), con columnas Nombre/Categoría/Sub Categoría/Marca/Stock/Disponible. Mismo criterio y estilo que el botón "⬇️ Excel" ya agregado en cotizaciones.html. Pedido por Cristian: "quiero bajar en un excel los stocks de cada categoria, ejemplo lupas, podes diseñar un boton como el excel de cotizaciones". Confirmado con test: exporta solo la categoría activa (no mezcla con otras), cada fila trae el Stock real y Disponible Sí/No, el nombre del archivo menciona la categoría exportada, y sin resultados avisa en vez de generar un Excel vacío.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.16.4 (BUG REAL — confirmado con el log de versión que el archivo SÍ estaba actualizado (v2026.08.16.3), así que el "sigue igual" de Cristian era un bug de código de verdad, no un tema de deploy. Causa: _sumarDefaultTildados (v2026.08.16.2) buscaba los módulos/Hijos en el array `dispositivos` — pero ESE array nunca tiene Hijos, se filtran a propósito desde v2026.08.14.6 (_esHijoDeOtroProducto, "no quiero ver los hijos en la lista de precios") para que no aparezcan como productos sueltos. La suma daba siempre 0 aunque el código corriera perfecto — el test anterior no lo detectó porque tenía los Hijos metidos directo en `dispositivos`, sin reflejar el filtrado real. Fix: nuevo array _catalogoCompleto (sin filtrar, con Hijos incluidos), guardado en los mismos 2 lugares donde se arma `dispositivos` (carga inicial y polling cada 10 min) — _sumarDefaultTildados ahora busca ahí. Test corregido para reflejar la arquitectura real (Hijos SOLO en _catalogoCompleto, dispositivos sin ellos como en producción) — con esa corrección, confirma el mismo caso exacto (50.500→50.900) que antes pasaba en falso.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.08.16.3 (Cristian reportó "sigue igual, esa diferencia" sobre el fix de precio con default tildados (v2026.08.16.2) — encontrado el motivo: el log de versión propio en consola (agregado en v2026.08.15.2) quedó HARDCODEADO como string suelto, y me olvidé de actualizarlo en cada bump siguiente — para cuando llegó este reporte, la consola seguía mostrando "v2026.08.15.1" pese a que el archivo real ya iba por v2026.08.16.2, así que no servía para confirmar nada. Convertido a una constante con nombre (_VERSION_ARCHIVO_SELECTOR) — actualizar ahí en cada entrega, un solo lugar bien visible en vez de un string perdido dentro del console.log. De paso, mismo arreglo preventivo en eventos.html y empresas.html, que tenían el mismo patrón de riesgo (coincidían con la versión real por ahora, pero se iban a desactualizar en la próxima vuelta si no se corregía). El fix de precio en sí (v2026.08.16.2) no se tocó — está bien, confirmado con el mismo test de antes, sigue en verde.) -->
@@ -374,6 +375,22 @@
     }
     body.tema-claro .buscador input::placeholder { color: #94a3b8 !important; }
     body.tema-claro .buscador input:focus { border-color: #1a4b8c !important; }
+
+    /* Franja sticky de "vista-lista" (buscador + orden Nombre/Precio +
+       Stock) — tenía el fondo, el input y los 3 botones con colores
+       fijos de modo OSCURO en el HTML (nunca se integró al sistema de
+       temas), así que quedaba oscura aunque el resto de la pantalla
+       estuviera en modo claro. Reportado por Cristian con captura:
+       "fijate que queda un modo oscuro esa parte, y estoy en modo
+       claro". */
+    body.tema-claro #lista-header-sticky { background: #f8fafc !important; border-bottom-color: #e2e8f0 !important; }
+    body.tema-claro #lista-header-sticky #buscador {
+        background: #ffffff !important; border-color: #cbd5e1 !important; color: #0f172a !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E") !important;
+        background-repeat: no-repeat !important; background-position: 14px center !important;
+    }
+    body.tema-claro #lista-header-sticky #buscador::placeholder { color: #94a3b8 !important; }
+    body.tema-claro #btn-exportar-stock { background: #ffffff !important; border-color: #06d6a066 !important; color: #059669 !important; }
 
     /* ── Sticky buscador subcategorías ─────────────────────────── */
     body.tema-claro #vista-subcategorias > div[style*="sticky"] {
@@ -1214,7 +1231,7 @@
 
     <!-- PANTALLA LISTA -->
     <div id="vista-lista" style="display:none;">
-        <div style="position:sticky; top:62px; z-index:50; background:#030712; padding:8px 20px; border-bottom:1px solid #1c2541;">
+        <div id="lista-header-sticky" style="position:sticky; top:62px; z-index:50; background:#030712; padding:8px 20px; border-bottom:1px solid #1c2541;">
             <input type="text" id="buscador" placeholder="Buscar equipos, marcas o modelos..."
                 oninput="busquedaUniversal(this.value)"
                 style="width:100%; background:#1c2541; border:1px solid #222e50; border-radius:10px; padding:10px 16px 10px 40px; color:#f8fafc; font-size:14px; outline:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:14px center;">
@@ -1233,9 +1250,11 @@
                      (respeta categoría/subcategoría/búsqueda activos),
                      mismo botón que ya existe en cotizaciones.html.
                      Pedido por Cristian: "quiero bajar en un excel los
-                     stocks de cada categoria, ejemplo lupas". -->
-                <button type="button" onclick="_exportarStockCategoriaExcel()" title="Exportar stock a Excel"
-                    style="flex-shrink:0; padding:6px 12px; border-radius:8px; border:1px solid #06d6a033; background:transparent; color:#06d6a0; font-size:11.5px; font-weight:700; cursor:pointer;">⬇️ Excel</button>
+                     stocks de cada categoria, ejemplo lupas" / "el
+                     boton que se llame stock y la flecha de download
+                     dejala". -->
+                <button type="button" id="btn-exportar-stock" onclick="_exportarStockCategoriaExcel()" title="Exportar stock a Excel"
+                    style="flex-shrink:0; padding:6px 12px; border-radius:8px; border:1px solid #06d6a033; background:transparent; color:#06d6a0; font-size:11.5px; font-weight:700; cursor:pointer;">⬇️ Stock</button>
             </div>
         </div>
         <div class="lista" id="lista">
@@ -1602,7 +1621,7 @@ const APP_VERSION = PORTAL_TLC_VERSION; console.log("%c TLC Portal v" + APP_VERS
 // Ahora es una constante con nombre bien visible — actualizar ACÁ en
 // cada entrega, un solo lugar, no un string perdido en medio de un
 // console.log.
-const _VERSION_ARCHIVO_SELECTOR = '2026.08.19.1';
+const _VERSION_ARCHIVO_SELECTOR = '2026.08.19.2';
 console.log("%c TLC Selector Dispositivos v" + _VERSION_ARCHIVO_SELECTOR + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 const SHEET_ID     = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
 
@@ -3201,8 +3220,16 @@ window._setOrdenDispositivos = function(tipo) {
     _ordenActual = (tipo === 'precio') ? 'precio' : 'nombre';
     var btnNombre = document.getElementById('btn-orden-nombre');
     var btnPrecio = document.getElementById('btn-orden-precio');
+    // Colores según el tema activo — antes eran fijos (esquema oscuro
+    // siempre), así que el botón inactivo quedaba oscuro aunque el
+    // resto de la pantalla estuviera en modo claro. Reportado por
+    // Cristian con captura: "fijate que queda un modo oscuro esa
+    // parte, y estoy en modo claro".
+    var esClaro = document.body.classList.contains('tema-claro');
     var activo   = 'flex:1; padding:6px 10px; border-radius:8px; border:1px solid #3a86ff; background:#3a86ff; color:#fff; font-size:11.5px; font-weight:700; cursor:pointer;';
-    var inactivo = 'flex:1; padding:6px 10px; border-radius:8px; border:1px solid #222e50; background:transparent; color:#94a3b8; font-size:11.5px; font-weight:700; cursor:pointer;';
+    var inactivo = esClaro
+        ? 'flex:1; padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; background:#ffffff; color:#475569; font-size:11.5px; font-weight:700; cursor:pointer;'
+        : 'flex:1; padding:6px 10px; border-radius:8px; border:1px solid #222e50; background:transparent; color:#94a3b8; font-size:11.5px; font-weight:700; cursor:pointer;';
     if (btnNombre) btnNombre.style.cssText = (_ordenActual === 'nombre') ? activo : inactivo;
     if (btnPrecio) btnPrecio.style.cssText = (_ordenActual === 'precio') ? activo : inactivo;
 
@@ -3279,18 +3306,25 @@ function _exportarStockCategoriaExcel() {
 
     const filas = _ordenarDispositivos(filtrados).map(function(d) {
         const stockNum = parseFloat(d['Stock']);
+        const precioLista = parseFloat(d['Precio LISTA']);
+        const precioContado = parseFloat(d['Precio CONTADO CNO']);
         return {
             'Nombre de Dispositivo': d['Nombre de Dispositivo'] || '',
             'Categoría': d['Categoria'] || '',
             'Sub Categoría': d['Sub Categoria'] || '',
             'Marca': d['Marca'] || '',
+            // Precio de Lista y Contado en columnas separadas — pedido
+            // por Cristian: "agrega al excel precio de lista y de
+            // contado en 2 columnas".
+            'Precio Lista (USD)': !isNaN(precioLista) ? precioLista : '',
+            'Precio Contado (USD)': !isNaN(precioContado) ? precioContado : '',
             'Stock': !isNaN(stockNum) ? stockNum : 0,
             'Disponible': (!isNaN(stockNum) && stockNum >= 1) ? 'Sí' : 'No',
         };
     });
 
     const hoja = XLSX.utils.json_to_sheet(filas);
-    hoja['!cols'] = [ { wch: 38 }, { wch: 16 }, { wch: 20 }, { wch: 14 }, { wch: 9 }, { wch: 11 } ];
+    hoja['!cols'] = [ { wch: 38 }, { wch: 16 }, { wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 9 }, { wch: 11 } ];
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, 'Stock');
     const nombreCat = (subcatActual !== 'TODAS' ? subcatActual : (catActual || 'Catalogo')).replace(/[^a-zA-Z0-9]+/g, '-');
