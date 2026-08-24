@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.7 (Fix de layout en el ranking del Dashboard — "los que tienen mas de 1 renglon no se abren". Diagnóstico: el click en sí funciona bien a nivel DOM (confirmado con un test que dispara un evento click real, no solo llamando la función), pero nombres largos SIN espacios (ej. "IR/RF/AF/Mcolor/BV") podían desbordar el ancho del modal en vez de ajustarse — en el celular, eso corre visualmente la zona clickeable real fuera de lo que se ve en pantalla. Agregado word-break:break-word + flex-wrap:wrap + min-width:0 en el span del nombre, para que cualquier texto largo se ajuste siempre al ancho disponible. No pude probar esto en un celular real desde acá — si sigue sin abrir después de este fix, avisame con el nombre exacto del equipo que falla, para seguir buscando.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.6 (2 correcciones más sobre "no trae todos los equipos que aparecen en el tablero": (1) BUG REAL — el ranking del Dashboard tenía un tope fijo de 15 ítems (slice(0,15)) — con más de 15 equipos distintos entre los negocios filtrados, los que no entraban en el top 15 por cantidad quedaban invisibles, aunque estuvieran bien contados y se vieran perfecto en el tablero. Sacado el tope — el modal ya scrollea (overflow-y:auto), no hace falta cortar la lista. (2) La vista de Lista (no el Kanban) también tenía el mismo patrón incompleto que ya se había corregido en el Dashboard/Export — solo miraba c.carrito, no c.productos (formato viejo) — corregido para que las 3 vistas (Lista/Kanban/Dashboard/Export) miren siempre los mismos 2 campos. Confirmado con test: con 20 equipos distintos simulados, el ranking ahora muestra los 20, incluyendo el que antes quedaba afuera del top 15.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.5 (BUG REAL — "porque no me aparece el micro clear sky en el dashboard" → primero se sospechó de un filtro activo (vendedor/pipeline/fecha), pero Cristian confirmó "lo veo en el tablero, esta visible, no esta filtrado", descartando esa explicación. Causa real: algunos negocios (formato viejo, de antes de que existiera "carrito" como tal) guardan sus equipos en c.productos (array de strings sueltas), no en c.carrito (array de objetos). El Kanban y el buscador YA miraban los dos campos (ver aplicarFiltros/renderKanban) — pero el ranking del Dashboard y la columna Equipos del Export SOLO miraban carrito, así que un negocio "viejo" se veía perfecto en el tablero pero quedaba invisible en el Dashboard y en el Excel. Corregido en los dos lugares. De paso, se agregó un aviso "⚠️ Mostrando solo negocios que pasan estos filtros" arriba del Dashboard cuando hay vendedor/pipeline/etapa/fechas activos — para que la próxima vez que "falte" algo sea obvio de un vistazo si es por un filtro puesto o por otra cosa. Confirmado con test: un negocio con equipos solo en "productos" (MICRO CLEAR SKY) ahora aparece tanto en el ranking como en el Excel.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.4 (Cada fila del ranking "Equipos más pedidos" del Dashboard ahora es clickeable — al tocarla, cierra el Dashboard, carga el nombre exacto del equipo en el buscador principal (el mismo de siempre, que ya matchea contra el carrito) y muestra la lista filtrada, para ver de una todos los negocios que lo incluyen. Pedido por Cristian: "quiero tildar un equipo, ej 5500A y que me traiga todos esos negocios". Confirmado con test: tocar "SUNKINGDOM SK-5500A" en el ranking cierra el modal, carga el buscador, y muestra exactamente los 2 negocios que lo incluyen (ni el que no lo tiene, ni ninguno de más).) -->
@@ -886,7 +887,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.6';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.7';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -3580,9 +3581,15 @@ window._abrirDashboardNegocios = function() {
             return '<div onclick="_filtrarPorEquipoDesdeDashboard(\'' + nombreJs + '\')" title="Ver los negocios que incluyen este equipo" ' +
                 'style="margin-bottom:9px;cursor:pointer;padding:4px;border-radius:6px;transition:background .15s;" ' +
                 'onmouseover="this.style.background=\'#1e304055\'" onmouseout="this.style.background=\'transparent\'">' +
-                '<div style="display:flex;justify-content:space-between;font-size:12px;color:#f1f5f9;margin-bottom:3px;">' +
-                    '<span>' + (i+1) + '. ' + _escCot(r.nombre) + '</span>' +
-                    '<span style="font-weight:700;color:#3a86ff;">' + r.cantidad + '</span></div>' +
+                // flex-wrap + word-break — nombres largos sin espacios
+                // (ej. "IR/RF/AF/Mcolor/BV") podían desbordar el ancho
+                // del modal en vez de ajustarse, corriendo la zona
+                // clickeable real fuera de lo que se veía en pantalla
+                // en el celular. Reportado por Cristian: "los que
+                // tienen mas de 1 renglon no se abren".
+                '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px;font-size:12px;color:#f1f5f9;margin-bottom:3px;">' +
+                    '<span style="min-width:0;word-break:break-word;flex:1 1 auto;">' + (i+1) + '. ' + _escCot(r.nombre) + '</span>' +
+                    '<span style="font-weight:700;color:#3a86ff;flex-shrink:0;">' + r.cantidad + '</span></div>' +
                 '<div style="background:#0a1424;border-radius:6px;height:8px;overflow:hidden;">' +
                     '<div style="background:linear-gradient(90deg,#3a86ff,#06d6a0);height:100%;width:' + pct + '%;"></div></div>' +
             '</div>';
