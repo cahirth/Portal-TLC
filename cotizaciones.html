@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.4 (Cada fila del ranking "Equipos más pedidos" del Dashboard ahora es clickeable — al tocarla, cierra el Dashboard, carga el nombre exacto del equipo en el buscador principal (el mismo de siempre, que ya matchea contra el carrito) y muestra la lista filtrada, para ver de una todos los negocios que lo incluyen. Pedido por Cristian: "quiero tildar un equipo, ej 5500A y que me traiga todos esos negocios". Confirmado con test: tocar "SUNKINGDOM SK-5500A" en el ranking cierra el modal, carga el buscador, y muestra exactamente los 2 negocios que lo incluyen (ni el que no lo tiene, ni ninguno de más).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.3 (2 ajustes al Dashboard/filtros de negocios: (1) "Mesa Eléctrica" queda excluida del ranking de equipos más pedidos — viene incluida por defecto con varios equipos (Tildado_Default), así que contarla infla el ranking sin decir nada real sobre qué se pide más. Sigue apareciendo normal en la columna Equipos del export, ahí sí es un registro fiel del carrito. Pedido por Cristian: "las mesas electricas no las tengas en cuenta porque se incluyen con los equipos". (2) Nuevo filtro de rango de fechas (Desde/Hasta) en la barra de filtros — afecta a cotFiltradas igual que el resto de los filtros, así que también alcanza al Dashboard y al Export Excel automáticamente, sin tocarlos aparte. Pedido por Cristian: "me gustaria filtrar por rango de fechas en los filtros tbien". Confirmado con test: el ranking ya no incluye Mesa Eléctrica aunque esté en el carrito; y el filtro de fechas (Desde solo, Desde+Hasta, y limpiar) reduce/restaura la lista visible correctamente.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.2 (Nuevo Dashboard de Negocios (botón "📊 Dashboard" junto al selector de pipeline) — KPIs básicos (cantidad de negocios, monto total, equipos distintos) + ranking de los equipos más pedidos (cuántos negocios distintos incluyen cada uno), con barras simples en CSS, sin librería nueva. Nuevo botón "⬇️ Excel" — exporta la lista YA FILTRADA en pantalla (respeta vendedor/pipeline/etapa/búsqueda activos) a un .xlsx real vía SheetJS (agregada al head), con columnas ID/Cliente/Vendedor/Pipeline/Estado/Equipos/Monto/Fecha. Los dos operan sobre TODOS los pipelines por defecto — si se quiere solo FacoExtrema, se filtra por ese pipeline primero y después se abre el Dashboard o se exporta. Forma de pago quedó afuera a propósito, confirmado con Cristian — ese dato vive en el presupuesto de cada negocio (no en la lista ya cargada) y pedirlo uno por uno sería lento. Pedido por Cristian: "En el pipeline de Facoextrema podemos exportar los negocios? Y podés hacer un dashboard de los negocios, cuantificar equipos... y hacer un gráfico y ranking de los más pedidos?". Confirmado con test: KPIs correctos, ranking ordenado por cantidad de negocios que incluyen cada equipo, y el export arma las filas exactas con el pipeline resuelto a su nombre real.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.1 (BUG REAL — "a veces los pipeline tardan en cargarse... la abrís y no hay nada... tarda un rato, se arregla solo". Causa: el <select id="select-pipeline"> arrancaba con CERO <option> en el HTML crudo, y solo se llenaba cuando _cargarPipelines() (un POST al backend GAS — /config no tiene lectura pública en Firebase, así que no se puede leer directo como el resto — puede tardar) terminaba, sin await, en paralelo con el resto del arranque. Fix en 2 capas: (1) el select ahora arranca con 2 opciones fijas en el HTML crudo ("Ver Todos los Pipelines" / "Pipeline General"), nunca vacío, aunque el backend todavía no respondió. (2) Nuevo caché de la lista real en localStorage (tlc_cache_pipelines, mismo criterio que ya usan empresas.html/eventos.html) — de la segunda visita en adelante, la lista REAL de pipelines aparece al instante, sin esperar el viaje lento, que igual sigue corriendo atrás para traer el dato fresco. Confirmado con 2 tests: sin caché el select nunca queda vacío, y con caché de una visita anterior la lista real se ve ANTES de que termine el pedido lento simulado.) -->
@@ -883,7 +884,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.3';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.4';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -3505,7 +3506,12 @@ window._abrirDashboardNegocios = function() {
             '<div style="font-size:9.5px;color:#94a3b8;text-transform:uppercase;">Equipos distintos</div></div>';
 
     // ── Ranking — barras simples en CSS (sin librería nueva), ancho
-    //    proporcional al máximo del top 15. ──
+    //    proporcional al máximo del top 15. Cada fila es clickeable —
+    //    al tocarla, filtra la lista principal por ese equipo (mismo
+    //    buscador de siempre, que ya matchea contra el carrito) y
+    //    cierra el Dashboard, para ver de una todos los negocios que
+    //    lo incluyen. Pedido por Cristian: "quiero tildar un equipo,
+    //    ej 5500A y que me traiga todos esos negocios". ──
     var elRanking = document.getElementById('dash-negocios-ranking');
     if (!ranking.length) {
         elRanking.innerHTML = '<div style="color:#64748b;font-size:12.5px;text-align:center;padding:20px 0;">No hay negocios con equipos cargados en este filtro.</div>';
@@ -3513,7 +3519,10 @@ window._abrirDashboardNegocios = function() {
         var maxCantidad = ranking[0].cantidad;
         elRanking.innerHTML = ranking.map(function(r, i) {
             var pct = Math.max(6, Math.round((r.cantidad / maxCantidad) * 100));
-            return '<div style="margin-bottom:9px;">' +
+            var nombreJs = r.nombre.replace(/'/g, "\\'");
+            return '<div onclick="_filtrarPorEquipoDesdeDashboard(\'' + nombreJs + '\')" title="Ver los negocios que incluyen este equipo" ' +
+                'style="margin-bottom:9px;cursor:pointer;padding:4px;border-radius:6px;transition:background .15s;" ' +
+                'onmouseover="this.style.background=\'#1e304055\'" onmouseout="this.style.background=\'transparent\'">' +
                 '<div style="display:flex;justify-content:space-between;font-size:12px;color:#f1f5f9;margin-bottom:3px;">' +
                     '<span>' + (i+1) + '. ' + _escCot(r.nombre) + '</span>' +
                     '<span style="font-weight:700;color:#3a86ff;">' + r.cantidad + '</span></div>' +
@@ -3528,6 +3537,20 @@ window._abrirDashboardNegocios = function() {
 
 window._cerrarDashboardNegocios = function() {
     document.getElementById('modal-dashboard-negocios').style.display = 'none';
+};
+
+// ── Drill-down desde el ranking — cierra el Dashboard, carga el
+//    nombre del equipo en el buscador de siempre (que ya matchea
+//    contra el carrito, ver aplicarFiltros) y fuerza la vista de
+//    lista para que se vean de una los negocios resultantes. Pedido
+//    por Cristian: "quiero tildar un equipo, ej 5500A y que me traiga
+//    todos esos negocios".
+window._filtrarPorEquipoDesdeDashboard = function(nombreEquipo) {
+    _cerrarDashboardNegocios();
+    var elBuscador = document.getElementById('buscador');
+    if (elBuscador) elBuscador.value = nombreEquipo;
+    aplicarFiltros();
+    setVista('lista');
 };
 
 // ── Exportar Excel — misma lista YA FILTRADA en pantalla
