@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.5 (BUG REAL — "porque no me aparece el micro clear sky en el dashboard" → primero se sospechó de un filtro activo (vendedor/pipeline/fecha), pero Cristian confirmó "lo veo en el tablero, esta visible, no esta filtrado", descartando esa explicación. Causa real: algunos negocios (formato viejo, de antes de que existiera "carrito" como tal) guardan sus equipos en c.productos (array de strings sueltas), no en c.carrito (array de objetos). El Kanban y el buscador YA miraban los dos campos (ver aplicarFiltros/renderKanban) — pero el ranking del Dashboard y la columna Equipos del Export SOLO miraban carrito, así que un negocio "viejo" se veía perfecto en el tablero pero quedaba invisible en el Dashboard y en el Excel. Corregido en los dos lugares. De paso, se agregó un aviso "⚠️ Mostrando solo negocios que pasan estos filtros" arriba del Dashboard cuando hay vendedor/pipeline/etapa/fechas activos — para que la próxima vez que "falte" algo sea obvio de un vistazo si es por un filtro puesto o por otra cosa. Confirmado con test: un negocio con equipos solo en "productos" (MICRO CLEAR SKY) ahora aparece tanto en el ranking como en el Excel.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.4 (Cada fila del ranking "Equipos más pedidos" del Dashboard ahora es clickeable — al tocarla, cierra el Dashboard, carga el nombre exacto del equipo en el buscador principal (el mismo de siempre, que ya matchea contra el carrito) y muestra la lista filtrada, para ver de una todos los negocios que lo incluyen. Pedido por Cristian: "quiero tildar un equipo, ej 5500A y que me traiga todos esos negocios". Confirmado con test: tocar "SUNKINGDOM SK-5500A" en el ranking cierra el modal, carga el buscador, y muestra exactamente los 2 negocios que lo incluyen (ni el que no lo tiene, ni ninguno de más).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.3 (2 ajustes al Dashboard/filtros de negocios: (1) "Mesa Eléctrica" queda excluida del ranking de equipos más pedidos — viene incluida por defecto con varios equipos (Tildado_Default), así que contarla infla el ranking sin decir nada real sobre qué se pide más. Sigue apareciendo normal en la columna Equipos del export, ahí sí es un registro fiel del carrito. Pedido por Cristian: "las mesas electricas no las tengas en cuenta porque se incluyen con los equipos". (2) Nuevo filtro de rango de fechas (Desde/Hasta) en la barra de filtros — afecta a cotFiltradas igual que el resto de los filtros, así que también alcanza al Dashboard y al Export Excel automáticamente, sin tocarlos aparte. Pedido por Cristian: "me gustaria filtrar por rango de fechas en los filtros tbien". Confirmado con test: el ranking ya no incluye Mesa Eléctrica aunque esté en el carrito; y el filtro de fechas (Desde solo, Desde+Hasta, y limpiar) reduce/restaura la lista visible correctamente.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.2 (Nuevo Dashboard de Negocios (botón "📊 Dashboard" junto al selector de pipeline) — KPIs básicos (cantidad de negocios, monto total, equipos distintos) + ranking de los equipos más pedidos (cuántos negocios distintos incluyen cada uno), con barras simples en CSS, sin librería nueva. Nuevo botón "⬇️ Excel" — exporta la lista YA FILTRADA en pantalla (respeta vendedor/pipeline/etapa/búsqueda activos) a un .xlsx real vía SheetJS (agregada al head), con columnas ID/Cliente/Vendedor/Pipeline/Estado/Equipos/Monto/Fecha. Los dos operan sobre TODOS los pipelines por defecto — si se quiere solo FacoExtrema, se filtra por ese pipeline primero y después se abre el Dashboard o se exporta. Forma de pago quedó afuera a propósito, confirmado con Cristian — ese dato vive en el presupuesto de cada negocio (no en la lista ya cargada) y pedirlo uno por uno sería lento. Pedido por Cristian: "En el pipeline de Facoextrema podemos exportar los negocios? Y podés hacer un dashboard de los negocios, cuantificar equipos... y hacer un gráfico y ranking de los más pedidos?". Confirmado con test: KPIs correctos, ranking ordenado por cantidad de negocios que incluyen cada equipo, y el export arma las filas exactas con el pipeline resuelto a su nombre real.) -->
@@ -884,7 +885,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.4';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.5';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -3480,8 +3481,21 @@ window._abrirDashboardNegocios = function() {
     var totalUSD = 0;
     lista.forEach(function(c) {
         totalUSD += _monto(c);
-        (c.carrito || []).forEach(function(it) {
-            var nombre = (it.nombre || '').trim();
+        // BUG REAL — algunos negocios (formato viejo, cargados antes
+        // de que existiera "carrito" como tal) guardan sus equipos en
+        // c.productos (array de strings sueltas), no en c.carrito
+        // (array de objetos {nombre,...}). El Kanban y el buscador YA
+        // miran los dos campos (ver aplicarFiltros, renderKanban) —
+        // el ranking del Dashboard solo miraba carrito, así que un
+        // negocio "viejo" quedaba invisible en el ranking aunque se
+        // viera perfecto en el tablero. Reportado por Cristian: "lo
+        // veo en el tablero, esta visible, no esta filtrado".
+        var nombresEquipos = [
+            ...(c.carrito || []).map(function(it) { return it.nombre; }),
+            ...(Array.isArray(c.productos) ? c.productos : []),
+        ];
+        nombresEquipos.forEach(function(nombreRaw) {
+            var nombre = (nombreRaw || '').trim();
             if (!nombre) return;
             if (EQUIPOS_EXCLUIDOS_RANKING.indexOf(nombre.toLowerCase()) !== -1) return;
             conteoEquipos[nombre] = (conteoEquipos[nombre] || 0) + 1;
@@ -3492,6 +3506,32 @@ window._abrirDashboardNegocios = function() {
         .map(function(nombre) { return { nombre: nombre, cantidad: conteoEquipos[nombre] }; })
         .sort(function(a, b) { return b.cantidad - a.cantidad; })
         .slice(0, 15); // top 15 — más que eso no aporta en un dashboard chico
+
+    // ── Aviso de filtros activos — sin esto, si faltaba un equipo en
+    //    el ranking por tener un filtro puesto atrás (vendedor,
+    //    pipeline, etapa o fechas), parecía un bug ("¿por qué no me
+    //    aparece el Micro Clear Sky?") cuando en realidad el Dashboard
+    //    estaba haciendo exactamente lo que debía: mostrar solo los
+    //    negocios que pasan los filtros actuales. Reportado por
+    //    Cristian: "porque no me aparece el micro clear sky en el
+    //    dashboard". ──
+    var partesFiltro = [];
+    if (vendedorActivo) partesFiltro.push('Vendedor: ' + vendedorActivo);
+    if (pipelineActual !== 'TODOS') {
+        var pipelineObjFiltro = PIPELINES.find(function(p) { return p.id === pipelineActual; });
+        partesFiltro.push('Pipeline: ' + (pipelineObjFiltro ? pipelineObjFiltro.nombre : (pipelineActual === 'GENERAL' ? 'General' : pipelineActual)));
+    }
+    if (filtroEstado !== 'TODOS') partesFiltro.push('Etapa: ' + filtroEstado);
+    var fDesdeFiltro = (document.getElementById('filtro-fecha-desde') || {}).value || '';
+    var fHastaFiltro = (document.getElementById('filtro-fecha-hasta') || {}).value || '';
+    if (fDesdeFiltro || fHastaFiltro) partesFiltro.push('Fechas: ' + (fDesdeFiltro || '…') + ' a ' + (fHastaFiltro || '…'));
+    var elAvisoFiltros = document.getElementById('dash-negocios-filtros-activos');
+    if (partesFiltro.length) {
+        elAvisoFiltros.innerHTML = '⚠️ Mostrando solo negocios que pasan estos filtros: <b>' + partesFiltro.join(' · ') + '</b>';
+        elAvisoFiltros.style.display = 'block';
+    } else {
+        elAvisoFiltros.style.display = 'none';
+    }
 
     // ── Resumen (KPIs) ──
     document.getElementById('dash-negocios-resumen').innerHTML =
@@ -3571,7 +3611,10 @@ window._exportarNegociosExcel = function() {
             'Vendedor': c.vendedor || '',
             'Pipeline': pipelineObj ? pipelineObj.nombre : (c.pipeline_id ? c.pipeline_id : 'General'),
             'Estado': c.estado || '',
-            'Equipos': (c.carrito || []).map(function(it) { return it.nombre; }).join(' · '),
+            'Equipos': [
+                ...(c.carrito || []).map(function(it) { return it.nombre; }),
+                ...(Array.isArray(c.productos) ? c.productos : []),
+            ].filter(Boolean).join(' · '),
             'Monto (USD)': Math.round(_monto(c)),
             'Fecha': c.fechaCreacion || c.fecha || '',
         };
@@ -4842,6 +4885,7 @@ window._confirmarOrdenPreparacion = async function() {
       <div style="font-size:15px;font-weight:800;color:#f1f5f9;">📊 Dashboard de Negocios</div>
       <button onclick="_cerrarDashboardNegocios()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
     </div>
+    <div id="dash-negocios-filtros-activos" style="display:none;font-size:11px;color:#f8961e;background:#f8961e14;border:1px solid #f8961e33;border-radius:8px;padding:8px 10px;margin-bottom:14px;"></div>
     <div id="dash-negocios-resumen" style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;"></div>
     <div style="font-size:11px;font-weight:700;color:#3a86ff;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">🏆 Equipos más pedidos</div>
     <div id="dash-negocios-ranking"></div>
