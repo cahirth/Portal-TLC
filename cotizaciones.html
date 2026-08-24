@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.6 (2 correcciones más sobre "no trae todos los equipos que aparecen en el tablero": (1) BUG REAL — el ranking del Dashboard tenía un tope fijo de 15 ítems (slice(0,15)) — con más de 15 equipos distintos entre los negocios filtrados, los que no entraban en el top 15 por cantidad quedaban invisibles, aunque estuvieran bien contados y se vieran perfecto en el tablero. Sacado el tope — el modal ya scrollea (overflow-y:auto), no hace falta cortar la lista. (2) La vista de Lista (no el Kanban) también tenía el mismo patrón incompleto que ya se había corregido en el Dashboard/Export — solo miraba c.carrito, no c.productos (formato viejo) — corregido para que las 3 vistas (Lista/Kanban/Dashboard/Export) miren siempre los mismos 2 campos. Confirmado con test: con 20 equipos distintos simulados, el ranking ahora muestra los 20, incluyendo el que antes quedaba afuera del top 15.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.5 (BUG REAL — "porque no me aparece el micro clear sky en el dashboard" → primero se sospechó de un filtro activo (vendedor/pipeline/fecha), pero Cristian confirmó "lo veo en el tablero, esta visible, no esta filtrado", descartando esa explicación. Causa real: algunos negocios (formato viejo, de antes de que existiera "carrito" como tal) guardan sus equipos en c.productos (array de strings sueltas), no en c.carrito (array de objetos). El Kanban y el buscador YA miraban los dos campos (ver aplicarFiltros/renderKanban) — pero el ranking del Dashboard y la columna Equipos del Export SOLO miraban carrito, así que un negocio "viejo" se veía perfecto en el tablero pero quedaba invisible en el Dashboard y en el Excel. Corregido en los dos lugares. De paso, se agregó un aviso "⚠️ Mostrando solo negocios que pasan estos filtros" arriba del Dashboard cuando hay vendedor/pipeline/etapa/fechas activos — para que la próxima vez que "falte" algo sea obvio de un vistazo si es por un filtro puesto o por otra cosa. Confirmado con test: un negocio con equipos solo en "productos" (MICRO CLEAR SKY) ahora aparece tanto en el ranking como en el Excel.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.4 (Cada fila del ranking "Equipos más pedidos" del Dashboard ahora es clickeable — al tocarla, cierra el Dashboard, carga el nombre exacto del equipo en el buscador principal (el mismo de siempre, que ya matchea contra el carrito) y muestra la lista filtrada, para ver de una todos los negocios que lo incluyen. Pedido por Cristian: "quiero tildar un equipo, ej 5500A y que me traiga todos esos negocios". Confirmado con test: tocar "SUNKINGDOM SK-5500A" en el ranking cierra el modal, carga el buscador, y muestra exactamente los 2 negocios que lo incluyen (ni el que no lo tiene, ni ninguno de más).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.3 (2 ajustes al Dashboard/filtros de negocios: (1) "Mesa Eléctrica" queda excluida del ranking de equipos más pedidos — viene incluida por defecto con varios equipos (Tildado_Default), así que contarla infla el ranking sin decir nada real sobre qué se pide más. Sigue apareciendo normal en la columna Equipos del export, ahí sí es un registro fiel del carrito. Pedido por Cristian: "las mesas electricas no las tengas en cuenta porque se incluyen con los equipos". (2) Nuevo filtro de rango de fechas (Desde/Hasta) en la barra de filtros — afecta a cotFiltradas igual que el resto de los filtros, así que también alcanza al Dashboard y al Export Excel automáticamente, sin tocarlos aparte. Pedido por Cristian: "me gustaria filtrar por rango de fechas en los filtros tbien". Confirmado con test: el ranking ya no incluye Mesa Eléctrica aunque esté en el carrito; y el filtro de fechas (Desde solo, Desde+Hasta, y limpiar) reduce/restaura la lista visible correctamente.) -->
@@ -885,7 +886,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.5';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.6';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2245,7 +2246,16 @@ function renderLista() {
         const idxReal  = todasLasCot.indexOf(c);
         const id       = c.idCot || c.id_cotizacion || String(c.id || '') || '—';
         const cliente  = c.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
-        const equipos  = (c.carrito||[]).map(i => i.nombre).join(' · ') || '—';
+        // BUG REAL — solo miraba carrito, no productos (formato viejo)
+        // — negocios sin carrito mostraban "—" en esta vista aunque el
+        // Kanban SÍ les mostrara sus equipos. Reportado por Cristian:
+        // "revisa el dashboard, no trae todos los equipos que aparecen
+        // en el tablero" — mismo patrón que ya se corrigió en el
+        // Dashboard y el Export, faltaba acá también.
+        const equipos  = [
+            ...(c.carrito || []).map(function(it) { return it.nombre; }),
+            ...(Array.isArray(c.productos) ? c.productos : []),
+        ].filter(Boolean).join(' · ') || '—';
         const fecha    = _fmtFechaHora(c.fechaCreacion || c.fecha);
         const monto    = _monto(c);
         const estadoCss = ESTADO_CSS[c.estado] || 'e-cotizacion';
@@ -3502,10 +3512,17 @@ window._abrirDashboardNegocios = function() {
         });
     });
 
+    // BUG REAL — el tope de 15 (slice(0,15)) dejaba afuera cualquier
+    // equipo que no entrara en el top 15 por cantidad, aunque SÍ
+    // estuviera bien contado — con más de 15 equipos distintos en los
+    // negocios filtrados, varios quedaban invisibles en el ranking
+    // pese a verse perfecto en el tablero. El modal ya scrollea
+    // (overflow-y:auto), así que no hace falta cortar la lista.
+    // Reportado por Cristian: "revisa el dashboard, no trae todos los
+    // equipos que aparecen en el tablero".
     var ranking = Object.keys(conteoEquipos)
         .map(function(nombre) { return { nombre: nombre, cantidad: conteoEquipos[nombre] }; })
-        .sort(function(a, b) { return b.cantidad - a.cantidad; })
-        .slice(0, 15); // top 15 — más que eso no aporta en un dashboard chico
+        .sort(function(a, b) { return b.cantidad - a.cantidad; });
 
     // ── Aviso de filtros activos — sin esto, si faltaba un equipo en
     //    el ranking por tener un filtro puesto atrás (vendedor,
