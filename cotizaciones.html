@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.11 (Nuevo filtro por Colaborador, junto al de Vendedor — mismo patrón, misma lista (listaVendedores), con "Todos los colaboradores" para sacarlo. Nueva variable colaboradorActivo, aplicada en aplicarFiltros() junto a los demás filtros (estado/búsqueda/pipeline/fechas). Solo visible para quien ya tiene permiso de ver el dropdown de Vendedor (mismo criterio de administración). Pedido por Cristian: "pusiste un filtro tbien para colaborador?". Confirmado con test: el selector trae los mismos nombres que Vendedor, sin filtro se ven todos los negocios, filtrando por un colaborador puntual solo se ven los que lo tienen asignado, y volviendo a "Todos" se ven todos de nuevo.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.10 (Nuevo campo "Colaborador" en el detalle del negocio — justo debajo de Vendedor, en la MISMA tarjeta (un grid de 2 columnas pondría cualquier tarjeta nueva al lado, no abajo, así que se combinaron en una sola). Misma lista desplegable que Vendedor (listaVendedores), más una opción "Sin colaborador" para dejarlo vacío. No afecta comisión ni el "dueño" del negocio — eso lo sigue manejando Vendedor. Nueva acción de backend actualizarColaborador (ver FotoMap.gs v188) con el mismo patrón robusto RTDB-primero que ya se corrigió en reasignarVendedor — se construyó bien desde el arranque, no repite el bug viejo. Pedido por Cristian con captura: "ademas de vendedor, podemos agregar un campo de Colaborador?, justo abajo de vendedor, con lista desplegable trayendo todos los usuarios que traes como vendedor, en cotizaciones obvio". Confirmado con test de punta a punta: el select existe en la misma tarjeta que Vendedor, trae la misma lista de nombres, y al elegir uno se manda al backend correctamente.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.9 (BUG REAL de layout en pantallas angostas — los botones "📊 Dashboard" y "⬇️ Excel" tenían flex-shrink:0 (nunca se achican), dejándole muy poco espacio al selector de pipeline (que sí se comprime hasta min-width) — el nombre del pipeline quedaba cortado, pegado contra el botón Dashboard. Fix: el TEXTO de esos 2 botones (no el ícono) se esconde en pantallas ≤700px vía media query, liberando espacio real; de paso, el selector de pipeline pasó de flex:0 1 210px a flex:1 1 210px (ahora también puede crecer, no solo achicarse) con min-width subido de 150 a 170px. Reportado por Cristian con captura: "entonces queda tapado por el boton del dashboard, chequealo". No pude verificar esto visualmente desde acá (jsdom no calcula layout real) — avisame si en el celular sigue viéndose mal.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.8 (Segunda vuelta sobre "los que tienen mas de 1 linea no se abren" — el fix anterior (v2026.08.19.7, flex-wrap + word-break) no alcanzó: Cristian confirmó "andan todos excepto los que tienen mas de 1 linea que son 2 o 3". Causa real más probable: el header de cada fila (número+nombre+contador) usaba display:flex, un layout que con nombres de 2-3 líneas podía desalinear visualmente el contador o correr la fila fuera de donde el navegador registraba el click — el click en sí funcionaba a nivel DOM, pero visualmente el vendedor tocaba otra cosa. Rediseñado SIN flex — todo en un párrafo de bloque normal (número, nombre y "(cantidad)" en el mismo texto fluido), imposible de desalinear sin importar cuántas líneas ocupe. De paso, escapado más robusto del nombre para el onclick: antes solo neutralizaba comillas simples — un nombre real con comilla DOBLE (común en specs con medidas en pulgadas) rompía el atributo onclick="..." entero, dejando HTML inválido. Ahora también neutraliza comillas dobles (a entidad HTML) y barras invertidas. Confirmado con test usando CLICK REAL (dispatchEvent, no solo llamar la función) sobre una fila de nombre largo real (la de la captura de Cristian) y sobre una fila con comilla doble adentro del nombre — las dos funcionan de punta a punta.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.7 (Fix de layout en el ranking del Dashboard — "los que tienen mas de 1 renglon no se abren". Diagnóstico: el click en sí funciona bien a nivel DOM (confirmado con un test que dispara un evento click real, no solo llamando la función), pero nombres largos SIN espacios (ej. "IR/RF/AF/Mcolor/BV") podían desbordar el ancho del modal en vez de ajustarse — en el celular, eso corre visualmente la zona clickeable real fuera de lo que se ve en pantalla. Agregado word-break:break-word + flex-wrap:wrap + min-width:0 en el span del nombre, para que cualquier texto largo se ajuste siempre al ancho disponible. No pude probar esto en un celular real desde acá — si sigue sin abrir después de este fix, avisame con el nombre exacto del equipo que falla, para seguir buscando.) -->
@@ -732,6 +734,17 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
         </select>
     </div>
 
+    <!-- Filtro por Colaborador — mismo patrón que el de Vendedor,
+         mismo criterio de administración (solo lo ve quien puede ver
+         el de vendedor). Pedido por Cristian: "pusiste un filtro tbien
+         para colaborador?". -->
+    <div id="colaborador-selector-wrap" style="display:none; flex:0 1 180px; max-width:200px;">
+        <select id="colaborador-selector" onchange="selColaborador(this.value)"
+            style="width:100%; padding:7px 12px; background:#0f1a30; border:1px solid #3a86ff33;
+                   border-radius:8px; color:#f1f5f9; font-size:12px; outline:none; cursor:pointer;">
+        </select>
+    </div>
+
     <!-- PIPELINE / CAMPAÑA -->
     <div id="pipeline-selector-wrap" style="display:none; gap:6px; flex:1 1 210px; min-width:170px;">
         <select id="select-pipeline" onchange="_onCambiarPipeline(this.value)"
@@ -909,7 +922,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.9';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.11';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1185,6 +1198,7 @@ let cotActual         = null;
 let vistaActual       = 'lista';
 let filtroEstado      = 'TODOS';
 let vendedorActivo    = null; // null = el propio usuario; string = nombre elegido por admin
+let colaboradorActivo = null; // null = sin filtrar; string = nombre elegido en el dropdown de Colaborador
 
 // ─── INIT ────────────────────────────────────────────────────────
 function _leerSesionCompartida() {
@@ -1971,6 +1985,7 @@ async function init() {
 
     // Configurar dropdown según permisos
     _configurarDropdownVendedor();
+    _configurarDropdownColaborador();
 
     await cargar();
     // Si hay pipelines cacheados de una visita anterior, se muestran
@@ -2074,6 +2089,35 @@ function selVendedor(valor) {
     aplicarFiltros();
 }
 
+// ─── DROPDOWN COLABORADOR — mismo patrón que Vendedor, pero filtra
+// por el campo c.colaborador en vez de c.vendedor (ver aplicarFiltros
+// más abajo). Pedido por Cristian: "pusiste un filtro tbien para
+// colaborador?". ────────────────────────────────────────────────
+function _configurarDropdownColaborador() {
+    const wrap = document.getElementById('colaborador-selector-wrap');
+    const sel  = document.getElementById('colaborador-selector');
+    if (!wrap || !sel) return;
+    if (permisos.dropdownVendedor) {
+        wrap.style.display = 'block';
+        const opciones = [
+            '<option value="TODOS">🤝 Todos los colaboradores</option>',
+            ...listaVendedores
+                .filter(v => v.nombre)
+                .map(v => `<option value="${v.nombre}">${v.nombre}</option>`)
+        ].join('');
+        sel.innerHTML = opciones;
+        colaboradorActivo = null;
+    } else {
+        wrap.style.display = 'none';
+        colaboradorActivo = null;
+    }
+}
+
+function selColaborador(valor) {
+    colaboradorActivo = valor === 'TODOS' ? null : valor;
+    aplicarFiltros();
+}
+
 // Filtra historicoCompleto por vendedor activo → todasLasCot
 function _aplicarFiltroVendedor() {
     if (!vendedorActivo) {
@@ -2150,6 +2194,7 @@ async function cargar(forzar = false) {
         });
         // Reconstruir dropdown con la lista completa
         _configurarDropdownVendedor();
+        _configurarDropdownColaborador();
 
         // Aplicar filtro vendedor según permisos
         if (!permisos.verTodo) {
@@ -2227,7 +2272,11 @@ function aplicarFiltros() {
             if (fechaDesdeVal) matchFecha = matchFecha && fechaNegocio >= new Date(fechaDesdeVal + 'T00:00:00');
             if (fechaHastaVal) matchFecha = matchFecha && fechaNegocio <= new Date(fechaHastaVal + 'T23:59:59');
         }
-        return matchEstado && matchQ && matchPipeline && matchFecha;
+        // Colaborador — mismo criterio simple de comparación exacta
+        // que ya se usa para pipeline (el nombre viene tal cual del
+        // dropdown, no hace falta normalizar acentos/mayúsculas acá).
+        const matchColaborador = !colaboradorActivo || c.colaborador === colaboradorActivo;
+        return matchEstado && matchQ && matchPipeline && matchFecha && matchColaborador;
     });
     if (vistaActual === 'lista') renderLista();
     else renderKanban();
@@ -2750,6 +2799,21 @@ function _renderDetalle(c) {
                        border-radius:6px;padding:5px 6px;font-family:inherit;">
                 ${listaVendedores.map(v => `<option value="${v.nombre}" ${v.nombre === c.vendedor ? 'selected' : ''}>${v.nombre}</option>`).join('')}
             </select>` : `<div class="det-card-val">${c.vendedor || '—'}</div>`}
+            <!-- Colaborador — mismo criterio que Vendedor (misma lista
+                 de nombres, mismo patrón de guardado), pero un campo
+                 aparte, sin afectar la comisión ni la reasignación de
+                 dueño del negocio. Pedido por Cristian, con captura:
+                 "podemos agregar un campo de Colaborador?, justo abajo
+                 de vendedor, con lista desplegable trayendo todos los
+                 usuarios que traes como vendedor". -->
+            <div class="det-card-label" style="margin-top:10px;">Colaborador</div>
+            ${puedeGestionar ? `
+            <select class="det-colaborador-select" data-id="${id}" onchange="_mutarColaboradorCotizacion('${id}', this.value)"
+                style="width:100%;font-size:12px;font-weight:600;color:#0f172a;background:white;border:1px solid #cbd5e1;
+                       border-radius:6px;padding:5px 6px;font-family:inherit;">
+                <option value="">Sin colaborador</option>
+                ${listaVendedores.map(v => `<option value="${v.nombre}" ${v.nombre === c.colaborador ? 'selected' : ''}>${v.nombre}</option>`).join('')}
+            </select>` : `<div class="det-card-val">${c.colaborador || '—'}</div>`}
         </div>
         <div class="det-card">
             <div class="det-card-label">Contacto${(c.contactosAdicionales && c.contactosAdicionales.length) ? 's' : ''}</div>
@@ -3269,6 +3333,40 @@ function _mutarVendedorCotizacion(id, nuevoVendedor) {
             } catch(e) {}
         })
         .catch(e => console.warn('Persistencia vendedor:', e))
+    );
+}
+
+// ─── COLABORADOR — mismo patrón que reasignar vendedor (misma lista
+// de nombres, guardado optimista + persistencia serializada), pero
+// sin tocar comisión ni dueño del negocio. Pedido por Cristian con
+// captura: "podemos agregar un campo de Colaborador?, justo abajo de
+// vendedor, con lista desplegable trayendo todos los usuarios que
+// traes como vendedor". ──────────────────────────────────────────
+function _mutarColaboradorCotizacion(id, nuevoColaborador) {
+    // Paso A: actualizar en memoria a 0ms
+    [historicoCompleto, todasLasCot].forEach(arr => {
+        const c = arr.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id));
+        if (c) c.colaborador = nuevoColaborador;
+    });
+    if (cotActual && String(cotActual.idCot || cotActual.id_cotizacion || cotActual.id || '') === String(id)) {
+        cotActual.colaborador = nuevoColaborador;
+    }
+
+    // Paso B: encolar escritura serializada (mismo patrón que vendedor/estado)
+    _mutacionQueue = _mutacionQueue.then(() =>
+        fetch(APPS_SCRIPT_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    JSON.stringify({ accion: 'actualizarColaborador', idCot: id, colaborador: nuevoColaborador }),
+        })
+        .then(r => r.text()).then(t => {
+            try {
+                const r = JSON.parse(t);
+                if (r.ok) console.log('Colaborador guardado ✅', r.colaboradorAnterior, '→', r.colaboradorNuevo);
+                else console.warn('Guardar colaborador ⚠️', r.error);
+            } catch(e) {}
+        })
+        .catch(e => console.warn('Persistencia colaborador:', e))
     );
 }
 
