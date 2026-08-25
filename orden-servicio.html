@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | orden-servicio.html | v2026.08.19.1 (Los 3 campos de texto (Falla Reportada, Diagnóstico Técnico, Tareas Realizadas) ahora crecen automáticamente según su contenido, en vez de quedar con una altura fija (min-height:75px) y scroll interno — un textarea con scroll no tiene sentido en un documento pensado para imprimir/PDF, no se puede scrollear un papel, el texto quedaba cortado sin forma de verlo completo. Nueva función _autoAlturaTextarea(), aplicada a los 3 campos justo después de cargar los datos del ticket. Reportado por Cristian con captura, marcando el cuadro de Tareas Realizadas con scroll interno.) -->
 <!-- Portal TLC | orden-servicio.html | v2026.08.06.1 (Evidencia Fotográfica ahora muestra TODO, no solo las fotos "bloqueadas" del ingreso — se agregaron las secciones Fotos del Equipo (completas, no solo las protegidas), Antes de Reparar y Después de Reparar, mismos 3 campos que ya existen en el detalle del ticket de servicio.html (fotos, fotos_antes_reparar, fotos_despues_reparar). Reportado por Cristian con 2 capturas.) -->
 <html lang="es">
 <head>
@@ -69,7 +70,7 @@
         .parts-table tr:last-child td { border-bottom: none; }
         .price-col { text-align: right; font-weight: 600; }
 
-        .form-textarea { width: 100%; border: 1px solid var(--border-color); color: var(--text-dark); padding: 12px; border-radius: 6px; font-size: 13px; resize: none; min-height: 75px; background-color: #fff; line-height: 1.4; }
+        .form-textarea { width: 100%; border: 1px solid var(--border-color); color: var(--text-dark); padding: 12px; border-radius: 6px; font-size: 13px; resize: none; min-height: 75px; background-color: #fff; line-height: 1.4; overflow: hidden; }
         
         /* Firmas de conformidad */
         .signature-container { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 30px; }
@@ -251,6 +252,18 @@
         } catch(e) { return iso; }
     }
 
+    // Auto-crece un textarea readonly según su contenido — sin esto,
+    // el min-height fijo (75px) dejaba scroll interno en textareas con
+    // texto largo (ej. Tareas Realizadas), algo que no tiene sentido
+    // en un documento pensado para imprimir/PDF (no se puede scrollear
+    // un papel, quedaba texto cortado sin forma de verlo completo).
+    // Reportado por Cristian con captura.
+    function _autoAlturaTextarea(el) {
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+    }
+
     async function _cargarTicket() {
         var params = new URLSearchParams(window.location.search);
         var id     = params.get('id');
@@ -320,6 +333,13 @@
                 _renderGrupoFotosOS(fotosDespues, 'os-evidencia-despues', 'os-evidencia-despues-wrap');
             }
             document.getElementById('os-tareas').value     = t.tareas_realizadas || '';
+
+            // Auto-crecer los 3 textareas readonly según su contenido
+            // real, ya cargado — sin esto quedaban con scroll interno
+            // en vez de mostrar todo el texto. Ver _autoAlturaTextarea.
+            ['os-falla', 'os-diagnostico', 'os-tareas'].forEach(function(idCampo) {
+                _autoAlturaTextarea(document.getElementById(idCampo));
+            });
 
         } catch(e) {
             _mostrarError('Error cargando datos: ' + e.message);
