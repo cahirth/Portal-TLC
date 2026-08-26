@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.12 (Los links dentro de una nota de seguimiento ahora quedan clickeables — antes se mostraban como texto plano (había que copiar y pegar a mano). Nuevo helper _linkificarTexto() (envuelve _fixEncoding, detecta cualquier http/https suelto y lo convierte en <a target="_blank">), aplicado en el render de cada nota. Directamente relevante para la nota automática "Se envió la ficha técnica..." que ahora agrega ficha-equipo.html (ver v2026.08.19.3/4 de ese archivo), que trae el link real de lo que se compartió. Pedido por Cristian: "podes hacer clickeable el link?". Confirmado con test: el link queda envuelto en un <a href> con target="_blank", el resto del texto de la nota sigue intacto, y un texto sin ningún link no se altera.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.11 (Nuevo filtro por Colaborador, junto al de Vendedor — mismo patrón, misma lista (listaVendedores), con "Todos los colaboradores" para sacarlo. Nueva variable colaboradorActivo, aplicada en aplicarFiltros() junto a los demás filtros (estado/búsqueda/pipeline/fechas). Solo visible para quien ya tiene permiso de ver el dropdown de Vendedor (mismo criterio de administración). Pedido por Cristian: "pusiste un filtro tbien para colaborador?". Confirmado con test: el selector trae los mismos nombres que Vendedor, sin filtro se ven todos los negocios, filtrando por un colaborador puntual solo se ven los que lo tienen asignado, y volviendo a "Todos" se ven todos de nuevo.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.10 (Nuevo campo "Colaborador" en el detalle del negocio — justo debajo de Vendedor, en la MISMA tarjeta (un grid de 2 columnas pondría cualquier tarjeta nueva al lado, no abajo, así que se combinaron en una sola). Misma lista desplegable que Vendedor (listaVendedores), más una opción "Sin colaborador" para dejarlo vacío. No afecta comisión ni el "dueño" del negocio — eso lo sigue manejando Vendedor. Nueva acción de backend actualizarColaborador (ver FotoMap.gs v188) con el mismo patrón robusto RTDB-primero que ya se corrigió en reasignarVendedor — se construyó bien desde el arranque, no repite el bug viejo. Pedido por Cristian con captura: "ademas de vendedor, podemos agregar un campo de Colaborador?, justo abajo de vendedor, con lista desplegable trayendo todos los usuarios que traes como vendedor, en cotizaciones obvio". Confirmado con test de punta a punta: el select existe en la misma tarjeta que Vendedor, trae la misma lista de nombres, y al elegir uno se manda al backend correctamente.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.9 (BUG REAL de layout en pantallas angostas — los botones "📊 Dashboard" y "⬇️ Excel" tenían flex-shrink:0 (nunca se achican), dejándole muy poco espacio al selector de pipeline (que sí se comprime hasta min-width) — el nombre del pipeline quedaba cortado, pegado contra el botón Dashboard. Fix: el TEXTO de esos 2 botones (no el ícono) se esconde en pantallas ≤700px vía media query, liberando espacio real; de paso, el selector de pipeline pasó de flex:0 1 210px a flex:1 1 210px (ahora también puede crecer, no solo achicarse) con min-width subido de 150 a 170px. Reportado por Cristian con captura: "entonces queda tapado por el boton del dashboard, chequealo". No pude verificar esto visualmente desde acá (jsdom no calcula layout real) — avisame si en el celular sigue viéndose mal.) -->
@@ -922,7 +923,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.11';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.12';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2913,7 +2914,7 @@ function _renderDetalle(c) {
         html += `<div style="display:flex;flex-direction:column;gap:8px;">
             ${todasNotas.map((n, ni) => `
             <div class="nota-item">
-                <div id="nota-txt-display-${id}-${ni}" class="nota-texto">${_fixEncoding(n.texto)}</div>
+                <div id="nota-txt-display-${id}-${ni}" class="nota-texto">${_linkificarTexto(n.texto)}</div>
                 <div id="nota-edit-${id}-${ni}" style="display:none;">
                     <textarea style="width:100%;background:#080d14;border:1px solid #3a86ff;border-radius:6px;
                                padding:8px;color:#f1f5f9;font-size:12px;resize:vertical;min-height:60px;
@@ -3799,6 +3800,18 @@ function _fixEncoding(str) {
     } catch(e) {
         return str;
     }
+}
+
+// Convierte cualquier URL suelta dentro de un texto en un link
+// clickeable — sin esto, el link real que se agrega en la nota de
+// "se envió la ficha técnica" (ver ficha-equipo.html) quedaba como
+// texto plano, había que copiarlo y pegarlo a mano. Pedido por
+// Cristian: "podes hacer clickeable el link?".
+function _linkificarTexto(texto) {
+    var textoFijo = _fixEncoding(texto);
+    return textoFijo.replace(/(https?:\/\/[^\s]+)/g, function(url) {
+        return '<a href="' + url + '" target="_blank" rel="noopener" style="color:#3a86ff;text-decoration:underline;word-break:break-all;">' + url + '</a>';
+    });
 }
 
 function _fmtFechaHora(f) {

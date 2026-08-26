@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.19.4 (Simplificación del envío obligatorio (v2026.08.19.3) — Cristian pidió sacar el modal con 2 campos separados ("el modal para agregar nombre y telefono sacalo, solo pone un popup 5 seg que debe ingresar el nombre apellido y telefono"): los campos Nombre y Apellido / Teléfono YA están visibles en la propia ficha, no hacía falta pedirlos de nuevo en un modal aparte. Ahora, si falta alguno al tocar "Enviar por WhatsApp", se muestra un aviso simple (toast, 5 segundos, se cierra solo) señalando cuál falta, y se enfoca+resalta ese campo en la propia ficha — no se envía nada hasta completarlo y volver a tocar el botón. _confirmarDatosWspObligatorio() y el modal wsp-datos-modal se eliminaron; _ejecutarEnvioFichaWsp() ahora lee directo fi-empresa-buscar/fi-telefono-destino para armar el contacto (mismo criterio de "nombre del contacto = el ingresado" que antes). Confirmado con test actualizado: sin datos no envía y avisa mencionando ambos campos faltantes; con solo uno completo sigue sin enviar y pide específicamente el que falta; con los 2 ya cargados en la ficha, envía y registra empresa+contacto+negocio+nota igual que antes.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.3 (El envío por WhatsApp desde la ficha ahora exige Nombre y Apellido + Teléfono con un modal OBLIGATORIO — reemplaza el prompt() opcional de v2026.08.19.2/v189, que se podía cancelar o dejar vacío. El modal no se cierra ni deja pasar sin completar los 2 campos. Al confirmar: (1) se verifica/crea la empresa con ese nombre (backend, ver FotoMap.gs v190 — ahora chequea server-side antes de crear, no solo el cache del cliente), (2) se crea/actualiza un contacto REAL en /contactos con el mismo nombre y teléfono ingresados, asociado a esa empresa, (3) se crea/suma el negocio (ya lo hacía), (4) se agrega una nota de seguimiento al negocio: "📤 Se envió la ficha técnica de [equipo] — [link real enviado]". Nuevo helper _registrarContactoYNota(), enganchado en los 3 puntos de éxito de _guardarSeguimientoVentas (negocio ya resuelto en esta carga de página / negocio existente encontrado / negocio recién creado). El flujo del QR de FacoExtrema (_compartirFichaWspPersonalizado) ya exigía teléfono desde antes — solo se le agregó que también dispare la nota. Pedido por Cristian: "Desde ficha técnica quiero que sea obligatorio al enviar por WhatsApp pida nombre y apellido y teléfono. En ell back debe crear la empresa si no existe (verificar), el nombre del contacto si mismo que el ingresado. Crear el negocio (ya lo hace) y en notas crear una notas que diga que fue enviada la ficha técnica y mostrar el link de la ficha enviada". Confirmado con 2 baterías de test: el modal bloquea de verdad (no se puede saltear con uno o ningún campo completo), y con los 2 datos completos se verifica el flujo end-to-end completo — WhatsApp se abre, la empresa se crea con el nombre correcto, el contacto se crea con el mismo nombre+teléfono asociado a esa empresa, el negocio se crea, y la nota queda con el texto y el link reales.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.2 (2 correcciones sobre "Ver Stock" (v2026.08.19.1): (1) ahora muestra TODOS los Hijos disponibles, tildados o no — antes solo mostraba los tildados, dejando afuera módulos que también podían tener stock relevante. (2) Cada línea con stock ≥1 se pinta en verde y con letra un toque más grande (15px/800), INDIVIDUALMENTE — antes el color/tamaño era uniforme para todo el recuadro según si TODO tenía stock o no; ahora cada ítem se distingue solo, sin depender del estado de los demás. El recuadro general pasó a un fondo neutro (gris clarito) ya que el color relevante ahora vive en cada línea, no en el conjunto. Pedido por Cristian: "1) mostrame todo, padre e hijos 2) cuando stock >= 1 pinta esa linea en verde y un toque mas grande la letra". Confirmado con test actualizado: el módulo NO tildado (Biometría) ahora aparece, y cada línea (Padre y Hijos) tiene su propio color/tamaño según su propio stock, sin importar si están tildados.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.1 ("Ver Stock" ahora también muestra el stock de cada módulo/Hijo TILDADO, no solo el del Padre — una línea por cada uno (✅/❌ + cantidad), con el color general del recuadro reflejando si falta stock en algo, no solo en el Padre. Antes solo leía d['Stock'] del Padre, ignorando los módulos por completo. Pedido por Cristian: "quiero leer stock en los hijos tbien, ahora lee solo los padres, para el sky y apollo mas que nada, pero aplica a toda la lista" — el fix es genérico (cualquier equipo con módulos tildados), no algo puntual para esos 2 equipos. selector-dispositivos.html tiene una función equivalente pero es código muerto a propósito desde v2026.08.15.1 (solo vive para el puente viejo de HubSpot) — no se tocó. Confirmado con 2 tests: un equipo modular con 2 módulos tildados (uno con stock, otro sin) más uno NO tildado (que no debe aparecer); y un equipo simple sin módulos tildados sigue comportándose exactamente igual que antes.) -->
@@ -347,35 +348,22 @@
   </div>
 </div>
 
-<!-- Modal OBLIGATORIO de Nombre/Apellido + Teléfono antes de enviar por
-     WhatsApp — reemplaza el prompt() opcional que existía antes (v189
-     de este archivo). Ahora es obligatorio: no se puede cerrar sin
-     completar los 2 datos, no hay "cancelar y enviar igual". Pedido
-     por Cristian: "Desde ficha técnica quiero que sea obligatorio al
-     enviar por WhatsApp pida nombre y apellido y teléfono". -->
-<div class="qrf-modal-overlay" id="wsp-datos-modal">
-  <div class="qrf-modal-card">
-    <div class="qrf-modal-header">
-      <h3>📤 Antes de enviar</h3>
-    </div>
-    <div class="qrf-scan-txt" style="margin-top:0;">Para poder registrar el negocio, completá estos 2 datos del destinatario.</div>
-    <div class="qrf-dato-fila">
-      <span class="lbl">Nombre y Apellido</span>
-      <input type="text" id="wsp-datos-nombre" placeholder="Ej. Juan Pérez" style="text-align:right;">
-    </div>
-    <div class="qrf-dato-fila">
-      <span class="lbl">Teléfono</span>
-      <input type="tel" id="wsp-datos-telefono" placeholder="Ej. 1122334455" style="text-align:right;">
-    </div>
-    <div id="wsp-datos-error" style="display:none;color:#ef4444;font-size:12px;margin-top:8px;text-align:center;"></div>
-    <button type="button" class="qrf-btn-usar" onclick="_confirmarDatosWspObligatorio()">✅ Continuar y enviar</button>
-  </div>
-</div>
+<!-- Aviso de 5 segundos — reemplaza el modal con 2 campos de v2026.08.19.3
+     (era un paso extra innecesario: los campos Nombre/Apellido y
+     Teléfono YA están visibles en la propia ficha, justo abajo del
+     selector de pipeline — no hacía falta pedirlos de nuevo en un
+     modal aparte). Ahora solo avisa y enfoca el campo que falta.
+     Pedido por Cristian: "el modal para agregar nombre y telefono
+     sacalo, solo pone un popup 5 seg que debe ingresar el nombre
+     apellido y telefono". -->
+<div id="wsp-aviso-toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;
+    z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.35);text-align:center;max-width:90vw;"></div>
 
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.19.3';
+var FICHA_EQUIPO_VERSION = '2026.08.19.4';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -1914,51 +1902,56 @@ function _compartirFichaWsp(e) {
     if (empresaActual.trim() && telefonoActual.trim()) {
         // Ya están cargados los 2 datos (ej. vinieron de un QR escaneado
         // antes, o el vendedor ya los tipeó a mano) — no hace falta
-        // volver a pedirlos, se manda directo.
+        // avisar nada, se manda directo.
         _ejecutarEnvioFichaWsp();
         return;
     }
-    var elNombreModal = document.getElementById('wsp-datos-nombre');
-    var elTelModal = document.getElementById('wsp-datos-telefono');
-    if (elNombreModal) elNombreModal.value = empresaActual;
-    if (elTelModal) elTelModal.value = telefonoActual;
-    var elError = document.getElementById('wsp-datos-error');
-    if (elError) elError.style.display = 'none';
-    var modal = document.getElementById('wsp-datos-modal');
-    if (modal) modal.classList.add('abierto');
+    var faltaNombre = !empresaActual.trim();
+    var faltaTelefono = !telefonoActual.trim();
+    var mensaje = (faltaNombre && faltaTelefono)
+        ? 'Completá Nombre y Apellido y Teléfono para poder enviar.'
+        : (faltaNombre ? 'Completá el Nombre y Apellido para poder enviar.' : 'Completá el Teléfono para poder enviar.');
+    _mostrarAvisoWsp(mensaje);
+    // Enfoca y resalta el primer campo que falte, en vez de abrir un
+    // modal aparte a pedir de nuevo lo mismo — ya está visible en la
+    // propia ficha, arriba de estos botones.
+    var elAEnfocar = faltaNombre ? elEmpresaBuscar : elTelefono;
+    if (elAEnfocar) {
+        elAEnfocar.focus();
+        elAEnfocar.style.borderColor = '#ef4444';
+        setTimeout(function() { elAEnfocar.style.borderColor = ''; }, 2500);
+    }
+    // No se manda nada — el vendedor tiene que completar el campo
+    // señalado y tocar "Enviar por WhatsApp" de nuevo.
 }
 
-// Se llama al tocar "Continuar y enviar" en el modal obligatorio.
-// Valida que los 2 campos estén completos — si falta alguno, muestra
-// el error y NO cierra el modal (no hay forma de saltearlo).
-function _confirmarDatosWspObligatorio() {
-    var nombreIngresado = ((document.getElementById('wsp-datos-nombre') || {}).value || '').trim();
-    var telefonoIngresado = ((document.getElementById('wsp-datos-telefono') || {}).value || '').trim();
-    var elError = document.getElementById('wsp-datos-error');
-    if (!nombreIngresado || !telefonoIngresado) {
-        if (elError) {
-            elError.textContent = !nombreIngresado && !telefonoIngresado
-                ? 'Completá el nombre y el teléfono para poder enviar.'
-                : (!nombreIngresado ? 'Completá el nombre y apellido.' : 'Completá el teléfono.');
-            elError.style.display = 'block';
-        }
-        return;
-    }
-    var elEmpresaBuscar = document.getElementById('fi-empresa-buscar');
-    var elTelefono = document.getElementById('fi-telefono-destino');
-    if (elEmpresaBuscar) elEmpresaBuscar.value = nombreIngresado;
-    if (elTelefono) elTelefono.value = telefonoIngresado;
-    // El nombre y teléfono ingresados ACÁ son los que van a terminar
-    // siendo el contacto real del negocio (ver _registrarContactoYNota,
-    // más abajo) — no dependemos de que haya un contacto pre-existente
-    // seleccionado por autocompletado o QR. Pedido por Cristian: "el
-    // nombre del contacto sea el mismo que el ingresado".
-    _contactoSeleccionadoFicha = { nombre: nombreIngresado, telefono: telefonoIngresado };
-    document.getElementById('wsp-datos-modal').classList.remove('abierto');
-    _ejecutarEnvioFichaWsp();
+// Aviso simple de 5 segundos (no bloqueante, se cierra solo) — pedido
+// por Cristian: "el modal para agregar nombre y telefono sacalo, solo
+// pone un popup 5 seg que debe ingresar el nombre apellido y
+// telefono". Los campos en sí (Nombre y Apellido / Teléfono) ya están
+// visibles en la propia ficha — este aviso solo señala cuál falta.
+var _wspAvisoTimeout = null;
+function _mostrarAvisoWsp(mensaje) {
+    var el = document.getElementById('wsp-aviso-toast');
+    if (!el) return;
+    el.textContent = '⚠️ ' + mensaje;
+    el.style.display = 'block';
+    if (_wspAvisoTimeout) clearTimeout(_wspAvisoTimeout);
+    _wspAvisoTimeout = setTimeout(function() { el.style.display = 'none'; }, 5000);
 }
 
 function _ejecutarEnvioFichaWsp() {
+    // El nombre y teléfono ya visibles en la ficha son los que van a
+    // terminar siendo el contacto real del negocio (ver
+    // _registrarContactoYNota, más abajo) — no dependemos de que haya
+    // un contacto pre-existente seleccionado por autocompletado o QR,
+    // a menos que ya hubiera uno. Pedido por Cristian: "el nombre del
+    // contacto sea el mismo que el ingresado".
+    var nombreActual = ((document.getElementById('fi-empresa-buscar') || {}).value || '').trim();
+    var telefonoActualParaContacto = ((document.getElementById('fi-telefono-destino') || {}).value || '').trim();
+    if (!_contactoSeleccionadoFicha || _contactoSeleccionadoFicha.nombre !== nombreActual) {
+        _contactoSeleccionadoFicha = { nombre: nombreActual, telefono: telefonoActualParaContacto };
+    }
     var link = 'https://ir.tlcsrl.com.ar/ficha-equipo.html?nombre=' + encodeURIComponent(_fichaNombreActual) + '&modo=cliente';
     if (_variantesOcultas.length) link += '&ocultar=' + encodeURIComponent(_variantesOcultas.join(','));
     if (_fichaModulosTildados.size) link += '&modulos=' + Array.from(_fichaModulosTildados).map(encodeURIComponent).join(',');
