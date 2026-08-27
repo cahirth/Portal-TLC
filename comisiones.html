@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | comisiones.html | v2026.08.26.3 (Corrección de nombre de columna — el permiso de acceso pedía 'Comisiones', pero index.html (que grisea el botón del menú) ya usaba 'Ver Comisiones' de antes. Alineado a 'Ver Comisiones' en los dos lados, para que sea la MISMA columna la que controla el botón gris del menú y el acceso real a la pantalla. Confirmado con test actualizado.) -->
 <!-- Portal TLC | comisiones.html | v2026.08.26.2 (El acceso al módulo ahora se controla con una columna DEDICADA "Comisiones" en la hoja Vendedores (TRUE/FALSE por usuario) — antes chequeaba el permiso de "Ventas", que no distinguía a quién mostrarle esto. permisos.js ya soportaba esto de forma completamente genérica (cualquier nombre de columna), no hizo falta tocar nada ahí — solo cambiar qué columna se le pide. Pedido por Cristian: "en el modulo comisiones habilitarlo o deshabilitarlo de acuerdo a los permisos en la hoja vendedores columna Comisiones true/false... o volcarlo a permisos.js". Falta que Cristian agregue esa columna en el Excel — sin ella, el mecanismo fail-open de permisos.js deja pasar a todos igual, hasta que se cargue. Confirmado con test: valida que se llama a validarAccesoModulo('Comisiones'), no 'Ventas'.) -->
 <!-- Portal TLC | comisiones.html | v2026.08.26.1 (Pantalla nueva —
      Ranking de comisiones por vendedor, con filtro de fechas
@@ -244,16 +245,18 @@ async function _iniciar() {
         permisos = ROLES[account.rol] || ROLES['Vend_Externo'];
 
         if (typeof validarAccesoModulo === 'function') {
-            // Columna dedicada "Comisiones" en la hoja Vendedores
-            // (TRUE/FALSE por usuario) — mismo mecanismo genérico de
-            // permisos.js que ya usan empresas.html/servicio.html
+            // Columna dedicada "Ver Comisiones" en la hoja Vendedores
+            // (TRUE/FALSE por usuario) — mismo nombre que ya usa
+            // index.html para grisear/deshabilitar el botón del menú
+            // (userPermisos.verComisiones). Mismo mecanismo genérico
+            // de permisos.js que ya usan empresas.html/servicio.html
             // (columna exacta = nombre del módulo). Pedido por
             // Cristian: "en el modulo comisiones habilitarlo o
             // deshabilitarlo de acuerdo a los permisos en la hoja
             // vendedores columna Comisiones true/false... o volcarlo
             // a permisos.js" — ya está soportado ahí de forma
             // genérica, solo hacía falta pedir la columna correcta.
-            const acceso = await validarAccesoModulo('Comisiones');
+            const acceso = await validarAccesoModulo('Ver Comisiones');
             if (!acceso) return;
         }
 
