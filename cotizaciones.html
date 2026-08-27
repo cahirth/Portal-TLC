@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.14 (Separación de responsabilidades: tocar la caja "Cliente" (con empresa ya asignada) sigue precargando ESA MISMA empresa en empresas.html — es para cambiar el CONTACTO. Nuevo botón aparte "🔄 Cambiar Empresa", chiquito debajo de la caja, que NO precarga ninguna — arranca directo en la lista de Empresas para buscar y elegir una totalmente distinta. Aclarado por Cristian tras la entrega anterior: "no me entendiste... quiero que agregues un boton para cambiar de empresa, que me lleve al modulo empresas y poder elegir otra empresa totalmente diferente, que lo que hisicste esta ok y dejalo, es para cambiar el contacto". Nueva función _irACambiarEmpresaDeNegocio(), separada de _irAEmpresaDesdeNegocio() (que sigue igual). Confirmado con test: tocar la caja Cliente arma la URL CON ?empresa=actual (precarga), el botón nuevo arma la URL SIN ese parámetro (arranca en la lista).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.13 (2 cambios: (1) Box "Cliente" del hero del detalle — tenía TODO el estilo fijo inline (fondo #0f1a30, texto claro) sin adaptarse a modo claro; nueva clase det-cliente-box + override de tema-claro (fondo celeste #eef2ff). Reportado por Cristian: "sigo con el bug en modo claro, si paso el mouse por encima se pone color negro" — el negro venía del fondo fijo, nunca del hover en sí (el onmouseover solo cambiaba el borde). (2) Ahora SIEMPRE se puede ir a cambiar la empresa de un negocio desde ese mismo box, incluso si ya tiene una asignada — antes, si ya tenía empresa, solo abría esa MISMA ficha en modo ver/editar, sin forma de elegir otra distinta; si no tenía ninguna, directamente bloqueaba con un alert. _irAEmpresaDesdeNegocio() ahora siempre lleva a empresas.html?volverA=negocio&idNegocio=X (con ?empresa=X de contexto si ya tenía una). Pedido por Cristian con captura: "a un negocio existente permitime poder cambiar la empresa, si ya tiene una empresa asignada, permitime cambiarla llevandome al modulo empresas y elegir otra con sus contactos asociados". Ver empresas.html v2026.08.19.5 y FotoMap.gs v192 (nueva acción reasignarEmpresaNegocio) para el resto del flujo. Confirmado con 2 tests: el fondo del box Cliente no se pone negro ni en reposo ni simulando el hover en modo claro; y (del lado de empresas.html) el flujo completo de principio a fin.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.12 (Los links dentro de una nota de seguimiento ahora quedan clickeables — antes se mostraban como texto plano (había que copiar y pegar a mano). Nuevo helper _linkificarTexto() (envuelve _fixEncoding, detecta cualquier http/https suelto y lo convierte en <a target="_blank">), aplicado en el render de cada nota. Directamente relevante para la nota automática "Se envió la ficha técnica..." que ahora agrega ficha-equipo.html (ver v2026.08.19.3/4 de ese archivo), que trae el link real de lo que se compartió. Pedido por Cristian: "podes hacer clickeable el link?". Confirmado con test: el link queda envuelto en un <a href> con target="_blank", el resto del texto de la nota sigue intacto, y un texto sin ningún link no se altera.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.11 (Nuevo filtro por Colaborador, junto al de Vendedor — mismo patrón, misma lista (listaVendedores), con "Todos los colaboradores" para sacarlo. Nueva variable colaboradorActivo, aplicada en aplicarFiltros() junto a los demás filtros (estado/búsqueda/pipeline/fechas). Solo visible para quien ya tiene permiso de ver el dropdown de Vendedor (mismo criterio de administración). Pedido por Cristian: "pusiste un filtro tbien para colaborador?". Confirmado con test: el selector trae los mismos nombres que Vendedor, sin filtro se ven todos los negocios, filtrando por un colaborador puntual solo se ven los que lo tienen asignado, y volviendo a "Todos" se ven todos de nuevo.) -->
@@ -933,7 +934,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.13';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.14';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2742,12 +2743,17 @@ function _renderDetalle(c) {
     ).join('');
     html += `<div class="det-hero" style="padding:20px 16px 12px;">
         <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px;">
-            <div class="det-cliente-box" onclick="_irAEmpresaDesdeNegocio('${id}', '${(c.empresaId||'').replace(/'/g,"\\'")}')" title="${c.empresaId ? 'Cambiar la empresa de este negocio' : 'Vincular este negocio a una ficha de Empresa'}" style="flex:1;min-width:170px;background:#0f1a30;border:1px solid #3a86ff33;border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s;" onmouseover="this.style.borderColor='#3a86ffaa'" onmouseout="this.style.borderColor='#3a86ff33'">
-                <div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;">🏢 Cliente <span style="font-weight:400;text-transform:none;">— tocá para ${c.empresaId ? 'cambiar' : 'vincular'} →</span></div>
-                <div style="font-size:12.5px;font-weight:700;color:#f1f5f9;line-height:1.3;">${cliente}</div>
-                ${c.cuit ? `<div style="font-size:10.5px;color:#94a3b8;margin-top:3px;">CUIT ${c.cuit}</div>` : ''}
-                ${contactoNombre ? `<div style="font-size:10.5px;color:#94a3b8;margin-top:3px;">👤 ${contactoNombre}</div>` : ''}
-                ${(c.telefono || c.contacto?.telefono) ? `<div style="font-size:10.5px;color:#94a3b8;margin-top:3px;">📞 ${c.telefono || c.contacto?.telefono}</div>` : ''}
+            <div style="flex:1;min-width:170px;display:flex;flex-direction:column;gap:6px;">
+                <div class="det-cliente-box" onclick="_irAEmpresaDesdeNegocio('${id}', '${(c.empresaId||'').replace(/'/g,"\\'")}')" title="${c.empresaId ? 'Ver/cambiar el contacto de esta empresa' : 'Vincular este negocio a una ficha de Empresa'}" style="background:#0f1a30;border:1px solid #3a86ff33;border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s;" onmouseover="this.style.borderColor='#3a86ffaa'" onmouseout="this.style.borderColor='#3a86ff33'">
+                    <div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;">🏢 Cliente <span style="font-weight:400;text-transform:none;">— tocá para ${c.empresaId ? 'cambiar el contacto' : 'vincular'} →</span></div>
+                    <div style="font-size:12.5px;font-weight:700;color:#f1f5f9;line-height:1.3;">${cliente}</div>
+                    ${c.cuit ? `<div style="font-size:10.5px;color:#94a3b8;margin-top:3px;">CUIT ${c.cuit}</div>` : ''}
+                    ${contactoNombre ? `<div style="font-size:10.5px;color:#94a3b8;margin-top:3px;">👤 ${contactoNombre}</div>` : ''}
+                    ${(c.telefono || c.contacto?.telefono) ? `<div style="font-size:10.5px;color:#94a3b8;margin-top:3px;">📞 ${c.telefono || c.contacto?.telefono}</div>` : ''}
+                </div>
+                <button type="button" onclick="event.stopPropagation(); _irACambiarEmpresaDeNegocio('${id}')" title="Elegir una empresa totalmente distinta para este negocio" style="align-self:flex-start;font-size:10.5px;font-weight:700;color:#3a86ff;background:transparent;border:1px dashed #3a86ff55;border-radius:8px;padding:4px 10px;cursor:pointer;">
+                    🔄 Cambiar Empresa
+                </button>
             </div>
             <div id="det-fotos-equipos" style="flex-shrink:0;">${_renderFotosEquipos(carrito)}</div>
         </div>
@@ -3299,17 +3305,27 @@ function _mutarEstadoCotizacion(id, nuevoEstado) {
 // empresas pero que al volver, vuelva a ese negocio, fijate lo más
 // fácil".
 function _irAEmpresaDesdeNegocio(idCot, empresaId) {
-  // Antes bloqueaba con un alert si NO había empresa vinculada — ahora
-  // siempre lleva al módulo Empresas: si ya tiene una asignada, la
-  // abre de entrada (para tener contexto) pero se puede elegir
-  // cualquier OTRA desde ahí; si no tiene ninguna, arranca en la
-  // lista para elegir una de cero. Pedido por Cristian con captura:
-  // "a un negocio existente permitime poder cambiar la empresa, si ya
-  // tiene una empresa asignada, permitime cambiarla llevandome al
-  // modulo empresas y elegir otra con sus contactos asociados".
+  // Deja ir/cambiar el CONTACTO de la empresa ya asignada al negocio
+  // — si ya tiene una, la abre de entrada (para elegir otro contacto
+  // ahí mismo); si no tiene ninguna, arranca en la lista para
+  // vincular una de cero. Para elegir una empresa TOTALMENTE
+  // DISTINTA, ver _irACambiarEmpresaDeNegocio (botón aparte "🔄
+  // Cambiar Empresa"). Pedido por Cristian: "lo que hisicste esta ok
+  // y dejalo, es para cambiar el contacto".
   var url = 'empresas.html?volverA=negocio&idNegocio=' + encodeURIComponent(idCot);
   if (empresaId) url += '&empresa=' + encodeURIComponent(empresaId);
   window.location.href = url;
+}
+
+// Botón aparte "🔄 Cambiar Empresa" — a diferencia de
+// _irAEmpresaDesdeNegocio (que precarga la empresa YA asignada, para
+// cambiar el contacto), este SIEMPRE arranca en la lista de Empresas
+// sin precargar ninguna, para poder buscar y elegir una empresa
+// totalmente distinta desde cero. Pedido por Cristian: "quiero que
+// agregues un boton para cambiar de empresa, que me lleve al modulo
+// empresas y poder elegir otra empresa totalmente diferente".
+function _irACambiarEmpresaDeNegocio(idCot) {
+  window.location.href = 'empresas.html?volverA=negocio&idNegocio=' + encodeURIComponent(idCot);
 }
 
 function _cambiarEstadoDesdeDetalle(id, nuevoEstado) {
