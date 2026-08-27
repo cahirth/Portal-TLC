@@ -7,6 +7,7 @@
 <!-- Portal TLC | servicio.html | v2026.08.10.4 (3 pedidos de Cristian con captura sobre la grilla de la Orden de Preparación: (1) columnas responsivas — antes la tabla no tenía anchos definidos, así que en pantallas angostas o con muchas columnas el navegador apretaba SKU y N° de Serie hasta casi desaparecer, cortando el texto tipeado en vez de mostrarlo entero. Ahora la tabla tiene table-layout:fixed con anchos mínimos por columna y min-width:860px en total — si no entra, el contenedor (que ya tenía overflow-x:auto) scrollea en vez de apretar. (2) Campo "Equipo" pasa a ser editable (antes texto fijo) — permite corregir/aclarar la descripción de un equipo puntual, por ejemplo distinguir 2 unidades idénticas que van a domicilios distintos (usa st_actualizarEquipoOrden con "descripcion", ver FotoMap.gs v173). (3) Confirmado que el link del POE-8 ya manda todos los datos disponibles (tecnico/cliente/domicilio/telefono/modelo/serie/id_ticket/equipo_index) al archivo nuevo — no hacía falta ningún cambio ahí. Confirmado con test: input editable con el valor correcto, URL del POE-8 completa.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.3 (Tope en "+ Agregar Caja" del modal "Asignación de Cajas" — no se puede tener más cajas que equipos (cada equipo entra en una sola caja, cualquier caja de más quedaría vacía sí o sí). Botón se deshabilita visualmente al llegar al tope, y avisa si de todas formas se intenta pasar. Pedido por Cristian: "cantidad máxima a agregar cajas, la cantidad de ítems, topealo". Confirmado con test: con 3 equipos, permite hasta 3 cajas, se deshabilita ahí, y avisa si se intenta una 4ta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.2 (Candado Preparación/CC → Para Instalar APAGADO temporalmente — pedido por Cristian: "me pide muchas condiciones... liberame temporalmente". El requisito de Checklist no se puede cumplir en la práctica todavía (falta conectar los formularios individuales de checklist, prerrequisito pendiente). Toda la lógica del candado sigue intacta en _validarGate, controlada por un interruptor nuevo (GATE_PARA_INSTALAR_ACTIVO = false) — para reactivarlo alcanza con volver ese valor a true, sin tocar nada más. Confirmado con test: con el interruptor apagado, deja pasar aunque no haya nada completo.) -->
+<!-- Portal TLC | servicio.html | v2026.08.19.2 (Los 2 botones del circuito de Etiquetas de Despacho ahora se deshabilitan y muestran "⏳ Generando..." mientras procesan, evitando doble clic — "Generar Etiquetas de Despacho" (abre el modal, se restaura solo al cerrarlo con X/Cancelar o tras imprimir con éxito) e "Imprimir Etiquetas" (mientras guarda la asignación de cajas en el backend; si falla, se restaura para poder reintentar; si sale bien, el modal se cierra y el botón queda oculto con él). Al reabrir el modal se resetea defensivamente el botón de Imprimir a su texto normal, para no arrastrar un "Generando..." viejo de un ciclo anterior como si fuera el texto "original" a restaurar. Pedido por Cristian con 2 capturas: "al apretar GENERAR ETIQUETA DE DESPACHO, deshabilitar el boton y poner Generando. Lo mismo en imprimir etiquetas". Confirmado con test de punta a punta: ambos botones se deshabilitan y cambian de texto al usarse, se restauran correctamente al cerrar/fallar, y no arrastran estados viejos entre ciclos.) -->
 <!-- Portal TLC | servicio.html | v2026.08.19.1 (El botón "🏷️ Generar Etiquetas de Despacho" pasa de mostrarse en "Para Instalar" a mostrarse en "Preparación / Control de Calidad" — Cristian: "podes agregarlo en preparacion, es mejor q en para instalar, ya que ahi se prepara el pedido/cajas". Un solo cambio de condición (t.deposito === 'para_instalar' → 'preparacion_control_calidad') en el render del detalle de la Orden de Preparación. El candado de avance de etapa (Serie + POE-8 + Checklist + Estado, exigido para pasar de Preparación/CC a Para Instalar) es un requisito DISTINTO y queda totalmente intacto — este cambio solo mueve CUÁNDO se puede generar la etiqueta, no toca las condiciones para avanzar de etapa. Confirmado con test: la condición nueva está en el lugar correcto, la vieja ya no aparece ahí, y el candado de avance sigue sin alterarse.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.1 (Circuito nuevo "Etiquetas de Despacho" — pedido por Cristian con archivo de referencia (etiqueta-despacho-100x150.html). Botón "🏷️ Generar Etiquetas de Despacho" en el detalle de la Orden de Preparación, visible solo en la etapa Para Instalar. Abre el modal "Asignación de Cajas" — lista los equipos con su N° de Serie, permite asignar cada uno a una caja (select por ítem), botón "+ Agregar Caja", contador "Total bultos: N cajas", campo de Transporte/Expreso. Al confirmar, guarda la asignación en el ticket (st_guardarEtiquetasCajas, ver FotoMap.gs v171) y abre etiqueta-despacho.html en pestaña nueva, que imprime una etiqueta de 100×150mm por caja. Bloquea con aviso si alguna caja queda sin ítems asignados. Confirmado con test aislado de punta a punta: abrir modal, agregar caja, reasignar ítem, confirmar — arma bien los grupos por caja y abre la pestaña correcta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.09.4 (Candado Preparación/CC → Para Instalar suma un 4to requisito, confirmado por Cristian: el "Estado" de CADA equipo (Pendiente/Retirado del depósito/Verificado/Listo para despacho) debe estar en "Listo para despacho" — antes ese desplegable era puramente informativo, no bloqueaba nada, aunque el resto (Serie+POE-8+Checklist) estuviera completo. Mensaje de aviso extendido para mencionarlo. Confirmado con test: el escenario exacto de la captura de Cristian (todo completo pero Estado en "Pendiente") ahora bloquea correctamente.) -->
@@ -786,7 +787,7 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
 
     <div style="font-size:12.5px;font-weight:700;color:var(--text-main);margin-bottom:14px;" id="etq-contador-cajas">Total bultos: 1 caja</div>
 
-    <button type="button" onclick="_confirmarImprimirEtiquetas()" style="width:100%;padding:11px;border-radius:8px;background:#8b5cf6;border:none;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">🖨️ Imprimir Etiquetas</button>
+    <button type="button" id="etq-btn-imprimir" onclick="_confirmarImprimirEtiquetas()" style="width:100%;padding:11px;border-radius:8px;background:#8b5cf6;border:none;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">🖨️ Imprimir Etiquetas</button>
   </div>
 </div>
 
@@ -2106,12 +2107,22 @@ function _urlPOE8(t, eq, indiceEquipo) {
 // caja. Pedido por Cristian, con etiqueta-despacho-100x150.html como
 // referencia de diseño.
 var _ETQ_ESTADO = null;
+var _ETQ_BTN_ABRIR = null; // referencia al botón "Generar Etiquetas de Despacho" que abrió el modal, para poder restaurarlo al cerrar
 
-window._abrirModalEtiquetasCajas = function(idTicket) {
+// Pedido por Cristian: "al apretar GENERAR ETIQUETA DE DESPACHO,
+// deshabilitar el boton y poner Generando. Lo mismo en imprimir
+// etiquetas" — evita dobles clics mientras se procesa/abre el modal.
+window._abrirModalEtiquetasCajas = function(idTicket, btnEl) {
   var t = _tickets.find(function(x){ return x.id_ticket === idTicket; });
   if (!t) return;
   var equipos = Array.isArray(t.equipos) ? t.equipos : [];
   if (!equipos.length) { alert('Esta orden no tiene equipos cargados.'); return; }
+  if (btnEl) {
+    _ETQ_BTN_ABRIR = btnEl;
+    btnEl.disabled = true;
+    btnEl.dataset.textoOriginal = btnEl.textContent;
+    btnEl.textContent = '⏳ Generando...';
+  }
   _ETQ_ESTADO = {
     idTicket: idTicket,
     equipos: equipos,
@@ -2120,12 +2131,26 @@ window._abrirModalEtiquetasCajas = function(idTicket) {
   };
   document.getElementById('etq-transporte').value = t.etiquetas_transporte || '';
   _renderItemsEtq();
+  // Reseteo defensivo — si el botón de Imprimir quedó en "Generando..."
+  // de un ciclo anterior (ej. se cerró el modal justo después de un
+  // éxito, sin pasar por acá), evita arrastrar ese texto viejo como si
+  // fuera el "original" la próxima vez que se toque Imprimir.
+  var btnImprimirReset = document.getElementById('etq-btn-imprimir');
+  if (btnImprimirReset) { btnImprimirReset.disabled = false; btnImprimirReset.textContent = '🖨️ Imprimir Etiquetas'; }
   document.getElementById('modal-etiquetas-cajas').style.display = 'flex';
 };
 
 window._cerrarModalEtiquetasCajas = function() {
   document.getElementById('modal-etiquetas-cajas').style.display = 'none';
   _ETQ_ESTADO = null;
+  // Restaura el botón que abrió el modal — tanto si se cierra con la
+  // X/Cancelar como si se imprimió con éxito, para que la próxima vez
+  // que se abra vuelva a decir lo de siempre.
+  if (_ETQ_BTN_ABRIR) {
+    _ETQ_BTN_ABRIR.disabled = false;
+    if (_ETQ_BTN_ABRIR.dataset.textoOriginal) _ETQ_BTN_ABRIR.textContent = _ETQ_BTN_ABRIR.dataset.textoOriginal;
+    _ETQ_BTN_ABRIR = null;
+  }
 };
 
 function _renderItemsEtq() {
@@ -2202,16 +2227,31 @@ window._confirmarImprimirEtiquetas = function() {
   var cajaVacia = cajas.find(function(c){ return !c.items.length; });
   if (cajaVacia) { alert('La Caja ' + cajaVacia.numero + ' no tiene ningún equipo asignado — asignale algo o quitala.'); return; }
 
+  // Deshabilitar mientras se guarda — pedido por Cristian: "Lo mismo
+  // en imprimir etiquetas" (evita doble clic durante el fetch/apertura
+  // de la pestaña de impresión). Se restaura solo si falla — si sale
+  // bien, el modal se cierra y el botón desaparece con él.
+  var btnImprimir = document.getElementById('etq-btn-imprimir');
+  var textoOriginalBtn = btnImprimir ? btnImprimir.textContent : '';
+  if (btnImprimir) { btnImprimir.disabled = true; btnImprimir.textContent = '⏳ Generando...'; }
+
   var idTicket = est.idTicket;
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_guardarEtiquetasCajas', id_ticket:idTicket, cajas:cajas, transporte:transporte }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert('Error al guardar: ' + (r.error||'')); return; }
+      if (!r.ok) {
+        alert('Error al guardar: ' + (r.error||''));
+        if (btnImprimir) { btnImprimir.disabled = false; btnImprimir.textContent = textoOriginalBtn; }
+        return;
+      }
       window._cerrarModalEtiquetasCajas();
       window.open('https://cahirth.github.io/Portal-TLC/etiqueta-despacho.html?ticket=' + encodeURIComponent(idTicket), '_blank');
     })
-    .catch(function(){ alert('Error de conexión al guardar la asignación de cajas.'); });
+    .catch(function() {
+      alert('Error de conexión al guardar la asignación de cajas.');
+      if (btnImprimir) { btnImprimir.disabled = false; btnImprimir.textContent = textoOriginalBtn; }
+    });
 };
 
 function _renderSeccionOrdenPreparacion(t) {
@@ -2303,7 +2343,7 @@ function _renderSeccionOrdenPreparacion(t) {
     '</div>' +
     '<div style="margin-bottom:10px;"><button class="op-btn" onclick="window.open(\'https://cahirth.github.io/Portal-TLC/orden-preparacion.html?id=' + t.id_ticket + '\',\'_blank\')" style="width:100%;">🖨 Imprimir / Exportar Orden de Preparación</button></div>' +
     (t.deposito === 'preparacion_control_calidad' ?
-      '<div style="margin-bottom:10px;"><button class="op-btn" style="width:100%;background:#8b5cf6;color:#fff;border-color:#8b5cf6;" onclick="_abrirModalEtiquetasCajas(\'' + t.id_ticket + '\')">🏷️ Generar Etiquetas de Despacho</button></div>'
+      '<div style="margin-bottom:10px;"><button type="button" id="btn-generar-etiquetas-' + t.id_ticket + '" class="op-btn" style="width:100%;background:#8b5cf6;color:#fff;border-color:#8b5cf6;" onclick="_abrirModalEtiquetasCajas(\'' + t.id_ticket + '\', this)">🏷️ Generar Etiquetas de Despacho</button></div>'
       : '') +
   '</div>';
 }
