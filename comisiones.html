@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<!-- Portal TLC | comisiones.html | v2026.08.26.1 (Pantalla nueva —
+     Ranking de comisiones por vendedor, con filtro de fechas
+     Desde/Hasta. Solo cuenta negocios en estado "Ganada". Vendedores
+     internos: 1% fijo sobre el neto total. Vendedores externos: suma
+     el % de comisión propio de CADA equipo vendido (columna
+     "COMISIONES" en Lista_Precios). El monto final de cada negocio es
+     editable a mano (comision_override en Firebase) — si se carga un
+     valor, reemplaza al calculado automático hasta que se borre.
+     Pedido por Cristian: "crear un boton llamado COMISIONES en
+     Index... por vendedor (ranking/lista, sumando todos sus
+     negocios)... los vendedores internos cobran 1% y los externos de
+     acuerdo a cada equipo discriminado en el excel, dejar todas los
+     camos de comisiones editables, ademas necesito filtro desde
+     hasta". Ve TODOS los vendedores si sos Administrador
+     (permisos.verTodo); si no, solo tu propia fila. -->
+<html lang="es">
+<head>
+<script src="version.js"></script>
+<script src="permisos.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TLC — Comisiones</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',sans-serif; -webkit-tap-highlight-color:transparent; }
+    body { background:#030712; color:#f8fafc; min-height:100vh; color-scheme:dark; }
+
+    .header { position:sticky; top:0; z-index:50; background:#0b1329; border-bottom:1px solid #1c2541;
+        padding:14px 16px; display:flex; align-items:center; gap:12px; }
+    .header button { width:36px; height:36px; border-radius:50%; background:#1c2541; border:none; color:#fff;
+        font-size:16px; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+    .header h1 { font-size:16px; font-weight:800; }
+    .header p { font-size:11px; color:#94a3b8; }
+
+    .contenedor { max-width:900px; margin:0 auto; padding:16px; }
+
+    .filtros-fecha { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#0f1a30;
+        border:1px solid #1e3050; border-radius:12px; padding:12px 14px; margin-bottom:16px; }
+    .filtros-fecha label { font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; }
+    .filtros-fecha input[type="date"] { padding:7px 10px; background:#0a1424; border:1px solid #222e50;
+        border-radius:8px; color:#f1f5f9; font-size:12.5px; outline:none; }
+    .filtros-fecha button { padding:8px 14px; border-radius:8px; border:1px solid #3a86ff33; background:#0a1424;
+        color:#3a86ff; font-size:12px; font-weight:700; cursor:pointer; }
+
+    .resumen-total { background:linear-gradient(135deg,#0f1a30,#1c2541); border:1px solid #1e3050; border-radius:14px;
+        padding:16px 18px; margin-bottom:16px; text-align:center; }
+    .resumen-total .val { font-size:32px; font-weight:900; color:#06d6a0; }
+    .resumen-total .lbl { font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; margin-top:4px; }
+
+    .vendedor-card { background:#0f1a30; border:1px solid #1e3050; border-radius:12px; margin-bottom:10px; overflow:hidden; }
+    .vendedor-head { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; cursor:pointer; }
+    .vendedor-head .nombre { font-size:14px; font-weight:800; display:flex; align-items:center; gap:8px; }
+    .badge-interno { font-size:9px; font-weight:800; padding:2px 8px; border-radius:20px; background:#3a86ff22; color:#3a86ff; text-transform:uppercase; }
+    .badge-externo { font-size:9px; font-weight:800; padding:2px 8px; border-radius:20px; background:#f8961e22; color:#f8961e; text-transform:uppercase; }
+    .vendedor-head .monto { font-size:17px; font-weight:900; color:#06d6a0; }
+    .vendedor-negocios { display:none; border-top:1px solid #1e3050; }
+    .vendedor-negocios.abierto { display:block; }
+    .negocio-fila { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 16px;
+        border-bottom:1px solid #16213d; font-size:12.5px; }
+    .negocio-fila:last-child { border-bottom:none; }
+    .negocio-fila .info { flex:1; min-width:0; }
+    .negocio-fila .razon { font-weight:700; color:#f1f5f9; }
+    .negocio-fila .meta { font-size:11px; color:#64748b; margin-top:2px; }
+    .negocio-fila .calc { font-size:10.5px; color:#94a3b8; }
+    .comision-input-wrap { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+    .comision-input { width:100px; padding:6px 8px; background:#0a1424; border:1px solid #222e50; border-radius:6px;
+        color:#06d6a0; font-size:12.5px; font-weight:700; text-align:right; outline:none; }
+    .comision-input:focus { border-color:#06d6a0; }
+    .btn-guardar-comision { padding:6px 9px; border-radius:6px; border:1px solid #06d6a033; background:#0a1424;
+        color:#06d6a0; font-size:11px; cursor:pointer; }
+    .btn-limpiar-comision { padding:6px 9px; border-radius:6px; border:1px solid #ef444433; background:#0a1424;
+        color:#ef4444; font-size:11px; cursor:pointer; }
+    .tag-editado { font-size:9px; color:#f8961e; font-weight:700; margin-left:4px; }
+
+    .empty { text-align:center; color:#64748b; font-size:13px; padding:40px 20px; }
+    .spinner { width:26px; height:26px; border:3px solid #1e3050; border-top-color:#3a86ff; border-radius:50%;
+        animation:girar 0.8s linear infinite; margin:0 auto 10px; }
+    @keyframes girar { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <button onclick="window.location.href='index.html'">←</button>
+    <div>
+        <h1>💰 Comisiones</h1>
+        <p>Ranking por vendedor — solo negocios Ganados</p>
+    </div>
+</div>
+
+<div class="contenedor">
+    <div class="filtros-fecha">
+        <label>Desde</label>
+        <input type="date" id="filtro-desde">
+        <label>Hasta</label>
+        <input type="date" id="filtro-hasta">
+        <button onclick="_cargarComisiones()">🔍 Buscar</button>
+        <button onclick="_limpiarFiltroFechas()" style="border-color:#ef444433;color:#ef4444;">✕ Limpiar</button>
+    </div>
+
+    <div class="resumen-total" id="resumen-total" style="display:none;">
+        <div class="val" id="resumen-total-val">USD 0</div>
+        <div class="lbl">Total comisiones en el período</div>
+    </div>
+
+    <div id="lista-vendedores">
+        <div class="empty"><div class="spinner"></div>Cargando comisiones...</div>
+    </div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+const SESSION_KEY = 'tlc_session_v1';
+
+const ROLES = {
+    Administrador: { verTodo: true },
+    Vendedor:      { verTodo: false },
+    Vend_Externo:  { verTodo: false },
+};
+
+let currentUser = null;
+let currentUserNombre = '';
+let permisos = { verTodo: false };
+let _ultimoResultado = [];
+
+function _esc(s) { const d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
+
+function _fmtFechaCorta(iso) {
+    if (!iso) return '—';
+    try {
+        const d = new Date(iso);
+        if (isNaN(d)) return '—';
+        return d.toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+    } catch(e) { return '—'; }
+}
+
+window._limpiarFiltroFechas = function() {
+    document.getElementById('filtro-desde').value = '';
+    document.getElementById('filtro-hasta').value = '';
+    _cargarComisiones();
+};
+
+async function _cargarComisiones() {
+    const cont = document.getElementById('lista-vendedores');
+    cont.innerHTML = '<div class="empty"><div class="spinner"></div>Cargando comisiones...</div>';
+    const desde = document.getElementById('filtro-desde').value || '';
+    const hasta = document.getElementById('filtro-hasta').value || '';
+    try {
+        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'calcularComisiones', desde, hasta }) });
+        const r = await resp.json();
+        if (!r.ok) { cont.innerHTML = '<div class="empty">⚠ ' + _esc(r.error || 'Error al calcular comisiones') + '</div>'; return; }
+        let vendedores = r.vendedores || [];
+        // Sin permiso de verTodo, solo se ve la propia fila — mismo
+        // criterio que el resto del Portal para vendedores externos.
+        if (!permisos.verTodo && currentUserNombre) {
+            const propioNombre = currentUserNombre.toLowerCase().trim();
+            vendedores = vendedores.filter(function(v) { return String(v.vendedor||'').toLowerCase().trim() === propioNombre; });
+        }
+        _ultimoResultado = vendedores;
+        _renderVendedores(vendedores);
+    } catch(e) {
+        cont.innerHTML = '<div class="empty">⚠ Error de conexión al cargar las comisiones.</div>';
+    }
+}
+
+function _renderVendedores(vendedores) {
+    const cont = document.getElementById('lista-vendedores');
+    const elResumen = document.getElementById('resumen-total');
+    const elResumenVal = document.getElementById('resumen-total-val');
+    if (!vendedores.length) {
+        cont.innerHTML = '<div class="empty">No hay negocios Ganados en este período.</div>';
+        elResumen.style.display = 'none';
+        return;
+    }
+    const totalGeneral = vendedores.reduce(function(acc, v) { return acc + v.totalComision; }, 0);
+    elResumenVal.textContent = 'USD ' + Math.round(totalGeneral).toLocaleString('es-AR');
+    elResumen.style.display = 'block';
+
+    cont.innerHTML = vendedores.map(function(v, vi) {
+        const filasNegocios = v.negocios.map(function(n, ni) {
+            const idInput = 'com-input-' + vi + '-' + ni;
+            const tieneOverride = n.comisionOverride !== null && n.comisionOverride !== undefined;
+            return '<div class="negocio-fila">' +
+                '<div class="info">' +
+                    '<div class="razon">' + _esc(n.razonSocial || 'Sin nombre') + '</div>' +
+                    '<div class="meta">' + _esc(n.idCot) + ' · ' + _fmtFechaCorta(n.fecha) + ' · Neto USD ' + Math.round(n.montoUSD).toLocaleString('es-AR') + '</div>' +
+                    '<div class="calc">Calculado automático: USD ' + n.comisionCalculada.toLocaleString('es-AR') + (tieneOverride ? '<span class="tag-editado">EDITADO A MANO</span>' : '') + '</div>' +
+                '</div>' +
+                '<div class="comision-input-wrap">' +
+                    '<input type="number" step="0.01" class="comision-input" id="' + idInput + '" value="' + n.comisionFinal + '">' +
+                    '<button class="btn-guardar-comision" onclick="_guardarComisionFila(\'' + n.idCot + '\', \'' + idInput + '\')" title="Guardar">💾</button>' +
+                    (tieneOverride ? '<button class="btn-limpiar-comision" onclick="_limpiarComisionFila(\'' + n.idCot + '\', \'' + idInput + '\', ' + n.comisionCalculada + ')" title="Volver al calculado automático">↺</button>' : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
+        return '<div class="vendedor-card">' +
+            '<div class="vendedor-head" onclick="_toggleVendedor(' + vi + ')">' +
+                '<div class="nombre">' + _esc(v.vendedor) + (v.esInterno ? '<span class="badge-interno">Interno · 1%</span>' : '<span class="badge-externo">Externo</span>') + '</div>' +
+                '<div class="monto">USD ' + Math.round(v.totalComision).toLocaleString('es-AR') + '</div>' +
+            '</div>' +
+            '<div class="vendedor-negocios" id="vendedor-negocios-' + vi + '">' + filasNegocios + '</div>' +
+        '</div>';
+    }).join('');
+}
+
+window._toggleVendedor = function(vi) {
+    const el = document.getElementById('vendedor-negocios-' + vi);
+    if (el) el.classList.toggle('abierto');
+};
+
+window._guardarComisionFila = async function(idCot, idInput) {
+    const valor = document.getElementById(idInput).value;
+    try {
+        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'guardarComisionManual', idCot: idCot, comisionManual: valor }) });
+        const r = await resp.json();
+        if (!r.ok) { alert('No se pudo guardar: ' + (r.error||'')); return; }
+        _cargarComisiones();
+    } catch(e) { alert('Error de conexión al guardar la comisión.'); }
+};
+
+window._limpiarComisionFila = async function(idCot, idInput, valorCalculado) {
+    try {
+        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'guardarComisionManual', idCot: idCot, comisionManual: '' }) });
+        const r = await resp.json();
+        if (!r.ok) { alert('No se pudo restaurar: ' + (r.error||'')); return; }
+        _cargarComisiones();
+    } catch(e) { alert('Error de conexión al restaurar la comisión.'); }
+};
+
+async function _iniciar() {
+    try {
+        const raw = localStorage.getItem(SESSION_KEY);
+        if (!raw) { window.location.href = 'index.html'; return; }
+        const payload = JSON.parse(raw);
+        const account = (payload && payload.account) ? payload.account : payload;
+        if (!account || !account.username) { window.location.href = 'index.html'; return; }
+        currentUser = account;
+        currentUserNombre = account.name || account.username || '';
+        permisos = ROLES[account.rol] || ROLES['Vend_Externo'];
+
+        if (typeof validarAccesoModulo === 'function') {
+            const acceso = await validarAccesoModulo('Ventas');
+            if (!acceso) return;
+        }
+
+        await _cargarComisiones();
+    } catch(e) {
+        document.getElementById('lista-vendedores').innerHTML = '<div class="empty">⚠ Error al iniciar la sesión.</div>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', _iniciar);
+
+console.log('%c Portal TLC | comisiones.html | v' + (typeof PORTAL_TLC_VERSION !== 'undefined' ? PORTAL_TLC_VERSION : '?') + ' ', 'background:#06d6a0;color:#0a1424;font-weight:800;border-radius:4px;padding:2px 8px;');
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(function() {});
+    });
+}
+</script>
+</body>
+</html>
