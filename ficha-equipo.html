@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.19.5 (BUG REAL — un mismo nombre puede aparecer VARIAS veces en el catálogo: una vez como equipo propio (Padre, "Pertenece a" vacío) y otras veces como módulo Hijo default de OTROS equipos, con su propio precio (distinto) para esa combinación puntual — ej. "Mesa Eléctrica" viene incluida por defecto con varios equipos. La búsqueda por nombre al abrir la ficha (?nombre=...) hacía un simple .find() — la PRIMERA fila que matcheara el nombre, sin importar si era el Padre o un Hijo — así que podía agarrar la fila de un Hijo (con el precio equivocado) en vez de la fila del equipo propio. Ahora prioriza la fila SIN "Pertenece a" cargado (el Padre real); si no hay ninguna así, cae a la primera que encuentre (mismo comportamiento de siempre, no rompe nada para nombres que solo existen como Hijo). Reportado por Cristian con 2 capturas: "Mesa Eléctrica" mostraba USD 730 en el selector pero USD 400 al abrir la ficha — "cuando lo abro... me muestra el precio de los hijos". Confirmado con 2 tests: con el Hijo apareciendo PRIMERO en el array a propósito, igual muestra el precio y los datos (Marca/Categoría) del Padre; y un nombre que SOLO existe como Hijo (sin ningún Padre) sigue funcionando exactamente igual que antes.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.4 (Simplificación del envío obligatorio (v2026.08.19.3) — Cristian pidió sacar el modal con 2 campos separados ("el modal para agregar nombre y telefono sacalo, solo pone un popup 5 seg que debe ingresar el nombre apellido y telefono"): los campos Nombre y Apellido / Teléfono YA están visibles en la propia ficha, no hacía falta pedirlos de nuevo en un modal aparte. Ahora, si falta alguno al tocar "Enviar por WhatsApp", se muestra un aviso simple (toast, 5 segundos, se cierra solo) señalando cuál falta, y se enfoca+resalta ese campo en la propia ficha — no se envía nada hasta completarlo y volver a tocar el botón. _confirmarDatosWspObligatorio() y el modal wsp-datos-modal se eliminaron; _ejecutarEnvioFichaWsp() ahora lee directo fi-empresa-buscar/fi-telefono-destino para armar el contacto (mismo criterio de "nombre del contacto = el ingresado" que antes). Confirmado con test actualizado: sin datos no envía y avisa mencionando ambos campos faltantes; con solo uno completo sigue sin enviar y pide específicamente el que falta; con los 2 ya cargados en la ficha, envía y registra empresa+contacto+negocio+nota igual que antes.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.3 (El envío por WhatsApp desde la ficha ahora exige Nombre y Apellido + Teléfono con un modal OBLIGATORIO — reemplaza el prompt() opcional de v2026.08.19.2/v189, que se podía cancelar o dejar vacío. El modal no se cierra ni deja pasar sin completar los 2 campos. Al confirmar: (1) se verifica/crea la empresa con ese nombre (backend, ver FotoMap.gs v190 — ahora chequea server-side antes de crear, no solo el cache del cliente), (2) se crea/actualiza un contacto REAL en /contactos con el mismo nombre y teléfono ingresados, asociado a esa empresa, (3) se crea/suma el negocio (ya lo hacía), (4) se agrega una nota de seguimiento al negocio: "📤 Se envió la ficha técnica de [equipo] — [link real enviado]". Nuevo helper _registrarContactoYNota(), enganchado en los 3 puntos de éxito de _guardarSeguimientoVentas (negocio ya resuelto en esta carga de página / negocio existente encontrado / negocio recién creado). El flujo del QR de FacoExtrema (_compartirFichaWspPersonalizado) ya exigía teléfono desde antes — solo se le agregó que también dispare la nota. Pedido por Cristian: "Desde ficha técnica quiero que sea obligatorio al enviar por WhatsApp pida nombre y apellido y teléfono. En ell back debe crear la empresa si no existe (verificar), el nombre del contacto si mismo que el ingresado. Crear el negocio (ya lo hace) y en notas crear una notas que diga que fue enviada la ficha técnica y mostrar el link de la ficha enviada". Confirmado con 2 baterías de test: el modal bloquea de verdad (no se puede saltear con uno o ningún campo completo), y con los 2 datos completos se verifica el flujo end-to-end completo — WhatsApp se abre, la empresa se crea con el nombre correcto, el contacto se crea con el mismo nombre+teléfono asociado a esa empresa, el negocio se crea, y la nota queda con el texto y el link reales.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.2 (2 correcciones sobre "Ver Stock" (v2026.08.19.1): (1) ahora muestra TODOS los Hijos disponibles, tildados o no — antes solo mostraba los tildados, dejando afuera módulos que también podían tener stock relevante. (2) Cada línea con stock ≥1 se pinta en verde y con letra un toque más grande (15px/800), INDIVIDUALMENTE — antes el color/tamaño era uniforme para todo el recuadro según si TODO tenía stock o no; ahora cada ítem se distingue solo, sin depender del estado de los demás. El recuadro general pasó a un fondo neutro (gris clarito) ya que el color relevante ahora vive en cada línea, no en el conjunto. Pedido por Cristian: "1) mostrame todo, padre e hijos 2) cuando stock >= 1 pinta esa linea en verde y un toque mas grande la letra". Confirmado con test actualizado: el módulo NO tildado (Biometría) ahora aparece, y cada línea (Padre y Hijos) tiene su propio color/tamaño según su propio stock, sin importar si están tildados.) -->
@@ -363,7 +364,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.19.4';
+var FICHA_EQUIPO_VERSION = '2026.08.19.5';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -930,7 +931,22 @@ async function _cargarFicha() {
 
     try {
         var lista = await cargarPreciosFicha();
-        var d = (Array.isArray(lista) ? lista : []).find(function(x) { return x['Nombre de Dispositivo'] === nombre; });
+        var candidatos = (Array.isArray(lista) ? lista : []).filter(function(x) { return x['Nombre de Dispositivo'] === nombre; });
+        // BUG REAL — un mismo nombre puede aparecer VARIAS veces en el
+        // catálogo: una vez como equipo propio (Padre, "Pertenece a"
+        // vacío) y otras veces como módulo Hijo default de OTROS
+        // equipos (con su propio precio, distinto, para esa
+        // combinación puntual) — ej. "Mesa Eléctrica" viene incluida
+        // por defecto con varios equipos. Antes esto hacía un simple
+        // .find() (la PRIMERA fila que matcheara el nombre), así que
+        // podía agarrar una fila de Hijo (con el precio equivocado)
+        // en vez de la fila del equipo propio. Ahora prioriza la fila
+        // SIN "Pertenece a" cargado (el Padre real) — si no hay
+        // ninguna así, cae a la primera que encuentre (mismo
+        // comportamiento de siempre, para no romper nada). Reportado
+        // por Cristian con 2 capturas: "Mesa Eléctrica" mostraba USD
+        // 730 en el selector pero USD 400 al abrir la ficha.
+        var d = candidatos.find(function(x) { return !x['Pertenece a']; }) || candidatos[0];
         if (!d) { _mostrarError('No se encontró el equipo "' + nombre + '" en el catálogo.'); return; }
 
         document.title = d['Nombre de Dispositivo'] + ' — Ficha Técnica TLC';
