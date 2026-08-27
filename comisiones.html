@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | comisiones.html | v2026.08.26.2 (El acceso al módulo ahora se controla con una columna DEDICADA "Comisiones" en la hoja Vendedores (TRUE/FALSE por usuario) — antes chequeaba el permiso de "Ventas", que no distinguía a quién mostrarle esto. permisos.js ya soportaba esto de forma completamente genérica (cualquier nombre de columna), no hizo falta tocar nada ahí — solo cambiar qué columna se le pide. Pedido por Cristian: "en el modulo comisiones habilitarlo o deshabilitarlo de acuerdo a los permisos en la hoja vendedores columna Comisiones true/false... o volcarlo a permisos.js". Falta que Cristian agregue esa columna en el Excel — sin ella, el mecanismo fail-open de permisos.js deja pasar a todos igual, hasta que se cargue. Confirmado con test: valida que se llama a validarAccesoModulo('Comisiones'), no 'Ventas'.) -->
 <!-- Portal TLC | comisiones.html | v2026.08.26.1 (Pantalla nueva —
      Ranking de comisiones por vendedor, con filtro de fechas
      Desde/Hasta. Solo cuenta negocios en estado "Ganada". Vendedores
@@ -243,7 +244,16 @@ async function _iniciar() {
         permisos = ROLES[account.rol] || ROLES['Vend_Externo'];
 
         if (typeof validarAccesoModulo === 'function') {
-            const acceso = await validarAccesoModulo('Ventas');
+            // Columna dedicada "Comisiones" en la hoja Vendedores
+            // (TRUE/FALSE por usuario) — mismo mecanismo genérico de
+            // permisos.js que ya usan empresas.html/servicio.html
+            // (columna exacta = nombre del módulo). Pedido por
+            // Cristian: "en el modulo comisiones habilitarlo o
+            // deshabilitarlo de acuerdo a los permisos en la hoja
+            // vendedores columna Comisiones true/false... o volcarlo
+            // a permisos.js" — ya está soportado ahí de forma
+            // genérica, solo hacía falta pedir la columna correcta.
+            const acceso = await validarAccesoModulo('Comisiones');
             if (!acceso) return;
         }
 
