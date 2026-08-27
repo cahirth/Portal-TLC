@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.19.6 (Fix de contraste — el texto del banner "Usar esta empresa" (v2026.08.19.5) tenía color claro fijo (#e2f8ef, pensado para fondo oscuro) sobre un fondo verde muy clarito, quedando casi invisible en modo claro — se veía el botón pero no se entendía la instrucción de arriba. Reportado por Cristian con captura: "como cambio de empresa?" (la función ya estaba, pero no se leía la explicación). Nueva clase banner-usar-empresa-texto con override de tema-claro (#0d4a38, verde oscuro legible). Confirmado con test: el color del texto ya no es el clarito original, pasa a ser el oscuro nuevo con buen contraste.) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.5 (Nuevo flujo "cambiar empresa de un negocio" — cuando se llega desde cotizaciones.html con ?volverA=negocio&idNegocio=X (ver ese archivo v2026.08.19.13), se muestra un banner "✅ Usar esta empresa" en el detalle, y cada contacto de la lista suma su propio botón "✅ Usar este contacto". Al elegir, llama a la acción nueva reasignarEmpresaNegocio (FotoMap.gs v192) con la empresa+contacto realmente elegidos (no los que tenía antes el negocio) y vuelve directo a cotizaciones.html?id=X. Se puede navegar libremente a CUALQUIER otra empresa desde acá (buscador, lista) antes de elegir — no queda pegado a la que tenía el negocio originalmente. Pedido por Cristian con captura: "a un negocio existente permitime poder cambiar la empresa, si ya tiene una empresa asignada, permitime cambiarla llevandome al modulo empresas y elegir otra con sus contactos asociados". Confirmado con test de punta a punta: abre la empresa vieja de contexto, permite abrir una empresa totalmente distinta, el botón por contacto aparece, elegir un contacto llama al backend con la empresa+contacto nuevos, y arma bien la URL de vuelta al negocio de origen.) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.4 (BUG REAL — "lo guardo pero no aparece... después de minutos aparecieron 4 empresas todas con el mismo nombre" (Cristian creó la misma empresa 4 veces creyendo que no se guardaba, cuando en realidad SÍ se guardaba las 4 veces). Causa: carrera entre pedidos concurrentes a listarEmpresas — el fetch de fondo de _cargarEmpresasCacheFirst (arranca solo al abrir la página) podía tardar más que el fetch fresco que dispara _cargarEmpresas() al crear una empresa nueva; si el pedido VIEJO y lento resolvía DESPUÉS del nuevo, su respuesta (sin la empresa recién creada) sobreescribía el array EMPRESAS entero, haciendo "desaparecer" lo que se acababa de crear aunque ya estuviera bien guardado en Firebase. Fix: número de secuencia global (_cargaEmpresasSeq) — cada pedido de listarEmpresas guarda cuál era el número vigente al arrancar, y descarta su propia respuesta en silencio si mientras tanto arrancó un pedido más nuevo. Confirmado con test reproduciendo el escenario exacto: pedido lento (300ms, lista vieja) arrancado por la página al abrir, empresa nueva creada mientras tanto (fetch rápido, 20ms, lista completa) — la empresa nueva se ve de inmediato y SIGUE viéndose después de que el pedido viejo finalmente resuelve.) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.3 (El FAB de QR ya no guarda directo al escanear — ahora abre un modal de revisión, mismo estilo EXACTO que el paso 2 del modal de QR de index.html (#qr-fac-paso-datos): todos los campos editables (Nombre/Apellido/Email/Teléfono/DNI/Categoría), badge VIP si corresponde, y un botón "Guardar" explícito abajo — nada se guarda hasta que el vendedor confirma. Si el DNI o email escaneado ya coincide con un contacto EXISTENTE en EMPRESAS que tenga teléfono cargado, se precarga ESE teléfono automáticamente (con un aviso visual de dónde salió), más confiable que lo que traiga el QR. Pedido por Cristian: "abrir el modal que se escanea igual a index, si es un contacto existente y tiene telefono cargado en empresas, mostrarlo en el modal, todos campos editables, boton abajo del modal Guardar". Confirmado con test actualizado: el modal se abre (no guarda directo), el teléfono se precarga del contacto existente cuando el QR no lo trae, se puede editar cualquier campo antes de confirmar, y recién al tocar Guardar se manda todo (con las ediciones incluidas) y se refresca la lista.) -->
@@ -172,6 +173,7 @@
 
   /* ═══════ MODO CLARO ═══════ */
   body.tema-claro { background:#f0f4f8; color:#1e293b; color-scheme: light; }
+  body.tema-claro .banner-usar-empresa-texto { color:#0d4a38 !important; }
   body.tema-claro .header { background:linear-gradient(135deg,#ffffff,#f1f5f9); border-bottom-color:#cbd5e1; }
   body.tema-claro .header-text h1 { color:#0f172a; }
   body.tema-claro .avatar-btn { background:#ffffff; border-color:#cbd5e1; }
@@ -328,7 +330,7 @@
 
       <div id="banner-usar-empresa-negocio" style="display:none;align-items:center;justify-content:space-between;gap:10px;
           background:#06d6a01a;border:1px solid #06d6a044;border-radius:12px;padding:12px 14px;margin-bottom:14px;flex-wrap:wrap;">
-        <div style="font-size:12.5px;color:#e2f8ef;flex:1;min-width:180px;">
+        <div class="banner-usar-empresa-texto" style="font-size:12.5px;color:#e2f8ef;flex:1;min-width:180px;">
           Volviendo de un negocio — elegí un contacto de esta empresa abajo, o usá la empresa sin ninguno en particular.
         </div>
         <button onclick="_usarEmpresaParaNegocio('')" style="padding:9px 14px;border-radius:8px;border:none;
@@ -396,7 +398,7 @@ console.log("%c TLC Empresas v" + APP_VERSION + " ", "background:#3a86ff;color:w
 // todavía no llegó a producción". Guardado como constante con nombre
 // (no un string suelto dentro del console.log) — actualizar ACÁ en
 // cada entrega.
-const _VERSION_ARCHIVO_EMPRESAS = '2026.08.19.5';
+const _VERSION_ARCHIVO_EMPRESAS = '2026.08.19.6';
 console.log("%c TLC Empresas (archivo) v" + _VERSION_ARCHIVO_EMPRESAS + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 // ══════════════════════════════════════════════════════════════════
 // Empresas y Contactos conectados a Firebase (empresas/{id},
