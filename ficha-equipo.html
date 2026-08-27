@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.19.6 (Nuevo badge "💰 Tu comisión: X%" en la ficha técnica — visible SOLO para vendedores logueados con la columna "Ver Comisiones" tildada en la hoja Vendedores (TRUE/FALSE), mostrando el % de comisión que tiene cargado ESE equipo puntual (columna "COMISIONES" en Lista_Precios). Nunca se muestra en fichas abiertas por un cliente (link compartido, sin sesión) — se corta de una sin consultar nada si no hay _sesionVendedor. Puramente visual/informativo — NO participa del cálculo real de comisiones (ver FotoMap.gs calcularComisiones, que sigue usando 1% fijo para internos y % por equipo para externos, sin relación con esta columna). Usa la nueva consultarPermisoModulo() de permisos.js v2026.08.19.2 (versión NO bloqueante de validarAccesoModulo, para permisos que solo deciden mostrar/ocultar algo). Se agregó <script src="permisos.js"> al head, que antes no cargaba este archivo. Pedido por Cristian: "en ficha técnica, ver comisiones, si está tildado, el vendedor ve la comisión que va a recibir de ese equipo, que está en el Excel... si está destildado, no lo ve. Es solamente visual". Confirmado con 4 tests: cliente sin sesión nunca lo ve (aunque el equipo tenga % cargado), vendedor con el permiso en true ve el % real del equipo, vendedor con el permiso en false no ve nada, y un equipo sin % cargado tampoco muestra nada aunque el vendedor tenga permiso.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.5 (BUG REAL — un mismo nombre puede aparecer VARIAS veces en el catálogo: una vez como equipo propio (Padre, "Pertenece a" vacío) y otras veces como módulo Hijo default de OTROS equipos, con su propio precio (distinto) para esa combinación puntual — ej. "Mesa Eléctrica" viene incluida por defecto con varios equipos. La búsqueda por nombre al abrir la ficha (?nombre=...) hacía un simple .find() — la PRIMERA fila que matcheara el nombre, sin importar si era el Padre o un Hijo — así que podía agarrar la fila de un Hijo (con el precio equivocado) en vez de la fila del equipo propio. Ahora prioriza la fila SIN "Pertenece a" cargado (el Padre real); si no hay ninguna así, cae a la primera que encuentre (mismo comportamiento de siempre, no rompe nada para nombres que solo existen como Hijo). Reportado por Cristian con 2 capturas: "Mesa Eléctrica" mostraba USD 730 en el selector pero USD 400 al abrir la ficha — "cuando lo abro... me muestra el precio de los hijos". Confirmado con 2 tests: con el Hijo apareciendo PRIMERO en el array a propósito, igual muestra el precio y los datos (Marca/Categoría) del Padre; y un nombre que SOLO existe como Hijo (sin ningún Padre) sigue funcionando exactamente igual que antes.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.4 (Simplificación del envío obligatorio (v2026.08.19.3) — Cristian pidió sacar el modal con 2 campos separados ("el modal para agregar nombre y telefono sacalo, solo pone un popup 5 seg que debe ingresar el nombre apellido y telefono"): los campos Nombre y Apellido / Teléfono YA están visibles en la propia ficha, no hacía falta pedirlos de nuevo en un modal aparte. Ahora, si falta alguno al tocar "Enviar por WhatsApp", se muestra un aviso simple (toast, 5 segundos, se cierra solo) señalando cuál falta, y se enfoca+resalta ese campo en la propia ficha — no se envía nada hasta completarlo y volver a tocar el botón. _confirmarDatosWspObligatorio() y el modal wsp-datos-modal se eliminaron; _ejecutarEnvioFichaWsp() ahora lee directo fi-empresa-buscar/fi-telefono-destino para armar el contacto (mismo criterio de "nombre del contacto = el ingresado" que antes). Confirmado con test actualizado: sin datos no envía y avisa mencionando ambos campos faltantes; con solo uno completo sigue sin enviar y pide específicamente el que falta; con los 2 ya cargados en la ficha, envía y registra empresa+contacto+negocio+nota igual que antes.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.3 (El envío por WhatsApp desde la ficha ahora exige Nombre y Apellido + Teléfono con un modal OBLIGATORIO — reemplaza el prompt() opcional de v2026.08.19.2/v189, que se podía cancelar o dejar vacío. El modal no se cierra ni deja pasar sin completar los 2 campos. Al confirmar: (1) se verifica/crea la empresa con ese nombre (backend, ver FotoMap.gs v190 — ahora chequea server-side antes de crear, no solo el cache del cliente), (2) se crea/actualiza un contacto REAL en /contactos con el mismo nombre y teléfono ingresados, asociado a esa empresa, (3) se crea/suma el negocio (ya lo hacía), (4) se agrega una nota de seguimiento al negocio: "📤 Se envió la ficha técnica de [equipo] — [link real enviado]". Nuevo helper _registrarContactoYNota(), enganchado en los 3 puntos de éxito de _guardarSeguimientoVentas (negocio ya resuelto en esta carga de página / negocio existente encontrado / negocio recién creado). El flujo del QR de FacoExtrema (_compartirFichaWspPersonalizado) ya exigía teléfono desde antes — solo se le agregó que también dispare la nota. Pedido por Cristian: "Desde ficha técnica quiero que sea obligatorio al enviar por WhatsApp pida nombre y apellido y teléfono. En ell back debe crear la empresa si no existe (verificar), el nombre del contacto si mismo que el ingresado. Crear el negocio (ya lo hace) y en notas crear una notas que diga que fue enviada la ficha técnica y mostrar el link de la ficha enviada". Confirmado con 2 baterías de test: el modal bloquea de verdad (no se puede saltear con uno o ningún campo completo), y con los 2 datos completos se verifica el flujo end-to-end completo — WhatsApp se abre, la empresa se crea con el nombre correcto, el contacto se crea con el mismo nombre+teléfono asociado a esa empresa, el negocio se crea, y la nota queda con el texto y el link reales.) -->
@@ -39,6 +40,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ficha Técnica — TLC SRL</title>
+    <script src="permisos.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <meta property="og:title" content="Ficha Técnica — Tecnología Láser Corneal">
     <meta property="og:description" content="Características, precio y financiación disponible. Tocá para ver el detalle completo.">
@@ -253,6 +255,17 @@
                     <span id="fi-precio-oferta-faco-iva" style="display:none; font-size:14px; font-weight:700; color:var(--text-muted);"></span>
                 </div>
                 <div id="fi-badge-oferta-faco" style="display:none; margin-top:6px; padding:3px 10px; border-radius:6px; background:#dc2626; color:#fff; font-size:11px; font-weight:800; letter-spacing:.3px; width:fit-content;">LIMITADO FACOEXTREMA</div>
+                <!-- Badge de comisión — SOLO visible para vendedores
+                     logueados con la columna "Ver Comisiones" tildada
+                     en la hoja Vendedores (permisos.js). Nunca se
+                     muestra en fichas abiertas por un cliente (link
+                     compartido, sin sesión). Puramente informativo —
+                     no participa del cálculo real de comisiones.html.
+                     Pedido por Cristian: "en ficha técnica, ver
+                     comisiones, si está tildado, el vendedor ve la
+                     comisión que va a recibir de ese equipo... es
+                     solamente visual". -->
+                <div id="fi-badge-comision" style="display:none; margin-top:6px; padding:3px 10px; border-radius:6px; background:#06d6a022; border:1px solid #06d6a055; color:#04241c; font-size:11px; font-weight:800; letter-spacing:.3px; width:fit-content;"></div>
             </div>
         </div>
     </div>
@@ -364,7 +377,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.19.5';
+var FICHA_EQUIPO_VERSION = '2026.08.19.6';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -466,6 +479,35 @@ function _leerSesionVendedorFicha() {
     if (!cuenta || !cuenta.username) return null;
     return cuenta;
   } catch(e) { return null; }
+}
+
+// Badge "Tu comisión: X%" — SOLO para vendedores logueados con la
+// columna "Ver Comisiones" tildada (permisos.js, no bloqueante).
+// Nunca se muestra en fichas abiertas por un cliente (link
+// compartido, sin sesión) — se corta de una si no hay _sesionVendedor,
+// sin llegar a consultar nada. Puramente informativo, no participa
+// del cálculo real de comisiones (ver FotoMap.gs calcularComisiones).
+// Pedido por Cristian: "en ficha técnica, ver comisiones, si está
+// tildado, el vendedor ve la comisión que va a recibir de ese
+// equipo... es solamente visual".
+async function _mostrarBadgeComisionSiCorresponde(equipo) {
+  var elBadge = document.getElementById('fi-badge-comision');
+  if (!elBadge) return;
+  elBadge.style.display = 'none';
+  if (!_sesionVendedor) return; // vista de cliente — nunca mostrar
+  var pct = parseFloat(equipo && equipo['COMISIONES']);
+  if (isNaN(pct)) return; // este equipo no tiene % de comisión cargado
+  try {
+    if (typeof consultarPermisoModulo !== 'function') return;
+    var puedeVer = await consultarPermisoModulo('Ver Comisiones');
+    if (!puedeVer) return;
+    // El equipo pudo haber cambiado mientras esperábamos la consulta
+    // (ej. el vendedor ya navegó a otra ficha) — solo pintamos si
+    // seguimos mirando el mismo equipo.
+    if (_fichaPadreActual !== equipo) return;
+    elBadge.textContent = '💰 Tu comisión: ' + pct.toLocaleString('es-AR') + '%';
+    elBadge.style.display = 'block';
+  } catch(e) { /* fail-open silencioso — si falla, simplemente no se muestra */ }
 }
 
 // Se llama recién cuando el fotoMap termina de cargar (puede ser antes
@@ -993,6 +1035,7 @@ async function _cargarFicha() {
         // (filas cuyo "Pertenece a" matchea el nombre exacto del Padre)
         // y pintar los checkboxes, si tiene alguno. ──
         _fichaPadreActual = d;
+        _mostrarBadgeComisionSiCorresponde(d);
         _fichaHijosDisponibles = lista.filter(function(x) {
             return x['Pertenece a'] && String(x['Pertenece a']).trim() === String(d['Nombre de Dispositivo']).trim();
         });

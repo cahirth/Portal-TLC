@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.19.3 (Corrección de nombre de columna — la v2026.08.19.2 (recién anterior) usaba "Ver Comisiones" por error; Cristian confirmó con captura del Excel real que la columna se llama simplemente "Comisiones", sin "Ver" adelante. Corregido en cols.indexOf() y en el arreglo de diagnóstico de columnas faltantes. Ver comisiones.html (misma corrección, para que ambos lados lean la MISMA columna real).) -->
 <!-- Portal TLC | index.html | v2026.08.19.2 (El botón "Comisiones" del submenú de Ventas ahora se pone gris/deshabilitado según la columna "Ver Comisiones" de la hoja Vendedores (TRUE/FALSE) — mismo mecanismo que ya usan los demás módulos (opacidad 0.35 + toast "🔒 No tienes permiso" al tocarlo), sumado como caso puntual porque el botón vive DENTRO del submenú de Ventas, no es un ítem de primer nivel que ya pasara por aplicarPermisosMenu(). El campo userPermisos.verComisiones y la lectura de la columna "Ver Comisiones" ya existían de antes (preparados sin usar); solo hacía falta sumar menu-item-comisiones a la lista de secciones grises y darle su propio wrapper _abrirComisionesConPermiso(). Pedido por Cristian: "Quidro que el boton este en gris, deshabitado si la.tilde esta en false desde el excel". Ver comisiones.html (usa la MISMA columna "Ver Comisiones" para el permiso de acceso a la pantalla en sí). Confirmado con test: con la columna en false el botón queda gris y tocarlo no navega (solo avisa), con la columna en true vuelve a verse normal.) -->
 <!-- Portal TLC | index.html | v2026.08.19.1 (Tope de 5 en "Mis Pendientes Críticos" del Radar (home) — antes 90%/75% no tenían ningún límite (solo "resto" estaba topeado en 8), así que un vendedor con muchos negocios avanzados a la vez podía saturar el panel entero. Ahora el tope es GLOBAL: máximo 5 tarjetas en total, priorizando 90% primero (por monto desc), después 75%, después el resto — si sobra lugar dentro de los 5. Pedido por Cristian, aclarando el pedido de filtro por vendedor en cotizaciones.html: "con los últimos cinco más importantes al noventa por ciento, está bien, no hace falta ver todos". Confirmado con test: con 9 pendientes simulados (3 al 90%, 4 al 75%, 2 en otros estados), muestra exactamente 5 — los 3 del 90% primero, después los 2 de mayor monto al 75%.) -->
 <!-- Portal TLC | index.html | v2026.08.16.1 (2 arreglos sobre permisos: (1) el pie de versión mostraba un texto FIJO "v2026.07.05.7" en el HTML — ya existía código (línea ~2100) que intentaba actualizarlo buscando un elemento con id="footer-version-idx", pero el <p> real nunca tenía ese id, así que el código nunca lo encontraba y quedaba pegado desde julio, aunque el archivo real se hubiera actualizado decenas de veces desde entonces. Agregado el id que faltaba. (2) cargarPermisosUsuario() se quedaba muda cuando una columna de permisos no matcheaba exacto con el Sheet (a diferencia de permisos.js, que sí avisa) — agregado el mismo aviso por consola, más un log de diagnóstico con el valor CRUDO leído para Servicio Tecnico y Administracion puntualmente. Reportado por Cristian: "no me habilita administracion ni servicio" — con este diagnóstico se confirma que "Administracion" directamente no existe como columna en el Sheet (según la captura que mandó, solo tiene Internos/Empresas/Ventas/Servicio Tecnico/Regulatoria) — no es un bug, es un módulo sin construir/sin columna cargada todavía. Para "Servicio Tecnico" específicamente, que sí está tildado en su fila, hace falta que revise el nuevo log de consola para confirmar si el problema es de nombre de columna o de valor cargado. Confirmado con 4 tests: el pie de versión se actualiza solo, avisa de columnas faltantes, no avisa de las que sí existen, y el log de diagnóstico muestra el valor crudo real.) -->
@@ -1482,7 +1483,7 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
     // ─── PERMISOS ─────────────────────────────────────────────────────────────
     const SHEET_ID_PERMISOS = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
     // Placeholder de arranque (mientras carga el Sheet) — el valor real y
-    // definitivo de verComisiones viene SIEMPRE de la columna "Ver Comisiones"
+    // definitivo de verComisiones viene SIEMPRE de la columna "Comisiones"
     // en cargarPermisosUsuario(), independiente del rol.
     let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, tareas: true, empresas: true, eventos: true, verComisiones: false, rol: 'Administrador' };
 
@@ -1506,7 +1507,7 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
             const eventosIdx = cols.indexOf('Eventos'); // ← columna nueva, "permisos.moduloEventos" — si todavía no existe en el Sheet, bool() la deja en false (bloqueado) sin romper nada
             const regulatoriaIdx = cols.indexOf('Regulatoria');
             const reportesIdx = cols.indexOf('Reportes');
-            const comisionesIdx = cols.indexOf('Ver Comisiones');
+            const comisionesIdx = cols.indexOf('Comisiones');
 
             // DIAGNÓSTICO — a diferencia de permisos.js (que sí avisa
             // por consola cuando no encuentra una columna), esta
@@ -1519,7 +1520,7 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
             // saber si era un problema de nombre de columna o del
             // valor cargado en su fila. Mismo criterio que ya usa
             // permisos.js.
-            [['Servicio Tecnico', servicioIdx], ['Administracion', adminIdx], ['Comercio Exterior', comexIdx], ['Tareas', tareasIdx], ['Eventos', eventosIdx], ['Regulatoria', regulatoriaIdx], ['Reportes', reportesIdx], ['Ver Comisiones', comisionesIdx]].forEach(([nombre, idx]) => {
+            [['Servicio Tecnico', servicioIdx], ['Administracion', adminIdx], ['Comercio Exterior', comexIdx], ['Tareas', tareasIdx], ['Eventos', eventosIdx], ['Regulatoria', regulatoriaIdx], ['Reportes', reportesIdx], ['Comisiones', comisionesIdx]].forEach(([nombre, idx]) => {
                 if (idx === -1) console.warn('[index.html] Columna "' + nombre + '" no encontrada en Vendedores (encabezados reales: ' + cols.join(' | ') + ') — el módulo queda bloqueado para todos hasta que se cargue esa columna.');
             });
 

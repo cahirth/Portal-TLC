@@ -1,4 +1,13 @@
-// Portal TLC | permisos.js | v2026.08.16.1 | Validación de acceso a módulos secundarios
+// Portal TLC | permisos.js | v2026.08.19.2 | Validación de acceso a módulos secundarios
+// v2026.08.19.2: nueva función consultarPermisoModulo() — misma
+//      lectura que validarAccesoModulo (columna de Vendedores,
+//      TRUE/FALSE por email) pero SIN alert ni redirect en ningún
+//      caso, para permisos que solo deciden si MOSTRAR o no un dato
+//      en pantalla, no si se puede entrar a un módulo entero. Usada
+//      por ficha-equipo.html para la columna "Ver Comisiones" (el %
+//      de comisión de cada equipo, visible solo para vendedores
+//      logueados con esa columna tildada — puramente informativo).
+//      Ver comentario largo de la función para el detalle completo.
 // BUG REAL DE FONDO — validarAccesoModulo hacía un pedido de red EN
 // VIVO a Google Sheets (gviz) en CADA carga de página, en los 4
 // módulos que lo usan (empresas.html, eventos.html, servicio.html,
@@ -147,6 +156,75 @@ async function validarAccesoModulo(columnaSheet) {
 
   } catch(e) {
     console.warn('[permisos.js] Error validando acceso (fail-open, se permite igual):', e);
+    return true;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// consultarPermisoModulo — misma lectura que validarAccesoModulo
+// (columna de la solapa Vendedores, TRUE/FALSE por email), pero SIN
+// ningún alert ni redirect en ningún caso. Para permisos que solo
+// deciden si MOSTRAR o no un dato en pantalla (no si se puede entrar
+// a un módulo entero) — ej. "Ver Comisiones" en ficha-equipo.html,
+// que decide si ese vendedor ve el % de comisión de cada equipo, sin
+// bloquear el resto de la ficha para nadie. Mismo criterio fail-open:
+// ante cualquier error, se resuelve en true (no rompe nada visual por
+// un problema de red).
+//
+//   const puedeVer = await consultarPermisoModulo('Ver Comisiones');
+//   if (puedeVer) { /* mostrar el dato */ }
+// ══════════════════════════════════════════════════════════════════
+async function consultarPermisoModulo(columnaSheet) {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY_PERMISOS_JS);
+    if (!raw) return false; // sin sesión, no hay a quién mostrarle nada
+    let payload;
+    try { payload = JSON.parse(raw); } catch(e) { return false; }
+    if (!payload.expira || Date.now() > payload.expira) return false;
+    const email = payload.account && payload.account.username;
+    if (!email) return false;
+
+    const TTL_PERMISOS_MS = 10 * 60 * 1000;
+    const claveCache = 'permiso_visual_cache_' + columnaSheet + '_' + email.toLowerCase().trim();
+    try {
+      const cacheRaw = sessionStorage.getItem(claveCache);
+      if (cacheRaw) {
+        const cache = JSON.parse(cacheRaw);
+        if (cache && typeof cache.permitido === 'boolean' && (Date.now() - cache.ts) < TTL_PERMISOS_MS) {
+          return cache.permitido;
+        }
+      }
+    } catch(eCacheGet) {}
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID_PERMISOS_JS}/gviz/tq?tqx=out:json&sheet=Vendedores`;
+    let res;
+    try {
+      res = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    const text = await res.text();
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+    if (!match) return true;
+
+    const json = JSON.parse(match[1]);
+    const rows = json.table.rows;
+    const cols = json.table.cols.map(c => c.label);
+    const emailIdx = cols.indexOf('Email');
+    const colIdx   = cols.indexOf(columnaSheet);
+    if (colIdx === -1) { console.warn('[permisos.js] Columna "' + columnaSheet + '" no encontrada en Vendedores — se permite mostrar igual.'); return true; }
+
+    const fila = rows.find(r => { const v = r.c[emailIdx]?.v || ''; return v.toLowerCase().trim() === email.toLowerCase().trim(); });
+    const permitido = fila
+      ? (fila.c[colIdx]?.v === true || fila.c[colIdx]?.v === 'TRUE' || fila.c[colIdx]?.v === 'true' || fila.c[colIdx]?.v === 1)
+      : false;
+
+    try { sessionStorage.setItem(claveCache, JSON.stringify({ permitido: permitido, ts: Date.now() })); } catch(eCacheSet) {}
+    return permitido;
+  } catch(e) {
+    console.warn('[permisos.js] Error consultando permiso visual (fail-open, se muestra igual):', e);
     return true;
   }
 }
