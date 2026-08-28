@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.19.15 (Al ir a editar un presupuesto, el borrador que se manda a presupuesto-editor.html ahora incluye modalidadPago (el adelanto/anticipo real de TLC6/TLC12/Leasing) — antes se perdía y siempre volvía al default genérico al reabrir. Ver presupuesto-editor.html v2026.08.27.1 y FotoMap.gs v194 para el resto del fix. Reportado por Cristian: "todos los descuentos y adelanto, forma de pago, tal cual están en el presupuesto a editar, ahora no lo trae".) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.14 (Separación de responsabilidades: tocar la caja "Cliente" (con empresa ya asignada) sigue precargando ESA MISMA empresa en empresas.html — es para cambiar el CONTACTO. Nuevo botón aparte "🔄 Cambiar Empresa", chiquito debajo de la caja, que NO precarga ninguna — arranca directo en la lista de Empresas para buscar y elegir una totalmente distinta. Aclarado por Cristian tras la entrega anterior: "no me entendiste... quiero que agregues un boton para cambiar de empresa, que me lleve al modulo empresas y poder elegir otra empresa totalmente diferente, que lo que hisicste esta ok y dejalo, es para cambiar el contacto". Nueva función _irACambiarEmpresaDeNegocio(), separada de _irAEmpresaDesdeNegocio() (que sigue igual). Confirmado con test: tocar la caja Cliente arma la URL CON ?empresa=actual (precarga), el botón nuevo arma la URL SIN ese parámetro (arranca en la lista).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.13 (2 cambios: (1) Box "Cliente" del hero del detalle — tenía TODO el estilo fijo inline (fondo #0f1a30, texto claro) sin adaptarse a modo claro; nueva clase det-cliente-box + override de tema-claro (fondo celeste #eef2ff). Reportado por Cristian: "sigo con el bug en modo claro, si paso el mouse por encima se pone color negro" — el negro venía del fondo fijo, nunca del hover en sí (el onmouseover solo cambiaba el borde). (2) Ahora SIEMPRE se puede ir a cambiar la empresa de un negocio desde ese mismo box, incluso si ya tiene una asignada — antes, si ya tenía empresa, solo abría esa MISMA ficha en modo ver/editar, sin forma de elegir otra distinta; si no tenía ninguna, directamente bloqueaba con un alert. _irAEmpresaDesdeNegocio() ahora siempre lleva a empresas.html?volverA=negocio&idNegocio=X (con ?empresa=X de contexto si ya tenía una). Pedido por Cristian con captura: "a un negocio existente permitime poder cambiar la empresa, si ya tiene una empresa asignada, permitime cambiarla llevandome al modulo empresas y elegir otra con sus contactos asociados". Ver empresas.html v2026.08.19.5 y FotoMap.gs v192 (nueva acción reasignarEmpresaNegocio) para el resto del flujo. Confirmado con 2 tests: el fondo del box Cliente no se pone negro ni en reposo ni simulando el hover en modo claro; y (del lado de empresas.html) el flujo completo de principio a fin.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.12 (Los links dentro de una nota de seguimiento ahora quedan clickeables — antes se mostraban como texto plano (había que copiar y pegar a mano). Nuevo helper _linkificarTexto() (envuelve _fixEncoding, detecta cualquier http/https suelto y lo convierte en <a target="_blank">), aplicado en el render de cada nota. Directamente relevante para la nota automática "Se envió la ficha técnica..." que ahora agrega ficha-equipo.html (ver v2026.08.19.3/4 de ese archivo), que trae el link real de lo que se compartió. Pedido por Cristian: "podes hacer clickeable el link?". Confirmado con test: el link queda envuelto en un <a href> con target="_blank", el resto del texto de la nota sigue intacto, y un texto sin ningún link no se altera.) -->
@@ -934,7 +935,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.14';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.15';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -3981,6 +3982,14 @@ function _irAPresupuestoEditor(idCot) {
                 lugarEntrega: cond.lugarEntrega || 'cliente',
                 notas: cond.notas || '',
             },
+            // El adelanto/anticipo real de la modalidad TLC6/TLC12/
+            // Leasing que se usó en este presupuesto — sin esto, al
+            // reabrir para editar siempre volvía al default genérico
+            // (35%/50%), no al que realmente se había cargado.
+            // Reportado por Cristian: "todos los descuentos y
+            // adelanto, forma de pago, tal cual están en el
+            // presupuesto a editar, ahora no lo trae".
+            modalidadPago: c.modalidadPago || null,
             moneda: c.monedaTotales || 'USD',
         }));
     } catch(e) { console.warn('Error guardando borrador para editar:', e); }

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.08.27.1 (2 bugs reales encontrados al reabrir un negocio para editar — Cristian: "cuando edito un presupuesto debe traer exactamente las variables del presupuestos, todos los descuentos y adelanto, forma de pago, tal cual están en el presupuesto a editar, ahora no lo trae". (1) El ANTICIPO/ADELANTO de TLC6/TLC12 volvía siempre al default genérico (35%/50%) en vez del real guardado — _restaurarDraftYItemPendiente ahora aplica draft.modalidadPago.anticipoPct/anticipoTipo a PARAMS_PAGO antes de que se pinte la tarjeta de Modalidades de Pago (ver cotizaciones.html y FotoMap.gs v194, que ahora mandan/guardan ese dato). (2) BUG encontrado de rebote haciendo el test: _onCambiarFormaPago() para CUALQUIER modalidad que no fuera Contado (TLC6/TLC12/Leasing) siempre reseteaba el descuento de cada ítem a 0%, sin importar si era carga inicial — se perdía el descuento real guardado. Ahora respeta el valor real en la carga inicial (mismo criterio que ya existía para Contado), y solo resetea a 0 cuando el usuario cambia de modalidad a mano en medio de la sesión. Confirmado con 5 tests: el anticipo restaurado es el real (no el genérico), la forma de pago es la correcta, el descuento del ítem es el real, la tarjeta en pantalla lo refleja, y el reset a 0 sigue funcionando al cambiar de modalidad a mano.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.14.2 (Soporte para una LISTA de ítems pendientes (sessionStorage nuevo: tlc_items_pendientes_presupuesto), además del ítem suelto de siempre (tlc_item_pendiente_presupuesto, sin tocar — sigue funcionando exactamente igual). Usado por el botón nuevo "Agregar Cotización" de ficha-equipo.html (ver esa v2026.08.15.5), que manda el equipo Padre + cada módulo/accesorio tildado como varias líneas separadas, en vez de un solo ítem. _restaurarDraftYItemPendiente refactorizada: se extrajo _procesarUnItemPendiente() (agrega una línea, o suma cantidad si ya existe una igual) para poder reusarla tanto con el ítem suelto como con cada elemento de la lista nueva — mismo cálculo de descuento automático y misma detección de duplicados en los dos casos, un solo lugar para arreglar si hiciera falta. Parte del pedido de Cristian de eliminar la pantalla intermedia de selector-dispositivos.html y trasladar "Agregar cotización" a la ficha técnica. Confirmado con 2 tests: una lista de 2 ítems (equipo + accesorio) se carga como 2 líneas separadas con sus precios y descuentos correctos; el flujo viejo del ítem suelto sigue cargando 1 sola línea exactamente igual que antes.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.14.1 (BUG REAL encontrado — el campo "Descuento" de cada ítem se auto-completaba con la fórmula (Precio LISTA − Precio CONTADO CNO) / Precio LISTA, sin importar qué tan chica fuera la diferencia. Si en la planilla Lista_Precios el Precio Contado de un equipo quedaba cargado con apenas $1-2 de diferencia contra el Precio Lista (redondeo de centavos al tipear, no un descuento real), la fórmula igual generaba un "descuento" de fracciones de % — en un ítem de ~$30.000, una diferencia de $2 daba 0,01% de descuento = exactos $3 de "Descuentos (Contado)" en el Total, sin que nadie hubiera tocado nada. Reportado por Cristian: "no puse descuento, quiero que sea 0, y no $3". Arreglado en DOS lugares: (1) el auto-cálculo ahora trata cualquier diferencia menor a 0.05% como ruido de redondeo y la deja en 0%, para presupuestos nuevos; (2) clamp defensivo agregado también en _calcularItem(), que corrige presupuestos VIEJOS ya guardados en Firebase con este descuento fantasma sin necesidad de regenerarlos — al volver a abrirlos, el 0,01% guardado se recalcula como 0% real. Confirmado con test numérico reproduciendo el caso exacto (ítem $30.000, Precio Contado con $2 de diferencia → $3 de descuento fantasma → $0 con el fix).) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.13.2 (BUG REAL de redondeo encontrado — en las tarjetas de Modalidades de Pago (TLC 6/12), las cifras "sin IVA" y "con IVA" se redondeaban CADA UNA por separado, arrancando las dos desde el número exacto sin redondear. Como el redondeo de cada una podía "caer" en un múltiplo de 10 distinto, si el cliente tomaba el "sin IVA" que VE en pantalla y le sumaba el IVA a mano, el resultado no coincidía con el "con IVA" que mostraba el sistema — una diferencia de unos pocos dólares sin ninguna explicación visible. Reportado por Cristian: "hace descuentos locos de 3$". Ahora el "con IVA" se calcula encadenado sobre el "sin IVA" YA REDONDEADO, no sobre el exacto — las dos cifras que ve el cliente son consistentes entre sí. Confirmado con números reales: antes había una diferencia de $5,75 en un caso concreto (anticipo USD 26.141,20, IVA 10,5%), ahora coincide siempre.) -->
@@ -544,6 +545,19 @@ function _restaurarDraftYItemPendiente() {
       if (draft.ticketId) TICKET_ID = draft.ticketId;
       _draftCondiciones = draft.condiciones || null;
       _draftMoneda = draft.moneda || null;
+      // v2026.08.27 — restaura el ADELANTO/ANTICIPO real de la
+      // modalidad TLC6/TLC12 que se había usado en este presupuesto,
+      // sobreescribiendo el default genérico de PARAMS_PAGO (35%/50%)
+      // — antes esto se perdía siempre al reabrir para editar.
+      // Reportado por Cristian: "todos los descuentos y adelanto,
+      // forma de pago, tal cual están en el presupuesto a editar,
+      // ahora no lo trae". PARAMS_PAGO ya está definido acá arriba
+      // (línea ~1190), antes de que se llame a esta función.
+      var mp = draft.modalidadPago;
+      if (mp && (mp.tipo === 'tlc6' || mp.tipo === 'tlc12') && PARAMS_PAGO[mp.tipo]) {
+        if (mp.anticipoPct !== undefined && mp.anticipoPct !== null) PARAMS_PAGO[mp.tipo].anticipoPct = mp.anticipoPct;
+        if (mp.anticipoTipo) PARAMS_PAGO[mp.tipo].anticipoTipo = mp.anticipoTipo;
+      }
     }
   } catch (e) { console.warn('Error restaurando borrador:', e); }
   sessionStorage.removeItem('tlc_presupuesto_draft');
@@ -1431,7 +1445,19 @@ window._onCambiarFormaPago = function(esCargaInicial) {
       if (!esCargaInicial) it.descuentoEditadoManual = false;
     });
   } else {
-    ITEMS.forEach(function(it) { it.descuento = 0; });
+    // BUG REAL — para cualquier modalidad que no sea Contado (TLC6,
+    // TLC12, Leasing), esto SIEMPRE ponía el descuento en 0%, incluso
+    // en la carga inicial al reabrir un negocio ya guardado con un
+    // descuento real cargado en esa modalidad — se perdía sin ningún
+    // aviso. Ahora respeta el valor que ya traía el ítem cuando es
+    // carga inicial (mismo criterio que ya existía para Contado);
+    // solo lo resetea a 0 cuando el usuario cambia de modalidad a
+    // mano, en medio de la sesión. Reportado por Cristian: "todos los
+    // descuentos y adelanto... tal cual están en el presupuesto a
+    // editar, ahora no lo trae".
+    ITEMS.forEach(function(it) {
+      if (!esCargaInicial) it.descuento = 0;
+    });
   }
   _render();
 };
