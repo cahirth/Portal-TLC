@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | etiqueta-despacho.html | v2026.08.27.1 (3 pedidos de Cristian: (1) Selector de tamaño 100×150mm (térmica, default) / A4 — mismo diseño exacto, escalado x2 con transform:scale dentro de una hoja A4 normal para quien no tiene impresora térmica. (2) Campo "N° de Remito" OBLIGATORIO en el toolbar — se completa a mano, bloquea la impresión (de etiquetas y de carteles de frágil) hasta cargarlo, y se refleja en vivo en el pie de cada etiqueta ya renderizada. (3) Nuevo botón "⚠️ Imprimir Carteles de Frágil (A4)" — genera 4 carteles por caja (uno por lado), en A4 apaisado, con el símbolo de frágil bien grande, para pegar en los costados de la caja — no reemplazan la etiqueta de destinatario, son avisos de manipulación aparte. El @page real (tamaño de hoja al imprimir) ahora se inyecta dinámicamente por JS según el modo elegido, ya que @page no admite selectores por clase CSS. Pedido: "las etiquetas necesito elegir el tamaño 100 x 100 o A4" (aclarado después: es 100x150, el actual) "Agregar un campo en la etiqueta que sea obligatorio completar el numero de remito manualmente" / "dame la opción para que se pueda elegir tamaño a cuatro. Y también quiero que me agregues carteles de frágil en a cuatro apaisado, para pegar también por todos lados de la caja". Confirmado con 5 tests: sin remito no imprime nada y avisa; cargar el remito se refleja en vivo en las etiquetas ya pintadas; imprime con 100x150 por defecto; cambiar a A4 usa el @page correcto; los carteles de frágil generan 4 por caja en A4 apaisado.) -->
 <!-- Portal TLC | etiqueta-despacho.html | v2026.08.10.1 (Página nueva — imprime una etiqueta térmica de 100×150mm por cada caja asignada en el modal "Asignación de Cajas" de servicio.html. Diseño calcado del archivo de referencia etiqueta-despacho-100x150.html que armó Cristian (header con logo + íconos de manipulación, indicador CAJA X DE N, bloque Destinatario/Remitente, packing list de esa caja, footer con N° de orden + QR de verificación). Lee ?ticket=ID, trae el ticket completo de Firebase (servicio_tecnico/{id}) y usa t.etiquetas_cajas (guardado por st_guardarEtiquetasCajas, ver FotoMap.gs v171). Cada etiqueta es su propia página física — @page:100mm×150mm, page-break-after:always entre cajas, un solo click en "Imprimir todas las etiquetas" manda todo el lote a la impresora térmica de una vez. Parte del circuito "Etiquetas de Despacho" pedido por Cristian.) -->
 <html lang="es">
 <head>
@@ -28,6 +29,12 @@
   .btn-pdf:hover { background:#1e293b; }
   .btn-volver { background:#3a86ff; }
   .btn-volver:hover { background:#2f6fd6; }
+  .btn-fragil { background:#dc2626; }
+  .btn-fragil:hover { background:#b91c1c; }
+
+  .btn-tamano { padding:8px 13px; border:1.5px solid var(--line-strong); border-radius:7px; background:var(--white);
+    color:var(--ink); font-size:12px; font-weight:800; cursor:pointer; }
+  .btn-tamano-activo { border-color:var(--ink); background:var(--ink); color:var(--white); }
 
   .estado-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 20px; text-align:center; }
   .spinner { width:40px; height:40px; border:3px solid #e2e8f0; border-top-color:#0f172a; border-radius:50%; animation:girar .8s linear infinite; margin-bottom:20px; }
@@ -93,7 +100,48 @@
   .qr-wrap { flex:0 0 auto; width:21mm; height:21mm; padding:.8mm; display:flex; align-items:center; justify-content:center; background:var(--white); border:1px solid var(--ink); }
   .qr-image { display:block; width:100%; height:100%; }
 
-  @page { size:100mm 150mm; margin:0; }
+  /* El @page (tamaño de hoja real al imprimir) se inyecta dinámicamente
+     por JS según el modo elegido — ver _actualizarPageSizeParaImprimir()
+     más abajo. No puede ser una regla CSS fija acá porque @page no
+     admite selectores por clase (body.modo-x @page no existe). */
+
+  /* Tamaño A4 — misma etiqueta, escalada 2x dentro de una hoja A4
+     normal (para quien no tiene impresora térmica). El diseño en sí
+     (proporciones, tipografía, layout) es EXACTAMENTE el mismo que
+     100×150mm — se agranda todo con transform:scale, no hace falta
+     rediseñar cada medida en mm por separado. Pedido por Cristian:
+     "dame la opción para que se pueda elegir tamaño a cuatro". */
+  body.modo-a4 .label-shell { width:200mm; height:300mm; display:flex; align-items:flex-start; justify-content:center; }
+  body.modo-a4 .shipping-label { transform:scale(2); transform-origin:top left; }
+
+  @media print {
+    body.modo-a4 .label-shell { width:210mm; height:297mm; }
+    body.modo-a4 .shipping-label { transform:scale(2) translate(2.5mm, 2.5mm); }
+  }
+
+  /* Carteles de FRÁGIL — A4 apaisado, para pegar en los costados de
+     la caja (no reemplazan la etiqueta de destinatario, son avisos
+     de manipulación aparte). Pedido por Cristian: "quiero que me
+     agregues carteles de frágil en a cuatro apaisado, para pegar
+     también por todos lados de la caja". */
+  .fragil-shell { width:297mm; height:210mm; margin:0 auto 24px; }
+  .fragil-cartel {
+    width:297mm; height:210mm; padding:14mm;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8mm;
+    background:var(--white); border:1px solid var(--line-strong);
+    box-shadow:0 12px 34px rgba(15,23,42,.16);
+    print-color-adjust:exact; -webkit-print-color-adjust:exact;
+  }
+  .fragil-symbol { font-size:70mm; line-height:1; font-family:"Segoe UI Symbol","Arial Unicode MS",Arial,sans-serif; }
+  .fragil-texto { font-size:40mm; font-weight:900; letter-spacing:4mm; color:var(--ink); text-transform:uppercase; }
+  .fragil-subtexto { font-size:12mm; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:1mm; }
+
+  @media print {
+    body.modo-fragil .no-print { display:none !important; }
+    body.modo-fragil .fragil-shell { width:297mm; height:210mm; margin:0; page-break-after:always; }
+    body.modo-fragil .fragil-shell:last-child { page-break-after:auto; }
+    body.modo-fragil .fragil-cartel { width:297mm; height:210mm; margin:0; border:0; box-shadow:none; }
+  }
 
   @media print {
     html, body { width:100mm; margin:0 !important; padding:0 !important; background:var(--white); }
@@ -112,12 +160,31 @@
 
 <div class="toolbar no-print" id="toolbar" style="display:none;">
   <div class="toolbar-note">
-    <span id="toolbar-cantidad">—</span> etiqueta(s) — tamaño real 100 × 150 mm cada una.<br>
+    <span id="toolbar-cantidad">—</span> etiqueta(s).<br>
     Al imprimir, elegí escala 100 % y sin márgenes adicionales.
   </div>
-  <div class="toolbar-botones">
+</div>
+
+<div class="toolbar-config no-print" id="toolbar-config" style="display:none;max-width:720px;margin:0 auto 14px;padding:14px 16px;background:#fff;border:1px solid var(--line);border-radius:10px;">
+  <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;">
+    <div>
+      <div style="font-size:10.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Tamaño de la etiqueta</div>
+      <div style="display:flex;gap:6px;">
+        <button type="button" id="btn-tamano-100" class="btn-tamano btn-tamano-activo" onclick="_cambiarTamano('100x150')">🧾 Térmica 100×150mm</button>
+        <button type="button" id="btn-tamano-a4" class="btn-tamano" onclick="_cambiarTamano('a4')">📄 A4</button>
+      </div>
+    </div>
+    <div style="flex:1;min-width:180px;">
+      <div style="font-size:10.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">N° de Remito <span style="color:#dc2626;">*</span></div>
+      <input type="text" id="input-remito" placeholder="Obligatorio para poder imprimir" oninput="_actualizarRemitoEnEtiquetas()"
+        style="width:100%;padding:9px 12px;border:1px solid var(--line-strong);border-radius:7px;font-size:13px;font-weight:700;">
+      <div id="remito-error" style="display:none;color:#dc2626;font-size:11px;font-weight:700;margin-top:4px;">Completá el número de remito antes de imprimir.</div>
+    </div>
+  </div>
+  <div class="toolbar-botones" style="margin-top:14px;">
     <button class="btn-accion btn-volver" type="button" onclick="window._volverEtiquetas()">&#8592; Volver</button>
-    <button class="btn-accion btn-pdf" type="button" onclick="window.print()">🖨 Imprimir todas las etiquetas</button>
+    <button class="btn-accion btn-pdf" type="button" onclick="_imprimirEtiquetas()">🖨 Imprimir todas las etiquetas</button>
+    <button class="btn-accion btn-fragil" type="button" onclick="_imprimirCartelesFragil()">⚠️ Imprimir Carteles de Frágil (A4)</button>
   </div>
 </div>
 
@@ -128,12 +195,113 @@
 </div>
 
 <div id="labels-root" style="display:none;"></div>
+<div id="fragil-root" style="display:none;"></div>
 
 <script>
 'use strict';
 
 var FIREBASE_DB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
 var LOGO_URL = 'https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25';
+var _remitoActual = '';
+var _tamanoActual = '100x150'; // '100x150' | 'a4'
+var _ticketActual = null;
+var _cantCajasActual = 0;
+
+// El @page real (tamaño de hoja al imprimir) se inyecta acá — no
+// puede ser una regla CSS fija en el <style>, porque @page no admite
+// selectores por clase. Se llama justo antes de cada window.print().
+function _actualizarPageSizeParaImprimir(tipo) {
+  var el = document.getElementById('page-size-dinamico');
+  if (!el) { el = document.createElement('style'); el.id = 'page-size-dinamico'; document.head.appendChild(el); }
+  var tamanos = {
+    '100x150':      '@page { size:100mm 150mm; margin:0; }',
+    'a4':           '@page { size:A4 portrait; margin:0; }',
+    'a4-apaisado':  '@page { size:A4 landscape; margin:0; }',
+  };
+  el.textContent = tamanos[tipo] || tamanos['100x150'];
+}
+
+// Pedido por Cristian: "dame la opción para que se pueda elegir
+// tamaño a cuatro" — mismo diseño de la etiqueta, escalado x2 dentro
+// de una hoja A4 (ver CSS body.modo-a4).
+window._cambiarTamano = function(tam) {
+  _tamanoActual = tam;
+  document.body.classList.toggle('modo-a4', tam === 'a4');
+  document.getElementById('btn-tamano-100').classList.toggle('btn-tamano-activo', tam === '100x150');
+  document.getElementById('btn-tamano-a4').classList.toggle('btn-tamano-activo', tam === 'a4');
+};
+
+// N° de Remito OBLIGATORIO — se completa a mano (no viene de ningún
+// dato guardado), y se refleja en vivo en cada etiqueta ya renderizada.
+// Pedido por Cristian: "Agregar un campo en la etiqueta que sea
+// obligatorio completar el numero de remito manualmente".
+window._actualizarRemitoEnEtiquetas = function() {
+  _remitoActual = document.getElementById('input-remito').value.trim();
+  document.querySelectorAll('[id^="etiqueta-remito-"]').forEach(function(el) {
+    el.textContent = 'REMITO N° ' + (_remitoActual || '—');
+  });
+  if (_remitoActual) document.getElementById('remito-error').style.display = 'none';
+};
+
+function _validarRemitoCargado() {
+  if (_remitoActual) return true;
+  document.getElementById('remito-error').style.display = 'block';
+  document.getElementById('input-remito').focus();
+  document.getElementById('input-remito').scrollIntoView({ behavior:'smooth', block:'center' });
+  return false;
+}
+
+window._imprimirEtiquetas = function() {
+  if (!_validarRemitoCargado()) return;
+  document.getElementById('fragil-root').style.display = 'none';
+  document.getElementById('labels-root').style.display = 'block';
+  document.body.classList.remove('modo-fragil');
+  _actualizarPageSizeParaImprimir(_tamanoActual === 'a4' ? 'a4' : '100x150');
+  window.print();
+};
+
+// Carteles de FRÁGIL — A4 apaisado, 4 copias por caja (una por cada
+// lado), para pegar en los costados. Son avisos de manipulación
+// aparte de la etiqueta de destinatario, no la reemplazan. Pedido por
+// Cristian: "quiero que me agregues carteles de frágil en a cuatro
+// apaisado, para pegar también por todos lados de la caja".
+function _renderCartelesFragil(totalCajas) {
+  var UN_CARTEL =
+    '<div class="fragil-shell">' +
+      '<div class="fragil-cartel">' +
+        '<div class="fragil-symbol">🍸</div>' +
+        '<div class="fragil-texto">FRÁGIL</div>' +
+        '<div class="fragil-subtexto">Manipular con cuidado — Vidrio / Óptica de precisión</div>' +
+      '</div>' +
+    '</div>';
+  var html = '';
+  for (var i = 0; i < totalCajas; i++) {
+    for (var j = 0; j < 4; j++) { html += UN_CARTEL; } // 4 lados de la caja
+  }
+  return html;
+}
+
+window._imprimirCartelesFragil = function() {
+  if (!_validarRemitoCargado()) return;
+  if (!_cantCajasActual) return;
+  var root = document.getElementById('fragil-root');
+  if (!root.innerHTML) root.innerHTML = _renderCartelesFragil(_cantCajasActual);
+  document.getElementById('labels-root').style.display = 'none';
+  root.style.display = 'block';
+  document.body.classList.add('modo-fragil');
+  _actualizarPageSizeParaImprimir('a4-apaisado');
+  window.print();
+};
+
+// Al terminar de imprimir (cualquiera de los 2 modos), vuelve la
+// pantalla a mostrar las etiquetas normales — si el usuario imprimió
+// los carteles de frágil, no debería quedarse con la pantalla
+// "trabada" en ese modo.
+window.addEventListener('afterprint', function() {
+  document.getElementById('fragil-root').style.display = 'none';
+  document.getElementById('labels-root').style.display = 'block';
+  document.body.classList.remove('modo-fragil');
+});
 
 function esc(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, function(c) {
@@ -231,6 +399,7 @@ function renderEtiquetaCaja(t, caja, totalCajas, urlQr) {
           '<div class="verification-copy">' +
             '<div class="verification-title">Escanear para verificar</div>' +
             '<div class="verification-order">ORDEN DE PREPARACIÓN N° ' + esc(t.id_ticket) + '</div>' +
+            '<div class="verification-order" id="etiqueta-remito-' + esc(caja.numero) + '">REMITO N° ' + esc(_remitoActual || '—') + '</div>' +
             '<div class="verification-note">Etiqueta logística de uso interno. Verifique el bulto contra la orden antes del despacho.</div>' +
           '</div>' +
           '<div class="qr-wrap"><img class="qr-image" src="' + urlQr + '" alt="Código QR de verificación"></div>' +
@@ -245,6 +414,8 @@ function renderTodasLasEtiquetas(t) {
     mostrarError('Sin cajas asignadas', 'Esta orden todavía no tiene una asignación de cajas guardada — volvé al ticket y usá "🏷️ Generar Etiquetas de Despacho".', false);
     return;
   }
+  _ticketActual = t;
+  _cantCajasActual = cajas.length;
   // QR de verificación — apunta al ticket en servicio.html, generado
   // vía un servicio público de QR (no hace falta ninguna librería
   // nueva en el Portal).
@@ -260,6 +431,7 @@ function renderTodasLasEtiquetas(t) {
   document.getElementById('estado-cargando').style.display = 'none';
   document.getElementById('labels-root').style.display = 'block';
   document.getElementById('toolbar').style.display = 'flex';
+  document.getElementById('toolbar-config').style.display = 'block';
 }
 
 function cargarTicket(id) {
