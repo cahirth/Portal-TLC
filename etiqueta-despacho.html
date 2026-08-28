@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | etiqueta-despacho.html | v2026.08.27.2 (Rediseño de los Carteles de Frágil (v2026.08.27.1) — ahora traen los 3 íconos de manipulación completos y bien grandes (🍸 FRÁGIL, ⬆⬆ ESTE LADO ARRIBA, ☔ MANTENER SECO — los mismos símbolos ya usados en el header de la etiqueta principal, acá mucho más grandes), en fila, más el logo de TLC arriba a la izquierda. Reemplaza el diseño anterior (solo un símbolo de copa + subtexto). Pedido por Cristian con captura de referencia: "en los carteles de Fragil, agregar grande todos esto de la imagen 1 y colocar el logo de TLC arriba a la izquierda". Confirmado con test: cada cartel trae los 3 íconos+textos completos y el logo real de TLC.) -->
 <!-- Portal TLC | etiqueta-despacho.html | v2026.08.27.1 (3 pedidos de Cristian: (1) Selector de tamaño 100×150mm (térmica, default) / A4 — mismo diseño exacto, escalado x2 con transform:scale dentro de una hoja A4 normal para quien no tiene impresora térmica. (2) Campo "N° de Remito" OBLIGATORIO en el toolbar — se completa a mano, bloquea la impresión (de etiquetas y de carteles de frágil) hasta cargarlo, y se refleja en vivo en el pie de cada etiqueta ya renderizada. (3) Nuevo botón "⚠️ Imprimir Carteles de Frágil (A4)" — genera 4 carteles por caja (uno por lado), en A4 apaisado, con el símbolo de frágil bien grande, para pegar en los costados de la caja — no reemplazan la etiqueta de destinatario, son avisos de manipulación aparte. El @page real (tamaño de hoja al imprimir) ahora se inyecta dinámicamente por JS según el modo elegido, ya que @page no admite selectores por clase CSS. Pedido: "las etiquetas necesito elegir el tamaño 100 x 100 o A4" (aclarado después: es 100x150, el actual) "Agregar un campo en la etiqueta que sea obligatorio completar el numero de remito manualmente" / "dame la opción para que se pueda elegir tamaño a cuatro. Y también quiero que me agregues carteles de frágil en a cuatro apaisado, para pegar también por todos lados de la caja". Confirmado con 5 tests: sin remito no imprime nada y avisa; cargar el remito se refleja en vivo en las etiquetas ya pintadas; imprime con 100x150 por defecto; cambiar a A4 usa el @page correcto; los carteles de frágil generan 4 por caja en A4 apaisado.) -->
 <!-- Portal TLC | etiqueta-despacho.html | v2026.08.10.1 (Página nueva — imprime una etiqueta térmica de 100×150mm por cada caja asignada en el modal "Asignación de Cajas" de servicio.html. Diseño calcado del archivo de referencia etiqueta-despacho-100x150.html que armó Cristian (header con logo + íconos de manipulación, indicador CAJA X DE N, bloque Destinatario/Remitente, packing list de esa caja, footer con N° de orden + QR de verificación). Lee ?ticket=ID, trae el ticket completo de Firebase (servicio_tecnico/{id}) y usa t.etiquetas_cajas (guardado por st_guardarEtiquetasCajas, ver FotoMap.gs v171). Cada etiqueta es su propia página física — @page:100mm×150mm, page-break-after:always entre cajas, un solo click en "Imprimir todas las etiquetas" manda todo el lote a la impresora térmica de una vez. Parte del circuito "Etiquetas de Despacho" pedido por Cristian.) -->
 <html lang="es">
@@ -126,15 +127,17 @@
      también por todos lados de la caja". */
   .fragil-shell { width:297mm; height:210mm; margin:0 auto 24px; }
   .fragil-cartel {
-    width:297mm; height:210mm; padding:14mm;
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8mm;
+    width:297mm; height:210mm; padding:14mm; position:relative;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
     background:var(--white); border:1px solid var(--line-strong);
     box-shadow:0 12px 34px rgba(15,23,42,.16);
     print-color-adjust:exact; -webkit-print-color-adjust:exact;
   }
-  .fragil-symbol { font-size:70mm; line-height:1; font-family:"Segoe UI Symbol","Arial Unicode MS",Arial,sans-serif; }
-  .fragil-texto { font-size:40mm; font-weight:900; letter-spacing:4mm; color:var(--ink); text-transform:uppercase; }
-  .fragil-subtexto { font-size:12mm; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:1mm; }
+  .fragil-logo { position:absolute; top:10mm; left:10mm; width:auto; max-width:60mm; height:22mm; object-fit:contain; object-position:left center; }
+  .fragil-iconos-fila { display:flex; align-items:flex-start; justify-content:center; gap:20mm; }
+  .fragil-icono-item { display:flex; flex-direction:column; align-items:center; gap:6mm; }
+  .fragil-symbol { font-size:55mm; line-height:1; font-family:"Segoe UI Symbol","Arial Unicode MS",Arial,sans-serif; font-weight:800; color:var(--ink); }
+  .fragil-texto { font-size:14mm; font-weight:900; letter-spacing:1.2mm; color:var(--ink); text-transform:uppercase; text-align:center; line-height:1.15; }
 
   @media print {
     body.modo-fragil .no-print { display:none !important; }
@@ -265,13 +268,23 @@ window._imprimirEtiquetas = function() {
 // aparte de la etiqueta de destinatario, no la reemplazan. Pedido por
 // Cristian: "quiero que me agregues carteles de frágil en a cuatro
 // apaisado, para pegar también por todos lados de la caja".
+// Carteles de FRÁGIL — A4 apaisado, 4 copias por caja (una por cada
+// lado), para pegar en los costados. Son avisos de manipulación
+// aparte de la etiqueta de destinatario, no la reemplazan. Los 3
+// íconos son los mismos ya usados en el header de la etiqueta
+// principal (🍸/⬆⬆/☔), acá bien grandes. Pedido por Cristian: "en los
+// carteles de Fragil, agregar grande todos esto de la imagen 1 y
+// colocar el logo de TLC arriba a la izquierda".
 function _renderCartelesFragil(totalCajas) {
   var UN_CARTEL =
     '<div class="fragil-shell">' +
       '<div class="fragil-cartel">' +
-        '<div class="fragil-symbol">🍸</div>' +
-        '<div class="fragil-texto">FRÁGIL</div>' +
-        '<div class="fragil-subtexto">Manipular con cuidado — Vidrio / Óptica de precisión</div>' +
+        '<img class="fragil-logo" src="' + LOGO_URL + '" alt="Tecnología Láser Corneal" onerror="this.style.display=\'none\'">' +
+        '<div class="fragil-iconos-fila">' +
+          '<div class="fragil-icono-item"><span class="fragil-symbol">🍸</span><span class="fragil-texto">FRÁGIL</span></div>' +
+          '<div class="fragil-icono-item"><span class="fragil-symbol">⬆⬆</span><span class="fragil-texto">ESTE LADO<br>ARRIBA</span></div>' +
+          '<div class="fragil-icono-item"><span class="fragil-symbol">☔</span><span class="fragil-texto">MANTENER<br>SECO</span></div>' +
+        '</div>' +
       '</div>' +
     '</div>';
   var html = '';
