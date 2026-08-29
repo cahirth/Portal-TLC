@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.29.2 (Una vez enviada la ficha por WhatsApp, el Teléfono del cliente, "Enviar por WhatsApp" y "Guardar PDF" desaparecen, mostrando "✅ Ficha enviada" en su lugar — "Crear / Sumar Negocio" NO se oculta, no fue pedido. Persiste por equipo en localStorage (tlc_ficha_enviada_{nombre}), así que sigue así aunque se recargue la página — confirmado con Cristian: "debe quedar así aunque se recargue (mientras sea la misma ficha)", con un mensaje de confirmación en vez de nada: "sí, mostrar un mensaje tipo ✅ Ficha enviada". Se dispara en los 2 flujos de envío por WhatsApp que existen (el normal y el personalizado de FacoExtrema vía QR) — nunca en la vista de cliente (?modo=cliente), donde estos controles son del vendedor, no del receptor del link. Nuevas funciones _marcarFichaComoEnviada(), _aplicarEstadoFichaEnviada(), _verificarSiFichaYaEnviada() (esta última llamada al cargar la página, dentro del bloque exclusivo del vendedor). Confirmado con test de punta a punta: antes de enviar todo visible sin mensaje; después de enviar los 3 elementos desaparecen y aparece el mensaje; "Crear/Sumar Negocio" sigue visible; y el estado persiste al simular una recarga de página.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.1 (3 gaps reales encontrados en el flujo de "enviar a Ventas" desde la ficha técnica — Cristian: "desde ficha tecnica, cuando envio whatsapp o creo negocio, enviar al negocio todos los hijos, y crear cada vez una nota con el link de la/s fichas". (1) BUG REAL — el camino de "negocio totalmente NUEVO" (sin ningún otro existente para agrupar) solo mandaba el Padre en items al crear el negocio, nunca los Hijos tildados — los otros 2 caminos (apilar directo/apilar a uno existente) sí los mandaban bien vía itemsParaApilar, pero este tercero no. Ahora los 3 caminos usan la misma lista completa. (2) La nota con el link de la ficha SOLO se creaba si el origen era WhatsApp — "Crear/Sumar Negocio" directo no generaba ninguna nota. Ahora se crea en los 2 orígenes por igual, y _guardarSeguimientoVentas arma el link solo (_construirLinkFichaActual) cuando no viene uno ya armado. (3) Por pedido explícito, ahora es UNA NOTA SEPARADA por cada Hijo tildado (no todo junto en una sola) — además de la nota del Padre que ya existía. (4) El contacto tampoco se registraba en el origen "Crear/Sumar Negocio" — _contactoSeleccionadoFicha solo se sincronizaba dentro del flujo de WhatsApp; ahora se sincroniza una sola vez, centralizado, al principio de _guardarSeguimientoVentas, para los 2 orígenes por igual. Confirmado con 2 baterías de test de punta a punta (WhatsApp y Crear/Sumar Negocio): en ambos casos se crea el contacto, el negocio se crea con Padre+Hijo juntos, y se generan 2 notas separadas (una por el Padre, una por el Hijo) con el link real.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.6 (Nuevo badge "💰 Tu comisión: X%" en la ficha técnica — visible SOLO para vendedores logueados con la columna "Ver Comisiones" tildada en la hoja Vendedores (TRUE/FALSE), mostrando el % de comisión que tiene cargado ESE equipo puntual (columna "COMISIONES" en Lista_Precios). Nunca se muestra en fichas abiertas por un cliente (link compartido, sin sesión) — se corta de una sin consultar nada si no hay _sesionVendedor. Puramente visual/informativo — NO participa del cálculo real de comisiones (ver FotoMap.gs calcularComisiones, que sigue usando 1% fijo para internos y % por equipo para externos, sin relación con esta columna). Usa la nueva consultarPermisoModulo() de permisos.js v2026.08.19.2 (versión NO bloqueante de validarAccesoModulo, para permisos que solo deciden mostrar/ocultar algo). Se agregó <script src="permisos.js"> al head, que antes no cargaba este archivo. Pedido por Cristian: "en ficha técnica, ver comisiones, si está tildado, el vendedor ve la comisión que va a recibir de ese equipo, que está en el Excel... si está destildado, no lo ve. Es solamente visual". Confirmado con 4 tests: cliente sin sesión nunca lo ve (aunque el equipo tenga % cargado), vendedor con el permiso en true ve el % real del equipo, vendedor con el permiso en false no ve nada, y un equipo sin % cargado tampoco muestra nada aunque el vendedor tenga permiso.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.5 (BUG REAL — un mismo nombre puede aparecer VARIAS veces en el catálogo: una vez como equipo propio (Padre, "Pertenece a" vacío) y otras veces como módulo Hijo default de OTROS equipos, con su propio precio (distinto) para esa combinación puntual — ej. "Mesa Eléctrica" viene incluida por defecto con varios equipos. La búsqueda por nombre al abrir la ficha (?nombre=...) hacía un simple .find() — la PRIMERA fila que matcheara el nombre, sin importar si era el Padre o un Hijo — así que podía agarrar la fila de un Hijo (con el precio equivocado) en vez de la fila del equipo propio. Ahora prioriza la fila SIN "Pertenece a" cargado (el Padre real); si no hay ninguna así, cae a la primera que encuentre (mismo comportamiento de siempre, no rompe nada para nombres que solo existen como Hijo). Reportado por Cristian con 2 capturas: "Mesa Eléctrica" mostraba USD 730 en el selector pero USD 400 al abrir la ficha — "cuando lo abro... me muestra el precio de los hijos". Confirmado con 2 tests: con el Hijo apareciendo PRIMERO en el array a propósito, igual muestra el precio y los datos (Marca/Categoría) del Padre; y un nombre que SOLO existe como Hijo (sin ningún Padre) sigue funcionando exactamente igual que antes.) -->
@@ -303,15 +304,18 @@
             box-shadow:0 8px 24px rgba(0,0,0,.12);"></div>
         <div id="fi-empresa-status" style="font-size:11px; color:var(--text-muted); margin-top:-2px;"></div>
         <div id="fi-contactos-sugerencias" style="display:none; flex-wrap:wrap; gap:6px; margin-top:-4px;"></div>
-        <div style="display:flex; gap:10px; width:100%;">
+        <div id="fi-telefono-wrap" style="display:flex; gap:10px; width:100%;">
             <input type="tel" id="fi-telefono-destino" placeholder="Teléfono del cliente (opcional)"
                 style="flex:1; padding:11px 14px; border-radius:8px; border:1px solid var(--border-color); font-size:13px; outline:none;">
         </div>
         <div id="fi-lead-resultado" style="font-size:12px; margin-top:-2px;"></div>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:-4px; line-height:1.4;">
+        <div id="fi-ya-enviada-msg" style="display:none; font-size:13px; font-weight:700; color:#06d6a0; background:#06d6a01a; border:1px solid #06d6a044; border-radius:8px; padding:10px 14px; width:100%; box-sizing:border-box;">
+            ✅ Ficha enviada
+        </div>
+        <div id="fi-hint-botones" style="font-size:11px; color:var(--text-muted); margin-top:-4px; line-height:1.4;">
             💡 Los dos botones de abajo guardan el seguimiento en Ventas — si ya hay un negocio reciente con esta empresa, se suma ahí; si no, se crea uno nuevo.
         </div>
-        <div style="display:flex; gap:10px; width:100%; flex-wrap:wrap;">
+        <div id="fi-botones-envio-wrap" style="display:flex; gap:10px; width:100%; flex-wrap:wrap;">
             <a class="btn-wsp btn-wsp-orden" id="fi-btn-wsp-normal" href="#" onclick="_compartirFichaWsp(event)"
                 title="Abre WhatsApp con el link de esta ficha, y de paso guarda (o suma) el seguimiento en Ventas">
                 <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
@@ -324,7 +328,7 @@
                 </svg>
                 Crear / Sumar Negocio
             </button>
-            <button class="btn-wsp btn-pdf-ficha" onclick="window.print()">
+            <button id="fi-btn-guardar-pdf" class="btn-wsp btn-pdf-ficha" onclick="window.print()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
                     <path d="M12 17v-6M9 14l3 3 3-3"/>
                     <rect x="3" y="3" width="18" height="4" rx="1"/>
@@ -378,7 +382,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.29.1';
+var FICHA_EQUIPO_VERSION = '2026.08.29.2';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -964,6 +968,7 @@ async function _cargarFicha() {
           if (esFlujoQR) _forzarPipelineFacoExtrema(lista);
         });
         _precargarContactoQR(params.get('qr_telefono') || '', params.get('qr_nombre') || '');
+        _verificarSiFichaYaEnviada(nombre);
     }
 
     // El fotoMap (Apps Script) es mucho más lento que precios.json (RTDB
@@ -2049,6 +2054,42 @@ function _mostrarAvisoWsp(mensaje) {
 // variantes ocultas) — reusado tanto por el envío de WhatsApp como
 // por "Crear/Sumar Negocio" directo, que antes no armaba ningún link
 // (por eso nunca podía crear la nota con el link real).
+// Marca esta ficha (por equipo, en ESTE dispositivo) como ya enviada
+// al cliente — oculta el teléfono, "Enviar por WhatsApp" y "Guardar
+// PDF", mostrando "✅ Ficha enviada" en su lugar. Persiste en
+// localStorage, así que sigue así aunque se recargue la página.
+// "Crear / Sumar Negocio" NO se oculta — solo los 2 que pidió
+// Cristian: "Una vez enviada la ficha técnica al cliente, los
+// botones de WhatsApp y guardar PDF, debes desaparecer al igual que
+// el teléfono del cliente".
+function _claveFichaEnviada(nombreEquipo) {
+  return 'tlc_ficha_enviada_' + encodeURIComponent(nombreEquipo || '');
+}
+
+function _marcarFichaComoEnviada(nombreEquipo) {
+  try { localStorage.setItem(_claveFichaEnviada(nombreEquipo), '1'); } catch(e) {}
+  _aplicarEstadoFichaEnviada();
+}
+
+function _aplicarEstadoFichaEnviada() {
+  var elTelWrap = document.getElementById('fi-telefono-wrap');
+  var elWsp = document.getElementById('fi-btn-wsp-normal');
+  var elPdf = document.getElementById('fi-btn-guardar-pdf');
+  var elHint = document.getElementById('fi-hint-botones');
+  var elMsg = document.getElementById('fi-ya-enviada-msg');
+  if (elTelWrap) elTelWrap.style.display = 'none';
+  if (elWsp) elWsp.style.display = 'none';
+  if (elPdf) elPdf.style.display = 'none';
+  if (elHint) elHint.style.display = 'none';
+  if (elMsg) elMsg.style.display = 'block';
+}
+
+function _verificarSiFichaYaEnviada(nombreEquipo) {
+  try {
+    if (localStorage.getItem(_claveFichaEnviada(nombreEquipo)) === '1') _aplicarEstadoFichaEnviada();
+  } catch(e) {}
+}
+
 function _construirLinkFichaActual() {
   var link = 'https://ir.tlcsrl.com.ar/ficha-equipo.html?nombre=' + encodeURIComponent(_fichaNombreActual) + '&modo=cliente';
   if (_variantesOcultas.length) link += '&ocultar=' + encodeURIComponent(_variantesOcultas.join(','));
@@ -2063,6 +2104,7 @@ function _ejecutarEnvioFichaWsp() {
     var telWsp = _formatearTelefonoWsp(telRaw);
     var url = telWsp ? ('https://wa.me/' + telWsp + '?text=' + msg) : ('https://wa.me/?text=' + msg);
     window.open(url, '_blank');
+    _marcarFichaComoEnviada(_fichaNombreActual);
     // El guardado en Ventas va DESPUÉS de abrir WhatsApp — si fuera
     // antes (con await), el navegador podría bloquear la ventana de
     // WhatsApp por no considerarla ya un click directo del usuario.
@@ -2103,6 +2145,7 @@ function _compartirFichaWspPersonalizado(nombrePila) {
   var msg = encodeURIComponent('¡Hola ' + nombrePila + '! Un gusto saludarte en Faco Extrema. Te envío la ficha técnica del ' + _fichaNombreActual + ' que estuvimos viendo en el stand de TLC: ' + link);
   var url = 'https://wa.me/' + telWsp + '?text=' + msg;
   window.open(url, '_blank');
+  _marcarFichaComoEnviada(_fichaNombreActual);
   if (_sesionVendedor) _guardarSeguimientoVentas('whatsapp', link);
 }
 
