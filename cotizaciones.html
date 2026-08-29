@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.29.1 (PASO 2 de "trazabilidad y sincronización entre Ventas y Servicio Técnico" (Paso 1 en FotoMap.gs v195). Muestra en 3 lugares el progreso_st que ya viene calculado con cada negocio: (1) Tarjeta Kanban — barra full-width al pie, con "📦 Prep. ST: X/Y Listos" + "XX%", color reactivo (gris en 0%, azul en proceso, verde en 100%). Solo aparece si el negocio ya tiene una Orden de Preparación vinculada — no se muestra nada en negocios que nunca llegaron ahí. (2) Vista Lista — misma barra en versión compacta, debajo de cada fila. (3) Modal de detalle — bloque nuevo "📦 Estado de Preparación y Despacho" con la barra grande + desglose por equipo (SKU, N° de Serie o "Pendiente", badge de Calidad ✅/⏳, estado individual con su color) — el desglose se trae en vivo con un fetch directo a Firebase (mismo mecanismo que ya usa el resto de la pantalla), ya que el agregado que viaja con el negocio no incluye el detalle por equipo. Nuevo helper _renderBarraProgresoST() reusado en los 3 lugares, y _cargarDetalleEquiposST() para el desglose del modal. Polling cada 25s (_iniciarPollingProgresoST, pausado si la pestaña está en segundo plano) que refresca Kanban/Lista/Detalle solo — el Portal no usa listeners en vivo de Firebase en ningún lado, así que esto es el approach de "casi tiempo real" acordado con Cristian en vez de meter ese cambio de arquitectura de entrada. _recargarHistoricoYRerenderizarSiAbierto() extraída de abrirDetalle() para poder reusarla también desde el polling. Confirmado con test de punta a punta: sin progreso_st no aparece nada, en proceso muestra barra azul con el texto/% correctos, al 100% muestra verde, la vista Lista también lo trae, el modal de detalle carga el desglose real por equipo (serie/calidad/estado), y las funciones de polling existen y no rompen.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.15 (Al ir a editar un presupuesto, el borrador que se manda a presupuesto-editor.html ahora incluye modalidadPago (el adelanto/anticipo real de TLC6/TLC12/Leasing) — antes se perdía y siempre volvía al default genérico al reabrir. Ver presupuesto-editor.html v2026.08.27.1 y FotoMap.gs v194 para el resto del fix. Reportado por Cristian: "todos los descuentos y adelanto, forma de pago, tal cual están en el presupuesto a editar, ahora no lo trae".) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.14 (Separación de responsabilidades: tocar la caja "Cliente" (con empresa ya asignada) sigue precargando ESA MISMA empresa en empresas.html — es para cambiar el CONTACTO. Nuevo botón aparte "🔄 Cambiar Empresa", chiquito debajo de la caja, que NO precarga ninguna — arranca directo en la lista de Empresas para buscar y elegir una totalmente distinta. Aclarado por Cristian tras la entrega anterior: "no me entendiste... quiero que agregues un boton para cambiar de empresa, que me lleve al modulo empresas y poder elegir otra empresa totalmente diferente, que lo que hisicste esta ok y dejalo, es para cambiar el contacto". Nueva función _irACambiarEmpresaDeNegocio(), separada de _irAEmpresaDesdeNegocio() (que sigue igual). Confirmado con test: tocar la caja Cliente arma la URL CON ?empresa=actual (precarga), el botón nuevo arma la URL SIN ese parámetro (arranca en la lista).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.13 (2 cambios: (1) Box "Cliente" del hero del detalle — tenía TODO el estilo fijo inline (fondo #0f1a30, texto claro) sin adaptarse a modo claro; nueva clase det-cliente-box + override de tema-claro (fondo celeste #eef2ff). Reportado por Cristian: "sigo con el bug en modo claro, si paso el mouse por encima se pone color negro" — el negro venía del fondo fijo, nunca del hover en sí (el onmouseover solo cambiaba el borde). (2) Ahora SIEMPRE se puede ir a cambiar la empresa de un negocio desde ese mismo box, incluso si ya tiene una asignada — antes, si ya tenía empresa, solo abría esa MISMA ficha en modo ver/editar, sin forma de elegir otra distinta; si no tenía ninguna, directamente bloqueaba con un alert. _irAEmpresaDesdeNegocio() ahora siempre lleva a empresas.html?volverA=negocio&idNegocio=X (con ?empresa=X de contexto si ya tenía una). Pedido por Cristian con captura: "a un negocio existente permitime poder cambiar la empresa, si ya tiene una empresa asignada, permitime cambiarla llevandome al modulo empresas y elegir otra con sus contactos asociados". Ver empresas.html v2026.08.19.5 y FotoMap.gs v192 (nueva acción reasignarEmpresaNegocio) para el resto del flujo. Confirmado con 2 tests: el fondo del box Cliente no se pone negro ni en reposo ni simulando el hover en modo claro; y (del lado de empresas.html) el flujo completo de principio a fin.) -->
@@ -935,7 +936,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.19.15';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.29.1';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1972,6 +1973,7 @@ window.addEventListener('DOMContentLoaded', function() {
   if (_panelCampanaInicial) _panelCampanaInicial.style.display = 'none'; // arranca siempre cerrada
   _cargarNotificaciones();
   _iniciarPollingCampanaCot();
+  _iniciarPollingProgresoST();
 });
 
 async function init() {
@@ -2358,6 +2360,7 @@ function renderLista() {
                     ${permisos.verVendedorEnCard && c.vendedor ? `<div style="font-size:10px;color:#475569;margin-top:3px;">👤 ${c.vendedor}</div>` : ''}
                 </div>
             </div>
+            ${_renderBarraProgresoST(c, {compacta:true})}
             ${c.notes ? `<div class="cot-notas">📝 ${c.notes}</div>` : ''}
         </div>`;
     }).join('');
@@ -2458,6 +2461,7 @@ function renderKanban() {
                     onchange="event.stopPropagation(); _mutarEstadoCotizacion('${id}', this.value)">
                     ${etapasOpts}
                 </select>${linkHtml}
+                ${_renderBarraProgresoST(c)}
             </div>`;
         }).join('') : `<div class="kanban-empty-col">Sin cotizaciones</div>`;
 
@@ -2489,14 +2493,39 @@ function abrirDetalle(idx) {
     document.getElementById('detalle-overlay').classList.add('open');
     document.getElementById('detalle-overlay').scrollTop = 0;
     // Refrescar JSON en background para tener notas y estado actualizados
-    _recargarHistoricoSilencioso().then(() => {
-        // Re-buscar el objeto actualizado y re-renderizar si sigue abierto
-        const overlay = document.getElementById('detalle-overlay');
-        if (!overlay.classList.contains('open')) return;
-        const id = String(c.idCot || c.id_cotizacion || c.id || '');
-        const actualizado = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === id);
-        if (actualizado) _renderDetalle(actualizado);
-    });
+    _recargarHistoricoYRerenderizarSiAbierto(c);
+}
+
+// Refresca la lista completa (Kanban/Lista se repintan solos vía
+// aplicarFiltros dentro de _recargarHistoricoSilencioso) y, si el
+// detalle de ESTE negocio sigue abierto, lo vuelve a pintar también —
+// así el progreso de Preparación/ST (y notas/estado en general) se ve
+// actualizado sin que el vendedor tenga que cerrar y reabrir nada.
+async function _recargarHistoricoYRerenderizarSiAbierto(c) {
+    await _recargarHistoricoSilencioso();
+    const overlay = document.getElementById('detalle-overlay');
+    if (!overlay.classList.contains('open')) return;
+    const id = String(c.idCot || c.id_cotizacion || c.id || '');
+    const actualizado = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === id);
+    if (actualizado) { cotActual = actualizado; _renderDetalle(actualizado); }
+}
+
+// Polling de "casi tiempo real" para el progreso de Preparación/ST —
+// Paso 2 de "trazabilidad y sincronización entre Ventas y Servicio
+// Técnico". El Portal no usa listeners en vivo de Firebase en ningún
+// lado (todo es fetch puntual) — meter eso acá sería el primer cambio
+// de arquitectura de esa magnitud en todo el sistema. En cambio, cada
+// 25s se vuelve a pedir la lista completa (que ya trae progreso_st
+// embebido en cada negocio) y se repinta Kanban/Lista/Detalle si
+// corresponde — para un vendedor mirando la pantalla mientras atiende
+// una llamada, la diferencia práctica con tiempo real real es mínima.
+let _pollingProgresoSTId = null;
+function _iniciarPollingProgresoST() {
+    if (_pollingProgresoSTId) return; // ya está corriendo, no duplicar
+    _pollingProgresoSTId = setInterval(function() {
+        if (document.hidden) return; // no gastar red si la pestaña está en segundo plano
+        _recargarHistoricoYRerenderizarSiAbierto(cotActual || {});
+    }, 25000);
 }
 
 // Deep-link desde fuera de esta pantalla (ej: "Mis Pendientes" en index.html
@@ -2917,6 +2946,24 @@ function _renderDetalle(c) {
 
     // (Cambio de etapa ahora vive en el dropdown compacto del HERO, arriba)
 
+    // ── ESTADO DE PREPARACIÓN Y DESPACHO — Paso 2 de "trazabilidad y
+    // sincronización entre Ventas y Servicio Técnico". Solo se muestra
+    // si el negocio ya tiene una Orden de Preparación vinculada
+    // (c.progreso_st con total > 0, calculado por FotoMap.gs v195). El
+    // detalle POR EQUIPO (serie/calidad/estado de cada uno) no viene
+    // en el negocio — solo el agregado — así que se pide aparte, en
+    // vivo, al ticket de servicio_tecnico vinculado (mismo mecanismo
+    // de lectura directa a RTDB que ya usa el resto de la pantalla).
+    if (c.progreso_st && c.progreso_st.total) {
+        html += `<div style="padding:0 16px 10px;">
+            <div class="sec-titulo">📦 Estado de Preparación y Despacho</div>
+            <div class="det-card-full" style="margin-bottom:0;">
+                ${_renderBarraProgresoST(c)}
+                <div id="det-progreso-st-equipos" style="margin-top:10px;font-size:11px;color:#64748b;">Cargando detalle de equipos...</div>
+            </div>
+        </div>`;
+    }
+
     // ── NOTAS ─────────────────────────────────────────────────────
     const notas = (c.notas_papiro || c.Notas_Papiro || []);
     const notaLegacy = c.notes ? [{ texto: c.notes, fecha: c.fecha, vendedor: c.vendedor || '' }] : [];
@@ -3086,6 +3133,10 @@ function _renderDetalle(c) {
     html += `</div>`;
 
     document.getElementById('det-body').innerHTML = html;
+
+    if (c.progreso_st && c.progreso_st.total && c.orden_preparacion_ticket_id) {
+        _cargarDetalleEquiposST(c.orden_preparacion_ticket_id, id);
+    }
 
     // Si _preciosCache todavía no estaba listo al pintar arriba, esperamos
     // a que termine de cargar y re-pintamos SOLO el contenedor de fotos
@@ -3620,6 +3671,81 @@ async function _guardarNotaInline(id) {
 // ─── HELPERS ─────────────────────────────────────────────────────
 function _monto(c) {
     return parseFloat((c.totales||{}).total_con_iva || c.totalConIva || c.montoUSD || 0);
+}
+
+// Barra de progreso de Preparación/ST — Paso 2 de "trazabilidad y
+// sincronización entre Ventas y Servicio Técnico". Lee c.progreso_st
+// (calculado y guardado por el backend en FotoMap.gs v195, cada vez
+// que un técnico toca un equipo de la Orden de Preparación vinculada
+// a este negocio). Si el negocio nunca llegó a Preparación, no
+// devuelve nada — no tiene sentido mostrar una barra vacía en
+// negocios que todavía ni pasaron por ahí.
+// Color reactivo: 0% gris/neutro, 1-99% azul (en proceso), 100% verde
+// (listo para despacho/despachado).
+function _renderBarraProgresoST(c, opts) {
+    const p = c.progreso_st;
+    if (!p || !p.total) return '';
+    opts = opts || {};
+    const compacta = !!opts.compacta;
+    const pct = Math.max(0, Math.min(100, p.porcentaje || 0));
+    let color, fondoBarra;
+    if (pct === 0) { color = '#64748b'; fondoBarra = '#334155'; }
+    else if (pct === 100) { color = '#06d6a0'; fondoBarra = 'linear-gradient(90deg,#06d6a0,#04c98f)'; }
+    else { color = '#3a86ff'; fondoBarra = 'linear-gradient(90deg,#3a86ff,#60a5fa)'; }
+    const alturaBarra = compacta ? '5px' : '6px';
+    const tamanoTexto = compacta ? '9px' : '10px';
+    return `<div class="progreso-st-wrap" style="margin-top:${compacta?'4px':'8px'};">
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:${tamanoTexto};font-weight:700;color:${color};margin-bottom:3px;">
+            <span>📦 Prep. ST: ${p.listos}/${p.total} Listos</span>
+            <span>${pct}%</span>
+        </div>
+        <div style="width:100%;height:${alturaBarra};border-radius:20px;background:#1e293b;overflow:hidden;">
+            <div style="width:${pct}%;height:100%;border-radius:20px;background:${fondoBarra};transition:width .3s;"></div>
+        </div>
+    </div>`;
+}
+
+// Trae el detalle por equipo (SKU, N° de Serie, Calidad, Estado) del
+// ticket de Servicio Técnico vinculado a este negocio — lectura
+// directa a RTDB, mismo mecanismo que ya usa el resto de la pantalla
+// para no depender de que el backend GAS responda. El agregado
+// (progreso_st) ya vino con el negocio; esto es solo el desglose.
+async function _cargarDetalleEquiposST(idTicket, idNegocioDeReferencia) {
+    const cont = document.getElementById('det-progreso-st-equipos');
+    if (!cont) return;
+    try {
+        const res = await fetch('https://portal-tlc-default-rtdb.firebaseio.com/servicio_tecnico/' + encodeURIComponent(idTicket) + '.json?_=' + Date.now());
+        const ticket = await res.json();
+        // El modal pudo haberse cerrado o cambiado de negocio mientras
+        // esperábamos — no pisar el detalle de otro negocio distinto.
+        const idActual = cotActual ? (cotActual.idCot || cotActual.id_cotizacion || String(cotActual.id || '')) : null;
+        if (idActual !== idNegocioDeReferencia) return;
+        const contActual = document.getElementById('det-progreso-st-equipos');
+        if (!contActual) return;
+        if (!ticket || !Array.isArray(ticket.equipos) || !ticket.equipos.length) {
+            contActual.innerHTML = '<div style="font-size:11px;color:#64748b;">Sin equipos cargados en la Orden de Preparación.</div>';
+            return;
+        }
+        contActual.innerHTML = ticket.equipos.map(function(eq) {
+            const estado = eq.estado || 'Pendiente';
+            let colorEstado = '#94a3b8', bgEstado = '#1e293b';
+            if (estado === 'Listo para despacho') { colorEstado = '#06d6a0'; bgEstado = 'rgba(6,214,160,.12)'; }
+            else if (estado === 'Retirado del depósito' || estado === 'Verificado') { colorEstado = '#3a86ff'; bgEstado = 'rgba(58,134,255,.12)'; }
+            const calidadOk = eq.calidad_verificada === true;
+            const serie = (eq.nro_serie && String(eq.nro_serie).trim()) ? _escCot(eq.nro_serie) : '<span style="color:#f59e0b;">Pendiente</span>';
+            return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid #1e3050;font-size:11.5px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:140px;">
+                    <div style="font-weight:700;color:#f1f5f9;">${_escCot(eq.sku || eq.descripcion || 'Equipo')}</div>
+                    <div style="color:#64748b;font-size:10.5px;margin-top:1px;">N° Serie: ${serie}</div>
+                </div>
+                <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${calidadOk?'rgba(6,214,160,.12)':'rgba(148,163,184,.12)'};color:${calidadOk?'#06d6a0':'#94a3b8'};white-space:nowrap;">${calidadOk?'✅ Aprobado':'⏳ CC Pendiente'}</span>
+                <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${bgEstado};color:${colorEstado};white-space:nowrap;">${_escCot(estado)}</span>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        const contErr = document.getElementById('det-progreso-st-equipos');
+        if (contErr) contErr.innerHTML = '<div style="font-size:11px;color:#f59e0b;">No se pudo cargar el detalle de equipos ahora — el % de arriba sigue siendo válido.</div>';
+    }
 }
 
 // ── Dashboard de Negocios — ranking de equipos más pedidos + KPIs
