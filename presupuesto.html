@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto.html | v2026.08.29.1 (Los botones "Guardar PDF" y "Enviar por WhatsApp" (arriba a la derecha) ahora NO aparecen cuando quien mira el presupuesto es el CLIENTE — antes este archivo no distinguía entre vendedor y cliente en absoluto, ambos veían exactamente lo mismo. Nueva función esModoCliente() (mismo criterio ?modo=cliente que ya usa ficha-equipo.html), y el link que se manda por WhatsApp (urlParaCompartir) ahora incluye ese parámetro — así el cliente SIEMPRE lo recibe así, sin importar desde qué negocio/vendedor haya salido. "Volver" y "Ver Orden de Servicio" quedaron sin tocar (no fueron nombrados en el pedido). Pedido por Cristian con captura: "al enviar el presupuesto, aparecen arriba a la derecha 2 botones, Guardar PDF y Enviar Whatsapp, el presupuesto que recibe el cliente no debe contener esos botones, si el sender, o sea el vendedor, pero no el receptor". Confirmado con test de punta a punta: el vendedor (sin modo=cliente) ve los 2 botones normal; el cliente (con modo=cliente) no ve ninguno de los 2; y el link real que arma "Enviar por WhatsApp" incluye &modo=cliente.) -->
 <!-- Portal TLC | presupuesto.html | v2026.08.16.2 (Ancho angosto en impresión — Cristian con captura: "un poco angosto no?" (mucho aire a los costados en la hoja A4). Causa: max-width:780px, heredado de la regla de pantalla (pensada para lectura cómoda en un monitor), se seguía aplicando también al imprimir. Agregado max-width:none específicamente en @media print — .page ahora usa todo el ancho real disponible dentro del margen de @page, en vez de ese techo pensado para pantalla. Confirmado que el mecanismo de centrado/zoom de v2026.08.16.1 sigue intacto (mismo test, sigue en verde).) -->
 <!-- Portal TLC | presupuesto.html | v2026.08.16.1 (BUG REAL DE CENTRADO — Cristian pidió "que en hoja A4 salga centrado y sin saltos de página". Encontradas 2 causas: (1) la regla @media print pisaba ".page{margin:0 auto}" (el "auto" es lo que centra en pantalla) con "margin:0" — sin el auto, .page (max-width:780px) quedaba pegado al borde izquierdo del área imprimible. Restaurado a "margin:0 auto". (2) El mecanismo de "una sola hoja" (v2026.08.10.1) usaba transform:scale() con un ancho en porcentaje mayor a 100% para compensar — pero cuando el ancho de un elemento con margin:auto supera el 100% de su contenedor, CSS resuelve los márgenes automáticos a 0 (caso "over-constrained" de la spec), rompiendo el centrado apenas hacía falta achicar. Reemplazado transform:scale()+width-compensado por zoom — reacomoda el layout de verdad (no es solo un efecto visual), así el margin:0 auto restaurado en (1) lo sigue centrando sin ningún truco de ancho aparte. Confirmado con test: 3 escenarios (entra sin achicar, necesita achicarse ~0.667, caso extremo que toca el piso 0.55) — el zoom se aplica/no se aplica correctamente según haga falta, respeta el piso mínimo, y se resetea después de imprimir. Sobre "sin saltos de página": revisado que no queda ningún page-break FORZADO en el archivo (solo page-break-inside:avoid, defensivo) — el mecanismo de una sola hoja ya se encarga de esto, ahora además centrado.) -->
 <!-- Portal TLC | presupuesto.html | v2026.08.10.1 (Rediseño para que el PDF entre SIEMPRE en una sola hoja, sin importar cuántos ítems tenga el presupuesto — pedido por Cristian: "cuando guarda PDF, rediseñar para que entre en una sola página". Dos partes: (1) Compactado general en @media print — menos margen entre secciones (20-24px → 10px), menos padding en celdas de tabla, @page con márgenes más ajustados (22/22/32/22 en vez de 40/28/45/28) — soluciona la mayoría de los casos (presupuestos de pocos ítems) sin tocar el tamaño de letra. (2) Ajuste automático de escala vía beforeprint/afterprint — mide el alto real del contenido justo antes de imprimir y, si no entra en una hoja A4, aplica transform:scale() lo justo y necesario (con piso de 0.55 para no volverlo ilegible en un caso extremo) — esto SÍ garantiza una sola hoja para cualquier cantidad de ítems, el compactado de CSS por sí solo no podía garantizarlo. Confirmado con test (scrollHeight mockeado, jsdom no calcula layout real): escala correctamente cuando no entra, no toca nada cuando sí entra, respeta el piso en un caso extremo, y se resetea después de imprimir.) -->
@@ -141,6 +142,19 @@
   function getIdFromUrl() {
     var params = new URLSearchParams(window.location.search);
     return (params.get('id') || '').trim();
+  }
+
+  // Detecta si quien abrió el link es el CLIENTE (?modo=cliente en la
+  // URL) — mismo criterio que ya usa ficha-equipo.html. El link que se
+  // manda por WhatsApp ahora incluye este parámetro (ver
+  // urlParaCompartir más abajo), así que el cliente SIEMPRE lo recibe
+  // así; el vendedor, en cambio, entra desde cotizaciones.html sin
+  // este parámetro. Pedido por Cristian: "el presupuesto que recibe
+  // el cliente no debe contener esos botones, si el sender, o sea el
+  // vendedor, pero no el receptor".
+  function esModoCliente() {
+    var params = new URLSearchParams(window.location.search);
+    return params.get('modo') === 'cliente';
   }
 
   // ── Ajuste automático de escala para que SIEMPRE entre en una sola
@@ -468,7 +482,7 @@
     // que esa ruta "existe" con código 200) — WhatsApp corta apenas ve el
     // 404, sin importar que el contenido esté bien armado adentro. Esta
     // ruta SÍ es un archivo real, responde 200, preview funciona siempre.
-    var urlParaCompartir = idCot ? ('https://ir.tlcsrl.com.ar/presupuesto.html?id=' + encodeURIComponent(idCot)) : urlActual;
+    var urlParaCompartir = idCot ? ('https://ir.tlcsrl.com.ar/presupuesto.html?id=' + encodeURIComponent(idCot) + '&modo=cliente') : urlActual;
     var telWsp = formatearTelefonoWsp(p.telefono);
     var saludo = 'Hola, le compartimos su presupuesto de TLC';
     var linkWsp = (function() {
@@ -484,7 +498,9 @@
     // sistema pregunte a quién enviárselo".
     var contactosConTelefono = (contactosDisponibles || []).filter(function(ct) { return ct && ct.telefono; });
     var botonWsp;
-    if (contactosConTelefono.length > 1) {
+    if (esModoCliente()) {
+      botonWsp = ''; // el cliente nunca ve este botón — no tiene sentido que "se reenvíe a sí mismo"
+    } else if (contactosConTelefono.length > 1) {
       window._CONTACTOS_WSP = contactosConTelefono;
       window._SALUDO_WSP = saludo;
       window._URL_COMPARTIR_WSP = urlParaCompartir;
@@ -513,7 +529,7 @@
       '<div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">' +
         '<button class="btn-accion btn-volver" onclick="window._volverPresupuesto()">&#8592; Volver</button>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-          '<button class="btn-accion btn-pdf" onclick="window.print()">&#8595; Guardar PDF</button>' +
+          (esModoCliente() ? '' : '<button class="btn-accion btn-pdf" onclick="window.print()">&#8595; Guardar PDF</button>') +
           (p.ticketId ? '<a href="https://cahirth.github.io/Portal-TLC/orden-servicio.html?id=' + encodeURIComponent(p.ticketId) + '" target="_blank" rel="noopener noreferrer" class="btn-accion btn-volver" style="text-decoration:none;">🔧 Ver Orden de Servicio</a>' : '') +
           (esHistorico ? '' : botonWsp) +
         '</div>' +
