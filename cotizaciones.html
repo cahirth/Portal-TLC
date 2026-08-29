@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.29.5 (El motivo de marcar/desmarcar urgente (v2026.08.29.4) ahora también queda como una NOTA REAL en la misma lista de "Notas de Seguimiento" que ya se ve en el detalle — antes solo vivía en el tooltip del pin (invisible en el celular, donde no hay hover). Cristian: "funciona OK, como veo la nota que me pide opcional dentro del negocio?" → "agregalo en notas generales del negocio". Reusa el mismo mecanismo agregarNota que ya usa el resto de la pantalla — sin cartel ni sección aparte. Texto: "📌 Marcado como urgente: [motivo]" (o sin ":" si no hay motivo) al marcar, "📌 Desmarcado como urgente" al desmarcar; se refleja en memoria al toque, sin esperar un refresh completo. Confirmado con 4 tests: la nota se agrega con el motivo real, aparece en el detalle sin recargar nada, sin motivo no queda un ":" colgando, y desmarcar también deja su propio registro.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.4 (Nuevo pin 📌 "Urgente / Atender hoy" — Cristian: "como puedo marcar algunos negocios para atenderlos con urgencia, o para programar el dia de trabajo... no importa en q etapa estén", eligió la opción "marca + nota corta" entre 3 propuestas, con pin rojo. Toca el pin (Kanban, Lista, o el header del detalle) para marcar/desmarcar — al marcar pide una nota corta opcional (ej. "Llamar antes de las 15hs"), guardada vía la nueva acción marcarNegocioUrgente (FotoMap.gs v196). Se ve como un pin rojo (gris/apagado si no está marcado) + un borde rojo en el costado de la tarjeta, cruzando TODAS las etapas y pipelines — no depende de la columna del Kanban. Nuevo filtro toggle "📌 Solo urgentes (N)" en la barra de filtros, combinable con los demás (vendedor/pipeline/colaborador/fechas), con contador en vivo. Bug real encontrado por el propio test: "null || ''" convertía el cancelar del prompt en string vacío ANTES de poder chequear si había cancelado — corregido chequeando null primero. Confirmado con 5 tests: pines rojo/gris correctos cruzando 2 etapas distintas, el contador y el filtro funcionan, marcar llama al backend con los datos correctos, cancelar el prompt no marca nada, y desmarcar no pide ningún prompt.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.3 (2da vuelta del fix de v2026.08.29.2 — Cristian: primero "en notas anda OK y no lo pisa pero en mensajes internos si lo pisa" (causa: #det-mensajes-panel es HERMANO de #det-body, no descendiente — el chequeo de foco de la v2 solo miraba dentro de #det-body); arreglado eso, después "en notas tbien se borra" — causa de fondo real: el chequeo se basaba en el FOCO en el instante exacto del polling, así que si el vendedor sacaba la vista un segundo (miraba otra pestaña, tocaba otra cosa) justo cuando caía el refresco cada 25s, el texto seguía ahí sin guardar pero ya no estaba "enfocado", y se borraba igual. Reemplazado _hayFocoEnTextoDentroDelDetalle() por _hayTextoSinGuardarEnDetalle(idNegocio) — chequea directo si HAY TEXTO CARGADO (no vacío) en la nota o el mensaje de ESE negocio, sin importar dónde esté el foco en ese instante, que es lo que realmente hay que proteger. Ambos campos se vacían apenas se envían/guardan (antes de la respuesta del servidor), así que el chequeo nunca queda bloqueado para siempre. Confirmado con 4 tests: nota sin guardar y SIN foco (el escenario real reportado) no se borra; mismo caso para mensaje interno; y con los 2 campos vacíos el próximo ciclo actualiza con normalidad.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.2 (BUG REAL — "si estoy escribiendo una nota o un mensaje interno, de repente, se borra lo que estoy escribiendo... sospecho que es por el polling que le agregamos para actualizar la preparacion desde servicio". Confirmado: _recargarHistoricoYRerenderizarSiAbierto (el polling de progreso ST cada 25s, v2026.08.29.1) llamaba a _renderDetalle() sin condición, que reemplaza TODO el HTML de #det-body de una — incluida cualquier <textarea>/<input> donde el vendedor estuviera escribiendo (una nota nueva, un mensaje interno), borrándole el texto a mitad de camino sin guardar nada. Ya existía una protección similar pero solo para el panel de mensajes (_renderPanelMensajesCot, con guard sobre _idCotActual) — la nota nueva no tenía ninguna. Nueva función _hayFocoEnTextoDentroDelDetalle() — si el foco está en cualquier <textarea>/<input> de texto dentro de #det-body al momento de refrescar, se salta el repintado de esa vuelta entera (se reintenta en el próximo ciclo, 25s después); el Kanban/Lista de atrás se siguen actualizando igual, no dependen de este re-render. Confirmado con test: escribir en el campo de nota y forzar un ciclo de refresco NO borra el texto; sacar el foco y forzar otro ciclo SÍ actualiza el detalle con normalidad.) -->
@@ -950,7 +951,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.29.4';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.29.5';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -3790,6 +3791,26 @@ async function _toggleUrgenteDesdeTarjeta(id, activar) {
         const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === id);
         if (c) c.urgente = activar ? { activo:true, nota:nota } : null;
         aplicarFiltros();
+        if (cotActual && String(cotActual.idCot || cotActual.id_cotizacion || cotActual.id || '') === id) _renderDetalle(c || cotActual);
+
+        // Pedido por Cristian: "como veo la nota que me pide opcional
+        // dentro del negocio?... agregalo en notas generales del
+        // negocio" — antes el motivo solo quedaba en el tooltip del
+        // pin (invisible en el celular). Ahora también queda como una
+        // nota real, en la MISMA lista de Notas de Seguimiento que ya
+        // se ve en el detalle — mismo mecanismo (agregarNota) que usa
+        // el resto de la pantalla, sin inventar un cartel aparte.
+        const textoNotaUrgente = activar
+            ? ('📌 Marcado como urgente' + (nota ? ': ' + nota : ''))
+            : '📌 Desmarcado como urgente';
+        await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'agregarNota', idCot:id, nota:{
+                texto: textoNotaUrgente, fecha: new Date().toISOString(), vendedor: currentUserNombre,
+            } }) });
+        // Si el negocio ya tenía la nota en memoria (viene con
+        // todasLasCot), la reflejamos también ahí para no depender de
+        // un refresh completo — mismo patrón que el resto de la función.
+        if (c) { if (!Array.isArray(c.notas_papiro)) c.notas_papiro = []; c.notas_papiro.unshift({ texto: textoNotaUrgente, fecha: new Date().toISOString(), vendedor: currentUserNombre }); }
         if (cotActual && String(cotActual.idCot || cotActual.id_cotizacion || cotActual.id || '') === id) _renderDetalle(c || cotActual);
     } catch(e) { alert('Error de conexión al actualizar.'); }
 }
