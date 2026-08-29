@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.29.6 (BUG REAL — al agregar el estado "Enviado" (FotoMap.gs v197 / servicio.html v2026.08.29.1), el badge de estado por equipo en "Estado de Preparación y Despacho" se quedó sin contemplarlo, cayendo al color por defecto: un fondo SÓLIDO oscuro fijo (#1e293b) que no se adapta a modo claro — se veía como un cuadro negro raro en la pantalla clara. Reportado por Cristian con captura: "se ve en modo oscuro el estado de enviado, etc". "Enviado" ahora usa el mismo verde que "Listo para despacho" (ambos representan avance completo); el color por defecto (para "Pendiente" o cualquier estado no contemplado) pasa a ser un tinte semi-transparente rgba — el mismo patrón que ya usaba bien el badge de Calidad de al lado, funciona en los 2 temas. Confirmado con test: "Enviado" usa el verde correcto, "Pendiente" ya no usa el fondo sólido oscuro viejo, y no queda ningún badge de estado con el color #1e293b como fondo.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.5 (El motivo de marcar/desmarcar urgente (v2026.08.29.4) ahora también queda como una NOTA REAL en la misma lista de "Notas de Seguimiento" que ya se ve en el detalle — antes solo vivía en el tooltip del pin (invisible en el celular, donde no hay hover). Cristian: "funciona OK, como veo la nota que me pide opcional dentro del negocio?" → "agregalo en notas generales del negocio". Reusa el mismo mecanismo agregarNota que ya usa el resto de la pantalla — sin cartel ni sección aparte. Texto: "📌 Marcado como urgente: [motivo]" (o sin ":" si no hay motivo) al marcar, "📌 Desmarcado como urgente" al desmarcar; se refleja en memoria al toque, sin esperar un refresh completo. Confirmado con 4 tests: la nota se agrega con el motivo real, aparece en el detalle sin recargar nada, sin motivo no queda un ":" colgando, y desmarcar también deja su propio registro.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.4 (Nuevo pin 📌 "Urgente / Atender hoy" — Cristian: "como puedo marcar algunos negocios para atenderlos con urgencia, o para programar el dia de trabajo... no importa en q etapa estén", eligió la opción "marca + nota corta" entre 3 propuestas, con pin rojo. Toca el pin (Kanban, Lista, o el header del detalle) para marcar/desmarcar — al marcar pide una nota corta opcional (ej. "Llamar antes de las 15hs"), guardada vía la nueva acción marcarNegocioUrgente (FotoMap.gs v196). Se ve como un pin rojo (gris/apagado si no está marcado) + un borde rojo en el costado de la tarjeta, cruzando TODAS las etapas y pipelines — no depende de la columna del Kanban. Nuevo filtro toggle "📌 Solo urgentes (N)" en la barra de filtros, combinable con los demás (vendedor/pipeline/colaborador/fechas), con contador en vivo. Bug real encontrado por el propio test: "null || ''" convertía el cancelar del prompt en string vacío ANTES de poder chequear si había cancelado — corregido chequeando null primero. Confirmado con 5 tests: pines rojo/gris correctos cruzando 2 etapas distintas, el contador y el filtro funcionan, marcar llama al backend con los datos correctos, cancelar el prompt no marca nada, y desmarcar no pide ningún prompt.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.3 (2da vuelta del fix de v2026.08.29.2 — Cristian: primero "en notas anda OK y no lo pisa pero en mensajes internos si lo pisa" (causa: #det-mensajes-panel es HERMANO de #det-body, no descendiente — el chequeo de foco de la v2 solo miraba dentro de #det-body); arreglado eso, después "en notas tbien se borra" — causa de fondo real: el chequeo se basaba en el FOCO en el instante exacto del polling, así que si el vendedor sacaba la vista un segundo (miraba otra pestaña, tocaba otra cosa) justo cuando caía el refresco cada 25s, el texto seguía ahí sin guardar pero ya no estaba "enfocado", y se borraba igual. Reemplazado _hayFocoEnTextoDentroDelDetalle() por _hayTextoSinGuardarEnDetalle(idNegocio) — chequea directo si HAY TEXTO CARGADO (no vacío) en la nota o el mensaje de ESE negocio, sin importar dónde esté el foco en ese instante, que es lo que realmente hay que proteger. Ambos campos se vacían apenas se envían/guardan (antes de la respuesta del servidor), así que el chequeo nunca queda bloqueado para siempre. Confirmado con 4 tests: nota sin guardar y SIN foco (el escenario real reportado) no se borra; mismo caso para mensaje interno; y con los 2 campos vacíos el próximo ciclo actualiza con normalidad.) -->
@@ -951,7 +952,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.29.5';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.29.6';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -3862,8 +3863,20 @@ async function _cargarDetalleEquiposST(idTicket, idNegocioDeReferencia) {
         }
         contActual.innerHTML = ticket.equipos.map(function(eq) {
             const estado = eq.estado || 'Pendiente';
-            let colorEstado = '#94a3b8', bgEstado = '#1e293b';
-            if (estado === 'Listo para despacho') { colorEstado = '#06d6a0'; bgEstado = 'rgba(6,214,160,.12)'; }
+            // BUG REAL — al agregar el estado "Enviado" (FotoMap.gs v197 /
+            // servicio.html v2026.08.29.1), acá se quedó sin contemplar y
+            // caía al color por defecto: un fondo SÓLIDO oscuro fijo
+            // (#1e293b) que no se adapta a modo claro — se veía como un
+            // cuadro negro raro en la pantalla clara. Reportado por
+            // Cristian con captura: "se ve en modo oscuro el estado de
+            // enviado, etc". "Enviado" ahora usa el mismo verde que
+            // "Listo para despacho" (ambos representan avance completo), y
+            // el color por defecto (para "Pendiente" o cualquier estado
+            // no contemplado) pasa a ser un tinte semi-transparente — el
+            // MISMO patrón que ya usa el badge de Calidad de al lado, que
+            // sí se ve bien en los dos temas.
+            let colorEstado = '#94a3b8', bgEstado = 'rgba(148,163,184,.12)';
+            if (estado === 'Listo para despacho' || estado === 'Enviado') { colorEstado = '#06d6a0'; bgEstado = 'rgba(6,214,160,.12)'; }
             else if (estado === 'Retirado del depósito' || estado === 'Verificado') { colorEstado = '#3a86ff'; bgEstado = 'rgba(58,134,255,.12)'; }
             const calidadOk = eq.calidad_verificada === true;
             const serie = (eq.nro_serie && String(eq.nro_serie).trim()) ? _escCot(eq.nro_serie) : '<span style="color:#f59e0b;">Pendiente</span>';
