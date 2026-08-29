@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.29.6 (El badge de Garantía (v2026.08.29.5) ahora es más grande — 92px → 140px, con el texto interno escalado en la misma proporción (título, estrellas, número y "AÑOS"). Pedido por Cristian con captura: "un poco mas grande el sello de garantia".) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.5 (Nueva feature: GARANTÍA — Cristian: "quiero agregar en el excel una columna true/false llamada garantía, todos los equipos tienen 1 año de garantía pero algunos por promocion vamos a darle 3 años, quiero que muestre en ficha tecnica y tbien se trasladará a presupuesto como item sin cargo, el logo pegado y vistoso en la ficha tecnica como este, si tiene 1 año o 3 bien resaltado" (con imagen de referencia de un sello dorado). Nueva columna en Lista_Precios: "Garantia" (TRUE/FALSE) — todos los equipos arrancan en 1 año por default, TRUE = 3 años (promoción). (1) Badge grande "GARANTÍA X AÑOS" — sunburst dorado hecho con CSS puro (repeating-conic-gradient, sin ningún asset/imagen nueva), pegado como sticker sobre la foto del equipo (position:absolute sobre .foto-wrap, que ahora tiene position:relative). (2) La garantía se inyecta como un Hijo MÁS, sintético (no viene del Excel como fila propia), con precio $0 y tildado por default ("Garantía Extendida 3 años" o "Garantía 1 año" según corresponda) — reusa TAL CUAL todo el mecanismo ya existente para Hijos reales (aparece en "Módulos y Accesorios", viaja en itemsParaApilar, termina como línea sin cargo en el presupuesto), sin código nuevo para eso. Excluida explícitamente del mecanismo de "una nota por cada Hijo tildado" (v2026.08.29.1) — es automática en TODOS los envíos, no algo que el vendedor elige mandar, así que generarle su propia nota sería ruido en el historial de cada negocio. (3) Sugerido por el propio Cristian ("lo podemos poner en notas del presupuesto por default"): las notas por default del presupuesto ahora también mencionan "Incluye garantía de X año(s)." Confirmado con test de punta a punta (2 escenarios — Garantia=TRUE y FALSE): el badge muestra el número correcto, el módulo aparece ya tildado con el nombre correcto, viaja al carrito real con precio $0, y las notas mencionan la garantía. Batería de regresión actualizada (test-hijos-y-notas.js) para contemplar el nuevo ítem automático sin romper los tests existentes de Padre+Hijo.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.4 (BUG REAL — "a veces no aparecen los pipelines, esto es en ficha tecnica, pero a veces en cotizaciones tapoco". Causa: si el pedido a listarPipelines fallaba (Apps Script "despertándose", un hipo de red — suele ser transitorio), _cargarPipelinesFicha() se quedaba en silencio con SOLO "Pipeline General" y nunca reintentaba. Ahora reintenta UNA vez más, 1.5s después, antes de rendirse — resuelve la gran mayoría de los casos sin que el vendedor haga nada. También detecta {ok:false} como error real ahora (antes silenciosamente lo trataba como "sin pipelines", sin reintentar). Ver cotizaciones.html para el mismo fix del lado de _cargarPipelines(). Confirmado con test: con el primer intento fallando a propósito, reintenta solo y termina mostrando la lista real de pipelines, no solo el default.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.3 (BUG REAL sobre lo entregado en v2026.08.29.2 — Cristian con captura: "los botones de ficha tecnica, cuando le llegan al cliente deben desaparecer... si el cliente abre el link recibido por whatsapp esos botones no deben existir". La v.2 solo ocultaba Teléfono/WhatsApp/Guardar PDF en la pantalla PROPIA del vendedor DESPUÉS de que él mismo enviara (persistido en su dispositivo) — pero nunca los ocultaba en el link real que recibe el CLIENTE (?modo=cliente), que es donde de verdad no tienen sentido (son herramientas del vendedor, no del receptor). Ahora se ocultan directamente dentro del bloque ya existente que maneja modo=cliente/sin sesión (el mismo que ya ocultaba Crear Negocio, el buscador de empresa, etc.) — sin importar si "ya se envió" o no, simplemente nunca existen ahí. De paso, confirmado que el link guardado en la nota de seguimiento (ver v2026.08.29.1) YA tenía &modo=cliente desde antes — con este fix, abrir ese link desde la nota ahora sí muestra exactamente lo mismo que ve el cliente, sin código adicional necesario ahí. Confirmado con 3 tests: modo=cliente sin sesión los oculta; modo=cliente CON sesión de vendedor en ese navegador también los oculta (manda la URL, no la sesión); y el link normal del vendedor (sin modo=cliente) sigue mostrando todo con normalidad.) -->
@@ -92,20 +93,20 @@
            de referencia: "el logo pegado y vistoso en la ficha tecnica
            como este, si tiene 1 año o 3 bien resaltado". */
         .garantia-badge {
-            position:absolute; top:8px; right:8px; width:92px; height:92px; border-radius:50%;
+            position:absolute; top:10px; right:10px; width:140px; height:140px; border-radius:50%;
             background:repeating-conic-gradient(#ffd447 0deg 9deg, #d89b1f 9deg 18deg);
             display:flex; align-items:center; justify-content:center;
-            box-shadow:0 4px 14px rgba(0,0,0,.35); z-index:5;
+            box-shadow:0 6px 18px rgba(0,0,0,.35); z-index:5;
         }
         .garantia-badge-inner {
             width:76%; height:76%; border-radius:50%; background:#161616;
             display:flex; flex-direction:column; align-items:center; justify-content:center;
             color:#fff; text-align:center; line-height:1;
         }
-        .garantia-badge-titulo { font-size:8px; font-weight:900; letter-spacing:.5px; margin-bottom:2px; }
-        .garantia-badge-estrellas { font-size:6px; color:#ffd447; letter-spacing:1px; margin-bottom:1px; }
-        .garantia-badge-numero { font-size:26px; font-weight:900; color:#fff; }
-        .garantia-badge-anos { font-size:8px; font-weight:900; letter-spacing:.5px; margin-top:2px; }
+        .garantia-badge-titulo { font-size:12px; font-weight:900; letter-spacing:.7px; margin-bottom:3px; }
+        .garantia-badge-estrellas { font-size:9px; color:#ffd447; letter-spacing:1.5px; margin-bottom:2px; }
+        .garantia-badge-numero { font-size:40px; font-weight:900; color:#fff; }
+        .garantia-badge-anos { font-size:12px; font-weight:900; letter-spacing:.7px; margin-top:3px; }
         .foto-wrap.foto-cargando::after {
             content:''; width:28px; height:28px; border-radius:50%; border:3px solid #dbe4ee; border-top-color:var(--blue-tlc);
             animation:girar .7s linear infinite;
@@ -417,7 +418,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.29.5';
+var FICHA_EQUIPO_VERSION = '2026.08.29.6';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
