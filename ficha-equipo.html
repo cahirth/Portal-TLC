@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.29.3 (BUG REAL sobre lo entregado en v2026.08.29.2 — Cristian con captura: "los botones de ficha tecnica, cuando le llegan al cliente deben desaparecer... si el cliente abre el link recibido por whatsapp esos botones no deben existir". La v.2 solo ocultaba Teléfono/WhatsApp/Guardar PDF en la pantalla PROPIA del vendedor DESPUÉS de que él mismo enviara (persistido en su dispositivo) — pero nunca los ocultaba en el link real que recibe el CLIENTE (?modo=cliente), que es donde de verdad no tienen sentido (son herramientas del vendedor, no del receptor). Ahora se ocultan directamente dentro del bloque ya existente que maneja modo=cliente/sin sesión (el mismo que ya ocultaba Crear Negocio, el buscador de empresa, etc.) — sin importar si "ya se envió" o no, simplemente nunca existen ahí. De paso, confirmado que el link guardado en la nota de seguimiento (ver v2026.08.29.1) YA tenía &modo=cliente desde antes — con este fix, abrir ese link desde la nota ahora sí muestra exactamente lo mismo que ve el cliente, sin código adicional necesario ahí. Confirmado con 3 tests: modo=cliente sin sesión los oculta; modo=cliente CON sesión de vendedor en ese navegador también los oculta (manda la URL, no la sesión); y el link normal del vendedor (sin modo=cliente) sigue mostrando todo con normalidad.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.2 (Una vez enviada la ficha por WhatsApp, el Teléfono del cliente, "Enviar por WhatsApp" y "Guardar PDF" desaparecen, mostrando "✅ Ficha enviada" en su lugar — "Crear / Sumar Negocio" NO se oculta, no fue pedido. Persiste por equipo en localStorage (tlc_ficha_enviada_{nombre}), así que sigue así aunque se recargue la página — confirmado con Cristian: "debe quedar así aunque se recargue (mientras sea la misma ficha)", con un mensaje de confirmación en vez de nada: "sí, mostrar un mensaje tipo ✅ Ficha enviada". Se dispara en los 2 flujos de envío por WhatsApp que existen (el normal y el personalizado de FacoExtrema vía QR) — nunca en la vista de cliente (?modo=cliente), donde estos controles son del vendedor, no del receptor del link. Nuevas funciones _marcarFichaComoEnviada(), _aplicarEstadoFichaEnviada(), _verificarSiFichaYaEnviada() (esta última llamada al cargar la página, dentro del bloque exclusivo del vendedor). Confirmado con test de punta a punta: antes de enviar todo visible sin mensaje; después de enviar los 3 elementos desaparecen y aparece el mensaje; "Crear/Sumar Negocio" sigue visible; y el estado persiste al simular una recarga de página.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.1 (3 gaps reales encontrados en el flujo de "enviar a Ventas" desde la ficha técnica — Cristian: "desde ficha tecnica, cuando envio whatsapp o creo negocio, enviar al negocio todos los hijos, y crear cada vez una nota con el link de la/s fichas". (1) BUG REAL — el camino de "negocio totalmente NUEVO" (sin ningún otro existente para agrupar) solo mandaba el Padre en items al crear el negocio, nunca los Hijos tildados — los otros 2 caminos (apilar directo/apilar a uno existente) sí los mandaban bien vía itemsParaApilar, pero este tercero no. Ahora los 3 caminos usan la misma lista completa. (2) La nota con el link de la ficha SOLO se creaba si el origen era WhatsApp — "Crear/Sumar Negocio" directo no generaba ninguna nota. Ahora se crea en los 2 orígenes por igual, y _guardarSeguimientoVentas arma el link solo (_construirLinkFichaActual) cuando no viene uno ya armado. (3) Por pedido explícito, ahora es UNA NOTA SEPARADA por cada Hijo tildado (no todo junto en una sola) — además de la nota del Padre que ya existía. (4) El contacto tampoco se registraba en el origen "Crear/Sumar Negocio" — _contactoSeleccionadoFicha solo se sincronizaba dentro del flujo de WhatsApp; ahora se sincroniza una sola vez, centralizado, al principio de _guardarSeguimientoVentas, para los 2 orígenes por igual. Confirmado con 2 baterías de test de punta a punta (WhatsApp y Crear/Sumar Negocio): en ambos casos se crea el contacto, el negocio se crea con Padre+Hijo juntos, y se generan 2 notas separadas (una por el Padre, una por el Hijo) con el link real.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.19.6 (Nuevo badge "💰 Tu comisión: X%" en la ficha técnica — visible SOLO para vendedores logueados con la columna "Ver Comisiones" tildada en la hoja Vendedores (TRUE/FALSE), mostrando el % de comisión que tiene cargado ESE equipo puntual (columna "COMISIONES" en Lista_Precios). Nunca se muestra en fichas abiertas por un cliente (link compartido, sin sesión) — se corta de una sin consultar nada si no hay _sesionVendedor. Puramente visual/informativo — NO participa del cálculo real de comisiones (ver FotoMap.gs calcularComisiones, que sigue usando 1% fijo para internos y % por equipo para externos, sin relación con esta columna). Usa la nueva consultarPermisoModulo() de permisos.js v2026.08.19.2 (versión NO bloqueante de validarAccesoModulo, para permisos que solo deciden mostrar/ocultar algo). Se agregó <script src="permisos.js"> al head, que antes no cargaba este archivo. Pedido por Cristian: "en ficha técnica, ver comisiones, si está tildado, el vendedor ve la comisión que va a recibir de ese equipo, que está en el Excel... si está destildado, no lo ve. Es solamente visual". Confirmado con 4 tests: cliente sin sesión nunca lo ve (aunque el equipo tenga % cargado), vendedor con el permiso en true ve el % real del equipo, vendedor con el permiso en false no ve nada, y un equipo sin % cargado tampoco muestra nada aunque el vendedor tenga permiso.) -->
@@ -382,7 +383,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.29.2';
+var FICHA_EQUIPO_VERSION = '2026.08.29.3';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -961,6 +962,25 @@ async function _cargarFicha() {
         if (elBtnEscanearQR) elBtnEscanearQR.style.display = 'none';
         var elBtnEscanearQRLabel = document.getElementById('fi-btn-escanear-qr-label');
         if (elBtnEscanearQRLabel) elBtnEscanearQRLabel.style.display = 'none';
+        // BUG REAL — estos 3 son herramientas del VENDEDOR (mandar la
+        // ficha, o guardarla en PDF para uso propio) — nunca deberían
+        // verse cuando quien abre el link es el cliente (?modo=cliente)
+        // o no hay ninguna sesión de vendedor. Antes solo se ocultaban
+        // en la pantalla propia del vendedor DESPUÉS de que él mismo
+        // enviara (ver _verificarSiFichaYaEnviada) — acá directamente
+        // nunca deben existir, sin importar si "ya se envió" o no.
+        // Reportado por Cristian con captura: "los botones de ficha
+        // tecnica, cuando le llegan al cliente deben desaparecer...
+        // si el cliente abre el link recibido por whatsapp esos
+        // botones no deben existir".
+        var elTelWrapCliente = document.getElementById('fi-telefono-wrap');
+        if (elTelWrapCliente) elTelWrapCliente.style.display = 'none';
+        var elBtnWspCliente = document.getElementById('fi-btn-wsp-normal');
+        if (elBtnWspCliente) elBtnWspCliente.style.display = 'none';
+        var elBtnPdfCliente = document.getElementById('fi-btn-guardar-pdf');
+        if (elBtnPdfCliente) elBtnPdfCliente.style.display = 'none';
+        var elHintCliente = document.getElementById('fi-hint-botones');
+        if (elHintCliente) elHintCliente.style.display = 'none';
     } else {
         var esFlujoQR = !!(params.get('qr_telefono') || params.get('qr_nombre'));
         _cargarPipelinesFicha().then(function(lista) {
