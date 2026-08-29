@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.29.7 (El sello dorado de Garantía (v2026.08.29.5/.6) ahora SOLO se muestra para los equipos con 3 años (Garantia=TRUE en el Excel) — el resto (1 año, el default) va sin ningún sello. El accesorio tildado sin cargo en "Módulos y Accesorios" y la mención en las notas del presupuesto ("Incluye garantía de X año(s)") NO se tocaron — siguen apareciendo en los 2 casos, con o sin sello. Pedido por Cristian: "Solamente ponerle el logo lacrado de garantía tres años a los equipos que están marcados con garantía tildado true en Excel. Todos los demás van sin sello lacrado, pero sí va en la nota por default del presupuesto, eso no lo saques". Confirmado con test de punta a punta (2 escenarios): con Garantia=TRUE el sello se ve; con Garantia=FALSE el sello queda oculto, y en ambos casos el ítem sin cargo y la nota del presupuesto siguen intactos.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.6 (El badge de Garantía (v2026.08.29.5) ahora es más grande — 92px → 140px, con el texto interno escalado en la misma proporción (título, estrellas, número y "AÑOS"). Pedido por Cristian con captura: "un poco mas grande el sello de garantia".) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.5 (Nueva feature: GARANTÍA — Cristian: "quiero agregar en el excel una columna true/false llamada garantía, todos los equipos tienen 1 año de garantía pero algunos por promocion vamos a darle 3 años, quiero que muestre en ficha tecnica y tbien se trasladará a presupuesto como item sin cargo, el logo pegado y vistoso en la ficha tecnica como este, si tiene 1 año o 3 bien resaltado" (con imagen de referencia de un sello dorado). Nueva columna en Lista_Precios: "Garantia" (TRUE/FALSE) — todos los equipos arrancan en 1 año por default, TRUE = 3 años (promoción). (1) Badge grande "GARANTÍA X AÑOS" — sunburst dorado hecho con CSS puro (repeating-conic-gradient, sin ningún asset/imagen nueva), pegado como sticker sobre la foto del equipo (position:absolute sobre .foto-wrap, que ahora tiene position:relative). (2) La garantía se inyecta como un Hijo MÁS, sintético (no viene del Excel como fila propia), con precio $0 y tildado por default ("Garantía Extendida 3 años" o "Garantía 1 año" según corresponda) — reusa TAL CUAL todo el mecanismo ya existente para Hijos reales (aparece en "Módulos y Accesorios", viaja en itemsParaApilar, termina como línea sin cargo en el presupuesto), sin código nuevo para eso. Excluida explícitamente del mecanismo de "una nota por cada Hijo tildado" (v2026.08.29.1) — es automática en TODOS los envíos, no algo que el vendedor elige mandar, así que generarle su propia nota sería ruido en el historial de cada negocio. (3) Sugerido por el propio Cristian ("lo podemos poner en notas del presupuesto por default"): las notas por default del presupuesto ahora también mencionan "Incluye garantía de X año(s)." Confirmado con test de punta a punta (2 escenarios — Garantia=TRUE y FALSE): el badge muestra el número correcto, el módulo aparece ya tildado con el nombre correcto, viaja al carrito real con precio $0, y las notas mencionan la garantía. Batería de regresión actualizada (test-hijos-y-notas.js) para contemplar el nuevo ítem automático sin romper los tests existentes de Padre+Hijo.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.4 (BUG REAL — "a veces no aparecen los pipelines, esto es en ficha tecnica, pero a veces en cotizaciones tapoco". Causa: si el pedido a listarPipelines fallaba (Apps Script "despertándose", un hipo de red — suele ser transitorio), _cargarPipelinesFicha() se quedaba en silencio con SOLO "Pipeline General" y nunca reintentaba. Ahora reintenta UNA vez más, 1.5s después, antes de rendirse — resuelve la gran mayoría de los casos sin que el vendedor haga nada. También detecta {ok:false} como error real ahora (antes silenciosamente lo trataba como "sin pipelines", sin reintentar). Ver cotizaciones.html para el mismo fix del lado de _cargarPipelines(). Confirmado con test: con el primer intento fallando a propósito, reintenta solo y termina mostrando la lista real de pipelines, no solo el default.) -->
@@ -418,7 +419,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.29.6';
+var FICHA_EQUIPO_VERSION = '2026.08.29.7';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -1140,8 +1141,22 @@ async function _cargarFicha() {
         var elBadgeGarantia = document.getElementById('fi-badge-garantia');
         var elGarantiaNumero = document.getElementById('fi-garantia-numero');
         if (elBadgeGarantia && elGarantiaNumero) {
-            elGarantiaNumero.textContent = _anosGarantiaActual;
-            elBadgeGarantia.style.display = 'flex';
+            // El sello dorado SOLO se muestra para los equipos con 3
+            // años (Garantia=TRUE en el Excel) — el resto (1 año, el
+            // default) no lleva ningún sello, aunque sigue apareciendo
+            // como accesorio tildado y en las notas del presupuesto,
+            // que no se tocan acá. Pedido por Cristian: "Solamente
+            // ponerle el logo lacrado de garantía tres años a los
+            // equipos que están marcados con garantía tildado true en
+            // Excel. Todos los demás van sin sello lacrado, pero sí va
+            // en la nota por default del presupuesto, eso no lo
+            // saques".
+            if (tieneGarantiaExtendida) {
+                elGarantiaNumero.textContent = _anosGarantiaActual;
+                elBadgeGarantia.style.display = 'flex';
+            } else {
+                elBadgeGarantia.style.display = 'none';
+            }
         }
         // BUG REAL — si el vendedor tildaba un módulo (ej. "Mesa
         // Eléctrica") ANTES de compartir por WhatsApp, ese estado se
