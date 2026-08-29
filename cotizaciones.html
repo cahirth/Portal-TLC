@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.29.2 (BUG REAL — "si estoy escribiendo una nota o un mensaje interno, de repente, se borra lo que estoy escribiendo... sospecho que es por el polling que le agregamos para actualizar la preparacion desde servicio". Confirmado: _recargarHistoricoYRerenderizarSiAbierto (el polling de progreso ST cada 25s, v2026.08.29.1) llamaba a _renderDetalle() sin condición, que reemplaza TODO el HTML de #det-body de una — incluida cualquier <textarea>/<input> donde el vendedor estuviera escribiendo (una nota nueva, un mensaje interno), borrándole el texto a mitad de camino sin guardar nada. Ya existía una protección similar pero solo para el panel de mensajes (_renderPanelMensajesCot, con guard sobre _idCotActual) — la nota nueva no tenía ninguna. Nueva función _hayFocoEnTextoDentroDelDetalle() — si el foco está en cualquier <textarea>/<input> de texto dentro de #det-body al momento de refrescar, se salta el repintado de esa vuelta entera (se reintenta en el próximo ciclo, 25s después); el Kanban/Lista de atrás se siguen actualizando igual, no dependen de este re-render. Confirmado con test: escribir en el campo de nota y forzar un ciclo de refresco NO borra el texto; sacar el foco y forzar otro ciclo SÍ actualiza el detalle con normalidad.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.1 (PASO 2 de "trazabilidad y sincronización entre Ventas y Servicio Técnico" (Paso 1 en FotoMap.gs v195). Muestra en 3 lugares el progreso_st que ya viene calculado con cada negocio: (1) Tarjeta Kanban — barra full-width al pie, con "📦 Prep. ST: X/Y Listos" + "XX%", color reactivo (gris en 0%, azul en proceso, verde en 100%). Solo aparece si el negocio ya tiene una Orden de Preparación vinculada — no se muestra nada en negocios que nunca llegaron ahí. (2) Vista Lista — misma barra en versión compacta, debajo de cada fila. (3) Modal de detalle — bloque nuevo "📦 Estado de Preparación y Despacho" con la barra grande + desglose por equipo (SKU, N° de Serie o "Pendiente", badge de Calidad ✅/⏳, estado individual con su color) — el desglose se trae en vivo con un fetch directo a Firebase (mismo mecanismo que ya usa el resto de la pantalla), ya que el agregado que viaja con el negocio no incluye el detalle por equipo. Nuevo helper _renderBarraProgresoST() reusado en los 3 lugares, y _cargarDetalleEquiposST() para el desglose del modal. Polling cada 25s (_iniciarPollingProgresoST, pausado si la pestaña está en segundo plano) que refresca Kanban/Lista/Detalle solo — el Portal no usa listeners en vivo de Firebase en ningún lado, así que esto es el approach de "casi tiempo real" acordado con Cristian en vez de meter ese cambio de arquitectura de entrada. _recargarHistoricoYRerenderizarSiAbierto() extraída de abrirDetalle() para poder reusarla también desde el polling. Confirmado con test de punta a punta: sin progreso_st no aparece nada, en proceso muestra barra azul con el texto/% correctos, al 100% muestra verde, la vista Lista también lo trae, el modal de detalle carga el desglose real por equipo (serie/calidad/estado), y las funciones de polling existen y no rompen.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.15 (Al ir a editar un presupuesto, el borrador que se manda a presupuesto-editor.html ahora incluye modalidadPago (el adelanto/anticipo real de TLC6/TLC12/Leasing) — antes se perdía y siempre volvía al default genérico al reabrir. Ver presupuesto-editor.html v2026.08.27.1 y FotoMap.gs v194 para el resto del fix. Reportado por Cristian: "todos los descuentos y adelanto, forma de pago, tal cual están en el presupuesto a editar, ahora no lo trae".) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.14 (Separación de responsabilidades: tocar la caja "Cliente" (con empresa ya asignada) sigue precargando ESA MISMA empresa en empresas.html — es para cambiar el CONTACTO. Nuevo botón aparte "🔄 Cambiar Empresa", chiquito debajo de la caja, que NO precarga ninguna — arranca directo en la lista de Empresas para buscar y elegir una totalmente distinta. Aclarado por Cristian tras la entrega anterior: "no me entendiste... quiero que agregues un boton para cambiar de empresa, que me lleve al modulo empresas y poder elegir otra empresa totalmente diferente, que lo que hisicste esta ok y dejalo, es para cambiar el contacto". Nueva función _irACambiarEmpresaDeNegocio(), separada de _irAEmpresaDesdeNegocio() (que sigue igual). Confirmado con test: tocar la caja Cliente arma la URL CON ?empresa=actual (precarga), el botón nuevo arma la URL SIN ese parámetro (arranca en la lista).) -->
@@ -936,7 +937,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.29.1';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.29.2';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -2501,10 +2502,33 @@ function abrirDetalle(idx) {
 // detalle de ESTE negocio sigue abierto, lo vuelve a pintar también —
 // así el progreso de Preparación/ST (y notas/estado en general) se ve
 // actualizado sin que el vendedor tenga que cerrar y reabrir nada.
+//
+// BUG REAL — _renderDetalle() reemplaza TODO el HTML de #det-body de
+// una, incluida cualquier <textarea>/<input> donde el vendedor esté
+// escribiendo en ese momento (una nota nueva, un mensaje interno) —
+// el polling cada 25s le borraba lo que estaba tipeando a mitad de
+// camino, sin guardar nada. Reportado por Cristian: "si estoy
+// escribiendo una nota o un mensaje interno, de repente, se borra lo
+// que estoy escribiendo... sospecho que es por el polling". Ahora, si
+// el foco está en un campo de texto DENTRO del detalle al momento de
+// refrescar, se salta el repintado de esta vuelta — se reintenta
+// solo en el próximo ciclo (25s después), cuando lo más probable es
+// que ya haya guardado o se haya movido a otra cosa. El Kanban/Lista
+// de atrás sí se actualizan igual (no dependen de este re-render).
+function _hayFocoEnTextoDentroDelDetalle() {
+    const activo = document.activeElement;
+    if (!activo) return false;
+    const esCampoDeTexto = activo.tagName === 'TEXTAREA' || (activo.tagName === 'INPUT' && (activo.type === 'text' || activo.type === 'search' || !activo.type));
+    if (!esCampoDeTexto) return false;
+    const detBody = document.getElementById('det-body');
+    return !!(detBody && detBody.contains(activo));
+}
+
 async function _recargarHistoricoYRerenderizarSiAbierto(c) {
     await _recargarHistoricoSilencioso();
     const overlay = document.getElementById('detalle-overlay');
     if (!overlay.classList.contains('open')) return;
+    if (_hayFocoEnTextoDentroDelDetalle()) return; // el vendedor está escribiendo algo — no le pisamos el campo
     const id = String(c.idCot || c.id_cotizacion || c.id || '');
     const actualizado = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === id);
     if (actualizado) { cotActual = actualizado; _renderDetalle(actualizado); }
