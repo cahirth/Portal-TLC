@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.29.4 (BUG REAL — "a veces no aparecen los pipelines, esto es en ficha tecnica, pero a veces en cotizaciones tapoco". Causa: si el pedido a listarPipelines fallaba (Apps Script "despertándose", un hipo de red — suele ser transitorio), _cargarPipelinesFicha() se quedaba en silencio con SOLO "Pipeline General" y nunca reintentaba. Ahora reintenta UNA vez más, 1.5s después, antes de rendirse — resuelve la gran mayoría de los casos sin que el vendedor haga nada. También detecta {ok:false} como error real ahora (antes silenciosamente lo trataba como "sin pipelines", sin reintentar). Ver cotizaciones.html para el mismo fix del lado de _cargarPipelines(). Confirmado con test: con el primer intento fallando a propósito, reintenta solo y termina mostrando la lista real de pipelines, no solo el default.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.3 (BUG REAL sobre lo entregado en v2026.08.29.2 — Cristian con captura: "los botones de ficha tecnica, cuando le llegan al cliente deben desaparecer... si el cliente abre el link recibido por whatsapp esos botones no deben existir". La v.2 solo ocultaba Teléfono/WhatsApp/Guardar PDF en la pantalla PROPIA del vendedor DESPUÉS de que él mismo enviara (persistido en su dispositivo) — pero nunca los ocultaba en el link real que recibe el CLIENTE (?modo=cliente), que es donde de verdad no tienen sentido (son herramientas del vendedor, no del receptor). Ahora se ocultan directamente dentro del bloque ya existente que maneja modo=cliente/sin sesión (el mismo que ya ocultaba Crear Negocio, el buscador de empresa, etc.) — sin importar si "ya se envió" o no, simplemente nunca existen ahí. De paso, confirmado que el link guardado en la nota de seguimiento (ver v2026.08.29.1) YA tenía &modo=cliente desde antes — con este fix, abrir ese link desde la nota ahora sí muestra exactamente lo mismo que ve el cliente, sin código adicional necesario ahí. Confirmado con 3 tests: modo=cliente sin sesión los oculta; modo=cliente CON sesión de vendedor en ese navegador también los oculta (manda la URL, no la sesión); y el link normal del vendedor (sin modo=cliente) sigue mostrando todo con normalidad.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.2 (Una vez enviada la ficha por WhatsApp, el Teléfono del cliente, "Enviar por WhatsApp" y "Guardar PDF" desaparecen, mostrando "✅ Ficha enviada" en su lugar — "Crear / Sumar Negocio" NO se oculta, no fue pedido. Persiste por equipo en localStorage (tlc_ficha_enviada_{nombre}), así que sigue así aunque se recargue la página — confirmado con Cristian: "debe quedar así aunque se recargue (mientras sea la misma ficha)", con un mensaje de confirmación en vez de nada: "sí, mostrar un mensaje tipo ✅ Ficha enviada". Se dispara en los 2 flujos de envío por WhatsApp que existen (el normal y el personalizado de FacoExtrema vía QR) — nunca en la vista de cliente (?modo=cliente), donde estos controles son del vendedor, no del receptor del link. Nuevas funciones _marcarFichaComoEnviada(), _aplicarEstadoFichaEnviada(), _verificarSiFichaYaEnviada() (esta última llamada al cargar la página, dentro del bloque exclusivo del vendedor). Confirmado con test de punta a punta: antes de enviar todo visible sin mensaje; después de enviar los 3 elementos desaparecen y aparece el mensaje; "Crear/Sumar Negocio" sigue visible; y el estado persiste al simular una recarga de página.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.1 (3 gaps reales encontrados en el flujo de "enviar a Ventas" desde la ficha técnica — Cristian: "desde ficha tecnica, cuando envio whatsapp o creo negocio, enviar al negocio todos los hijos, y crear cada vez una nota con el link de la/s fichas". (1) BUG REAL — el camino de "negocio totalmente NUEVO" (sin ningún otro existente para agrupar) solo mandaba el Padre en items al crear el negocio, nunca los Hijos tildados — los otros 2 caminos (apilar directo/apilar a uno existente) sí los mandaban bien vía itemsParaApilar, pero este tercero no. Ahora los 3 caminos usan la misma lista completa. (2) La nota con el link de la ficha SOLO se creaba si el origen era WhatsApp — "Crear/Sumar Negocio" directo no generaba ninguna nota. Ahora se crea en los 2 orígenes por igual, y _guardarSeguimientoVentas arma el link solo (_construirLinkFichaActual) cuando no viene uno ya armado. (3) Por pedido explícito, ahora es UNA NOTA SEPARADA por cada Hijo tildado (no todo junto en una sola) — además de la nota del Padre que ya existía. (4) El contacto tampoco se registraba en el origen "Crear/Sumar Negocio" — _contactoSeleccionadoFicha solo se sincronizaba dentro del flujo de WhatsApp; ahora se sincroniza una sola vez, centralizado, al principio de _guardarSeguimientoVentas, para los 2 orígenes por igual. Confirmado con 2 baterías de test de punta a punta (WhatsApp y Crear/Sumar Negocio): en ambos casos se crea el contacto, el negocio se crea con Padre+Hijo juntos, y se generan 2 notas separadas (una por el Padre, una por el Hijo) con el link real.) -->
@@ -383,7 +384,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.29.3';
+var FICHA_EQUIPO_VERSION = '2026.08.29.4';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -582,14 +583,15 @@ var _fichaModulosTildados = new Set();
 var _empresasCacheFicha = null;
 var PIPELINES_FICHA_KEY = 'tlc_ficha_pipeline_actual';
 
-async function _cargarPipelinesFicha() {
+async function _cargarPipelinesFicha(_esReintento) {
   var sel = document.getElementById('fi-pipeline-select');
   if (!sel) return [];
   try {
     var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarPipelines' }) });
     var r = await resp.json();
-    var lista = (r.ok && Array.isArray(r.pipelines)) ? r.pipelines : [];
+    if (!r.ok) throw new Error(r.error || 'listarPipelines devolvió ok:false');
+    var lista = Array.isArray(r.pipelines) ? r.pipelines : [];
     lista.sort(function(a, b) { return a.nombre.localeCompare(b.nombre, 'es', { sensitivity:'base' }); });
     var html = '<option value="GENERAL">🏢 Pipeline General</option>';
     lista.forEach(function(p) { html += '<option value="' + p.id + '">🏷️ ' + _esc(p.nombre) + '</option>'; });
@@ -601,7 +603,21 @@ async function _cargarPipelinesFicha() {
     var existe = guardado === 'GENERAL' || lista.some(function(p){ return p.id === guardado; });
     sel.value = existe ? guardado : 'GENERAL';
     return lista;
-  } catch(e) { return []; } // si falla, se queda en Pipeline General, no bloquea nada
+  } catch(e) {
+    // BUG REAL — "a veces no aparecen los pipelines, esto es en ficha
+    // tecnica, pero a veces en cotizaciones tampoco". Antes, si el
+    // pedido fallaba (Apps Script "despertándose", un hipo de red —
+    // suele ser transitorio), se quedaba en silencio con SOLO
+    // "Pipeline General" y nunca reintentaba. Ahora reintenta UNA vez
+    // más, 1.5s después — resuelve la gran mayoría de los casos sin
+    // que el vendedor tenga que hacer nada.
+    if (!_esReintento) {
+      await new Promise(function(res) { setTimeout(res, 1500); });
+      return _cargarPipelinesFicha(true);
+    }
+    console.warn('[ficha-equipo] No se pudieron cargar los pipelines (2 intentos):', e);
+    return []; // si falla incluso el reintento, se queda en Pipeline General, no bloquea nada
+  }
 }
 
 // Pipeline obligatorio para negocios creados desde el QR de

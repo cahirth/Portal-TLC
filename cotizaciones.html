@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.29.7 (Mismo BUG REAL que ficha-equipo.html v2026.08.29.4 — Cristian: "a veces no aparecen los pipelines... a veces en cotizaciones tampoco". _cargarPipelines() ya tenía un fix parcial (v2026.08.19.1: defaults fijos + caché), pero si el pedido fallaba (Apps Script "despertándose", un hipo de red), PIPELINES se quedaba vacío en silencio y nunca reintentaba, dejando solo los 2 fijos (Ver Todos/General) sin la lista real — sobre todo en la primera visita, sin caché todavía. Ahora reintenta UNA vez más, 1.5s después, antes de rendirse; también detecta {ok:false} como error real (antes lo trataba como "sin pipelines"). Confirmado con test: con el primer intento fallando a propósito, reintenta solo y termina mostrando el pipeline real, no solo los 2 fijos.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.6 (BUG REAL — al agregar el estado "Enviado" (FotoMap.gs v197 / servicio.html v2026.08.29.1), el badge de estado por equipo en "Estado de Preparación y Despacho" se quedó sin contemplarlo, cayendo al color por defecto: un fondo SÓLIDO oscuro fijo (#1e293b) que no se adapta a modo claro — se veía como un cuadro negro raro en la pantalla clara. Reportado por Cristian con captura: "se ve en modo oscuro el estado de enviado, etc". "Enviado" ahora usa el mismo verde que "Listo para despacho" (ambos representan avance completo); el color por defecto (para "Pendiente" o cualquier estado no contemplado) pasa a ser un tinte semi-transparente rgba — el mismo patrón que ya usaba bien el badge de Calidad de al lado, funciona en los 2 temas. Confirmado con test: "Enviado" usa el verde correcto, "Pendiente" ya no usa el fondo sólido oscuro viejo, y no queda ningún badge de estado con el color #1e293b como fondo.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.5 (El motivo de marcar/desmarcar urgente (v2026.08.29.4) ahora también queda como una NOTA REAL en la misma lista de "Notas de Seguimiento" que ya se ve en el detalle — antes solo vivía en el tooltip del pin (invisible en el celular, donde no hay hover). Cristian: "funciona OK, como veo la nota que me pide opcional dentro del negocio?" → "agregalo en notas generales del negocio". Reusa el mismo mecanismo agregarNota que ya usa el resto de la pantalla — sin cartel ni sección aparte. Texto: "📌 Marcado como urgente: [motivo]" (o sin ":" si no hay motivo) al marcar, "📌 Desmarcado como urgente" al desmarcar; se refleja en memoria al toque, sin esperar un refresh completo. Confirmado con 4 tests: la nota se agrega con el motivo real, aparece en el detalle sin recargar nada, sin motivo no queda un ":" colgando, y desmarcar también deja su propio registro.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.4 (Nuevo pin 📌 "Urgente / Atender hoy" — Cristian: "como puedo marcar algunos negocios para atenderlos con urgencia, o para programar el dia de trabajo... no importa en q etapa estén", eligió la opción "marca + nota corta" entre 3 propuestas, con pin rojo. Toca el pin (Kanban, Lista, o el header del detalle) para marcar/desmarcar — al marcar pide una nota corta opcional (ej. "Llamar antes de las 15hs"), guardada vía la nueva acción marcarNegocioUrgente (FotoMap.gs v196). Se ve como un pin rojo (gris/apagado si no está marcado) + un borde rojo en el costado de la tarjeta, cruzando TODAS las etapas y pipelines — no depende de la columna del Kanban. Nuevo filtro toggle "📌 Solo urgentes (N)" en la barra de filtros, combinable con los demás (vendedor/pipeline/colaborador/fechas), con contador en vivo. Bug real encontrado por el propio test: "null || ''" convertía el cancelar del prompt en string vacío ANTES de poder chequear si había cancelado — corregido chequeando null primero. Confirmado con 5 tests: pines rojo/gris correctos cruzando 2 etapas distintas, el contador y el filtro funcionan, marcar llama al backend con los datos correctos, cancelar el prompt no marca nada, y desmarcar no pide ningún prompt.) -->
@@ -952,7 +953,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.29.6';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.29.7';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -999,15 +1000,31 @@ function _guardarPipelinesEnCache() {
     try { localStorage.setItem(PIPELINES_CACHE_KEY, JSON.stringify(PIPELINES)); } catch(eLs) { /* no crítico */ }
 }
 
-async function _cargarPipelines() {
+async function _cargarPipelines(_esReintento) {
     try {
         const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'listarPipelines' }) });
         const r = await resp.json();
-        PIPELINES = (r.ok && Array.isArray(r.pipelines)) ? r.pipelines : [];
+        if (!r.ok) throw new Error(r.error || 'listarPipelines devolvió ok:false');
+        PIPELINES = Array.isArray(r.pipelines) ? r.pipelines : [];
         PIPELINES.sort(function(a, b) { return a.nombre.localeCompare(b.nombre, 'es', { sensitivity:'base' }); });
         _guardarPipelinesEnCache();
-    } catch(e) { PIPELINES = []; }
+    } catch(e) {
+        // BUG REAL — "a veces los pipeline tardan en cargarse... a
+        // veces no aparecen". Antes, si el pedido fallaba (Apps
+        // Script "despertándose", un hipo de red — suele ser
+        // transitorio), PIPELINES quedaba vacío en silencio y nunca
+        // reintentaba — el select se quedaba solo con los 2 fijos
+        // (Ver Todos / General), sin la lista real. Ahora reintenta
+        // UNA vez más, 1.5s después, antes de rendirse — resuelve la
+        // gran mayoría de los casos sin que el vendedor haga nada.
+        if (!_esReintento) {
+            await new Promise(function(res) { setTimeout(res, 1500); });
+            return _cargarPipelines(true);
+        }
+        console.warn('No se pudieron cargar los pipelines (2 intentos):', e);
+        PIPELINES = [];
+    }
     _renderSelectPipeline();
 }
 
