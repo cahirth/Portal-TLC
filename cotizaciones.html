@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.08.29.4 (Nuevo pin 📌 "Urgente / Atender hoy" — Cristian: "como puedo marcar algunos negocios para atenderlos con urgencia, o para programar el dia de trabajo... no importa en q etapa estén", eligió la opción "marca + nota corta" entre 3 propuestas, con pin rojo. Toca el pin (Kanban, Lista, o el header del detalle) para marcar/desmarcar — al marcar pide una nota corta opcional (ej. "Llamar antes de las 15hs"), guardada vía la nueva acción marcarNegocioUrgente (FotoMap.gs v196). Se ve como un pin rojo (gris/apagado si no está marcado) + un borde rojo en el costado de la tarjeta, cruzando TODAS las etapas y pipelines — no depende de la columna del Kanban. Nuevo filtro toggle "📌 Solo urgentes (N)" en la barra de filtros, combinable con los demás (vendedor/pipeline/colaborador/fechas), con contador en vivo. Bug real encontrado por el propio test: "null || ''" convertía el cancelar del prompt en string vacío ANTES de poder chequear si había cancelado — corregido chequeando null primero. Confirmado con 5 tests: pines rojo/gris correctos cruzando 2 etapas distintas, el contador y el filtro funcionan, marcar llama al backend con los datos correctos, cancelar el prompt no marca nada, y desmarcar no pide ningún prompt.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.3 (2da vuelta del fix de v2026.08.29.2 — Cristian: primero "en notas anda OK y no lo pisa pero en mensajes internos si lo pisa" (causa: #det-mensajes-panel es HERMANO de #det-body, no descendiente — el chequeo de foco de la v2 solo miraba dentro de #det-body); arreglado eso, después "en notas tbien se borra" — causa de fondo real: el chequeo se basaba en el FOCO en el instante exacto del polling, así que si el vendedor sacaba la vista un segundo (miraba otra pestaña, tocaba otra cosa) justo cuando caía el refresco cada 25s, el texto seguía ahí sin guardar pero ya no estaba "enfocado", y se borraba igual. Reemplazado _hayFocoEnTextoDentroDelDetalle() por _hayTextoSinGuardarEnDetalle(idNegocio) — chequea directo si HAY TEXTO CARGADO (no vacío) en la nota o el mensaje de ESE negocio, sin importar dónde esté el foco en ese instante, que es lo que realmente hay que proteger. Ambos campos se vacían apenas se envían/guardan (antes de la respuesta del servidor), así que el chequeo nunca queda bloqueado para siempre. Confirmado con 4 tests: nota sin guardar y SIN foco (el escenario real reportado) no se borra; mismo caso para mensaje interno; y con los 2 campos vacíos el próximo ciclo actualiza con normalidad.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.2 (BUG REAL — "si estoy escribiendo una nota o un mensaje interno, de repente, se borra lo que estoy escribiendo... sospecho que es por el polling que le agregamos para actualizar la preparacion desde servicio". Confirmado: _recargarHistoricoYRerenderizarSiAbierto (el polling de progreso ST cada 25s, v2026.08.29.1) llamaba a _renderDetalle() sin condición, que reemplaza TODO el HTML de #det-body de una — incluida cualquier <textarea>/<input> donde el vendedor estuviera escribiendo (una nota nueva, un mensaje interno), borrándole el texto a mitad de camino sin guardar nada. Ya existía una protección similar pero solo para el panel de mensajes (_renderPanelMensajesCot, con guard sobre _idCotActual) — la nota nueva no tenía ninguna. Nueva función _hayFocoEnTextoDentroDelDetalle() — si el foco está en cualquier <textarea>/<input> de texto dentro de #det-body al momento de refrescar, se salta el repintado de esa vuelta entera (se reintenta en el próximo ciclo, 25s después); el Kanban/Lista de atrás se siguen actualizando igual, no dependen de este re-render. Confirmado con test: escribir en el campo de nota y forzar un ciclo de refresco NO borra el texto; sacar el foco y forzar otro ciclo SÍ actualiza el detalle con normalidad.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.1 (PASO 2 de "trazabilidad y sincronización entre Ventas y Servicio Técnico" (Paso 1 en FotoMap.gs v195). Muestra en 3 lugares el progreso_st que ya viene calculado con cada negocio: (1) Tarjeta Kanban — barra full-width al pie, con "📦 Prep. ST: X/Y Listos" + "XX%", color reactivo (gris en 0%, azul en proceso, verde en 100%). Solo aparece si el negocio ya tiene una Orden de Preparación vinculada — no se muestra nada en negocios que nunca llegaron ahí. (2) Vista Lista — misma barra en versión compacta, debajo de cada fila. (3) Modal de detalle — bloque nuevo "📦 Estado de Preparación y Despacho" con la barra grande + desglose por equipo (SKU, N° de Serie o "Pendiente", badge de Calidad ✅/⏳, estado individual con su color) — el desglose se trae en vivo con un fetch directo a Firebase (mismo mecanismo que ya usa el resto de la pantalla), ya que el agregado que viaja con el negocio no incluye el detalle por equipo. Nuevo helper _renderBarraProgresoST() reusado en los 3 lugares, y _cargarDetalleEquiposST() para el desglose del modal. Polling cada 25s (_iniciarPollingProgresoST, pausado si la pestaña está en segundo plano) que refresca Kanban/Lista/Detalle solo — el Portal no usa listeners en vivo de Firebase en ningún lado, así que esto es el approach de "casi tiempo real" acordado con Cristian en vez de meter ese cambio de arquitectura de entrada. _recargarHistoricoYRerenderizarSiAbierto() extraída de abrirDetalle() para poder reusarla también desde el polling. Confirmado con test de punta a punta: sin progreso_st no aparece nada, en proceso muestra barra azul con el texto/% correctos, al 100% muestra verde, la vista Lista también lo trae, el modal de detalle carga el desglose real por equipo (serie/calidad/estado), y las funciones de polling existen y no rompen.) -->
@@ -761,6 +762,16 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
         </select>
     </div>
 
+    <!-- Filtro "Solo urgentes" — Pedido por Cristian: marcar negocios
+         para atender con urgencia/hoy, cruzando todas las etapas. Se
+         combina con los demás filtros (vendedor/pipeline/fechas), no
+         los reemplaza. -->
+    <button id="btn-filtro-urgentes" onclick="_toggleFiltroUrgentes()"
+        style="padding:7px 12px; background:#0f1a30; border:1px solid #ef444455;
+               border-radius:8px; color:#94a3b8; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">
+        📌 Solo urgentes (<span id="contador-urgentes">0</span>)
+    </button>
+
     <!-- PIPELINE / CAMPAÑA -->
     <div id="pipeline-selector-wrap" style="display:none; gap:6px; flex:1 1 210px; min-width:170px;">
         <select id="select-pipeline" onchange="_onCambiarPipeline(this.value)"
@@ -859,6 +870,7 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
 <div class="detalle-overlay" id="detalle-overlay">
     <div class="detalle-header">
         <button class="btn-back" onclick="cerrarDetalle()" style="background:#3a86ff;border:none;color:#fff;">←</button>
+        <span id="det-pin-urgente" style="font-size:18px;"></span>
         <div style="flex:1;overflow:hidden;">
             <div class="det-titulo" id="det-titulo">—</div>
             <div class="det-subtitulo" id="det-subtitulo"></div>
@@ -938,7 +950,7 @@ console.log("%c TLC Cotizaciones v" + APP_VERSION + " ", "background:#3a86ff;col
 // en varios otros archivos, para poder confirmar en 10 segundos si
 // ESTE archivo puntual está actualizado, sin depender de la versión
 // compartida (que puede estar al día aunque este archivo no lo esté).
-const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.29.3';
+const _VERSION_ARCHIVO_COTIZACIONES = '2026.08.29.4';
 console.log("%c TLC Cotizaciones (archivo) v" + _VERSION_ARCHIVO_COTIZACIONES + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 const SHEET_ID    = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
@@ -1215,6 +1227,7 @@ let vistaActual       = 'lista';
 let filtroEstado      = 'TODOS';
 let vendedorActivo    = null; // null = el propio usuario; string = nombre elegido por admin
 let colaboradorActivo = null; // null = sin filtrar; string = nombre elegido en el dropdown de Colaborador
+let filtroSoloUrgentes = false; // toggle del filtro "📌 Solo urgentes"
 
 // ─── INIT ────────────────────────────────────────────────────────
 function _leerSesionCompartida() {
@@ -2135,6 +2148,17 @@ function selColaborador(valor) {
     aplicarFiltros();
 }
 
+function _toggleFiltroUrgentes() {
+    filtroSoloUrgentes = !filtroSoloUrgentes;
+    const btn = document.getElementById('btn-filtro-urgentes');
+    if (btn) {
+        btn.style.background = filtroSoloUrgentes ? '#ef4444' : '#0f1a30';
+        btn.style.color = filtroSoloUrgentes ? '#fff' : '#94a3b8';
+        btn.style.borderColor = filtroSoloUrgentes ? '#ef4444' : '#ef444455';
+    }
+    aplicarFiltros();
+}
+
 // Filtra historicoCompleto por vendedor activo → todasLasCot
 function _aplicarFiltroVendedor() {
     if (!vendedorActivo) {
@@ -2293,8 +2317,12 @@ function aplicarFiltros() {
         // que ya se usa para pipeline (el nombre viene tal cual del
         // dropdown, no hace falta normalizar acentos/mayúsculas acá).
         const matchColaborador = !colaboradorActivo || c.colaborador === colaboradorActivo;
-        return matchEstado && matchQ && matchPipeline && matchFecha && matchColaborador;
+        const matchUrgente = !filtroSoloUrgentes || !!(c.urgente && c.urgente.activo);
+        return matchEstado && matchQ && matchPipeline && matchFecha && matchColaborador && matchUrgente;
     });
+    const totalUrgentes = todasLasCot.filter(c => c.urgente && c.urgente.activo).length;
+    const elContadorUrgentes = document.getElementById('contador-urgentes');
+    if (elContadorUrgentes) elContadorUrgentes.textContent = totalUrgentes;
     if (vistaActual === 'lista') renderLista();
     else renderKanban();
     mostrarStats();
@@ -2349,10 +2377,10 @@ function renderLista() {
         const monto    = _monto(c);
         const estadoCss = ESTADO_CSS[c.estado] || 'e-cotizacion';
         const estadoLabel = _estadoLabel(c.estado);
-        return `<div class="cot-card" onclick="abrirDetalle(${idxReal})">
+        return `<div class="cot-card" onclick="abrirDetalle(${idxReal})" style="${c.urgente && c.urgente.activo ? 'border-left:3px solid #ef4444;' : ''}">
             <div class="cot-card-inner">
                 <div style="flex:1;min-width:0;">
-                    <div class="cot-nombre">${cliente}</div>
+                    <div class="cot-nombre">${_renderPinUrgente(c, id)} ${cliente}</div>
                     <div class="cot-equipo">${equipos}</div>
                     <div class="cot-fecha">${fecha} · ${id}</div>
                 </div>
@@ -2438,10 +2466,14 @@ function renderKanban() {
                 data-id="${id}"
                 onclick="abrirDetalle(${idxReal})"
                 ondragstart="_onDragStart(event,'${id}')"
-                ondragend="_onDragEnd(event)">
+                ondragend="_onDragEnd(event)"
+                style="${c.urgente && c.urgente.activo ? 'border-left:3px solid #ef4444;' : ''}">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2px;">
                     <div class="k-id" style="margin-bottom:0;">${id !== '—' ? id : ''}</div>
-                    ${probHtml}
+                    <div style="display:flex;align-items:center;gap:4px;">
+                        ${_renderPinUrgente(c, id)}
+                        ${probHtml}
+                    </div>
                 </div>
                 <div class="k-titulo">${titulo}</div>
                 ${empresaNombre && empresaNombre !== titulo ? `<div style="font-size:10px;color:#94a3b8;margin-top:-4px;margin-bottom:4px;">🏢 ${empresaNombre}</div>` : ''}
@@ -2786,6 +2818,8 @@ function _renderDetalle(c) {
     document.getElementById('det-titulo').textContent = c.nombreNegocio ? _fixEncoding(c.nombreNegocio) : cliente;
     const subtituloEl = document.getElementById('det-subtitulo');
     if (subtituloEl) subtituloEl.textContent = c.nombreNegocio ? cliente : '';
+    const pinUrgenteEl = document.getElementById('det-pin-urgente');
+    if (pinUrgenteEl) pinUrgenteEl.innerHTML = _renderPinUrgente(c, id);
 
     // ── Estado badge color ────────────────────────────────────────
     // OJO: background-color (no "background" shorthand) — el shorthand
@@ -3716,6 +3750,51 @@ function _monto(c) {
 // negocios que todavía ni pasaron por ahí.
 // Color reactivo: 0% gris/neutro, 1-99% azul (en proceso), 100% verde
 // (listo para despacho/despachado).
+// Pin rojo de "Urgente / Atender hoy" — cruza todas las etapas y
+// pipelines, no depende de la columna del Kanban. Pedido por
+// Cristian: "como puedo marcar algunos negocios para atenderlos con
+// urgencia, o para programar el dia de trabajo... no importa en q
+// etapa estén" — eligió esta opción entre 3 propuestas: "buena idea,
+// la implementamos ahora, me gusta con ese pin rojo".
+function _renderPinUrgente(c, id) {
+    const marcado = !!(c.urgente && c.urgente.activo);
+    const nota = marcado ? (c.urgente.nota || '') : '';
+    const tituloTooltip = marcado
+        ? ('Urgente' + (nota ? ': ' + nota : '') + ' — tocá para desmarcar')
+        : 'Marcar como urgente / para atender hoy';
+    return `<span onclick="event.stopPropagation(); _toggleUrgenteDesdeTarjeta('${id}', ${marcado ? 'false' : 'true'})"
+        title="${_escCot(tituloTooltip)}"
+        style="cursor:pointer;font-size:13px;line-height:1;filter:${marcado ? 'none' : 'grayscale(1) opacity(.35)'};">📌</span>`;
+}
+
+async function _toggleUrgenteDesdeTarjeta(id, activar) {
+    let nota = '';
+    if (activar) {
+        const notaIngresada = prompt('¿Por qué es urgente? (opcional — ej. "Llamar antes de las 15hs")');
+        // Si tocó "Cancelar" en el prompt (null), no marcamos nada —
+        // solo seguimos si dejó vacío a propósito (string vacío) o
+        // escribió algo. OJO: chequear null ANTES de aplicar
+        // cualquier fallback — "null || ''" convierte el cancelar en
+        // string vacío y esta guarda nunca dispararía.
+        if (notaIngresada === null) return;
+        nota = notaIngresada;
+    }
+    try {
+        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'marcarNegocioUrgente', idCot:id, activo:activar, nota:nota,
+                vendedor:(currentUserNombre||'') }) });
+        const r = await resp.json();
+        if (!r.ok) { alert('No se pudo actualizar: ' + (r.error||'')); return; }
+        // Reflejar en memoria sin esperar un refresh completo — misma
+        // idea que el resto de las mutaciones rápidas de esta pantalla.
+        const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === id);
+        if (c) c.urgente = activar ? { activo:true, nota:nota } : null;
+        aplicarFiltros();
+        if (cotActual && String(cotActual.idCot || cotActual.id_cotizacion || cotActual.id || '') === id) _renderDetalle(c || cotActual);
+    } catch(e) { alert('Error de conexión al actualizar.'); }
+}
+
+
 function _renderBarraProgresoST(c, opts) {
     const p = c.progreso_st;
     if (!p || !p.total) return '';
