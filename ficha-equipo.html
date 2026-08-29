@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.29.5 (Nueva feature: GARANTÍA — Cristian: "quiero agregar en el excel una columna true/false llamada garantía, todos los equipos tienen 1 año de garantía pero algunos por promocion vamos a darle 3 años, quiero que muestre en ficha tecnica y tbien se trasladará a presupuesto como item sin cargo, el logo pegado y vistoso en la ficha tecnica como este, si tiene 1 año o 3 bien resaltado" (con imagen de referencia de un sello dorado). Nueva columna en Lista_Precios: "Garantia" (TRUE/FALSE) — todos los equipos arrancan en 1 año por default, TRUE = 3 años (promoción). (1) Badge grande "GARANTÍA X AÑOS" — sunburst dorado hecho con CSS puro (repeating-conic-gradient, sin ningún asset/imagen nueva), pegado como sticker sobre la foto del equipo (position:absolute sobre .foto-wrap, que ahora tiene position:relative). (2) La garantía se inyecta como un Hijo MÁS, sintético (no viene del Excel como fila propia), con precio $0 y tildado por default ("Garantía Extendida 3 años" o "Garantía 1 año" según corresponda) — reusa TAL CUAL todo el mecanismo ya existente para Hijos reales (aparece en "Módulos y Accesorios", viaja en itemsParaApilar, termina como línea sin cargo en el presupuesto), sin código nuevo para eso. Excluida explícitamente del mecanismo de "una nota por cada Hijo tildado" (v2026.08.29.1) — es automática en TODOS los envíos, no algo que el vendedor elige mandar, así que generarle su propia nota sería ruido en el historial de cada negocio. (3) Sugerido por el propio Cristian ("lo podemos poner en notas del presupuesto por default"): las notas por default del presupuesto ahora también mencionan "Incluye garantía de X año(s)." Confirmado con test de punta a punta (2 escenarios — Garantia=TRUE y FALSE): el badge muestra el número correcto, el módulo aparece ya tildado con el nombre correcto, viaja al carrito real con precio $0, y las notas mencionan la garantía. Batería de regresión actualizada (test-hijos-y-notas.js) para contemplar el nuevo ítem automático sin romper los tests existentes de Padre+Hijo.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.4 (BUG REAL — "a veces no aparecen los pipelines, esto es en ficha tecnica, pero a veces en cotizaciones tapoco". Causa: si el pedido a listarPipelines fallaba (Apps Script "despertándose", un hipo de red — suele ser transitorio), _cargarPipelinesFicha() se quedaba en silencio con SOLO "Pipeline General" y nunca reintentaba. Ahora reintenta UNA vez más, 1.5s después, antes de rendirse — resuelve la gran mayoría de los casos sin que el vendedor haga nada. También detecta {ok:false} como error real ahora (antes silenciosamente lo trataba como "sin pipelines", sin reintentar). Ver cotizaciones.html para el mismo fix del lado de _cargarPipelines(). Confirmado con test: con el primer intento fallando a propósito, reintenta solo y termina mostrando la lista real de pipelines, no solo el default.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.3 (BUG REAL sobre lo entregado en v2026.08.29.2 — Cristian con captura: "los botones de ficha tecnica, cuando le llegan al cliente deben desaparecer... si el cliente abre el link recibido por whatsapp esos botones no deben existir". La v.2 solo ocultaba Teléfono/WhatsApp/Guardar PDF en la pantalla PROPIA del vendedor DESPUÉS de que él mismo enviara (persistido en su dispositivo) — pero nunca los ocultaba en el link real que recibe el CLIENTE (?modo=cliente), que es donde de verdad no tienen sentido (son herramientas del vendedor, no del receptor). Ahora se ocultan directamente dentro del bloque ya existente que maneja modo=cliente/sin sesión (el mismo que ya ocultaba Crear Negocio, el buscador de empresa, etc.) — sin importar si "ya se envió" o no, simplemente nunca existen ahí. De paso, confirmado que el link guardado en la nota de seguimiento (ver v2026.08.29.1) YA tenía &modo=cliente desde antes — con este fix, abrir ese link desde la nota ahora sí muestra exactamente lo mismo que ve el cliente, sin código adicional necesario ahí. Confirmado con 3 tests: modo=cliente sin sesión los oculta; modo=cliente CON sesión de vendedor en ese navegador también los oculta (manda la URL, no la sesión); y el link normal del vendedor (sin modo=cliente) sigue mostrando todo con normalidad.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.2 (Una vez enviada la ficha por WhatsApp, el Teléfono del cliente, "Enviar por WhatsApp" y "Guardar PDF" desaparecen, mostrando "✅ Ficha enviada" en su lugar — "Crear / Sumar Negocio" NO se oculta, no fue pedido. Persiste por equipo en localStorage (tlc_ficha_enviada_{nombre}), así que sigue así aunque se recargue la página — confirmado con Cristian: "debe quedar así aunque se recargue (mientras sea la misma ficha)", con un mensaje de confirmación en vez de nada: "sí, mostrar un mensaje tipo ✅ Ficha enviada". Se dispara en los 2 flujos de envío por WhatsApp que existen (el normal y el personalizado de FacoExtrema vía QR) — nunca en la vista de cliente (?modo=cliente), donde estos controles son del vendedor, no del receptor del link. Nuevas funciones _marcarFichaComoEnviada(), _aplicarEstadoFichaEnviada(), _verificarSiFichaYaEnviada() (esta última llamada al cargar la página, dentro del bloque exclusivo del vendedor). Confirmado con test de punta a punta: antes de enviar todo visible sin mensaje; después de enviar los 3 elementos desaparecen y aparece el mensaje; "Crear/Sumar Negocio" sigue visible; y el estado persiste al simular una recarga de página.) -->
@@ -82,8 +83,29 @@
         .logo-img { height:34px; }
         .tag-ficha { font-size:11px; font-weight:700; color:var(--text-muted); background:var(--bg-muted); padding:5px 12px; border-radius:20px; }
 
-        .foto-wrap { background:var(--bg-muted); display:flex; align-items:center; justify-content:center; padding:24px; min-height:120px; }
+        .foto-wrap { background:var(--bg-muted); display:flex; align-items:center; justify-content:center; padding:24px; min-height:120px; position:relative; }
         .foto-wrap.foto-cargando { position:relative; }
+
+        /* Badge de GARANTÍA — pegado como sticker sobre la foto del
+           equipo, sunburst dorado hecho con CSS puro (sin necesidad de
+           ninguna imagen/asset nueva). Pedido por Cristian con imagen
+           de referencia: "el logo pegado y vistoso en la ficha tecnica
+           como este, si tiene 1 año o 3 bien resaltado". */
+        .garantia-badge {
+            position:absolute; top:8px; right:8px; width:92px; height:92px; border-radius:50%;
+            background:repeating-conic-gradient(#ffd447 0deg 9deg, #d89b1f 9deg 18deg);
+            display:flex; align-items:center; justify-content:center;
+            box-shadow:0 4px 14px rgba(0,0,0,.35); z-index:5;
+        }
+        .garantia-badge-inner {
+            width:76%; height:76%; border-radius:50%; background:#161616;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            color:#fff; text-align:center; line-height:1;
+        }
+        .garantia-badge-titulo { font-size:8px; font-weight:900; letter-spacing:.5px; margin-bottom:2px; }
+        .garantia-badge-estrellas { font-size:6px; color:#ffd447; letter-spacing:1px; margin-bottom:1px; }
+        .garantia-badge-numero { font-size:26px; font-weight:900; color:#fff; }
+        .garantia-badge-anos { font-size:8px; font-weight:900; letter-spacing:.5px; margin-top:2px; }
         .foto-wrap.foto-cargando::after {
             content:''; width:28px; height:28px; border-radius:50%; border:3px solid #dbe4ee; border-top-color:var(--blue-tlc);
             animation:girar .7s linear infinite;
@@ -225,7 +247,18 @@
             </div>
             <span class="tag-ficha">Ficha Técnica</span>
         </div>
-        <div class="foto-wrap foto-cargando"><img id="fi-foto" src="" alt="" style="display:none;"></div>
+        <div class="foto-wrap foto-cargando">
+            <img id="fi-foto" src="" alt="" style="display:none;">
+            <div id="fi-badge-garantia" class="garantia-badge" style="display:none;">
+                <div class="garantia-badge-inner">
+                    <div class="garantia-badge-titulo">GARANTÍA</div>
+                    <div class="garantia-badge-estrellas">★★★</div>
+                    <div class="garantia-badge-numero" id="fi-garantia-numero">1</div>
+                    <div class="garantia-badge-estrellas">★★★</div>
+                    <div class="garantia-badge-anos">AÑOS</div>
+                </div>
+            </div>
+        </div>
         <div class="card-pad">
             <div class="marca-cat" id="fi-marca-cat">—</div>
             <div class="nombre-equipo" id="fi-nombre">—</div>
@@ -384,7 +417,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.29.4';
+var FICHA_EQUIPO_VERSION = '2026.08.29.5';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -565,6 +598,7 @@ function fotoUrl(foto) {
 }
 var _fichaNombreActual = '';
 var _fichaPrecioListaActual = 0;
+var _anosGarantiaActual = 1; // 1 (default) o 3 (por promoción, columna "Garantia"=TRUE) — leído al cargar el Padre
 var _fichaPrecioContadoActual = 0; // ← Precio CONTADO CNO del catálogo — antes solo vivía local a la función de render, nunca viajaba al crear/apilar el negocio
 var _fichaFotoRawActual = '';
 
@@ -1081,6 +1115,33 @@ async function _cargarFicha() {
         _fichaHijosDisponibles = lista.filter(function(x) {
             return x['Pertenece a'] && String(x['Pertenece a']).trim() === String(d['Nombre de Dispositivo']).trim();
         });
+        // GARANTÍA — nueva columna en Lista_Precios ("Garantia",
+        // TRUE/FALSE). Todos los equipos tienen 1 año de garantía por
+        // defecto; los tildados en TRUE tienen 3 años (por promoción).
+        // Se inyecta como un Hijo MÁS (sintético, no viene del Excel
+        // como fila propia) con precio $0, tildado por default — así
+        // reusa TAL CUAL todo el mecanismo que ya existe para Hijos
+        // reales (aparece en "Módulos y Accesorios", viaja en
+        // itemsParaApilar, termina como línea sin cargo en el
+        // presupuesto) sin código nuevo para eso. El badge grande es
+        // aparte, puramente visual, pegado sobre la foto del equipo.
+        // Pedido por Cristian: "quiero agregar en el excel una columna
+        // true/false llamada garantía... quiero que muestre en ficha
+        // tecnica y tbien se trasladará a presupuesto como item sin
+        // cargo... el logo pegado y vistoso... si tiene 1 año o 3 bien
+        // resaltado".
+        var tieneGarantiaExtendida = d['Garantia'] === true || String(d['Garantia']).trim().toUpperCase() === 'TRUE';
+        _anosGarantiaActual = tieneGarantiaExtendida ? 3 : 1;
+        _fichaHijosDisponibles.push({
+            'Nombre de Dispositivo': tieneGarantiaExtendida ? 'Garantía Extendida 3 años' : 'Garantía 1 año',
+            'Precio LISTA': 0, 'Precio CONTADO CNO': 0, 'Tildado_Default': true,
+        });
+        var elBadgeGarantia = document.getElementById('fi-badge-garantia');
+        var elGarantiaNumero = document.getElementById('fi-garantia-numero');
+        if (elBadgeGarantia && elGarantiaNumero) {
+            elGarantiaNumero.textContent = _anosGarantiaActual;
+            elBadgeGarantia.style.display = 'flex';
+        }
         // BUG REAL — si el vendedor tildaba un módulo (ej. "Mesa
         // Eléctrica") ANTES de compartir por WhatsApp, ese estado se
         // perdía por completo: el link que recibía el cliente
@@ -1773,9 +1834,12 @@ async function _registrarContactoYNota(empresaId, idCot, link, hijosEnviados) {
   // Una nota SEPARADA por cada Hijo tildado que se haya sumado junto
   // con el Padre (mismo link, ya que la ficha enviada es una sola
   // página con los módulos incluidos — pedido explícito: "una nota
-  // por cada Hijo tildado, una línea por módulo").
+  // por cada Hijo tildado, una línea por módulo"). La Garantía
+  // sintética queda afuera de esto — es automática en TODOS los
+  // envíos, no algo que el vendedor elige mandar, así que generarle
+  // su propia nota sería ruido en el historial de cada negocio.
   (Array.isArray(hijosEnviados) ? hijosEnviados : []).forEach(function(h) {
-    if (h && h.nombre) notasAAgregar.push('📤 Se envió el módulo ' + h.nombre + ' — ' + link);
+    if (h && h.nombre && h.nombre.indexOf('Garant') !== 0) notasAAgregar.push('📤 Se envió el módulo ' + h.nombre + ' — ' + link);
   });
 
   for (var i = 0; i < notasAAgregar.length; i++) {
@@ -2014,7 +2078,11 @@ async function _guardarSeguimientoVentas(origen, linkFichaEnviada) {
         };
       }),
       formaPago: '', validez: '15', validezFecha: '', tiempoEntrega: 'inmediato', tiempoEntregaCustom: '', lugarEntrega: 'cliente',
-      notas: 'Generado automáticamente al compartir la Ficha Técnica' + (_sesionVendedor && _sesionVendedor.name ? ' por ' + _sesionVendedor.name : '') + '.',
+      // La garantía también queda mencionada en las notas del
+      // presupuesto (además del ítem sin cargo en el carrito) —
+      // sugerido por el propio Cristian: "lo podemos poner en notas
+      // del presupuesto por default".
+      notas: 'Generado automáticamente al compartir la Ficha Técnica' + (_sesionVendedor && _sesionVendedor.name ? ' por ' + _sesionVendedor.name : '') + '. Incluye garantía de ' + _anosGarantiaActual + ' año' + (_anosGarantiaActual !== 1 ? 's' : '') + '.',
       moneda: 'USD',
       tcOficial: null,
       pipeline_id: pipelineElegido,
