@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.30.1 (Nueva sección "💰 Gastos" en el detalle de CADA tarjeta, de TODOS los eventos/pipelines por igual — copiado tal cual de "Gastos del servicio" en servicio.html (misma tabla fecha/descripción/importe, total en vivo, botón "+ Agregar gasto"), con clases CSS prefijadas ev- para no colisionar con nada existente. Nuevas funciones _renderGastosEv/_agregarGastoEv/_editarGastoEv/_eliminarGastoEv/_guardarGastosEv, guardando vía la nueva acción ev_actualizarGastos (FotoMap.gs v199) en eventos/{id_evento}/tarjetas/{id_tarjeta}/gastos. Sin la rama de solo-lectura que tiene servicio.html para tickets finalizados — las tarjetas de eventos no tienen un estado equivalente. Pedido por Cristian: "en gestion de congresos y eventos en todas las tarjetas de todos los pipelines habilitar seccion Gastos, copialo de las tarjetas de servicio tecnico, e implementalo en eventos.html". Confirmado con test de punta a punta: la sección aparece al abrir cualquier tarjeta, agregar/editar/eliminar un gasto funciona y actualiza el total en pantalla sin recargar todo, y cada cambio llama al backend real con id_evento/id_tarjeta correctos.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.13 (Logo del evento — nuevo. Se ve como una miniatura de 30px junto al nombre en el header, y también en cada tarjeta del selector "Todos los eventos". Se agrega/cambia/quita desde el menú de tres puntos (⋯) del topbar: "🖼️ Agregar/Cambiar logo del evento" y "🚫 Quitar logo del evento" (este último solo visible si ya hay uno puesto) — ambos Administrador, usan ev_subirLogoEvento/ev_quitarLogoEvento de FotoMap.gs v167. Pedido por Cristian: "dame la posibilidad de agregar logo al nombre del evento". Confirmado con jsdom de punta a punta: subir actualiza el header y los textos del menú, quitar los revierte.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.12 (Progreso de checklists visible en la vista Lista — antes solo mostraba el texto "x/y" sin barra, a diferencia del Kanban que ya tenía barra visual. Se agregó la misma barra compacta (42px) + texto a cada fila de la lista, y se sumó el porcentaje al texto del Kanban también ("2/4 subtareas · 50%") para más claridad en los dos lados por igual. Pedido por Cristian: "podemos mostrar el progreso de las tarjetas en la miniatura, de kanban y listas?". Confirmado con jsdom con un checklist de 4 ítems (2 tildados): barra al 50% en ambas vistas.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.11 (3 pedidos de Cristian: (1) Menú de 3 puntos en el topbar del evento (mismo patrón que el de la tarjeta) — reemplaza los botones sueltos "Borrar evento"/"Todos los eventos" por: 🔗 Copiar link de este evento (nuevo), 📋 Duplicar evento (nuevo — usa ev_duplicarEvento de FotoMap.gs v166, solo Administrador), 🗑️ Borrar evento (Administrador) y 📋 Todos los eventos. (2) Nombre de pila completo del responsable ahora visible junto al avatar en la tarjeta cerrada del tablero Y en la vista Lista — antes solo se veía la inicial en un círculo, había que pasar el mouse para saber quién era. Confirmado con jsdom: se ve "Lucio" completo, no solo "L". Ambos pedidos con captura de Cristian.) -->
@@ -201,6 +202,32 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
 .ev-check-add-row button { padding:0 14px; border-radius:8px; border:none; background:var(--accent-blue); color:#fff; font-weight:700; cursor:pointer; flex-shrink:0; }
 
 .ev-section-titulo { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin:18px 0 8px; }
+
+/* ── GASTOS — copiado de servicio.html (misma tabla/estilo), acá con
+   clases prefijadas ev- para no colisionar con nada existente. Pedido
+   por Cristian: "en gestion de congresos y eventos en todas las
+   tarjetas de todos los pipelines habilitar seccion Gastos, copialo
+   de las tarjetas de servicio tecnico". ── */
+.ev-gastos-tabla{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;}
+.ev-gastos-tabla th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;
+  color:var(--text-muted);padding:4px 6px;text-align:left;border-bottom:1px solid var(--border-glow);}
+.ev-gastos-tabla td{padding:6px 6px;border-bottom:1px solid var(--border-glow);color:var(--text-main);vertical-align:middle;}
+.ev-gastos-tabla tr:last-child td{border-bottom:none;}
+.ev-gastos-input{width:100%;padding:4px 6px;border-radius:6px;background:var(--bg);
+  border:1px solid var(--border-glow);color:var(--text-main);font-size:12px;font-family:inherit;outline:none;}
+.ev-gastos-input:focus{border-color:var(--accent-blue);}
+.ev-gastos-input[type="date"]{min-width:110px;}
+.ev-gastos-input[type="number"]{min-width:80px;text-align:right;}
+.ev-gastos-total{display:flex;justify-content:flex-end;align-items:center;gap:8px;
+  margin-top:10px;padding-top:8px;border-top:1px solid var(--border-glow);}
+.ev-gastos-total-label{font-size:11px;font-weight:700;color:var(--text-muted);}
+.ev-gastos-total-val{font-size:14px;font-weight:800;color:var(--accent-green);}
+.ev-btn-add-gasto{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;
+  background:transparent;border:1px dashed var(--border-glow);color:var(--text-muted);
+  font-size:12px;font-weight:600;cursor:pointer;margin-top:8px;width:100%;justify-content:center;}
+.ev-btn-add-gasto:hover{border-color:var(--accent-blue);color:var(--accent-blue);}
+.ev-btn-del-gasto{background:none;border:none;color:#ef444460;cursor:pointer;font-size:14px;padding:2px 4px;}
+.ev-btn-del-gasto:hover{color:#ef4444;}
 .ev-msg-titulo { font-size:13px; font-weight:800; color:var(--text-main); margin:0 0 8px; }
 .ev-msg-lista-box { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:12px;
   padding:10px; max-height:340px; overflow-y:auto; margin-bottom:10px; }
@@ -523,7 +550,7 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 // diagnosticando bugs que en realidad eran "el archivo todavía no se
 // volvió a subir". Guardado como constante con nombre (no un string
 // suelto dentro del console.log) — actualizar ACÁ en cada entrega.
-const _VERSION_ARCHIVO_EVENTOS = '2026.08.16.4';
+const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.1';
 console.log("%c TLC Eventos v" + _VERSION_ARCHIVO_EVENTOS + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1552,6 +1579,9 @@ function _renderOverlayTarjeta() {
       '</div>' +
       '<input type="file" id="ev-input-archivo" accept=".pdf,.png,.jpg,.jpeg,.xlsx" style="display:none;" onchange="_subirAdjuntoEv(event)">' +
       '<div id="ev-adjuntos-cont">' + _renderAdjuntos(t) + '</div>' +
+
+      '<div class="ev-section-titulo">💰 Gastos</div>' +
+      '<div id="ev-gastos-cont">' + _renderGastosEv(t) + '</div>' +
     '</div>' +
 
     '<div class="ev-overlay-col-mensajes">' +
@@ -1796,6 +1826,80 @@ function _eliminarNotaEv(idNota) {
 // ── Adjuntos + portada ──
 var ADJUNTOS_ICONOS_EV = { pdf:'📄', png:'🖼️', jpg:'🖼️', jpeg:'🖼️', xlsx:'📊' };
 var ADJUNTOS_EXT_IMAGEN_EV = ['png', 'jpg', 'jpeg'];
+// ── GASTOS — copiado de servicio.html (_renderGastos y sus 4
+// handlers), adaptado a la estructura de eventos.html (id_evento +
+// id_tarjeta en vez de id_ticket). Sin la rama de solo-lectura de
+// servicio.html — las tarjetas de eventos no tienen un estado
+// "finalizado/cancelado" equivalente. Pedido por Cristian: "en
+// gestion de congresos y eventos en todas las tarjetas de todos los
+// pipelines habilitar seccion Gastos, copialo de las tarjetas de
+// servicio tecnico, e implementalo en eventos.html".
+function _renderGastosEv(t) {
+  var gastos = (t.gastos && Array.isArray(t.gastos)) ? t.gastos : (t.gastos ? Object.values(t.gastos) : []);
+  var total  = gastos.reduce(function(s, g) { return s + (parseFloat(g.importe) || 0); }, 0);
+
+  var filas = gastos.length ? gastos.map(function(g, i) {
+    return '<tr>' +
+      '<td><input type="date" class="ev-gastos-input" value="' + _esc(g.fecha||'') + '" onchange="_editarGastoEv(' + i + ',\'fecha\',this.value)"></td>' +
+      '<td><input type="text" class="ev-gastos-input" value="' + _esc(g.descripcion||'') + '" placeholder="Descripción..." onblur="_editarGastoEv(' + i + ',\'descripcion\',this.value)"></td>' +
+      '<td><input type="number" class="ev-gastos-input" value="' + (g.importe||'') + '" placeholder="0" onblur="_editarGastoEv(' + i + ',\'importe\',this.value)" min="0" step="0.01"></td>' +
+      '<td><button class="ev-btn-del-gasto" onclick="_eliminarGastoEv(' + i + ')">✕</button></td>' +
+    '</tr>';
+  }).join('') : '<tr><td colspan="4" style="color:var(--text-muted);padding:10px 6px;text-align:center;">Sin gastos registrados</td></tr>';
+
+  return '<table class="ev-gastos-tabla">' +
+    '<thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th><th></th></tr></thead>' +
+    '<tbody>' + filas + '</tbody>' +
+  '</table>' +
+  '<div class="ev-gastos-total">' +
+    '<span class="ev-gastos-total-label">Total:</span>' +
+    '<span class="ev-gastos-total-val">$ ' + total.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</span>' +
+  '</div>' +
+  '<button class="ev-btn-add-gasto" onclick="_agregarGastoEv()">+ Agregar gasto</button>';
+}
+
+window._agregarGastoEv = function() {
+  var t = _tarjetaActual();
+  if (!t) return;
+  if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
+  var hoy = new Date().toISOString().split('T')[0];
+  t.gastos.push({ fecha: hoy, descripcion: '', importe: '' });
+  var cont = document.getElementById('ev-gastos-cont');
+  if (cont) cont.innerHTML = _renderGastosEv(t);
+  _guardarGastosEv(t);
+};
+
+window._editarGastoEv = function(idx, campo, valor) {
+  var t = _tarjetaActual();
+  if (!t) return;
+  if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
+  if (!t.gastos[idx]) return;
+  t.gastos[idx][campo] = campo === 'importe' ? (parseFloat(valor)||0) : valor;
+  // Actualizar total sin re-render completo
+  var total = t.gastos.reduce(function(s,g){ return s+(parseFloat(g.importe)||0); }, 0);
+  var totalEl = document.querySelector('#ev-gastos-cont .ev-gastos-total-val');
+  if (totalEl) totalEl.textContent = '$ ' + total.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  _guardarGastosEv(t);
+};
+
+window._eliminarGastoEv = function(idx) {
+  var t = _tarjetaActual();
+  if (!t) return;
+  if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
+  t.gastos.splice(idx, 1);
+  var cont = document.getElementById('ev-gastos-cont');
+  if (cont) cont.innerHTML = _renderGastosEv(t);
+  _guardarGastosEv(t);
+};
+
+function _guardarGastosEv(t) {
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_actualizarGastos', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, gastos:t.gastos }) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){ if(!r.ok) console.warn('Error guardando gastos:', r.error); })
+  .catch(function(e){ console.warn(e); });
+}
+
 function _renderAdjuntos(t) {
   var adjuntos = Array.isArray(t.adjuntos) ? t.adjuntos : [];
   if (!adjuntos.length) return '';
