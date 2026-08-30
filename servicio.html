@@ -8,6 +8,7 @@
 <!-- Portal TLC | servicio.html | v2026.08.10.3 (Tope en "+ Agregar Caja" del modal "Asignación de Cajas" — no se puede tener más cajas que equipos (cada equipo entra en una sola caja, cualquier caja de más quedaría vacía sí o sí). Botón se deshabilita visualmente al llegar al tope, y avisa si de todas formas se intenta pasar. Pedido por Cristian: "cantidad máxima a agregar cajas, la cantidad de ítems, topealo". Confirmado con test: con 3 equipos, permite hasta 3 cajas, se deshabilita ahí, y avisa si se intenta una 4ta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.2 (Candado Preparación/CC → Para Instalar APAGADO temporalmente — pedido por Cristian: "me pide muchas condiciones... liberame temporalmente". El requisito de Checklist no se puede cumplir en la práctica todavía (falta conectar los formularios individuales de checklist, prerrequisito pendiente). Toda la lógica del candado sigue intacta en _validarGate, controlada por un interruptor nuevo (GATE_PARA_INSTALAR_ACTIVO = false) — para reactivarlo alcanza con volver ese valor a true, sin tocar nada más. Confirmado con test: con el interruptor apagado, deja pasar aunque no haya nada completo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.27.1 (BUG REAL — "se queda un rato en generando etiqueta y no la muestra despues". Al guardar la asignación de cajas con éxito, se abría la pestaña de la etiqueta con window.open() JUSTO DESPUÉS de esperar la respuesta del backend (fetch async) — varios navegadores bloquean esto como popup no solicitado, porque ya no lo consideran un gesto directo del usuario (mismo patrón ya documentado en _iaEnviarPregunta, este mismo archivo). Ahora, en vez de abrir la pestaña sola, se muestra un bloque de éxito con un link real "↗ Abrir Etiquetas de Despacho" (target=_blank) — el TOQUE del vendedor sobre ese link sí es un gesto directo, ningún navegador lo bloquea nunca. El modal ya no se cierra solo al guardar con éxito; se cierra cuando el vendedor toca el link. Al reabrir el modal (para el mismo ticket u otro) se resetea el estado de éxito, para no quedar pegado en la pantalla vieja. Confirmado con 5 tests: no se llama a window.open() directamente, se muestra el link real con la URL correcta, el formulario queda oculto durante el éxito, tocar el link cierra el modal, y reabrir resetea el estado.) -->
+<!-- Portal TLC | servicio.html | v2026.08.29.3 (El pin 📌 ahora TAMBIÉN se ve directo en cada tarjeta (Kanban y Lista), no solo en el botón de filtro de arriba (v2026.08.29.2) — Cristian tras esa entrega: "no veo ningun pin", esperaba verlo en la tarjeta misma, igual que en cotizaciones.html. El pin es clickeable: alterna la prioridad entre "urgente" y "media" con un solo toque, reusando el mecanismo genérico _guardarCampoSiCambio que YA existía (el mismo que actualiza "prioridad" desde el detalle del ticket) — sin backend nuevo. Rojo/activo si prioridad="urgente", gris/apagado si no. Confirmado con test: el pin se ve en rojo en el ticket urgente y en gris en el normal, tocarlo guarda el cambio correcto vía el mecanismo ya existente, y también aparece en la vista Lista.) -->
 <!-- Portal TLC | servicio.html | v2026.08.29.2 (Nuevo botón toggle "📌 Solo urgentes (N)" en la barra de filtros, con contador en vivo — mismo patrón visual/UX que el filtro de urgentes de cotizaciones.html. Reusa el campo "prioridad" que este archivo YA tenía (dropdown Prioridad con la opción "🔴 Urgente" + badge en cada tarjeta) — no hizo falta inventar un mecanismo de marca nuevo, es un atajo prominente sobre lo que ya existía. Sincronizado en los 2 sentidos con el dropdown de Prioridad: tocar el botón también mueve el dropdown, y elegir "Urgente" del dropdown también pinta el botón activo. Pedido por Cristian: "agregar solo urgentes igual que en cotizaciones". Confirmado con 5 tests: el contador muestra el total real, el filtro cruza etapas distintas (recepción y diagnóstico a la vez), botón↔dropdown quedan sincronizados en los 2 sentidos, y desactivar vuelve a mostrar todo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.29.1 (Nuevo 5to estado "Enviado" agregado al final del dropdown de estado por equipo (Pendiente/Retirado del depósito/Verificado/Listo para despacho/Enviado) — más avanzado que "Listo para despacho". El candado Preparación/CC → Para Instalar (que exige Serie+POE-8+Checklist+Estado) ahora acepta "Listo para despacho" O "Enviado" como válidos — antes solo aceptaba el primero, así que un equipo ya "Enviado" (más adelantado) quedaba bloqueado incorrectamente como si le faltara algo. Ver FotoMap.gs v197 para el nuevo modelo de cálculo del % de progreso (Serie/Calidad/Estado recalibrado con este 5to escalón nuevo). Pedido por Cristian con captura: "agregar enviado abajo de todo la dropdown". Confirmado con test: el dropdown incluye Enviado al final, el candado deja avanzar tanto con "Listo para despacho" como con "Enviado", y sigue bloqueando correctamente con "Pendiente".) -->
 <!-- Portal TLC | servicio.html | v2026.08.19.2 (Los 2 botones del circuito de Etiquetas de Despacho ahora se deshabilitan y muestran "⏳ Generando..." mientras procesan, evitando doble clic — "Generar Etiquetas de Despacho" (abre el modal, se restaura solo al cerrarlo con X/Cancelar o tras imprimir con éxito) e "Imprimir Etiquetas" (mientras guarda la asignación de cajas en el backend; si falla, se restaura para poder reintentar; si sale bien, el modal se cierra y el botón queda oculto con él). Al reabrir el modal se resetea defensivamente el botón de Imprimir a su texto normal, para no arrastrar un "Generando..." viejo de un ciclo anterior como si fuera el texto "original" a restaurar. Pedido por Cristian con 2 capturas: "al apretar GENERAR ETIQUETA DE DESPACHO, deshabilitar el boton y poner Generando. Lo mismo en imprimir etiquetas". Confirmado con test de punta a punta: ambos botones se deshabilitan y cambian de texto al usarse, se restauran correctamente al cerrar/fallar, y no arrastran estados viejos entre ciclos.) -->
@@ -1407,10 +1408,15 @@ function _renderLista(tickets) {
       var tecLabel = TECNICO_LABEL[t.tecnico_asignado] || '?';
       var tecColor = TECNICO_COLOR[t.tecnico_asignado] || '#475569';
       var fechaHtml = _fechaHtml(t.fecha_vencimiento);
+      var esUrgenteLista = t.prioridad === 'urgente';
+      var pinHtmlLista = '<span onclick="event.stopPropagation(); _guardarCampoSiCambio(\'' + t.id_ticket + '\',\'prioridad\',\'' +
+        (esUrgenteLista ? 'media' : 'urgente') + '\',\'' + (t.prioridad||'media') + '\')" ' +
+        'title="' + (esUrgenteLista ? 'Urgente — tocá para quitar' : 'Marcar como urgente') + '" ' +
+        'style="cursor:pointer;font-size:13px;line-height:1;margin-right:5px;filter:' + (esUrgenteLista ? 'none' : 'grayscale(1) opacity(.35)') + ';">📌</span>';
       return '<div class="lista-ticket" onclick="_abrirDetalle(\'' + t.id_ticket + '\')">'
         + '<span class="lista-col-dot" style="background:' + col.color + '"></span>'
         + '<div class="lista-ticket-main">'
-          + '<div class="lista-ticket-modelo">' + _esc(_nombreTarjetaTicket(t)) + '</div>'
+          + '<div class="lista-ticket-modelo">' + pinHtmlLista + _esc(_nombreTarjetaTicket(t)) + '</div>'
           + '<div class="lista-ticket-cliente">' + _esc(t.cliente||'—') + (t.equipo_serie ? ' · ' + _esc(t.equipo_serie) : '') + '</div>'
         + '</div>'
         + '<div class="lista-ticket-badges">'
@@ -1495,11 +1501,24 @@ function _renderTarjeta(t) {
   var fechaHtml = _fechaHtml(t.fecha_vencimiento);
   var puedeEditar = _permisos.servicio;
 
+  // Pin 📌 clickeable — mismo patrón visual que cotizaciones.html, acá
+  // reusando el mecanismo genérico _guardarCampoSiCambio (el mismo que
+  // ya actualiza "prioridad" desde el detalle del ticket) para
+  // alternar entre "urgente" y "media" con un solo toque, sin backend
+  // nuevo. Pedido por Cristian, tras la entrega del botón de filtro:
+  // "no veo ningun pin" — esperaba verlo también en la tarjeta misma,
+  // no solo el filtro de arriba.
+  var esUrgente = t.prioridad === 'urgente';
+  var pinHtml = '<span onclick="event.stopPropagation(); _guardarCampoSiCambio(\'' + t.id_ticket + '\',\'prioridad\',\'' +
+    (esUrgente ? 'media' : 'urgente') + '\',\'' + (t.prioridad||'media') + '\')" ' +
+    'title="' + (esUrgente ? 'Urgente — tocá para quitar' : 'Marcar como urgente') + '" ' +
+    'style="cursor:pointer;font-size:13px;line-height:1;margin-right:5px;filter:' + (esUrgente ? 'none' : 'grayscale(1) opacity(.35)') + ';">📌</span>';
+
   return '<div class="st-ticket" id="ticket-' + t.id_ticket + '" ' +
     (puedeEditar ? 'draggable="true" ondragstart="_onDragStart(event,\'' + t.id_ticket + '\')" ' : '') +
     'onclick="_abrirDetalle(\'' + t.id_ticket + '\')">' +
     '<div class="st-ticket-top">' +
-      '<div class="st-ticket-modelo">' + _esc(_nombreTarjetaTicket(t)) + '</div>' +
+      '<div class="st-ticket-modelo">' + pinHtml + _esc(_nombreTarjetaTicket(t)) + '</div>' +
     '</div>' +
     '<div class="st-ticket-cliente">' + _esc(t.cliente || '—') + '</div>' +
     (t.equipo_serie ? '<div class="st-ticket-serie">' + _esc(t.equipo_serie) + '</div>' : '') +
