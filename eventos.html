@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.30.3 (2 mejoras a Gastos (v2026.08.30.2): (1) El TC oficial usado para la conversión ahora se ve, en gris y chico, a la izquierda del toggle de moneda del Total (ej. "TC: $1.350") — antes se usaba internamente pero no se mostraba en ningún lado. (2) Los gastos ahora se ordenan ascendente por fecha automáticamente al renderizar — se ordena el array REAL (t.gastos), no una copia, porque los índices que usan editar/borrar/cambiar-moneda son posiciones dentro de ese mismo array; ordenar solo una copia para mostrar hubiera hecho que esas acciones tocaran el gasto equivocado tras reordenar. Pedido por Cristian: "mostrar al lado a la iz del total y del toggle de moneda el TC de calculo, en gris y mas chiquito" / "tambien mostrarlo ordenado ascendente por fecha a todos los gastos". Confirmado con test: el TC se ve correctamente formateado junto al total, los gastos quedan ordenados ascendente tanto en el array real como en pantalla, y editar por índice sigue apuntando al gasto correcto después de reordenar.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.2 (Gastos (v2026.08.30.1) rediseñado siguiendo EL MISMO estilo/mecanismo que presupuesto-editor.html — Cristian: "hacé los campos responsivos y permitime elegir la moneda USD ó AR$... quiero sigas el mismo estilo que presupuesto-editor, como elige la moneda por cada fila y el total y como obtiene TC desde la Api, aprovecha todas las funciones de ese módulo". (1) Layout: tabla reemplazada por tarjetas responsive con .campo/label (mismo patrón que .item-card/.item-grid), colapsa a 1 columna en mobile via @media. (2) Moneda por fila: mismo .moneda-switch clickeable (USD/AR$) que presupuesto-editor.html, con el importe SIEMPRE guardado en USD internamente — la moneda es solo una preferencia de display/tipeo (idéntico criterio a it.moneda/_toggleMonedaItem/_actualizarItem de ese módulo). (3) TC oficial: mismo endpoint dolarapi.com/v1/dolares/oficial, cargado una vez al abrir la página (_cargarTCEv, TC_OFICIAL_EV) y cacheado. (4) El Total también tiene su propio toggle USD/AR$ (independiente de cada fila), mostrando el total agregado (siempre en USD internamente) convertido a la moneda elegida. De rebote, _tarjetaActual() se hizo defensiva contra EVENTO_ACTUAL=null (pasaba naturalmente mientras corre _cargarTCEv en segundo plano al iniciar la página, antes de que se cargue ningún evento). Confirmado con test: el TC se carga desde la API real, tipear un monto en AR$ se convierte y guarda en USD, y el toggle del Total refleja correctamente la conversión (100 USD ⇄ AR$ 135.000 con TC 1350).) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.1 (Nueva sección "💰 Gastos" en el detalle de CADA tarjeta, de TODOS los eventos/pipelines por igual — copiado tal cual de "Gastos del servicio" en servicio.html (misma tabla fecha/descripción/importe, total en vivo, botón "+ Agregar gasto"), con clases CSS prefijadas ev- para no colisionar con nada existente. Nuevas funciones _renderGastosEv/_agregarGastoEv/_editarGastoEv/_eliminarGastoEv/_guardarGastosEv, guardando vía la nueva acción ev_actualizarGastos (FotoMap.gs v199) en eventos/{id_evento}/tarjetas/{id_tarjeta}/gastos. Sin la rama de solo-lectura que tiene servicio.html para tickets finalizados — las tarjetas de eventos no tienen un estado equivalente. Pedido por Cristian: "en gestion de congresos y eventos en todas las tarjetas de todos los pipelines habilitar seccion Gastos, copialo de las tarjetas de servicio tecnico, e implementalo en eventos.html". Confirmado con test de punta a punta: la sección aparece al abrir cualquier tarjeta, agregar/editar/eliminar un gasto funciona y actualiza el total en pantalla sin recargar todo, y cada cambio llama al backend real con id_evento/id_tarjeta correctos.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.13 (Logo del evento — nuevo. Se ve como una miniatura de 30px junto al nombre en el header, y también en cada tarjeta del selector "Todos los eventos". Se agrega/cambia/quita desde el menú de tres puntos (⋯) del topbar: "🖼️ Agregar/Cambiar logo del evento" y "🚫 Quitar logo del evento" (este último solo visible si ya hay uno puesto) — ambos Administrador, usan ev_subirLogoEvento/ev_quitarLogoEvento de FotoMap.gs v167. Pedido por Cristian: "dame la posibilidad de agregar logo al nombre del evento". Confirmado con jsdom de punta a punta: subir actualiza el header y los textos del menú, quitar los revierte.) -->
@@ -240,6 +241,7 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
 .ev-gastos-total{display:flex;justify-content:flex-end;align-items:center;gap:8px;
   margin-top:10px;padding-top:8px;border-top:1px solid var(--border-glow);}
 .ev-gastos-total-label{font-size:11px;font-weight:700;color:var(--text-muted);}
+.ev-gastos-tc-label{font-size:9px;font-weight:600;color:var(--text-dim);margin-right:2px;}
 .ev-gastos-total-val{font-size:14px;font-weight:800;color:var(--accent-green);}
 .ev-btn-add-gasto{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;
   background:transparent;border:1px dashed var(--border-glow);color:var(--text-muted);
@@ -567,7 +569,7 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 // diagnosticando bugs que en realidad eran "el archivo todavía no se
 // volvió a subir". Guardado como constante con nombre (no un string
 // suelto dentro del console.log) — actualizar ACÁ en cada entrega.
-const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.2';
+const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.3';
 console.log("%c TLC Eventos v" + _VERSION_ARCHIVO_EVENTOS + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1883,7 +1885,17 @@ function _aMonedaGastoEv(montoUSD, moneda) {
 var _monedaTotalGastosEv = 'USD'; // preferencia de display del Total — no se guarda, es solo visual
 
 function _renderGastosEv(t) {
-  var gastos = (t.gastos && Array.isArray(t.gastos)) ? t.gastos : (t.gastos ? Object.values(t.gastos) : []);
+  // Se normaliza y ordena el array REAL (t.gastos), no una copia — los
+  // índices que usan _editarGastoEv/_eliminarGastoEv/_toggleMonedaGastoEv
+  // son posiciones dentro de t.gastos, así que si solo ordenáramos una
+  // copia para mostrar, esos índices dejarían de coincidir y
+  // editar/borrar tocaría el gasto equivocado. Pedido por Cristian:
+  // "tambien mostrarlo ordenado ascendente por fecha a todos los
+  // gastos".
+  if (t.gastos && !Array.isArray(t.gastos)) t.gastos = Object.values(t.gastos);
+  if (!Array.isArray(t.gastos)) t.gastos = [];
+  t.gastos.sort(function(a, b) { return (a.fecha || '').localeCompare(b.fecha || ''); });
+  var gastos = t.gastos;
   var totalUSD = gastos.reduce(function(s, g) { return s + (parseFloat(g.importe) || 0); }, 0);
   var totalMostrado = _aMonedaGastoEv(totalUSD, _monedaTotalGastosEv);
 
@@ -1912,6 +1924,7 @@ function _renderGastosEv(t) {
 
   return tarjetas +
   '<div class="ev-gastos-total">' +
+    (TC_OFICIAL_EV ? '<span class="ev-gastos-tc-label">TC: $' + TC_OFICIAL_EV.toLocaleString('es-AR') + '</span>' : '') +
     '<div class="ev-moneda-switch" onclick="_toggleMonedaTotalGastosEv()" title="Ver total en otra moneda">' +
       '<span class="' + (_monedaTotalGastosEv !== 'ARS' ? 'activo' : '') + '">USD</span>' +
       '<span class="' + (_monedaTotalGastosEv === 'ARS' ? 'activo' : '') + '">AR$</span>' +
