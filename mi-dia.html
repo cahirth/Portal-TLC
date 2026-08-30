@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<!-- Portal TLC | mi-dia.html | v2026.08.30.1 (PASO 3 del módulo nuevo
+     "Mis Tareas / Mi Día" — pantalla que junta en un solo lugar los
+     pines 📌 personales de Ventas/Servicio Técnico/Eventos (Paso 1) +
+     las tareas sueltas manuales (Paso 2, colección /tareas). Solo
+     muestra lo que le pertenece al usuario logueado — confirmado con
+     Cristian: "Solo LOS QUE YO marqué/me pertenecen (personal,
+     filtrado por usuario)". Criterio de "me pertenece" por origen:
+     Ventas/Eventos → urgente.marcado_por === mi nombre (ambos guardan
+     quién lo marcó); Servicio Técnico → tecnico_asignado === mi clave
+     (ahí "urgente" es un nivel de prioridad compartido, sin
+     "marcado_por" — se usa el técnico asignado al ticket como proxy
+     de pertenencia, mismo criterio "Asignados a mí" que ya usa
+     servicio.html). Captura rápida de tareas sueltas arriba de todo;
+     filtros de Tiempo (Hoy/Vencidas/Semana/Todas — aplica solo a
+     tareas sueltas, los pines no tienen fecha de vencimiento) y
+     Origen (Todos/Ventas/Servicio/Eventos/Tareas). Cada pin trae un
+     link directo al negocio/ticket/tarjeta real (?id=/?ticket=/
+     ?id=+&tarjeta=). Selector de usuario para Administrador: queda
+     para el Paso 4, todavía no implementado acá.) -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Mis Tareas / Mi Día — Portal TLC</title>
+<script src="version.js"></script>
+<script src="permisos.js"></script>
+<style>
+:root {
+  --bg:#030712; --panel-dark:#0f172a; --panel-darker:#0a1424; --border-glow:#1e3050;
+  --text-main:#f1f5f9; --text-muted:#94a3b8; --text-dim:#64748b;
+  --accent-blue:#3a86ff; --accent-green:#06d6a0; --accent-purple:#8b5cf6; --accent-orange:#f8961e;
+}
+body.tema-claro {
+  --bg:#f0f4f8; --panel-dark:#ffffff; --panel-darker:#f8fafc; --border-glow:#e2e8f0;
+  --text-main:#0f172a; --text-muted:#64748b; --text-dim:#94a3b8;
+  color-scheme: light;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text-main); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:13px; min-height:100vh; color-scheme:dark; }
+button { font-family:inherit; }
+a { color:var(--accent-blue); text-decoration:none; }
+
+.md-header { display:flex; align-items:center; gap:10px; padding:12px 16px; background:var(--panel-dark); border-bottom:1px solid var(--border-glow); position:sticky; top:0; z-index:10; }
+.md-icon-btn { width:34px; height:34px; border-radius:9px; background:var(--panel-darker); border:1px solid var(--border-glow); color:var(--text-main); font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.md-titulo { font-size:15px; font-weight:800; flex:1; }
+.md-fecha-hoy { font-size:11px; color:var(--text-muted); }
+
+.md-wrap { max-width:760px; margin:0 auto; padding:16px; }
+
+.md-captura { display:flex; gap:8px; margin-bottom:18px; }
+.md-captura input { flex:1; padding:11px 14px; border-radius:10px; background:var(--panel-dark); border:1px solid var(--border-glow); color:var(--text-main); font-size:13px; outline:none; }
+.md-captura input:focus { border-color:var(--accent-blue); }
+.md-captura button { padding:0 18px; border-radius:10px; background:var(--accent-blue); border:none; color:#fff; font-weight:700; font-size:13px; cursor:pointer; white-space:nowrap; }
+
+.md-filtros { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
+.md-filtro-btn { padding:6px 12px; border-radius:20px; background:var(--panel-dark); border:1px solid var(--border-glow); color:var(--text-muted); font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.md-filtro-btn.activo { background:var(--accent-blue); border-color:var(--accent-blue); color:#fff; }
+
+.md-seccion-titulo { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin:20px 0 8px; }
+.md-seccion-titulo:first-child { margin-top:0; }
+
+.md-item { display:flex; align-items:flex-start; gap:10px; padding:11px 12px; background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:10px; margin-bottom:7px; }
+.md-item.md-completada { opacity:.5; }
+.md-item.md-completada .md-item-titulo { text-decoration:line-through; }
+.md-check { width:19px; height:19px; border-radius:6px; border:1.5px solid var(--border-glow); background:transparent; cursor:pointer; flex-shrink:0; margin-top:1px; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--accent-green); }
+.md-check.marcado { background:var(--accent-green); border-color:var(--accent-green); color:#04241c; }
+.md-item-body { flex:1; min-width:0; }
+.md-item-titulo { font-weight:700; font-size:13px; word-break:break-word; }
+.md-item-meta { display:flex; align-items:center; gap:6px; margin-top:4px; flex-wrap:wrap; }
+.md-origen-badge { font-size:9.5px; font-weight:800; padding:2px 8px; border-radius:20px; white-space:nowrap; }
+.md-origen-ventas { background:rgba(58,134,255,.15); color:var(--accent-blue); }
+.md-origen-servicio { background:rgba(139,92,246,.15); color:var(--accent-purple); }
+.md-origen-eventos { background:rgba(248,150,30,.15); color:var(--accent-orange); }
+.md-origen-tarea { background:rgba(6,214,160,.15); color:var(--accent-green); }
+.md-item-fecha { font-size:10.5px; color:var(--text-dim); }
+.md-item-nota { font-size:11px; color:var(--text-muted); margin-top:3px; }
+.md-item-link { font-size:11px; font-weight:700; }
+.md-btn-borrar { background:none; border:none; color:#ef444480; cursor:pointer; font-size:14px; padding:2px 6px; flex-shrink:0; }
+.md-btn-borrar:hover { color:#ef4444; }
+
+.md-vacio { text-align:center; padding:40px 20px; color:var(--text-muted); font-size:12.5px; }
+.md-loading { text-align:center; padding:40px 20px; color:var(--text-muted); font-size:12.5px; }
+
+.md-bloqueado { max-width:420px; margin:80px auto; text-align:center; padding:24px; }
+.md-bloqueado h2 { font-size:16px; margin-bottom:8px; }
+.md-bloqueado p { font-size:12.5px; color:var(--text-muted); }
+</style>
+</head>
+<body>
+
+<div class="md-header">
+  <button class="md-icon-btn" onclick="location.href='index.html'" title="Volver al menú">←</button>
+  <div class="md-titulo">📋 Mis Tareas / Mi Día</div>
+  <div class="md-fecha-hoy" id="md-fecha-hoy"></div>
+  <button class="md-icon-btn" onclick="_toggleTemaMd()" id="md-btn-tema" title="Tema">🌙</button>
+</div>
+
+<div id="md-contenido" style="display:none;">
+  <div class="md-wrap">
+    <div class="md-captura">
+      <input type="text" id="md-input-nueva-tarea" placeholder="Agregar una tarea rápida..." onkeydown="if(event.key==='Enter') _crearTareaMd();">
+      <button onclick="_crearTareaMd()">+ Agregar</button>
+    </div>
+
+    <div class="md-filtros" id="md-filtros-tiempo">
+      <button class="md-filtro-btn activo" data-tiempo="todas" onclick="_setFiltroTiempoMd('todas')">Todas</button>
+      <button class="md-filtro-btn" data-tiempo="hoy" onclick="_setFiltroTiempoMd('hoy')">Hoy</button>
+      <button class="md-filtro-btn" data-tiempo="vencidas" onclick="_setFiltroTiempoMd('vencidas')">Vencidas</button>
+      <button class="md-filtro-btn" data-tiempo="semana" onclick="_setFiltroTiempoMd('semana')">Esta semana</button>
+    </div>
+    <div class="md-filtros" id="md-filtros-origen">
+      <button class="md-filtro-btn activo" data-origen="todos" onclick="_setFiltroOrigenMd('todos')">Todos</button>
+      <button class="md-filtro-btn" data-origen="ventas" onclick="_setFiltroOrigenMd('ventas')">📦 Ventas</button>
+      <button class="md-filtro-btn" data-origen="servicio" onclick="_setFiltroOrigenMd('servicio')">🔧 Servicio</button>
+      <button class="md-filtro-btn" data-origen="eventos" onclick="_setFiltroOrigenMd('eventos')">🎪 Eventos</button>
+      <button class="md-filtro-btn" data-origen="tarea" onclick="_setFiltroOrigenMd('tarea')">📝 Tareas</button>
+    </div>
+
+    <div id="md-lista">
+      <div class="md-loading">Cargando...</div>
+    </div>
+  </div>
+</div>
+
+<div id="md-bloqueado-wrap" style="display:none;">
+  <div class="md-bloqueado">
+    <h2>🔒 Sin acceso</h2>
+    <p>No tenés permiso para ver este módulo. Si creés que es un error, pedile a un Administrador que active la columna "Tareas" en tu fila de la planilla de permisos.</p>
+  </div>
+</div>
+
+<script>
+'use strict';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+var RTDB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+var SESSION_KEY = 'tlc_session_v1';
+var TEMA_KEY = 'tlc_tema';
+
+var _session = null;
+var _itemsMd = []; // { tipo:'ventas'|'servicio'|'eventos'|'tarea', id, titulo, nota, fecha, completada, link, origenLabel }
+var _filtroTiempoMd = 'todas';
+var _filtroOrigenMd = 'todos';
+
+function _esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function _aplicarTemaMd() {
+  var t = localStorage.getItem(TEMA_KEY) || 'dark';
+  document.body.classList.toggle('tema-claro', t === 'light');
+  var btn = document.getElementById('md-btn-tema');
+  if (btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
+}
+window._toggleTemaMd = function() {
+  var actual = localStorage.getItem(TEMA_KEY) || 'dark';
+  localStorage.setItem(TEMA_KEY, actual === 'light' ? 'dark' : 'light');
+  _aplicarTemaMd();
+};
+_aplicarTemaMd();
+
+// Mismo mapeo email→código de técnico que ya usa servicio.html, para
+// poder calcular "asignado a mí" con el mismo criterio exacto — Servicio
+// Técnico es el único de los 3 orígenes sin "marcado_por" (prioridad
+// es un campo compartido, no por usuario).
+var EMAIL_A_TECNICO_MD = {
+  'cristian.hirth':'cristian_hirth', 'cristian.hirth@tlcsrl.com.ar':'cristian_hirth',
+  'fernando.del.campo':'fernando_del_campo',
+  'juan.garro':'juan_garro',
+  'damian.sosa':'damian_sosa',
+  'veronica.ribaita':'veronica_ribaita',
+  'lourdes.davalos':'lourdes_davalos',
+  'lucio.raineri':'lucio_raineri',
+};
+
+function _hoyISOmd() { return new Date().toISOString().slice(0,10); }
+
+async function _init() {
+  var raw = localStorage.getItem(SESSION_KEY);
+  if (!raw) { location.href = 'index.html'; return; }
+  var payload;
+  try { payload = JSON.parse(raw); } catch(e) { location.href = 'index.html'; return; }
+  if (payload && payload.expira && Date.now() > payload.expira) { location.href = 'index.html'; return; }
+  _session = (payload && payload.account) ? payload.account : payload;
+  if (!_session || !_session.username) { location.href = 'index.html'; return; }
+
+  var tieneAcceso = true;
+  try {
+    if (typeof validarAccesoModulo === 'function') tieneAcceso = await validarAccesoModulo('Tareas');
+  } catch(e) { tieneAcceso = true; } // fail-open, mismo criterio que el resto del Portal
+
+  if (!tieneAcceso) {
+    document.getElementById('md-bloqueado-wrap').style.display = 'block';
+    return;
+  }
+  document.getElementById('md-contenido').style.display = 'block';
+
+  document.getElementById('md-fecha-hoy').textContent = new Date().toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long' });
+
+  var emailCompleto = (_session.username || '').toLowerCase();
+  var prefixEmail = emailCompleto.split('@')[0];
+  var miClaveTecnico = EMAIL_A_TECNICO_MD[emailCompleto] || EMAIL_A_TECNICO_MD[prefixEmail] || prefixEmail.replace(/\./g, '_');
+
+  await _cargarTodoMd(miClaveTecnico);
+}
+
+async function _cargarTodoMd(miClaveTecnico) {
+  var items = [];
+
+  // ── Ventas — negocios marcados urgente POR MÍ ──
+  try {
+    var respVentas = await fetch(RTDB_URL + '/cotizaciones.json?_=' + Date.now());
+    var dataVentas = await respVentas.json();
+    Object.keys(dataVentas || {}).forEach(function(id) {
+      var c = dataVentas[id];
+      if (c && c.urgente && c.urgente.activo && c.urgente.marcado_por === _session.name) {
+        items.push({
+          tipo: 'ventas', id: id,
+          titulo: c.nombreNegocio || c.razonSocial || id,
+          nota: c.urgente.nota || '',
+          fecha: null, completada: false,
+          link: 'cotizaciones.html?id=' + encodeURIComponent(id),
+          origenLabel: '📦 Ventas',
+        });
+      }
+    });
+  } catch(e) { console.warn('Error cargando pines de Ventas:', e); }
+
+  // ── Servicio Técnico — tickets urgentes ASIGNADOS A MÍ (proxy de
+  // pertenencia, ya que "prioridad" no guarda quién lo marcó) ──
+  try {
+    var respSt = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now());
+    var dataSt = await respSt.json();
+    Object.keys(dataSt || {}).forEach(function(id) {
+      var t = dataSt[id];
+      if (t && t.prioridad === 'urgente' && t.tecnico_asignado === miClaveTecnico) {
+        items.push({
+          tipo: 'servicio', id: t.id_ticket || id,
+          titulo: (t.cliente || '—') + (t.equipo_modelo ? ' — ' + t.equipo_modelo : ''),
+          nota: '', fecha: null, completada: false,
+          link: 'servicio.html?ticket=' + encodeURIComponent(t.id_ticket || id),
+          origenLabel: '🔧 Servicio',
+        });
+      }
+    });
+  } catch(e) { console.warn('Error cargando pines de Servicio Técnico:', e); }
+
+  // ── Eventos — tarjetas marcadas urgente POR MÍ, en cualquier evento ──
+  try {
+    var respEv = await fetch(RTDB_URL + '/eventos.json?_=' + Date.now());
+    var dataEv = await respEv.json();
+    Object.keys(dataEv || {}).forEach(function(idEvento) {
+      var ev = dataEv[idEvento];
+      var tarjetas = (ev && ev.tarjetas) ? Object.values(ev.tarjetas) : [];
+      tarjetas.forEach(function(t) {
+        if (t && t.urgente && t.urgente.activo && t.urgente.marcado_por === _session.name) {
+          items.push({
+            tipo: 'eventos', id: t.id,
+            titulo: t.titulo + (ev.nombre ? ' (' + ev.nombre + ')' : ''),
+            nota: t.urgente.nota || '',
+            fecha: null, completada: false,
+            link: 'eventos.html?id=' + encodeURIComponent(idEvento) + '&tarjeta=' + encodeURIComponent(t.id),
+            origenLabel: '🎪 Eventos',
+          });
+        }
+      });
+    });
+  } catch(e) { console.warn('Error cargando pines de Eventos:', e); }
+
+  // ── Tareas sueltas (manuales) ──
+  try {
+    var respTareas = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'listarTareas', usuario_email:_session.username, solicitante_email:_session.username, solicitante_rol:(_session.rol||'') }) });
+    var rTareas = await respTareas.json();
+    if (rTareas.ok) {
+      (rTareas.tareas || []).forEach(function(t) {
+        items.push({
+          tipo: 'tarea', id: t.id, titulo: t.titulo, nota: t.descripcion || '',
+          fecha: t.fecha || null, completada: !!t.completada,
+          link: null, origenLabel: '📝 Tarea',
+        });
+      });
+    }
+  } catch(e) { console.warn('Error cargando tareas sueltas:', e); }
+
+  _itemsMd = items;
+  _renderListaMd();
+}
+
+function _pasaFiltroTiempoMd(item) {
+  if (item.tipo !== 'tarea') return true; // los pines no tienen fecha propia, siempre pasan
+  if (_filtroTiempoMd === 'todas') return true;
+  if (!item.fecha) return _filtroTiempoMd !== 'vencidas' && _filtroTiempoMd !== 'hoy';
+  var hoy = _hoyISOmd();
+  if (_filtroTiempoMd === 'hoy') return item.fecha === hoy;
+  if (_filtroTiempoMd === 'vencidas') return item.fecha < hoy && !item.completada;
+  if (_filtroTiempoMd === 'semana') {
+    var en7 = new Date(); en7.setDate(en7.getDate() + 7);
+    return item.fecha >= hoy && item.fecha <= en7.toISOString().slice(0,10);
+  }
+  return true;
+}
+function _pasaFiltroOrigenMd(item) {
+  return _filtroOrigenMd === 'todos' || item.tipo === _filtroOrigenMd;
+}
+
+window._setFiltroTiempoMd = function(v) {
+  _filtroTiempoMd = v;
+  document.querySelectorAll('#md-filtros-tiempo .md-filtro-btn').forEach(function(b) { b.classList.toggle('activo', b.dataset.tiempo === v); });
+  _renderListaMd();
+};
+window._setFiltroOrigenMd = function(v) {
+  _filtroOrigenMd = v;
+  document.querySelectorAll('#md-filtros-origen .md-filtro-btn').forEach(function(b) { b.classList.toggle('activo', b.dataset.origen === v); });
+  _renderListaMd();
+};
+
+function _renderItemMd(item) {
+  var claseOrigen = 'md-origen-' + item.tipo;
+  var esTarea = item.tipo === 'tarea';
+  var checkHtml = esTarea
+    ? '<button class="md-check' + (item.completada ? ' marcado' : '') + '" onclick="_toggleCompletarTareaMd(\'' + item.id + '\',' + (!item.completada) + ')">' + (item.completada ? '✓' : '') + '</button>'
+    : '<span class="md-check marcado" style="cursor:default;" title="Pin activo">📌</span>';
+  return '<div class="md-item' + (item.completada ? ' md-completada' : '') + '">' +
+    checkHtml +
+    '<div class="md-item-body">' +
+      '<div class="md-item-titulo">' + _esc(item.titulo) + '</div>' +
+      '<div class="md-item-meta">' +
+        '<span class="md-origen-badge ' + claseOrigen + '">' + item.origenLabel + '</span>' +
+        (item.fecha ? '<span class="md-item-fecha">📅 ' + _esc(item.fecha) + '</span>' : '') +
+        (item.link ? '<a class="md-item-link" href="' + item.link + '">Abrir →</a>' : '') +
+      '</div>' +
+      (item.nota ? '<div class="md-item-nota">' + _esc(item.nota) + '</div>' : '') +
+    '</div>' +
+    (esTarea ? '<button class="md-btn-borrar" onclick="_eliminarTareaMd(\'' + item.id + '\')" title="Eliminar">✕</button>' : '') +
+  '</div>';
+}
+
+function _renderListaMd() {
+  var filtrados = _itemsMd.filter(function(i) { return _pasaFiltroTiempoMd(i) && _pasaFiltroOrigenMd(i); });
+  var cont = document.getElementById('md-lista');
+  if (!filtrados.length) {
+    cont.innerHTML = '<div class="md-vacio">🎉 Nada por acá — todo tranquilo.</div>';
+    return;
+  }
+  // Pendientes primero, completadas al final
+  filtrados.sort(function(a, b) { return (a.completada?1:0) - (b.completada?1:0); });
+  var grupos = { ventas: [], servicio: [], eventos: [], tarea: [] };
+  filtrados.forEach(function(i) { grupos[i.tipo].push(i); });
+  var titulos = { ventas: '📦 Ventas', servicio: '🔧 Servicio Técnico', eventos: '🎪 Eventos', tarea: '📝 Tareas' };
+  var html = '';
+  ['ventas','servicio','eventos','tarea'].forEach(function(tipo) {
+    if (!grupos[tipo].length) return;
+    html += '<div class="md-seccion-titulo">' + titulos[tipo] + ' (' + grupos[tipo].length + ')</div>';
+    html += grupos[tipo].map(_renderItemMd).join('');
+  });
+  cont.innerHTML = html;
+}
+
+window._crearTareaMd = function() {
+  var input = document.getElementById('md-input-nueva-tarea');
+  var titulo = input.value.trim();
+  if (!titulo) return;
+  input.value = '';
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'crearTarea', titulo:titulo, usuario_email:_session.username, usuario_nombre:_session.name }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('No se pudo crear la tarea: ' + (r.error||'')); return; }
+      _itemsMd.push({ tipo:'tarea', id:r.tarea.id, titulo:r.tarea.titulo, nota:'', fecha:r.tarea.fecha||null, completada:false, link:null, origenLabel:'📝 Tarea' });
+      _renderListaMd();
+    })
+    .catch(function(e) { alert('Error de conexión al crear la tarea.'); });
+};
+
+window._toggleCompletarTareaMd = function(id, completar) {
+  var item = _itemsMd.find(function(i) { return i.tipo === 'tarea' && i.id === id; });
+  if (item) { item.completada = completar; _renderListaMd(); }
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'completarTarea', id_tarea:id, completada:completar }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) { if (!r.ok && item) { item.completada = !completar; _renderListaMd(); } });
+};
+
+window._eliminarTareaMd = function(id) {
+  if (!confirm('¿Eliminar esta tarea?')) return;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'eliminarTarea', id_tarea:id }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('No se pudo eliminar: ' + (r.error||'')); return; }
+      _itemsMd = _itemsMd.filter(function(i) { return !(i.tipo === 'tarea' && i.id === id); });
+      _renderListaMd();
+    });
+};
+
+_init();
+</script>
+</body>
+</html>
