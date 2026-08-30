@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.30.2 (Gastos (v2026.08.30.1) rediseñado siguiendo EL MISMO estilo/mecanismo que presupuesto-editor.html — Cristian: "hacé los campos responsivos y permitime elegir la moneda USD ó AR$... quiero sigas el mismo estilo que presupuesto-editor, como elige la moneda por cada fila y el total y como obtiene TC desde la Api, aprovecha todas las funciones de ese módulo". (1) Layout: tabla reemplazada por tarjetas responsive con .campo/label (mismo patrón que .item-card/.item-grid), colapsa a 1 columna en mobile via @media. (2) Moneda por fila: mismo .moneda-switch clickeable (USD/AR$) que presupuesto-editor.html, con el importe SIEMPRE guardado en USD internamente — la moneda es solo una preferencia de display/tipeo (idéntico criterio a it.moneda/_toggleMonedaItem/_actualizarItem de ese módulo). (3) TC oficial: mismo endpoint dolarapi.com/v1/dolares/oficial, cargado una vez al abrir la página (_cargarTCEv, TC_OFICIAL_EV) y cacheado. (4) El Total también tiene su propio toggle USD/AR$ (independiente de cada fila), mostrando el total agregado (siempre en USD internamente) convertido a la moneda elegida. De rebote, _tarjetaActual() se hizo defensiva contra EVENTO_ACTUAL=null (pasaba naturalmente mientras corre _cargarTCEv en segundo plano al iniciar la página, antes de que se cargue ningún evento). Confirmado con test: el TC se carga desde la API real, tipear un monto en AR$ se convierte y guarda en USD, y el toggle del Total refleja correctamente la conversión (100 USD ⇄ AR$ 135.000 con TC 1350).) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.1 (Nueva sección "💰 Gastos" en el detalle de CADA tarjeta, de TODOS los eventos/pipelines por igual — copiado tal cual de "Gastos del servicio" en servicio.html (misma tabla fecha/descripción/importe, total en vivo, botón "+ Agregar gasto"), con clases CSS prefijadas ev- para no colisionar con nada existente. Nuevas funciones _renderGastosEv/_agregarGastoEv/_editarGastoEv/_eliminarGastoEv/_guardarGastosEv, guardando vía la nueva acción ev_actualizarGastos (FotoMap.gs v199) en eventos/{id_evento}/tarjetas/{id_tarjeta}/gastos. Sin la rama de solo-lectura que tiene servicio.html para tickets finalizados — las tarjetas de eventos no tienen un estado equivalente. Pedido por Cristian: "en gestion de congresos y eventos en todas las tarjetas de todos los pipelines habilitar seccion Gastos, copialo de las tarjetas de servicio tecnico, e implementalo en eventos.html". Confirmado con test de punta a punta: la sección aparece al abrir cualquier tarjeta, agregar/editar/eliminar un gasto funciona y actualiza el total en pantalla sin recargar todo, y cada cambio llama al backend real con id_evento/id_tarjeta correctos.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.13 (Logo del evento — nuevo. Se ve como una miniatura de 30px junto al nombre en el header, y también en cada tarjeta del selector "Todos los eventos". Se agrega/cambia/quita desde el menú de tres puntos (⋯) del topbar: "🖼️ Agregar/Cambiar logo del evento" y "🚫 Quitar logo del evento" (este último solo visible si ya hay uno puesto) — ambos Administrador, usan ev_subirLogoEvento/ev_quitarLogoEvento de FotoMap.gs v167. Pedido por Cristian: "dame la posibilidad de agregar logo al nombre del evento". Confirmado con jsdom de punta a punta: subir actualiza el header y los textos del menú, quitar los revierte.) -->
 <!-- Portal TLC | eventos.html | v2026.08.09.12 (Progreso de checklists visible en la vista Lista — antes solo mostraba el texto "x/y" sin barra, a diferencia del Kanban que ya tenía barra visual. Se agregó la misma barra compacta (42px) + texto a cada fila de la lista, y se sumó el porcentaje al texto del Kanban también ("2/4 subtareas · 50%") para más claridad en los dos lados por igual. Pedido por Cristian: "podemos mostrar el progreso de las tarjetas en la miniatura, de kanban y listas?". Confirmado con jsdom con un checklist de 4 ítems (2 tildados): barra al 50% en ambas vistas.) -->
@@ -208,16 +209,34 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
    por Cristian: "en gestion de congresos y eventos en todas las
    tarjetas de todos los pipelines habilitar seccion Gastos, copialo
    de las tarjetas de servicio tecnico". ── */
-.ev-gastos-tabla{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;}
-.ev-gastos-tabla th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;
-  color:var(--text-muted);padding:4px 6px;text-align:left;border-bottom:1px solid var(--border-glow);}
-.ev-gastos-tabla td{padding:6px 6px;border-bottom:1px solid var(--border-glow);color:var(--text-main);vertical-align:middle;}
-.ev-gastos-tabla tr:last-child td{border-bottom:none;}
-.ev-gastos-input{width:100%;padding:4px 6px;border-radius:6px;background:var(--bg);
-  border:1px solid var(--border-glow);color:var(--text-main);font-size:12px;font-family:inherit;outline:none;}
+/* ── GASTOS — mismo estilo/mecanismo que presupuesto-editor.html
+   (tarjeta responsive con .campo/label, el mismo .moneda-switch por
+   fila, y el mismo TC oficial desde dolarapi.com). Pedido por
+   Cristian: "hacé los campos responsivos y permitime elegir la
+   moneda USD ó AR$... quiero sigas el mismo estilo que
+   presupuesto-editor, como elige la moneda por cada fila y el total
+   y como obtiene TC desde la Api, aprovecha todas las funciones de
+   ese módulo". ── */
+.ev-gasto-card{background:var(--panel-darker);border:1px solid var(--border-glow);border-radius:10px;padding:10px;margin-top:8px;}
+.ev-gasto-top{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.ev-gasto-desc-input{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border-glow);color:var(--text-main);
+  font-size:13px;font-weight:600;padding:4px 2px;outline:none;font-family:inherit;}
+.ev-gasto-desc-input:focus{border-color:var(--accent-blue);}
+.ev-btn-del-gasto{width:26px;height:26px;border-radius:7px;background:transparent;border:1px solid var(--border-glow);
+  color:#ef4444;cursor:pointer;flex-shrink:0;font-size:13px;}
+.ev-gasto-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.ev-gasto-grid .ev-campo label{font-size:8px;color:var(--text-dim);text-transform:uppercase;font-weight:700;display:block;margin-bottom:3px;}
+.ev-gastos-input{width:100%;background:var(--bg);border:1px solid var(--border-glow);border-radius:7px;
+  padding:6px 8px;color:var(--text-main);font-size:12px;outline:none;font-family:inherit;box-sizing:border-box;}
 .ev-gastos-input:focus{border-color:var(--accent-blue);}
-.ev-gastos-input[type="date"]{min-width:110px;}
-.ev-gastos-input[type="number"]{min-width:80px;text-align:right;}
+.ev-importe-input-wrap{display:flex;align-items:center;gap:5px;}
+.ev-importe-input-wrap input{flex:1;min-width:0;}
+.ev-moneda-switch{flex-shrink:0;display:flex;border-radius:20px;overflow:hidden;border:1px solid var(--border-glow);
+  font-size:8px;font-weight:800;cursor:pointer;user-select:none;}
+.ev-moneda-switch span{padding:6px 6px;transition:background .15s ease,color .15s ease;white-space:nowrap;}
+.ev-moneda-switch span.activo{background:var(--accent-blue);color:#fff;}
+.ev-moneda-switch span:not(.activo){color:var(--text-dim);background:var(--panel-darker);}
+@media (max-width:640px){ .ev-gasto-grid{grid-template-columns:1fr 1fr;} }
 .ev-gastos-total{display:flex;justify-content:flex-end;align-items:center;gap:8px;
   margin-top:10px;padding-top:8px;border-top:1px solid var(--border-glow);}
 .ev-gastos-total-label{font-size:11px;font-weight:700;color:var(--text-muted);}
@@ -226,8 +245,6 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
   background:transparent;border:1px dashed var(--border-glow);color:var(--text-muted);
   font-size:12px;font-weight:600;cursor:pointer;margin-top:8px;width:100%;justify-content:center;}
 .ev-btn-add-gasto:hover{border-color:var(--accent-blue);color:var(--accent-blue);}
-.ev-btn-del-gasto{background:none;border:none;color:#ef444460;cursor:pointer;font-size:14px;padding:2px 4px;}
-.ev-btn-del-gasto:hover{color:#ef4444;}
 .ev-msg-titulo { font-size:13px; font-weight:800; color:var(--text-main); margin:0 0 8px; }
 .ev-msg-lista-box { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:12px;
   padding:10px; max-height:340px; overflow-y:auto; margin-bottom:10px; }
@@ -550,7 +567,7 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 // diagnosticando bugs que en realidad eran "el archivo todavía no se
 // volvió a subir". Guardado como constante con nombre (no un string
 // suelto dentro del console.log) — actualizar ACÁ en cada entrega.
-const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.1';
+const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.2';
 console.log("%c TLC Eventos v" + _VERSION_ARCHIVO_EVENTOS + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1504,7 +1521,7 @@ function _cerrarOverlayTarjeta() {
   document.getElementById('ev-overlay-tarjeta').classList.remove('open');
   TARJETA_ACTUAL_ID = null;
 }
-function _tarjetaActual() { return EVENTO_ACTUAL.tarjetas.find(function(t){ return t.id === TARJETA_ACTUAL_ID; }); }
+function _tarjetaActual() { return (EVENTO_ACTUAL && Array.isArray(EVENTO_ACTUAL.tarjetas)) ? EVENTO_ACTUAL.tarjetas.find(function(t){ return t.id === TARJETA_ACTUAL_ID; }) : null; }
 
 async function _cargarInternosEv() {
   try {
@@ -1826,44 +1843,110 @@ function _eliminarNotaEv(idNota) {
 // ── Adjuntos + portada ──
 var ADJUNTOS_ICONOS_EV = { pdf:'📄', png:'🖼️', jpg:'🖼️', jpeg:'🖼️', xlsx:'📊' };
 var ADJUNTOS_EXT_IMAGEN_EV = ['png', 'jpg', 'jpeg'];
-// ── GASTOS — copiado de servicio.html (_renderGastos y sus 4
-// handlers), adaptado a la estructura de eventos.html (id_evento +
-// id_tarjeta en vez de id_ticket). Sin la rama de solo-lectura de
-// servicio.html — las tarjetas de eventos no tienen un estado
-// "finalizado/cancelado" equivalente. Pedido por Cristian: "en
-// gestion de congresos y eventos en todas las tarjetas de todos los
-// pipelines habilitar seccion Gastos, copialo de las tarjetas de
-// servicio tecnico, e implementalo en eventos.html".
+// ── GASTOS — mismo estilo/mecanismo que presupuesto-editor.html: TC
+// oficial desde dolarapi.com (mismo endpoint), moneda por fila con el
+// mismo .moneda-switch, e importe SIEMPRE guardado en USD
+// internamente (la moneda es solo una preferencia de display/tipeo,
+// igual que it.moneda en presupuesto-editor.html). Adaptado a la
+// estructura de eventos.html (id_evento + id_tarjeta en vez de
+// id_ticket/idCot). Pedido por Cristian: "en gestion de congresos y
+// eventos en todas las tarjetas de todos los pipelines habilitar
+// seccion Gastos, copialo de las tarjetas de servicio tecnico" y
+// después "hacé los campos responsivos y permitime elegir la moneda
+// USD ó AR$... quiero sigas el mismo estilo que presupuesto-editor,
+// como elige la moneda por cada fila y el total y como obtiene TC
+// desde la Api, aprovecha todas las funciones de ese módulo".
+var TC_OFICIAL_EV = null;
+async function _cargarTCEv() {
+  try {
+    var resp = await fetch('https://dolarapi.com/v1/dolares/oficial');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json();
+    TC_OFICIAL_EV = parseFloat(data.venta) || null;
+  } catch (e) {
+    console.warn('No se pudo obtener el TC oficial:', e);
+    TC_OFICIAL_EV = null;
+  }
+  var t = _tarjetaActual && _tarjetaActual();
+  var cont = document.getElementById('ev-gastos-cont');
+  if (t && cont) cont.innerHTML = _renderGastosEv(t);
+}
+_cargarTCEv();
+
+// Convierte un monto en USD a la moneda de display de un gasto —
+// mismo criterio que _aMonedaItem en presupuesto-editor.html.
+function _aMonedaGastoEv(montoUSD, moneda) {
+  if (moneda === 'ARS' && TC_OFICIAL_EV) return montoUSD * TC_OFICIAL_EV;
+  return montoUSD;
+}
+
+var _monedaTotalGastosEv = 'USD'; // preferencia de display del Total — no se guarda, es solo visual
+
 function _renderGastosEv(t) {
   var gastos = (t.gastos && Array.isArray(t.gastos)) ? t.gastos : (t.gastos ? Object.values(t.gastos) : []);
-  var total  = gastos.reduce(function(s, g) { return s + (parseFloat(g.importe) || 0); }, 0);
+  var totalUSD = gastos.reduce(function(s, g) { return s + (parseFloat(g.importe) || 0); }, 0);
+  var totalMostrado = _aMonedaGastoEv(totalUSD, _monedaTotalGastosEv);
 
-  var filas = gastos.length ? gastos.map(function(g, i) {
-    return '<tr>' +
-      '<td><input type="date" class="ev-gastos-input" value="' + _esc(g.fecha||'') + '" onchange="_editarGastoEv(' + i + ',\'fecha\',this.value)"></td>' +
-      '<td><input type="text" class="ev-gastos-input" value="' + _esc(g.descripcion||'') + '" placeholder="Descripción..." onblur="_editarGastoEv(' + i + ',\'descripcion\',this.value)"></td>' +
-      '<td><input type="number" class="ev-gastos-input" value="' + (g.importe||'') + '" placeholder="0" onblur="_editarGastoEv(' + i + ',\'importe\',this.value)" min="0" step="0.01"></td>' +
-      '<td><button class="ev-btn-del-gasto" onclick="_eliminarGastoEv(' + i + ')">✕</button></td>' +
-    '</tr>';
-  }).join('') : '<tr><td colspan="4" style="color:var(--text-muted);padding:10px 6px;text-align:center;">Sin gastos registrados</td></tr>';
+  var tarjetas = gastos.length ? gastos.map(function(g, i) {
+    var moneda = g.moneda || 'USD';
+    var importeMostrado = moneda === 'ARS' ? _aMonedaGastoEv(parseFloat(g.importe)||0, 'ARS') : (g.importe||'');
+    return '<div class="ev-gasto-card">' +
+      '<div class="ev-gasto-top">' +
+        '<input type="text" class="ev-gasto-desc-input" value="' + _esc(g.descripcion||'') + '" placeholder="Descripción del gasto..." onblur="_editarGastoEv(' + i + ',\'descripcion\',this.value)">' +
+        '<button class="ev-btn-del-gasto" onclick="_eliminarGastoEv(' + i + ')">✕</button>' +
+      '</div>' +
+      '<div class="ev-gasto-grid">' +
+        '<div class="ev-campo"><label>Fecha</label><input type="date" class="ev-gastos-input" value="' + _esc(g.fecha||'') + '" onchange="_editarGastoEv(' + i + ',\'fecha\',this.value)"></div>' +
+        '<div class="ev-campo"><label>Importe' + (moneda === 'ARS' && !TC_OFICIAL_EV ? ' <span style="color:#f8961e;">(cargando TC...)</span>' : '') + '</label>' +
+          '<div class="ev-importe-input-wrap">' +
+            '<div class="ev-moneda-switch" onclick="_toggleMonedaGastoEv(' + i + ')" title="Cambiar moneda">' +
+              '<span class="' + (moneda !== 'ARS' ? 'activo' : '') + '">USD</span>' +
+              '<span class="' + (moneda === 'ARS' ? 'activo' : '') + '">AR$</span>' +
+            '</div>' +
+            '<input type="number" class="ev-gastos-input" value="' + importeMostrado + '" placeholder="0" onblur="_editarGastoEv(' + i + ',\'importe\',this.value)" min="0" step="0.01">' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('') : '<div style="color:var(--text-muted);padding:10px 6px;text-align:center;font-size:12px;">Sin gastos registrados</div>';
 
-  return '<table class="ev-gastos-tabla">' +
-    '<thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th><th></th></tr></thead>' +
-    '<tbody>' + filas + '</tbody>' +
-  '</table>' +
+  return tarjetas +
   '<div class="ev-gastos-total">' +
+    '<div class="ev-moneda-switch" onclick="_toggleMonedaTotalGastosEv()" title="Ver total en otra moneda">' +
+      '<span class="' + (_monedaTotalGastosEv !== 'ARS' ? 'activo' : '') + '">USD</span>' +
+      '<span class="' + (_monedaTotalGastosEv === 'ARS' ? 'activo' : '') + '">AR$</span>' +
+    '</div>' +
     '<span class="ev-gastos-total-label">Total:</span>' +
-    '<span class="ev-gastos-total-val">$ ' + total.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</span>' +
+    '<span class="ev-gastos-total-val">' + (_monedaTotalGastosEv === 'ARS' ? 'AR$ ' : 'USD ') + totalMostrado.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</span>' +
   '</div>' +
   '<button class="ev-btn-add-gasto" onclick="_agregarGastoEv()">+ Agregar gasto</button>';
 }
+
+window._toggleMonedaTotalGastosEv = function() {
+  var t = _tarjetaActual();
+  if (!t) return;
+  if (_monedaTotalGastosEv !== 'ARS' && !TC_OFICIAL_EV) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
+  _monedaTotalGastosEv = (_monedaTotalGastosEv === 'ARS') ? 'USD' : 'ARS';
+  var cont = document.getElementById('ev-gastos-cont');
+  if (cont) cont.innerHTML = _renderGastosEv(t);
+};
+
+window._toggleMonedaGastoEv = function(idx) {
+  var t = _tarjetaActual();
+  if (!t || !Array.isArray(t.gastos) || !t.gastos[idx]) return;
+  var g = t.gastos[idx];
+  if (g.moneda !== 'ARS' && !TC_OFICIAL_EV) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
+  g.moneda = (g.moneda === 'ARS') ? 'USD' : 'ARS';
+  var cont = document.getElementById('ev-gastos-cont');
+  if (cont) cont.innerHTML = _renderGastosEv(t);
+};
 
 window._agregarGastoEv = function() {
   var t = _tarjetaActual();
   if (!t) return;
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
   var hoy = new Date().toISOString().split('T')[0];
-  t.gastos.push({ fecha: hoy, descripcion: '', importe: '' });
+  t.gastos.push({ fecha: hoy, descripcion: '', importe: '', moneda: 'USD' });
   var cont = document.getElementById('ev-gastos-cont');
   if (cont) cont.innerHTML = _renderGastosEv(t);
   _guardarGastosEv(t);
@@ -1873,12 +1956,23 @@ window._editarGastoEv = function(idx, campo, valor) {
   var t = _tarjetaActual();
   if (!t) return;
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
-  if (!t.gastos[idx]) return;
-  t.gastos[idx][campo] = campo === 'importe' ? (parseFloat(valor)||0) : valor;
+  var g = t.gastos[idx];
+  if (!g) return;
+  if (campo === 'importe') {
+    var num = parseFloat(valor) || 0;
+    // g.importe SIEMPRE se guarda en USD internamente — si el toggle
+    // de esta fila está en AR$, lo que tipeó el operador es un monto
+    // en pesos, hay que convertirlo antes de guardar (mismo criterio
+    // que _actualizarItem en presupuesto-editor.html).
+    g.importe = (g.moneda === 'ARS' && TC_OFICIAL_EV) ? (num / TC_OFICIAL_EV) : num;
+  } else {
+    g[campo] = valor;
+  }
   // Actualizar total sin re-render completo
-  var total = t.gastos.reduce(function(s,g){ return s+(parseFloat(g.importe)||0); }, 0);
+  var totalUSD = t.gastos.reduce(function(s,gg){ return s+(parseFloat(gg.importe)||0); }, 0);
+  var totalMostrado = _aMonedaGastoEv(totalUSD, _monedaTotalGastosEv);
   var totalEl = document.querySelector('#ev-gastos-cont .ev-gastos-total-val');
-  if (totalEl) totalEl.textContent = '$ ' + total.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  if (totalEl) totalEl.textContent = (_monedaTotalGastosEv === 'ARS' ? 'AR$ ' : 'USD ') + totalMostrado.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
   _guardarGastosEv(t);
 };
 
