@@ -8,6 +8,7 @@
 <!-- Portal TLC | servicio.html | v2026.08.10.3 (Tope en "+ Agregar Caja" del modal "Asignación de Cajas" — no se puede tener más cajas que equipos (cada equipo entra en una sola caja, cualquier caja de más quedaría vacía sí o sí). Botón se deshabilita visualmente al llegar al tope, y avisa si de todas formas se intenta pasar. Pedido por Cristian: "cantidad máxima a agregar cajas, la cantidad de ítems, topealo". Confirmado con test: con 3 equipos, permite hasta 3 cajas, se deshabilita ahí, y avisa si se intenta una 4ta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.2 (Candado Preparación/CC → Para Instalar APAGADO temporalmente — pedido por Cristian: "me pide muchas condiciones... liberame temporalmente". El requisito de Checklist no se puede cumplir en la práctica todavía (falta conectar los formularios individuales de checklist, prerrequisito pendiente). Toda la lógica del candado sigue intacta en _validarGate, controlada por un interruptor nuevo (GATE_PARA_INSTALAR_ACTIVO = false) — para reactivarlo alcanza con volver ese valor a true, sin tocar nada más. Confirmado con test: con el interruptor apagado, deja pasar aunque no haya nada completo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.27.1 (BUG REAL — "se queda un rato en generando etiqueta y no la muestra despues". Al guardar la asignación de cajas con éxito, se abría la pestaña de la etiqueta con window.open() JUSTO DESPUÉS de esperar la respuesta del backend (fetch async) — varios navegadores bloquean esto como popup no solicitado, porque ya no lo consideran un gesto directo del usuario (mismo patrón ya documentado en _iaEnviarPregunta, este mismo archivo). Ahora, en vez de abrir la pestaña sola, se muestra un bloque de éxito con un link real "↗ Abrir Etiquetas de Despacho" (target=_blank) — el TOQUE del vendedor sobre ese link sí es un gesto directo, ningún navegador lo bloquea nunca. El modal ya no se cierra solo al guardar con éxito; se cierra cuando el vendedor toca el link. Al reabrir el modal (para el mismo ticket u otro) se resetea el estado de éxito, para no quedar pegado en la pantalla vieja. Confirmado con 5 tests: no se llama a window.open() directamente, se muestra el link real con la URL correcta, el formulario queda oculto durante el éxito, tocar el link cierra el modal, y reabrir resetea el estado.) -->
+<!-- Portal TLC | servicio.html | v2026.08.30.1 (Gastos del Servicio rediseñado con el mismo estilo/mecanismo que eventos.html/presupuesto-editor.html — Cristian: "hacer igual que en eventos en servicio, que asi esta genial". (1) Layout: tabla reemplazada por tarjetas responsive con .campo/label, colapsa a 1 columna en mobile. (2) Moneda por fila (USD/AR$) con el mismo moneda-switch clickeable — el importe SIEMPRE se guarda en USD internamente, la moneda es solo una preferencia de display/tipeo. (3) TC oficial desde el mismo endpoint (dolarapi.com/v1/dolares/oficial), mostrado en gris y chico junto al total (TC_OFICIAL_ST, _cargarTCSt). (4) El Total tiene su propio toggle USD/AR$. (5) Los gastos se ordenan ascendente por fecha automáticamente — se ordena el array real, no una copia, para que los índices de editar/borrar/cambiar-moneda sigan apuntando al gasto correcto. Se conservó la rama de solo-lectura para tickets finalizados/cancelados (que eventos.html no tenía, por no aplicar ahí) — muestra los gastos con su moneda real pero sin ningún control editable. Confirmado con test: se ve el TC junto al total, los gastos aparecen ordenados ascendente, tipear en AR$ se convierte y guarda en USD vía el backend real, y un ticket finalizado muestra todo en solo lectura sin poder agregar ni editar.) -->
 <!-- Portal TLC | servicio.html | v2026.08.29.3 (El pin 📌 ahora TAMBIÉN se ve directo en cada tarjeta (Kanban y Lista), no solo en el botón de filtro de arriba (v2026.08.29.2) — Cristian tras esa entrega: "no veo ningun pin", esperaba verlo en la tarjeta misma, igual que en cotizaciones.html. El pin es clickeable: alterna la prioridad entre "urgente" y "media" con un solo toque, reusando el mecanismo genérico _guardarCampoSiCambio que YA existía (el mismo que actualiza "prioridad" desde el detalle del ticket) — sin backend nuevo. Rojo/activo si prioridad="urgente", gris/apagado si no. Confirmado con test: el pin se ve en rojo en el ticket urgente y en gris en el normal, tocarlo guarda el cambio correcto vía el mecanismo ya existente, y también aparece en la vista Lista.) -->
 <!-- Portal TLC | servicio.html | v2026.08.29.2 (Nuevo botón toggle "📌 Solo urgentes (N)" en la barra de filtros, con contador en vivo — mismo patrón visual/UX que el filtro de urgentes de cotizaciones.html. Reusa el campo "prioridad" que este archivo YA tenía (dropdown Prioridad con la opción "🔴 Urgente" + badge en cada tarjeta) — no hizo falta inventar un mecanismo de marca nuevo, es un atajo prominente sobre lo que ya existía. Sincronizado en los 2 sentidos con el dropdown de Prioridad: tocar el botón también mueve el dropdown, y elegir "Urgente" del dropdown también pinta el botón activo. Pedido por Cristian: "agregar solo urgentes igual que en cotizaciones". Confirmado con 5 tests: el contador muestra el total real, el filtro cruza etapas distintas (recepción y diagnóstico a la vez), botón↔dropdown quedan sincronizados en los 2 sentidos, y desactivar vuelve a mostrar todo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.29.1 (Nuevo 5to estado "Enviado" agregado al final del dropdown de estado por equipo (Pendiente/Retirado del depósito/Verificado/Listo para despacho/Enviado) — más avanzado que "Listo para despacho". El candado Preparación/CC → Para Instalar (que exige Serie+POE-8+Checklist+Estado) ahora acepta "Listo para despacho" O "Enviado" como válidos — antes solo aceptaba el primero, así que un equipo ya "Enviado" (más adelantado) quedaba bloqueado incorrectamente como si le faltara algo. Ver FotoMap.gs v197 para el nuevo modelo de cálculo del % de progreso (Serie/Calidad/Estado recalibrado con este 5to escalón nuevo). Pedido por Cristian con captura: "agregar enviado abajo de todo la dropdown". Confirmado con test: el dropdown incluye Enviado al final, el candado deja avanzar tanto con "Listo para despacho" como con "Enviado", y sigue bloqueando correctamente con "Pendiente".) -->
@@ -306,26 +307,39 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 .btn-siguiente-etapa.ultimo{background:linear-gradient(135deg,#06d6a0,#0096c7);}
 
 /* ── GASTOS DEL SERVICIO ── */
-.gastos-tabla{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;}
-.gastos-tabla th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;
-  color:var(--text-muted);padding:4px 6px;text-align:left;border-bottom:1px solid var(--border-glow);}
-.gastos-tabla td{padding:6px 6px;border-bottom:1px solid var(--border-glow);color:var(--text-main);vertical-align:middle;}
-.gastos-tabla tr:last-child td{border-bottom:none;}
-.gastos-input{width:100%;padding:4px 6px;border-radius:6px;background:var(--bg);
-  border:1px solid var(--border-glow);color:var(--text-main);font-size:12px;font-family:inherit;outline:none;}
+/* ── GASTOS — mismo estilo/mecanismo que presupuesto-editor.html y
+   eventos.html (tarjeta responsive, moneda-switch por fila, TC desde
+   dolarapi.com, orden ascendente por fecha). Pedido por Cristian:
+   "hacer igual que en eventos en servicio, que asi esta genial". ── */
+.gastos-card{background:var(--panel-darker);border:1px solid var(--border-glow);border-radius:10px;padding:10px;margin-top:8px;}
+.gastos-top{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.gastos-desc-input{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border-glow);color:var(--text-main);
+  font-size:13px;font-weight:600;padding:4px 2px;outline:none;font-family:inherit;}
+.gastos-desc-input:focus{border-color:var(--accent-blue);}
+.gastos-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.gastos-grid .gastos-campo label{font-size:8px;color:var(--text-dim);text-transform:uppercase;font-weight:700;display:block;margin-bottom:3px;}
+.gastos-input{width:100%;background:var(--bg);border:1px solid var(--border-glow);border-radius:7px;
+  padding:6px 8px;color:var(--text-main);font-size:12px;outline:none;font-family:inherit;box-sizing:border-box;}
 .gastos-input:focus{border-color:var(--accent-blue);}
-.gastos-input[type="date"]{min-width:110px;}
-.gastos-input[type="number"]{min-width:80px;text-align:right;}
+.gastos-importe-wrap{display:flex;align-items:center;gap:5px;}
+.gastos-importe-wrap input{flex:1;min-width:0;}
+.gastos-moneda-switch{flex-shrink:0;display:flex;border-radius:20px;overflow:hidden;border:1px solid var(--border-glow);
+  font-size:8px;font-weight:800;cursor:pointer;user-select:none;}
+.gastos-moneda-switch span{padding:6px 6px;transition:background .15s ease,color .15s ease;white-space:nowrap;}
+.gastos-moneda-switch span.activo{background:var(--accent-blue);color:#fff;}
+.gastos-moneda-switch span:not(.activo){color:var(--text-dim);background:var(--panel-darker);}
+@media (max-width:640px){ .gastos-grid{grid-template-columns:1fr 1fr;} }
 .gastos-total{display:flex;justify-content:flex-end;align-items:center;gap:8px;
   margin-top:10px;padding-top:8px;border-top:1px solid var(--border-glow);}
+.gastos-tc-label{font-size:9px;font-weight:600;color:var(--text-dim);margin-right:2px;}
 .gastos-total-label{font-size:11px;font-weight:700;color:var(--text-muted);}
 .gastos-total-val{font-size:14px;font-weight:800;color:var(--accent-green);}
 .btn-add-gasto{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;
   background:transparent;border:1px dashed var(--border-glow);color:var(--text-muted);
   font-size:12px;font-weight:600;cursor:pointer;margin-top:8px;width:100%;justify-content:center;}
 .btn-add-gasto:hover{border-color:var(--accent-blue);color:var(--accent-blue);}
-.btn-del-gasto{background:none;border:none;color:#ef444460;cursor:pointer;font-size:14px;padding:2px 4px;}
-.btn-del-gasto:hover{color:#ef4444;}
+.btn-del-gasto{width:26px;height:26px;border-radius:7px;background:transparent;border:1px solid var(--border-glow);
+  color:#ef4444;cursor:pointer;flex-shrink:0;font-size:13px;}
 
 /* ── K: FINALIZADAS OCULTAS ── */
 .btn-mostrar-fin{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;
@@ -3746,47 +3760,119 @@ window._siguienteEtapa = function(id) {
   _resolverAsignacionYMover(t, sig, dep, true);
 };
 
-// ── J: GASTOS DEL SERVICIO ───────────────────────────────────────
+// ── J: GASTOS DEL SERVICIO — mismo estilo/mecanismo que
+// presupuesto-editor.html y eventos.html (tarjeta responsive,
+// moneda-switch por fila con importe SIEMPRE en USD internamente, TC
+// desde dolarapi.com, orden ascendente por fecha). Se conserva la
+// rama de solo-lectura para tickets finalizados/cancelados, que
+// eventos.html no tenía por no aplicar ahí. Pedido por Cristian:
+// "hacer igual que en eventos en servicio, que asi esta genial".
+var TC_OFICIAL_ST = null;
+async function _cargarTCSt() {
+  try {
+    var resp = await fetch('https://dolarapi.com/v1/dolares/oficial');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json();
+    TC_OFICIAL_ST = parseFloat(data.venta) || null;
+  } catch (e) {
+    console.warn('No se pudo obtener el TC oficial:', e);
+    TC_OFICIAL_ST = null;
+  }
+  if (_ticketActual) {
+    var cont = document.getElementById('det-gastos-card');
+    if (cont) cont.innerHTML = _renderGastos(_ticketActual);
+  }
+}
+_cargarTCSt();
+
+function _aMonedaGastoSt(montoUSD, moneda) {
+  if (moneda === 'ARS' && TC_OFICIAL_ST) return montoUSD * TC_OFICIAL_ST;
+  return montoUSD;
+}
+
+var _monedaTotalGastosSt = 'USD'; // preferencia de display del Total — no se guarda, es solo visual
+
 function _renderGastos(t) {
   var finalizado = (t.deposito === 'finalizado' || t.deposito === 'cancelado');
-  var gastos = (t.gastos && Array.isArray(t.gastos)) ? t.gastos : (t.gastos ? Object.values(t.gastos) : []);
-  var total  = gastos.reduce(function(s, g) { return s + (parseFloat(g.importe) || 0); }, 0);
   var soloLectura = finalizado;
+  // Se normaliza y ordena el array REAL (t.gastos), no una copia — los
+  // índices que usan _editarGasto/_eliminarGasto/_toggleMonedaGasto
+  // son posiciones dentro de t.gastos.
+  if (t.gastos && !Array.isArray(t.gastos)) t.gastos = Object.values(t.gastos);
+  if (!Array.isArray(t.gastos)) t.gastos = [];
+  t.gastos.sort(function(a, b) { return (a.fecha || '').localeCompare(b.fecha || ''); });
+  var gastos = t.gastos;
+  var totalUSD = gastos.reduce(function(s, g) { return s + (parseFloat(g.importe) || 0); }, 0);
+  var totalMostrado = _aMonedaGastoSt(totalUSD, _monedaTotalGastosSt);
 
-  var filas = gastos.length ? gastos.map(function(g, i) {
+  var tarjetas = gastos.length ? gastos.map(function(g, i) {
+    var moneda = g.moneda || 'USD';
     if (soloLectura) {
-      return '<tr>' +
-        '<td>' + _esc(g.fecha || '—') + '</td>' +
-        '<td>' + _esc(g.descripcion || '—') + '</td>' +
-        '<td style="text-align:right">$ ' + (parseFloat(g.importe)||0).toLocaleString('es-AR') + '</td>' +
-        '<td></td>' +
-      '</tr>';
+      var importeSoloLectura = _aMonedaGastoSt(parseFloat(g.importe)||0, moneda);
+      return '<div class="gastos-card">' +
+        '<div class="gastos-top"><b style="font-size:13px;">' + _esc(g.descripcion || '—') + '</b></div>' +
+        '<div style="font-size:11px;color:var(--text-muted);">' + _esc(g.fecha || '—') + ' · ' + (moneda === 'ARS' ? 'AR$ ' : 'USD ') + importeSoloLectura.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</div>' +
+      '</div>';
     }
-    return '<tr>' +
-      '<td><input type="date" class="gastos-input" value="' + _esc(g.fecha||'') + '" onchange="_editarGasto(\'' + t.id_ticket + '\',' + i + ',\'fecha\',this.value)"></td>' +
-      '<td><input type="text" class="gastos-input" value="' + _esc(g.descripcion||'') + '" placeholder="Descripción..." onblur="_editarGasto(\'' + t.id_ticket + '\',' + i + ',\'descripcion\',this.value)"></td>' +
-      '<td><input type="number" class="gastos-input" value="' + (g.importe||'') + '" placeholder="0" onblur="_editarGasto(\'' + t.id_ticket + '\',' + i + ',\'importe\',this.value)" min="0" step="0.01"></td>' +
-      '<td><button class="btn-del-gasto" onclick="_eliminarGasto(\'' + t.id_ticket + '\',' + i + ')">✕</button></td>' +
-    '</tr>';
-  }).join('') : '<tr><td colspan="4" style="color:var(--text-muted);padding:10px 6px;text-align:center;">Sin gastos registrados</td></tr>';
+    var importeMostrado = moneda === 'ARS' ? _aMonedaGastoSt(parseFloat(g.importe)||0, 'ARS') : (g.importe||'');
+    return '<div class="gastos-card">' +
+      '<div class="gastos-top">' +
+        '<input type="text" class="gastos-desc-input" value="' + _esc(g.descripcion||'') + '" placeholder="Descripción del gasto..." onblur="_editarGasto(\'' + t.id_ticket + '\',' + i + ',\'descripcion\',this.value)">' +
+        '<button class="btn-del-gasto" onclick="_eliminarGasto(\'' + t.id_ticket + '\',' + i + ')">✕</button>' +
+      '</div>' +
+      '<div class="gastos-grid">' +
+        '<div class="gastos-campo"><label>Fecha</label><input type="date" class="gastos-input" value="' + _esc(g.fecha||'') + '" onchange="_editarGasto(\'' + t.id_ticket + '\',' + i + ',\'fecha\',this.value)"></div>' +
+        '<div class="gastos-campo"><label>Importe' + (moneda === 'ARS' && !TC_OFICIAL_ST ? ' <span style="color:#f8961e;">(cargando TC...)</span>' : '') + '</label>' +
+          '<div class="gastos-importe-wrap">' +
+            '<div class="gastos-moneda-switch" onclick="_toggleMonedaGasto(\'' + t.id_ticket + '\',' + i + ')" title="Cambiar moneda">' +
+              '<span class="' + (moneda !== 'ARS' ? 'activo' : '') + '">USD</span>' +
+              '<span class="' + (moneda === 'ARS' ? 'activo' : '') + '">AR$</span>' +
+            '</div>' +
+            '<input type="number" class="gastos-input" value="' + importeMostrado + '" placeholder="0" onblur="_editarGasto(\'' + t.id_ticket + '\',' + i + ',\'importe\',this.value)" min="0" step="0.01">' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('') : '<div style="color:var(--text-muted);padding:10px 6px;text-align:center;font-size:12px;">Sin gastos registrados</div>';
 
-  return '<table class="gastos-tabla">' +
-    '<thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th><th></th></tr></thead>' +
-    '<tbody>' + filas + '</tbody>' +
-  '</table>' +
+  return tarjetas +
   '<div class="gastos-total">' +
+    (TC_OFICIAL_ST ? '<span class="gastos-tc-label">TC: $' + TC_OFICIAL_ST.toLocaleString('es-AR') + '</span>' : '') +
+    (!soloLectura ? '<div class="gastos-moneda-switch" onclick="_toggleMonedaTotalGastos(\'' + t.id_ticket + '\')" title="Ver total en otra moneda">' +
+      '<span class="' + (_monedaTotalGastosSt !== 'ARS' ? 'activo' : '') + '">USD</span>' +
+      '<span class="' + (_monedaTotalGastosSt === 'ARS' ? 'activo' : '') + '">AR$</span>' +
+    '</div>' : '') +
     '<span class="gastos-total-label">Total:</span>' +
-    '<span class="gastos-total-val">$ ' + total.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</span>' +
+    '<span class="gastos-total-val">' + (_monedaTotalGastosSt === 'ARS' ? 'AR$ ' : 'USD ') + totalMostrado.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</span>' +
   '</div>' +
   (!soloLectura ? '<button class="btn-add-gasto" onclick="_agregarGasto(\'' + t.id_ticket + '\')">+ Agregar gasto</button>' : '<div style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:center;">Solo lectura — ticket finalizado</div>');
 }
+
+window._toggleMonedaTotalGastos = function(id) {
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (!t) return;
+  if (_monedaTotalGastosSt !== 'ARS' && !TC_OFICIAL_ST) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
+  _monedaTotalGastosSt = (_monedaTotalGastosSt === 'ARS') ? 'USD' : 'ARS';
+  var cont = document.getElementById('det-gastos-card');
+  if (cont) cont.innerHTML = _renderGastos(t);
+};
+
+window._toggleMonedaGasto = function(id, idx) {
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  if (!t || !Array.isArray(t.gastos) || !t.gastos[idx]) return;
+  var g = t.gastos[idx];
+  if (g.moneda !== 'ARS' && !TC_OFICIAL_ST) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
+  g.moneda = (g.moneda === 'ARS') ? 'USD' : 'ARS';
+  var cont = document.getElementById('det-gastos-card');
+  if (cont) cont.innerHTML = _renderGastos(t);
+};
 
 window._agregarGasto = function(id) {
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
   if (!t) return;
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
   var hoy = new Date().toISOString().split('T')[0];
-  t.gastos.push({ fecha: hoy, descripcion: '', importe: '' });
+  t.gastos.push({ fecha: hoy, descripcion: '', importe: '', moneda: 'USD' });
   if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual = t;
   _renderDetalle(t);
   _guardarGastos(id, t.gastos);
@@ -3796,12 +3882,23 @@ window._editarGasto = function(id, idx, campo, valor) {
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
   if (!t) return;
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
-  if (!t.gastos[idx]) return;
-  t.gastos[idx][campo] = campo === 'importe' ? (parseFloat(valor)||0) : valor;
+  var g = t.gastos[idx];
+  if (!g) return;
+  if (campo === 'importe') {
+    var num = parseFloat(valor) || 0;
+    // g.importe SIEMPRE se guarda en USD internamente — si el toggle
+    // de esta fila está en AR$, lo que tipeó el operador es un monto
+    // en pesos, hay que convertirlo antes de guardar (mismo criterio
+    // que presupuesto-editor.html/eventos.html).
+    g.importe = (g.moneda === 'ARS' && TC_OFICIAL_ST) ? (num / TC_OFICIAL_ST) : num;
+  } else {
+    g[campo] = valor;
+  }
   // Actualizar total sin re-render completo
-  var total = t.gastos.reduce(function(s,g){ return s+(parseFloat(g.importe)||0); }, 0);
+  var totalUSD = t.gastos.reduce(function(s,gg){ return s+(parseFloat(gg.importe)||0); }, 0);
+  var totalMostrado = _aMonedaGastoSt(totalUSD, _monedaTotalGastosSt);
   var totalEl = document.querySelector('#det-gastos-card .gastos-total-val');
-  if (totalEl) totalEl.textContent = '$ ' + total.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  if (totalEl) totalEl.textContent = (_monedaTotalGastosSt === 'ARS' ? 'AR$ ' : 'USD ') + totalMostrado.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
   _guardarGastos(id, t.gastos);
 };
 
