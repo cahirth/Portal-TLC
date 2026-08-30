@@ -8,6 +8,7 @@
 <!-- Portal TLC | servicio.html | v2026.08.10.3 (Tope en "+ Agregar Caja" del modal "Asignación de Cajas" — no se puede tener más cajas que equipos (cada equipo entra en una sola caja, cualquier caja de más quedaría vacía sí o sí). Botón se deshabilita visualmente al llegar al tope, y avisa si de todas formas se intenta pasar. Pedido por Cristian: "cantidad máxima a agregar cajas, la cantidad de ítems, topealo". Confirmado con test: con 3 equipos, permite hasta 3 cajas, se deshabilita ahí, y avisa si se intenta una 4ta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.2 (Candado Preparación/CC → Para Instalar APAGADO temporalmente — pedido por Cristian: "me pide muchas condiciones... liberame temporalmente". El requisito de Checklist no se puede cumplir en la práctica todavía (falta conectar los formularios individuales de checklist, prerrequisito pendiente). Toda la lógica del candado sigue intacta en _validarGate, controlada por un interruptor nuevo (GATE_PARA_INSTALAR_ACTIVO = false) — para reactivarlo alcanza con volver ese valor a true, sin tocar nada más. Confirmado con test: con el interruptor apagado, deja pasar aunque no haya nada completo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.27.1 (BUG REAL — "se queda un rato en generando etiqueta y no la muestra despues". Al guardar la asignación de cajas con éxito, se abría la pestaña de la etiqueta con window.open() JUSTO DESPUÉS de esperar la respuesta del backend (fetch async) — varios navegadores bloquean esto como popup no solicitado, porque ya no lo consideran un gesto directo del usuario (mismo patrón ya documentado en _iaEnviarPregunta, este mismo archivo). Ahora, en vez de abrir la pestaña sola, se muestra un bloque de éxito con un link real "↗ Abrir Etiquetas de Despacho" (target=_blank) — el TOQUE del vendedor sobre ese link sí es un gesto directo, ningún navegador lo bloquea nunca. El modal ya no se cierra solo al guardar con éxito; se cierra cuando el vendedor toca el link. Al reabrir el modal (para el mismo ticket u otro) se resetea el estado de éxito, para no quedar pegado en la pantalla vieja. Confirmado con 5 tests: no se llama a window.open() directamente, se muestra el link real con la URL correcta, el formulario queda oculto durante el éxito, tocar el link cierra el modal, y reabrir resetea el estado.) -->
+<!-- Portal TLC | servicio.html | v2026.08.29.2 (Nuevo botón toggle "📌 Solo urgentes (N)" en la barra de filtros, con contador en vivo — mismo patrón visual/UX que el filtro de urgentes de cotizaciones.html. Reusa el campo "prioridad" que este archivo YA tenía (dropdown Prioridad con la opción "🔴 Urgente" + badge en cada tarjeta) — no hizo falta inventar un mecanismo de marca nuevo, es un atajo prominente sobre lo que ya existía. Sincronizado en los 2 sentidos con el dropdown de Prioridad: tocar el botón también mueve el dropdown, y elegir "Urgente" del dropdown también pinta el botón activo. Pedido por Cristian: "agregar solo urgentes igual que en cotizaciones". Confirmado con 5 tests: el contador muestra el total real, el filtro cruza etapas distintas (recepción y diagnóstico a la vez), botón↔dropdown quedan sincronizados en los 2 sentidos, y desactivar vuelve a mostrar todo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.29.1 (Nuevo 5to estado "Enviado" agregado al final del dropdown de estado por equipo (Pendiente/Retirado del depósito/Verificado/Listo para despacho/Enviado) — más avanzado que "Listo para despacho". El candado Preparación/CC → Para Instalar (que exige Serie+POE-8+Checklist+Estado) ahora acepta "Listo para despacho" O "Enviado" como válidos — antes solo aceptaba el primero, así que un equipo ya "Enviado" (más adelantado) quedaba bloqueado incorrectamente como si le faltara algo. Ver FotoMap.gs v197 para el nuevo modelo de cálculo del % de progreso (Serie/Calidad/Estado recalibrado con este 5to escalón nuevo). Pedido por Cristian con captura: "agregar enviado abajo de todo la dropdown". Confirmado con test: el dropdown incluye Enviado al final, el candado deja avanzar tanto con "Listo para despacho" como con "Enviado", y sigue bloqueando correctamente con "Pendiente".) -->
 <!-- Portal TLC | servicio.html | v2026.08.19.2 (Los 2 botones del circuito de Etiquetas de Despacho ahora se deshabilitan y muestran "⏳ Generando..." mientras procesan, evitando doble clic — "Generar Etiquetas de Despacho" (abre el modal, se restaura solo al cerrarlo con X/Cancelar o tras imprimir con éxito) e "Imprimir Etiquetas" (mientras guarda la asignación de cajas en el backend; si falla, se restaura para poder reintentar; si sale bien, el modal se cierra y el botón queda oculto con él). Al reabrir el modal se resetea defensivamente el botón de Imprimir a su texto normal, para no arrastrar un "Generando..." viejo de un ciclo anterior como si fuera el texto "original" a restaurar. Pedido por Cristian con 2 capturas: "al apretar GENERAR ETIQUETA DE DESPACHO, deshabilitar el boton y poner Generando. Lo mismo en imprimir etiquetas". Confirmado con test de punta a punta: ambos botones se deshabilitan y cambian de texto al usarse, se restauran correctamente al cerrar/fallar, y no arrastran estados viejos entre ciclos.) -->
 <!-- Portal TLC | servicio.html | v2026.08.19.1 (El botón "🏷️ Generar Etiquetas de Despacho" pasa de mostrarse en "Para Instalar" a mostrarse en "Preparación / Control de Calidad" — Cristian: "podes agregarlo en preparacion, es mejor q en para instalar, ya que ahi se prepara el pedido/cajas". Un solo cambio de condición (t.deposito === 'para_instalar' → 'preparacion_control_calidad') en el render del detalle de la Orden de Preparación. El candado de avance de etapa (Serie + POE-8 + Checklist + Estado, exigido para pasar de Preparación/CC a Para Instalar) es un requisito DISTINTO y queda totalmente intacto — este cambio solo mueve CUÁNDO se puede generar la etiqueta, no toca las condiciones para avanzar de etapa. Confirmado con test: la condición nueva está en el lugar correcto, la vieja ya no aparece ahí, y el candado de avance sigue sin alterarse.) -->
@@ -598,6 +599,16 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
       <option value="baja">Baja</option>
     </select>
   </div>
+  <!-- Botón toggle "Solo urgentes" — mismo patrón que cotizaciones.html
+       (pin/filtro prominente con contador en vivo), reusando el campo
+       "prioridad" que este archivo YA tenía (no hacía falta un
+       mecanismo de marca nuevo). Pedido por Cristian: "agregar solo
+       urgentes igual que en cotizaciones". -->
+  <button id="btn-filtro-urgentes-st" onclick="_toggleFiltroUrgentesST()"
+      style="padding:6px 10px; background:var(--bg); border:1px solid #ef444455;
+             border-radius:10px; color:var(--text-muted); font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">
+      📌 Solo urgentes (<span id="contador-urgentes-st">0</span>)
+  </button>
   <div class="filtro-dd-wrap">
     <span class="filtro-dd-label">Estado de progreso</span>
     <select class="filtro-dd" id="dd-progreso" onchange="_selFiltroDD('estado',this)">
@@ -1319,6 +1330,18 @@ window._selFiltro = function(btn, tipo) {
 window._selFiltroDD = function(tipo, sel) {
   _filtros[tipo] = sel.value;
   sel.classList.toggle('tiene-filtro', sel.value !== 'todos');
+  // Si el cambio vino del dropdown de Prioridad (no del botón "Solo
+  // urgentes"), mantenemos el botón sincronizado igual — para que no
+  // queden mostrando cosas distintas entre sí.
+  if (tipo === 'prio') {
+    var btn = document.getElementById('btn-filtro-urgentes-st');
+    if (btn) {
+      var yaActivo = sel.value === 'urgente';
+      btn.style.background = yaActivo ? '#ef4444' : 'var(--bg)';
+      btn.style.color = yaActivo ? '#fff' : 'var(--text-muted)';
+      btn.style.borderColor = yaActivo ? '#ef4444' : '#ef444455';
+    }
+  }
   _aplicarFiltros();
 };
 
@@ -1343,11 +1366,33 @@ window._aplicarFiltros = function() {
     }
     return true;
   });
+  var elContadorUrgentesSt = document.getElementById('contador-urgentes-st');
+  if (elContadorUrgentesSt) elContadorUrgentesSt.textContent = _tickets.filter(function(t) { return t.prioridad === 'urgente'; }).length;
   if (_vistaActual === 'lista') {
     _renderLista(filtrados);
   } else {
     _renderKanban(filtrados);
   }
+};
+
+// Toggle "📌 Solo urgentes" — atajo prominente sobre el campo
+// "prioridad" que este archivo YA tenía (dropdown + badge en la
+// tarjeta), en vez de un mecanismo de marca nuevo. Mismo patrón visual
+// que cotizaciones.html. Pedido por Cristian: "agregar solo urgentes
+// igual que en cotizaciones".
+window._toggleFiltroUrgentesST = function() {
+  var activo = _filtros.prio === 'urgente';
+  _filtros.prio = activo ? 'todos' : 'urgente';
+  var dd = document.getElementById('dd-prio');
+  if (dd) { dd.value = _filtros.prio; dd.classList.toggle('tiene-filtro', _filtros.prio !== 'todos'); }
+  var btn = document.getElementById('btn-filtro-urgentes-st');
+  if (btn) {
+    var yaActivo = _filtros.prio === 'urgente';
+    btn.style.background = yaActivo ? '#ef4444' : 'var(--bg)';
+    btn.style.color = yaActivo ? '#fff' : 'var(--text-muted)';
+    btn.style.borderColor = yaActivo ? '#ef4444' : '#ef444455';
+  }
+  _aplicarFiltros();
 };
 
 // ── Render Lista ──────────────────────────────────────────────────
