@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.08.30.1 (BUG REAL — la clave de "Ficha enviada" (v2026.08.29.2) era SOLO por equipo, sin el destinatario: una vez mandada la ficha de un equipo a un cliente, quedaba bloqueada para SIEMPRE, ni siquiera dejaba mandársela a un cliente DISTINTO. Reportado por Cristian: "Un equipo, quiero enviar otro, y ya me pone el ficha enviada y no me deja mandar más... entiendo que podría ser el mismo, que no me deje enviar al mismo cliente, pero se traba" — confirmando el diagnóstico exacto. Ahora la clave incluye el teléfono (_claveFichaEnviada(equipo, telefono)) — cada combinación equipo+cliente se trackea por separado. Se re-chequea en cada tecla del teléfono (oninput), y como el campo queda oculto junto con "Ficha enviada", se agregó el link "¿Enviar a otro cliente?" dentro del mensaje para poder volver a mostrarlo y tipear un número nuevo (_habilitarNuevoDestinatario, _ocultarEstadoFichaEnviada). Confirmado con 5 tests: arranca limpio, marcar para un cliente muestra el estado, escribir un teléfono DISTINTO ya no bloquea (el bug reportado), volver a escribir el teléfono ya enviado muestra el estado de nuevo, y el link de "otro cliente" limpia y habilita todo.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.7 (El sello dorado de Garantía (v2026.08.29.5/.6) ahora SOLO se muestra para los equipos con 3 años (Garantia=TRUE en el Excel) — el resto (1 año, el default) va sin ningún sello. El accesorio tildado sin cargo en "Módulos y Accesorios" y la mención en las notas del presupuesto ("Incluye garantía de X año(s)") NO se tocaron — siguen apareciendo en los 2 casos, con o sin sello. Pedido por Cristian: "Solamente ponerle el logo lacrado de garantía tres años a los equipos que están marcados con garantía tildado true en Excel. Todos los demás van sin sello lacrado, pero sí va en la nota por default del presupuesto, eso no lo saques". Confirmado con test de punta a punta (2 escenarios): con Garantia=TRUE el sello se ve; con Garantia=FALSE el sello queda oculto, y en ambos casos el ítem sin cargo y la nota del presupuesto siguen intactos.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.6 (El badge de Garantía (v2026.08.29.5) ahora es más grande — 92px → 140px, con el texto interno escalado en la misma proporción (título, estrellas, número y "AÑOS"). Pedido por Cristian con captura: "un poco mas grande el sello de garantia".) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.29.5 (Nueva feature: GARANTÍA — Cristian: "quiero agregar en el excel una columna true/false llamada garantía, todos los equipos tienen 1 año de garantía pero algunos por promocion vamos a darle 3 años, quiero que muestre en ficha tecnica y tbien se trasladará a presupuesto como item sin cargo, el logo pegado y vistoso en la ficha tecnica como este, si tiene 1 año o 3 bien resaltado" (con imagen de referencia de un sello dorado). Nueva columna en Lista_Precios: "Garantia" (TRUE/FALSE) — todos los equipos arrancan en 1 año por default, TRUE = 3 años (promoción). (1) Badge grande "GARANTÍA X AÑOS" — sunburst dorado hecho con CSS puro (repeating-conic-gradient, sin ningún asset/imagen nueva), pegado como sticker sobre la foto del equipo (position:absolute sobre .foto-wrap, que ahora tiene position:relative). (2) La garantía se inyecta como un Hijo MÁS, sintético (no viene del Excel como fila propia), con precio $0 y tildado por default ("Garantía Extendida 3 años" o "Garantía 1 año" según corresponda) — reusa TAL CUAL todo el mecanismo ya existente para Hijos reales (aparece en "Módulos y Accesorios", viaja en itemsParaApilar, termina como línea sin cargo en el presupuesto), sin código nuevo para eso. Excluida explícitamente del mecanismo de "una nota por cada Hijo tildado" (v2026.08.29.1) — es automática en TODOS los envíos, no algo que el vendedor elige mandar, así que generarle su propia nota sería ruido en el historial de cada negocio. (3) Sugerido por el propio Cristian ("lo podemos poner en notas del presupuesto por default"): las notas por default del presupuesto ahora también mencionan "Incluye garantía de X año(s)." Confirmado con test de punta a punta (2 escenarios — Garantia=TRUE y FALSE): el badge muestra el número correcto, el módulo aparece ya tildado con el nombre correcto, viaja al carrito real con precio $0, y las notas mencionan la garantía. Batería de regresión actualizada (test-hijos-y-notas.js) para contemplar el nuevo ítem automático sin romper los tests existentes de Padre+Hijo.) -->
@@ -343,11 +344,13 @@
         <div id="fi-contactos-sugerencias" style="display:none; flex-wrap:wrap; gap:6px; margin-top:-4px;"></div>
         <div id="fi-telefono-wrap" style="display:flex; gap:10px; width:100%;">
             <input type="tel" id="fi-telefono-destino" placeholder="Teléfono del cliente (opcional)"
+                oninput="_verificarSiFichaYaEnviada(_fichaNombreActual)"
                 style="flex:1; padding:11px 14px; border-radius:8px; border:1px solid var(--border-color); font-size:13px; outline:none;">
         </div>
         <div id="fi-lead-resultado" style="font-size:12px; margin-top:-2px;"></div>
-        <div id="fi-ya-enviada-msg" style="display:none; font-size:13px; font-weight:700; color:#06d6a0; background:#06d6a01a; border:1px solid #06d6a044; border-radius:8px; padding:10px 14px; width:100%; box-sizing:border-box;">
-            ✅ Ficha enviada
+        <div id="fi-ya-enviada-msg" style="display:none; font-size:13px; font-weight:700; color:#06d6a0; background:#06d6a01a; border:1px solid #06d6a044; border-radius:8px; padding:10px 14px; width:100%; box-sizing:border-box; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <span>✅ Ficha enviada</span>
+            <span onclick="_habilitarNuevoDestinatario()" style="font-weight:600; font-size:12px; color:var(--accent-blue,#3a86ff); cursor:pointer; text-decoration:underline;">¿Enviar a otro cliente?</span>
         </div>
         <div id="fi-hint-botones" style="font-size:11px; color:var(--text-muted); margin-top:-4px; line-height:1.4;">
             💡 Los dos botones de abajo guardan el seguimiento en Ventas — si ya hay un negocio reciente con esta empresa, se suma ahí; si no, se crea uno nuevo.
@@ -419,7 +422,7 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
-var FICHA_EQUIPO_VERSION = '2026.08.29.7';
+var FICHA_EQUIPO_VERSION = '2026.08.30.1';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -2182,12 +2185,31 @@ function _mostrarAvisoWsp(mensaje) {
 // Cristian: "Una vez enviada la ficha técnica al cliente, los
 // botones de WhatsApp y guardar PDF, debes desaparecer al igual que
 // el teléfono del cliente".
-function _claveFichaEnviada(nombreEquipo) {
-  return 'tlc_ficha_enviada_' + encodeURIComponent(nombreEquipo || '');
+// BUG REAL — la clave de "ficha enviada" era SOLO por equipo
+// (nombreEquipo), sin el destinatario. Una vez mandada la ficha de un
+// equipo a UN cliente, quedaba bloqueada para SIEMPRE — ni siquiera
+// dejaba mandársela a un cliente DISTINTO más adelante, porque el
+// teléfono no formaba parte de la clave. Reportado por Cristian: "Un
+// equipo, quiero enviar otro, y ya me pone el ficha enviada y no me
+// deja mandar más... entiendo que podría ser el mismo, que no me deje
+// enviar al mismo cliente, pero se traba" — confirmando exactamente
+// este diagnóstico: bloquear el REENVÍO AL MISMO CLIENTE tiene
+// sentido, bloquear cualquier cliente nuevo no. Ahora la clave incluye
+// el teléfono también, así que cada combinación equipo+cliente se
+// trackea por separado. Como el teléfono puede cambiar DESPUÉS de
+// cargar la página (el vendedor tipeando un cliente nuevo), se
+// re-chequea en cada tecla (oninput en fi-telefono-destino) — y como
+// el campo de teléfono queda OCULTO junto con "Ficha enviada", se
+// agregó el link "¿Enviar a otro cliente?" dentro del mensaje mismo
+// para poder volver a mostrarlo y tipear un número distinto.
+function _claveFichaEnviada(nombreEquipo, telefono) {
+  var telNormalizado = String(telefono || '').replace(/[^\d]/g, ''); // solo dígitos, mismo criterio no importa cómo se haya tipeado (espacios, guiones, etc.)
+  return 'tlc_ficha_enviada_' + encodeURIComponent(nombreEquipo || '') + '_' + telNormalizado;
 }
 
 function _marcarFichaComoEnviada(nombreEquipo) {
-  try { localStorage.setItem(_claveFichaEnviada(nombreEquipo), '1'); } catch(e) {}
+  var telActual = (document.getElementById('fi-telefono-destino') || {}).value || '';
+  try { localStorage.setItem(_claveFichaEnviada(nombreEquipo, telActual), '1'); } catch(e) {}
   _aplicarEstadoFichaEnviada();
 }
 
@@ -2201,12 +2223,38 @@ function _aplicarEstadoFichaEnviada() {
   if (elWsp) elWsp.style.display = 'none';
   if (elPdf) elPdf.style.display = 'none';
   if (elHint) elHint.style.display = 'none';
-  if (elMsg) elMsg.style.display = 'block';
+  if (elMsg) elMsg.style.display = 'flex';
 }
+
+function _ocultarEstadoFichaEnviada() {
+  var elTelWrap = document.getElementById('fi-telefono-wrap');
+  var elWsp = document.getElementById('fi-btn-wsp-normal');
+  var elPdf = document.getElementById('fi-btn-guardar-pdf');
+  var elHint = document.getElementById('fi-hint-botones');
+  var elMsg = document.getElementById('fi-ya-enviada-msg');
+  if (elTelWrap) elTelWrap.style.display = 'flex';
+  if (elWsp) elWsp.style.display = '';
+  if (elPdf) elPdf.style.display = '';
+  if (elHint) elHint.style.display = '';
+  if (elMsg) elMsg.style.display = 'none';
+}
+
+// Vuelve a mostrar el teléfono/botones para cargar un cliente
+// distinto — limpia el campo para no confundir con el número
+// anterior. Si el vendedor termina tipeando el MISMO número de antes,
+// _verificarSiFichaYaEnviada (disparado por el oninput del teléfono)
+// vuelve a mostrar "Ficha enviada" solo, sin que haga falta nada más.
+window._habilitarNuevoDestinatario = function() {
+  var elTel = document.getElementById('fi-telefono-destino');
+  if (elTel) { elTel.value = ''; elTel.focus(); }
+  _ocultarEstadoFichaEnviada();
+};
 
 function _verificarSiFichaYaEnviada(nombreEquipo) {
   try {
-    if (localStorage.getItem(_claveFichaEnviada(nombreEquipo)) === '1') _aplicarEstadoFichaEnviada();
+    var telActual = (document.getElementById('fi-telefono-destino') || {}).value || '';
+    if (localStorage.getItem(_claveFichaEnviada(nombreEquipo, telActual)) === '1') _aplicarEstadoFichaEnviada();
+    else _ocultarEstadoFichaEnviada();
   } catch(e) {}
 }
 
