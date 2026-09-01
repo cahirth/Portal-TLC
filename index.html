@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.30.2 (Restaurado el botón "Tareas" → navega a mi-dia.html (con el mismo permiso ya existente), que se había perdido al recibir una versión de index.html sin ese cambio aplicado — ver el bloque de v2026.08.30.1 más abajo para el resto (permisos vía Firebase). Confirmado con test: con "Tareas"=true el botón no muestra ningún error al abrirlo; con "Tareas"=false queda gris y avisa con un toast, sin navegar.) -->
+<!-- Portal TLC | index.html | v2026.08.30.1 (BUG DE FONDO REAL — cargarPermisosUsuario() hacía su propio pedido en vivo a Google Sheets (gviz), separado del de permisos.js, pagando el mismo riesgo de lentitud/falla intermitente en CADA login (misma familia de problemas que los pipelines "a veces no aparecen"). Cristian: "quiero que todos los permisos del excel que ahora creo estas en permisos.js y no esta funcionando OK, los subamis a firebase manualmente con un boton script como el lista de precios, y asi los cambios son immediatos" — confirmado que "inmediato" es apenas se toca el botón de sincronizar (mismo criterio que Lista_Precios), no en vivo sin tocar nada. Ahora lee directo de Firebase RTDB (/permisos/{emailSeguro}, sincronizado por sincronizarPermisosAFirebase en FotoMap.gs v202) — nuevos helpers _emailKeySeguroIdx/_headerSeguroIdx, réplica exacta de _rtdbKeySeguro/_rtdbHeaderSeguro del backend (mismo criterio que usa permisos.js v2026.08.30.1). Usuario no encontrado en /permisos → acceso mínimo (todo en false); falla de red → fail-open (mantiene el permiso completo por default, no bloquea a nadie por un problema de conexión ajeno a los permisos en sí). Confirmado con test de punta a punta: lee la fila real de Firebase con la clave/columnas correctamente saneadas, arma userPermisos con los valores reales, y aplicarPermisosMenu() grisea/habilita el menú según corresponda.) -->
 <!-- Portal TLC | index.html | v2026.08.19.3 (Corrección de nombre de columna — la v2026.08.19.2 (recién anterior) usaba "Ver Comisiones" por error; Cristian confirmó con captura del Excel real que la columna se llama simplemente "Comisiones", sin "Ver" adelante. Corregido en cols.indexOf() y en el arreglo de diagnóstico de columnas faltantes. Ver comisiones.html (misma corrección, para que ambos lados lean la MISMA columna real).) -->
 <!-- Portal TLC | index.html | v2026.08.19.2 (El botón "Comisiones" del submenú de Ventas ahora se pone gris/deshabilitado según la columna "Ver Comisiones" de la hoja Vendedores (TRUE/FALSE) — mismo mecanismo que ya usan los demás módulos (opacidad 0.35 + toast "🔒 No tienes permiso" al tocarlo), sumado como caso puntual porque el botón vive DENTRO del submenú de Ventas, no es un ítem de primer nivel que ya pasara por aplicarPermisosMenu(). El campo userPermisos.verComisiones y la lectura de la columna "Ver Comisiones" ya existían de antes (preparados sin usar); solo hacía falta sumar menu-item-comisiones a la lista de secciones grises y darle su propio wrapper _abrirComisionesConPermiso(). Pedido por Cristian: "Quidro que el boton este en gris, deshabitado si la.tilde esta en false desde el excel". Ver comisiones.html (usa la MISMA columna "Ver Comisiones" para el permiso de acceso a la pantalla en sí). Confirmado con test: con la columna en false el botón queda gris y tocarlo no navega (solo avisa), con la columna en true vuelve a verse normal.) -->
 <!-- Portal TLC | index.html | v2026.08.19.1 (Tope de 5 en "Mis Pendientes Críticos" del Radar (home) — antes 90%/75% no tenían ningún límite (solo "resto" estaba topeado en 8), así que un vendedor con muchos negocios avanzados a la vez podía saturar el panel entero. Ahora el tope es GLOBAL: máximo 5 tarjetas en total, priorizando 90% primero (por monto desc), después 75%, después el resto — si sobra lugar dentro de los 5. Pedido por Cristian, aclarando el pedido de filtro por vendedor en cotizaciones.html: "con los últimos cinco más importantes al noventa por ciento, está bien, no hace falta ver todos". Confirmado con test: con 9 pendientes simulados (3 al 90%, 4 al 75%, 2 en otros estados), muestra exactamente 5 — los 3 del 90% primero, después los 2 de mayor monto al 75%.) -->
@@ -705,7 +707,7 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
                     <div class="item-text-box"><h3>Administración</h3><p>Gestión interna y reportes</p></div>
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
-                <div class="menu-item-row" id="menu-tareas" onclick="abrirModuloConPermiso('view-tareas-menu', 'Tareas', 'Gestión de tareas internas', 'tareas')">
+                <div class="menu-item-row" id="menu-tareas" onclick="_abrirTareasConPermiso()">
                     <div class="item-logo-container" style="background:linear-gradient(135deg, rgba(6,214,160,0.18), rgba(58,134,255,0.12)); border:1px solid rgba(6,214,160,0.35);">
                         <i class="fa-solid fa-list-check" style="color:#06d6a0; font-size:20px;"></i>
                     </div>
@@ -1482,78 +1484,72 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
 
     // ─── PERMISOS ─────────────────────────────────────────────────────────────
     const SHEET_ID_PERMISOS = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
+    const RTDB_URL_PERMISOS = 'https://portal-tlc-default-rtdb.firebaseio.com';
     // Placeholder de arranque (mientras carga el Sheet) — el valor real y
     // definitivo de verComisiones viene SIEMPRE de la columna "Comisiones"
     // en cargarPermisosUsuario(), independiente del rol.
     let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, tareas: true, empresas: true, eventos: true, verComisiones: false, rol: 'Administrador' };
 
+    // Mismo criterio EXACTO que _rtdbKeySeguro()/_rtdbHeaderSeguro()
+    // del lado del backend (FotoMap.gs) — ver permisos.js v2026.08.30.1
+    // para la explicación completa del cambio de gviz→Firebase.
+    function _emailKeySeguroIdx(email) {
+        let clave = String(email || '').trim().toLowerCase().replace(/[.#$\[\]\/]/g, '_').replace(/[\s+]/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '');
+        if (clave.length > 200) clave = clave.substring(0, 200);
+        return clave;
+    }
+    function _headerSeguroIdx(header) {
+        return String(header || '').trim().replace(/[.#$\[\]\/\s]/g, '_');
+    }
+
     async function cargarPermisosUsuario(email) {
         try {
-            const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID_PERMISOS}/gviz/tq?tqx=out:json&sheet=Vendedores`;
+            // BUG REAL DE FONDO — mismo problema que permisos.js: esta
+            // función hacía su PROPIO pedido en vivo a gviz (separado
+            // del de permisos.js), pagando el mismo riesgo de lentitud/
+            // falla de red en cada login. Cristian: "quiero que todos
+            // los permisos del excel... los subamis a firebase
+            // manualmente con un boton script como el lista de
+            // precios, y asi los cambios son immediatos". Ahora lee
+            // directo de Firebase (/permisos/{emailSeguro}),
+            // sincronizado a mano con el botón "Sincronizar permisos a
+            // Firebase ahora" — mismo criterio que permisos.js.
+            const url = RTDB_URL_PERMISOS + '/permisos/' + _emailKeySeguroIdx(email) + '.json';
             const res = await fetch(url);
-            const text = await res.text();
-            const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
-            const rows = json.table.rows;
-            const cols = json.table.cols.map(c => c.label);
+            const fila = await res.json(); // objeto plano { Email, Rol, Ventas, Servicio_Tecnico, ... } o null
 
-            const emailIdx   = cols.indexOf('Email');
-            const rolIdx     = cols.indexOf('Rol');
-            const ventasIdx  = cols.indexOf('Ventas');
-            const servicioIdx= cols.indexOf('Servicio Tecnico');
-            const comexIdx   = cols.indexOf('Comercio Exterior');
-            const adminIdx   = cols.indexOf('Administracion');
-            const tareasIdx  = cols.indexOf('Tareas');
-            const empresasIdx= cols.indexOf('Empresas');
-            const eventosIdx = cols.indexOf('Eventos'); // ← columna nueva, "permisos.moduloEventos" — si todavía no existe en el Sheet, bool() la deja en false (bloqueado) sin romper nada
-            const regulatoriaIdx = cols.indexOf('Regulatoria');
-            const reportesIdx = cols.indexOf('Reportes');
-            const comisionesIdx = cols.indexOf('Comisiones');
+            if (!fila) console.warn('[index.html] Email "' + email + '" no encontrado en /permisos (Firebase) — se aplica acceso mínimo. ¿Se sincronizó ya con el botón de la planilla?');
 
-            // DIAGNÓSTICO — a diferencia de permisos.js (que sí avisa
-            // por consola cuando no encuentra una columna), esta
-            // función se quedaba muda: si un nombre de columna no
-            // matcheaba EXACTO con el encabezado real del Sheet
-            // (typo, tilde de más/menos, espacio extra), simplemente
-            // bloqueaba el módulo sin ninguna pista de por qué.
-            // Reportado por Cristian: "no me habilita administracion
-            // ni servicio" — sin este aviso, no había forma rápida de
-            // saber si era un problema de nombre de columna o del
-            // valor cargado en su fila. Mismo criterio que ya usa
-            // permisos.js.
-            [['Servicio Tecnico', servicioIdx], ['Administracion', adminIdx], ['Comercio Exterior', comexIdx], ['Tareas', tareasIdx], ['Eventos', eventosIdx], ['Regulatoria', regulatoriaIdx], ['Reportes', reportesIdx], ['Comisiones', comisionesIdx]].forEach(([nombre, idx]) => {
-                if (idx === -1) console.warn('[index.html] Columna "' + nombre + '" no encontrada en Vendedores (encabezados reales: ' + cols.join(' | ') + ') — el módulo queda bloqueado para todos hasta que se cargue esa columna.');
-            });
-
-            const fila = rows.find(r => {
-                const v = r.c[emailIdx]?.v || '';
-                return v.toLowerCase().trim() === email.toLowerCase().trim();
-            });
-            if (!fila) console.warn('[index.html] Email "' + email + '" no encontrado en la solapa Vendedores — se aplica acceso mínimo.');
+            // DIAGNÓSTICO — mismo criterio que ya tenía esta función:
+            // avisar por consola de qué columnas no se encontraron,
+            // en vez de bloquear en silencio sin ninguna pista.
+            const columnasEsperadas = ['Ventas', 'Servicio Tecnico', 'Comercio Exterior', 'Administracion', 'Tareas', 'Empresas', 'Eventos', 'Regulatoria', 'Reportes', 'Comisiones'];
+            if (fila) {
+                columnasEsperadas.forEach(nombre => {
+                    if (!(_headerSeguroIdx(nombre) in fila)) console.warn('[index.html] Columna "' + nombre + '" no encontrada en /permisos (Firebase) — el módulo queda bloqueado para todos hasta que se sincronice esa columna.');
+                });
+            }
 
             if (fila) {
-                const bool = (idx) => {
-                    if (idx === -1) return false; // columna no existe todavía en el Sheet
-                    const v = fila.c[idx]?.v;
+                const bool = (nombreColumna) => {
+                    const clave = _headerSeguroIdx(nombreColumna);
+                    if (!(clave in fila)) return false; // columna no sincronizada todavía
+                    const v = fila[clave];
                     return v === true || v === 'TRUE' || v === 'true' || v === 1;
                 };
-                // Log del valor CRUDO leído para Servicio Técnico y
-                // Administración puntualmente — para diagnosticar de
-                // una si el problema es "no encuentra la columna" vs
-                // "la encuentra pero el valor cargado en la fila de
-                // este usuario no da true".
-                console.log('[index.html] Diagnóstico permisos de "' + email + '" — Servicio Tecnico: idx=' + servicioIdx + ', valor crudo=' + JSON.stringify(servicioIdx !== -1 ? fila.c[servicioIdx]?.v : 'columna no encontrada') + ' | Administracion: idx=' + adminIdx + ', valor crudo=' + JSON.stringify(adminIdx !== -1 ? fila.c[adminIdx]?.v : 'columna no encontrada'));
+                console.log('[index.html] Diagnóstico permisos de "' + email + '" — Servicio Tecnico: valor crudo=' + JSON.stringify(fila[_headerSeguroIdx('Servicio Tecnico')] ?? 'columna no encontrada') + ' | Administracion: valor crudo=' + JSON.stringify(fila[_headerSeguroIdx('Administracion')] ?? 'columna no encontrada'));
                 userPermisos = {
-                    rol:           fila.c[rolIdx]?.v || 'Vend_Externo',
-                    ventas:        bool(ventasIdx),
-                    servicio:      bool(servicioIdx),
-                    comex:         bool(comexIdx),
-                    admin:         bool(adminIdx),
-                    tareas:        bool(tareasIdx),
-                    empresas:      bool(empresasIdx),
-                    eventos:       bool(eventosIdx),
-                    regulatoria:   bool(regulatoriaIdx),
-                    reportes:      bool(reportesIdx),
-                    verComisiones: bool(comisionesIdx),
+                    rol:           fila[_headerSeguroIdx('Rol')] || 'Vend_Externo',
+                    ventas:        bool('Ventas'),
+                    servicio:      bool('Servicio Tecnico'),
+                    comex:         bool('Comercio Exterior'),
+                    admin:         bool('Administracion'),
+                    tareas:        bool('Tareas'),
+                    empresas:      bool('Empresas'),
+                    eventos:       bool('Eventos'),
+                    regulatoria:   bool('Regulatoria'),
+                    reportes:      bool('Reportes'),
+                    verComisiones: bool('Comisiones'),
                 };
             } else {
                 // Email no encontrado → acceso mínimo
@@ -1923,6 +1919,24 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
             return;
         }
         window.location.href = 'comisiones.html';
+    }
+
+    // "Tareas" ("Mi Día") navega a un archivo real (mi-dia.html) en
+    // vez de abrir una vista interna del menú ("view-tareas-menu",
+    // que solo mostraba un placeholder de "próximamente") — mismo
+    // patrón que _abrirComisionesConPermiso: respeta el mismo permiso
+    // que YA se lee y grisea el botón (columna "Tareas" TRUE/FALSE,
+    // vía aplicarPermisosMenu → menu-tareas). Pedido por Cristian:
+    // "mi dia va adentro de tareas en index.htmly debe respetar si
+    // esta habilitado en el excel en la columna Tareas, con las
+    // tildes true/false".
+    function _abrirTareasConPermiso() {
+        const el = document.getElementById('menu-tareas');
+        if (el && el.dataset.bloqueado === 'true') {
+            mostrarToast('🔒 No tienes permiso para acceder a Tareas');
+            return;
+        }
+        window.location.href = 'mi-dia.html';
     }
 
     // Para módulos que todavía no tienen vista real (ej. Regulatoria,
