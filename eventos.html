@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.30.6 (Cada gasto nuevo ahora registra automáticamente quién lo cargó y cuándo — "Por: Nombre — fecha hs" arriba de la descripción, mismo estilo/formato que ya usan las Notas Generales de este archivo (.ft, "Por: X — fecha hs"). Se completa solo al crear el gasto (_agregarGastoEv), leyendo el usuario logueado — no editable a mano. Los gastos viejos, sin creado_por, no muestran esa línea (no rompen nada). Réplica de lo mismo hecho en servicio.html v2026.08.30.2 — Cristian: "Podes replicarlo en eventos.html". Confirmado con test: un gasto viejo sin autor sigue viéndose normal, uno nuevo muestra el nombre+fecha/hora reales con el mismo formato que las Notas, y lo que se guarda en el backend incluye ambos campos.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.5 (BUG REAL sobre lo entregado en v2026.08.30.4 — Cristian: "con la ficha abierta no encuentro el pin para tildarlo, solo con la ficha cerrada". El pin solo se había agregado a la tarjeta CERRADA (Kanban), faltaba en el header del detalle ABIERTO — mismo gap que hubo que corregir en su momento para el modo=cliente de ficha-equipo.html. Agregado junto al título, dentro de _renderOverlayTarjeta — mismo criterio visual (gris/apagado sin marcar, sin filtro cuando está activo) y misma función _toggleUrgenteDesdeTarjetaEv ya existente, sin necesidad de nada nuevo. Confirmado con test: el pin aparece en el header del detalle abierto, tocarlo desde ahí marca la tarjeta correcta, y el header se actualiza solo (sin cerrar el modal) reflejando el cambio.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.4 (Paso 1 del módulo nuevo "Mis Tareas / Mi Día" — pin 📌 en tarjetas de Eventos, cerrando la trilogía junto con Ventas (cotizaciones.html) y Servicio Técnico (servicio.html). Mismo patrón exacto: tocar el pin marca/desmarca con una nota corta opcional, borde rojo en la tarjeta si está marcada, filtro toggle "📌 Solo urgentes (N)" con contador en vivo en la barra de filtros, y la nota queda registrada en Notas Generales de la tarjeta (reusando ev_agregarNota, ya existente — no hizo falta ningún mecanismo nuevo para eso). Guarda vía la nueva acción marcarTarjetaUrgenteEv (FotoMap.gs v200). Confirmado con 4 tests: los pines arrancan en gris, marcar con nota llama al backend correcto y agrega la nota en Notas Generales, el contador y el filtro funcionan mostrando solo la tarjeta marcada, y cancelar el prompt no marca nada.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.3 (2 mejoras a Gastos (v2026.08.30.2): (1) El TC oficial usado para la conversión ahora se ve, en gris y chico, a la izquierda del toggle de moneda del Total (ej. "TC: $1.350") — antes se usaba internamente pero no se mostraba en ningún lado. (2) Los gastos ahora se ordenan ascendente por fecha automáticamente al renderizar — se ordena el array REAL (t.gastos), no una copia, porque los índices que usan editar/borrar/cambiar-moneda son posiciones dentro de ese mismo array; ordenar solo una copia para mostrar hubiera hecho que esas acciones tocaran el gasto equivocado tras reordenar. Pedido por Cristian: "mostrar al lado a la iz del total y del toggle de moneda el TC de calculo, en gris y mas chiquito" / "tambien mostrarlo ordenado ascendente por fecha a todos los gastos". Confirmado con test: el TC se ve correctamente formateado junto al total, los gastos quedan ordenados ascendente tanto en el array real como en pantalla, y editar por índice sigue apuntando al gasto correcto después de reordenar.) -->
@@ -221,6 +222,7 @@ body.tema-claro .ev-campo input, body.tema-claro .ev-campo select, body.tema-cla
    y como obtiene TC desde la Api, aprovecha todas las funciones de
    ese módulo". ── */
 .ev-gasto-card{background:var(--panel-darker);border:1px solid var(--border-glow);border-radius:10px;padding:10px;margin-top:8px;}
+.ev-gasto-autor{font-size:10px;color:var(--text-dim);margin-bottom:5px;}
 .ev-gasto-top{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .ev-gasto-desc-input{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border-glow);color:var(--text-main);
   font-size:13px;font-weight:600;padding:4px 2px;outline:none;font-family:inherit;}
@@ -580,7 +582,7 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 // diagnosticando bugs que en realidad eran "el archivo todavía no se
 // volvió a subir". Guardado como constante con nombre (no un string
 // suelto dentro del console.log) — actualizar ACÁ en cada entrega.
-const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.5';
+const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.6';
 console.log("%c TLC Eventos v" + _VERSION_ARCHIVO_EVENTOS + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1983,7 +1985,17 @@ function _renderGastosEv(t) {
   var tarjetas = gastos.length ? gastos.map(function(g, i) {
     var moneda = g.moneda || 'USD';
     var importeMostrado = moneda === 'ARS' ? _aMonedaGastoEv(parseFloat(g.importe)||0, 'ARS') : (g.importe||'');
+    // Quién cargó el gasto y cuándo — mismo patrón que las Notas
+    // Generales de este archivo (.ft, "Por: X — fecha hs"). Se
+    // completa SOLO al crear el gasto (_agregarGastoEv), leyendo el
+    // usuario logueado — no es editable a mano. Pedido por Cristian:
+    // "quiero agregar al modulo servicio, en gastos, quien hace el
+    // gastos de acuerdo al usuario logueado y fecha y hora... Podes
+    // replicarlo en eventos.html".
+    var fechaCreacion = g.creado_en ? new Date(g.creado_en).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    var metaAutorHtml = g.creado_por ? '<div class="ev-gasto-autor">Por: ' + _esc(g.creado_por) + (fechaCreacion ? ' — ' + fechaCreacion + ' hs' : '') + '</div>' : '';
     return '<div class="ev-gasto-card">' +
+      metaAutorHtml +
       '<div class="ev-gasto-top">' +
         '<input type="text" class="ev-gasto-desc-input" value="' + _esc(g.descripcion||'') + '" placeholder="Descripción del gasto..." onblur="_editarGastoEv(' + i + ',\'descripcion\',this.value)">' +
         '<button class="ev-btn-del-gasto" onclick="_eliminarGastoEv(' + i + ')">✕</button>' +
@@ -2040,7 +2052,8 @@ window._agregarGastoEv = function() {
   if (!t) return;
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
   var hoy = new Date().toISOString().split('T')[0];
-  t.gastos.push({ fecha: hoy, descripcion: '', importe: '', moneda: 'USD' });
+  var autor = (_session && (_session.name || _session.username)) || 'Desconocido';
+  t.gastos.push({ fecha: hoy, descripcion: '', importe: '', moneda: 'USD', creado_por: autor, creado_en: new Date().toISOString() });
   var cont = document.getElementById('ev-gastos-cont');
   if (cont) cont.innerHTML = _renderGastosEv(t);
   _guardarGastosEv(t);
