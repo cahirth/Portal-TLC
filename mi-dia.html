@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | mi-dia.html | v2026.08.30.3 (En PC (≥900px), los 2 grupos de filtros (Tiempo + Origen) ahora quedan en UNA sola fila, con un separador vertical sutil entre ambos — antes se veían apilados en 2 líneas separadas incluso en pantallas anchas. Se envolvieron los 2 en un contenedor nuevo (.md-filtros-fila), que solo pasa a display:flex desde el media query de 900px — en mobile sigue apilado como antes (sin cambios ahí). Pedido por Cristian: "alinear los filtros en la PC en una sola fila". Confirmado con test: los 2 grupos comparten el mismo contenedor, el CSS los pone en fila desde 900px, y la lógica de ambos filtros (clase "activo" al tocar cada botón) sigue funcionando igual después de mover el HTML. Batería de regresión completa (10+4 tests de v2026.08.30.1/.2) sigue pasando sin cambios.) -->
 <!-- Portal TLC | mi-dia.html | v2026.08.30.2 (2 cambios de layout pedidos por Cristian: "inmovilizar panel desde la línea naranja, ensanchar la pantalla en PC". (1) Captura de tarea + los 2 filtros (Tiempo/Origen) ahora viven en un panel propio con position:sticky (.md-top-fijo), justo debajo del header — queda fijo mientras la lista de abajo (#md-lista) scrollea sola, así no hay que volver arriba para tocar un filtro con listas largas. Con borde inferior sutil marcando el corte. (2) El ancho máximo (.md-wrap y el panel fijo, alineados entre sí) pasa de 760px fijo a responsive: sigue en 760px en mobile, pero se ensancha a 1200px en pantallas ≥900px (PC). Confirmado con 4 tests: captura+filtros quedan dentro del panel fijo, la lista queda afuera (en el área que sí scrollea), el panel usa position:sticky, y el ancho crece igual en los dos (panel fijo y lista) en pantallas grandes. Batería de regresión completa (10 tests del Paso 3) sigue pasando sin cambios — la reestructuración del HTML no tocó ningún ID ni lógica.) -->
 <!-- Portal TLC | mi-dia.html | v2026.08.30.1 (PASO 3 del módulo nuevo
      "Mis Tareas / Mi Día" — pantalla que junta en un solo lugar los
@@ -64,6 +65,16 @@ a { color:var(--accent-blue); text-decoration:none; }
 .md-captura button { padding:0 18px; border-radius:10px; background:var(--accent-blue); border:none; color:#fff; font-weight:700; font-size:13px; cursor:pointer; white-space:nowrap; }
 
 .md-filtros { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
+
+/* En PC, los 2 grupos de filtros (Tiempo + Origen) quedan en una sola
+   fila, con un separador vertical sutil entre ambos — en mobile
+   siguen apilados como antes (default). Pedido por Cristian: "alinear
+   los filtros en la PC en una sola fila". */
+@media (min-width:900px) {
+  .md-filtros-fila { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .md-filtros-fila .md-filtros { margin-bottom:0; }
+  .md-filtros-fila #md-filtros-origen { padding-left:16px; border-left:1px solid var(--border-glow); }
+}
 .md-filtro-btn { padding:6px 12px; border-radius:20px; background:var(--panel-dark); border:1px solid var(--border-glow); color:var(--text-muted); font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
 .md-filtro-btn.activo { background:var(--accent-blue); border-color:var(--accent-blue); color:#fff; }
 
@@ -114,18 +125,20 @@ a { color:var(--accent-blue); text-decoration:none; }
         <button onclick="_crearTareaMd()">+ Agregar</button>
       </div>
 
-      <div class="md-filtros" id="md-filtros-tiempo">
-        <button class="md-filtro-btn activo" data-tiempo="todas" onclick="_setFiltroTiempoMd('todas')">Todas</button>
-        <button class="md-filtro-btn" data-tiempo="hoy" onclick="_setFiltroTiempoMd('hoy')">Hoy</button>
-        <button class="md-filtro-btn" data-tiempo="vencidas" onclick="_setFiltroTiempoMd('vencidas')">Vencidas</button>
-        <button class="md-filtro-btn" data-tiempo="semana" onclick="_setFiltroTiempoMd('semana')">Esta semana</button>
-      </div>
-      <div class="md-filtros" id="md-filtros-origen" style="margin-bottom:0;">
-        <button class="md-filtro-btn activo" data-origen="todos" onclick="_setFiltroOrigenMd('todos')">Todos</button>
-        <button class="md-filtro-btn" data-origen="ventas" onclick="_setFiltroOrigenMd('ventas')">📦 Ventas</button>
-        <button class="md-filtro-btn" data-origen="servicio" onclick="_setFiltroOrigenMd('servicio')">🔧 Servicio</button>
-        <button class="md-filtro-btn" data-origen="eventos" onclick="_setFiltroOrigenMd('eventos')">🎪 Eventos</button>
-        <button class="md-filtro-btn" data-origen="tarea" onclick="_setFiltroOrigenMd('tarea')">📝 Tareas</button>
+      <div class="md-filtros-fila">
+        <div class="md-filtros" id="md-filtros-tiempo">
+          <button class="md-filtro-btn activo" data-tiempo="todas" onclick="_setFiltroTiempoMd('todas')">Todas</button>
+          <button class="md-filtro-btn" data-tiempo="hoy" onclick="_setFiltroTiempoMd('hoy')">Hoy</button>
+          <button class="md-filtro-btn" data-tiempo="vencidas" onclick="_setFiltroTiempoMd('vencidas')">Vencidas</button>
+          <button class="md-filtro-btn" data-tiempo="semana" onclick="_setFiltroTiempoMd('semana')">Esta semana</button>
+        </div>
+        <div class="md-filtros" id="md-filtros-origen" style="margin-bottom:0;">
+          <button class="md-filtro-btn activo" data-origen="todos" onclick="_setFiltroOrigenMd('todos')">Todos</button>
+          <button class="md-filtro-btn" data-origen="ventas" onclick="_setFiltroOrigenMd('ventas')">📦 Ventas</button>
+          <button class="md-filtro-btn" data-origen="servicio" onclick="_setFiltroOrigenMd('servicio')">🔧 Servicio</button>
+          <button class="md-filtro-btn" data-origen="eventos" onclick="_setFiltroOrigenMd('eventos')">🎪 Eventos</button>
+          <button class="md-filtro-btn" data-origen="tarea" onclick="_setFiltroOrigenMd('tarea')">📝 Tareas</button>
+        </div>
       </div>
     </div>
   </div>
