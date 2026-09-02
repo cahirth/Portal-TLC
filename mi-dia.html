@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | mi-dia.html | v2026.08.30.2 (2 cambios de layout pedidos por Cristian: "inmovilizar panel desde la línea naranja, ensanchar la pantalla en PC". (1) Captura de tarea + los 2 filtros (Tiempo/Origen) ahora viven en un panel propio con position:sticky (.md-top-fijo), justo debajo del header — queda fijo mientras la lista de abajo (#md-lista) scrollea sola, así no hay que volver arriba para tocar un filtro con listas largas. Con borde inferior sutil marcando el corte. (2) El ancho máximo (.md-wrap y el panel fijo, alineados entre sí) pasa de 760px fijo a responsive: sigue en 760px en mobile, pero se ensancha a 1200px en pantallas ≥900px (PC). Confirmado con 4 tests: captura+filtros quedan dentro del panel fijo, la lista queda afuera (en el área que sí scrollea), el panel usa position:sticky, y el ancho crece igual en los dos (panel fijo y lista) en pantallas grandes. Batería de regresión completa (10 tests del Paso 3) sigue pasando sin cambios — la reestructuración del HTML no tocó ningún ID ni lógica.) -->
 <!-- Portal TLC | mi-dia.html | v2026.08.30.1 (PASO 3 del módulo nuevo
      "Mis Tareas / Mi Día" — pantalla que junta en un solo lugar los
      pines 📌 personales de Ventas/Servicio Técnico/Eventos (Paso 1) +
@@ -47,6 +48,15 @@ a { color:var(--accent-blue); text-decoration:none; }
 .md-fecha-hoy { font-size:11px; color:var(--text-muted); }
 
 .md-wrap { max-width:760px; margin:0 auto; padding:16px; }
+@media (min-width:900px) { .md-wrap { max-width:1200px; } }
+
+/* Captura + filtros quedan fijos (sticky) apenas debajo del header,
+   así no hay que volver a scrollear arriba para tocarlos con listas
+   largas. Pedido por Cristian: "inmovilizar panel desde la línea
+   naranja, ensanchar la pantalla en PC". */
+.md-top-fijo { position:sticky; top:58px; z-index:9; background:var(--bg); padding-top:16px; border-bottom:1px solid var(--border-glow); }
+.md-top-fijo-inner { max-width:760px; margin:0 auto; padding:0 16px 14px; }
+@media (min-width:900px) { .md-top-fijo-inner { max-width:1200px; } }
 
 .md-captura { display:flex; gap:8px; margin-bottom:18px; }
 .md-captura input { flex:1; padding:11px 14px; border-radius:10px; background:var(--panel-dark); border:1px solid var(--border-glow); color:var(--text-main); font-size:13px; outline:none; }
@@ -97,26 +107,30 @@ a { color:var(--accent-blue); text-decoration:none; }
 </div>
 
 <div id="md-contenido" style="display:none;">
+  <div class="md-top-fijo">
+    <div class="md-top-fijo-inner">
+      <div class="md-captura">
+        <input type="text" id="md-input-nueva-tarea" placeholder="Agregar una tarea rápida..." onkeydown="if(event.key==='Enter') _crearTareaMd();">
+        <button onclick="_crearTareaMd()">+ Agregar</button>
+      </div>
+
+      <div class="md-filtros" id="md-filtros-tiempo">
+        <button class="md-filtro-btn activo" data-tiempo="todas" onclick="_setFiltroTiempoMd('todas')">Todas</button>
+        <button class="md-filtro-btn" data-tiempo="hoy" onclick="_setFiltroTiempoMd('hoy')">Hoy</button>
+        <button class="md-filtro-btn" data-tiempo="vencidas" onclick="_setFiltroTiempoMd('vencidas')">Vencidas</button>
+        <button class="md-filtro-btn" data-tiempo="semana" onclick="_setFiltroTiempoMd('semana')">Esta semana</button>
+      </div>
+      <div class="md-filtros" id="md-filtros-origen" style="margin-bottom:0;">
+        <button class="md-filtro-btn activo" data-origen="todos" onclick="_setFiltroOrigenMd('todos')">Todos</button>
+        <button class="md-filtro-btn" data-origen="ventas" onclick="_setFiltroOrigenMd('ventas')">📦 Ventas</button>
+        <button class="md-filtro-btn" data-origen="servicio" onclick="_setFiltroOrigenMd('servicio')">🔧 Servicio</button>
+        <button class="md-filtro-btn" data-origen="eventos" onclick="_setFiltroOrigenMd('eventos')">🎪 Eventos</button>
+        <button class="md-filtro-btn" data-origen="tarea" onclick="_setFiltroOrigenMd('tarea')">📝 Tareas</button>
+      </div>
+    </div>
+  </div>
+
   <div class="md-wrap">
-    <div class="md-captura">
-      <input type="text" id="md-input-nueva-tarea" placeholder="Agregar una tarea rápida..." onkeydown="if(event.key==='Enter') _crearTareaMd();">
-      <button onclick="_crearTareaMd()">+ Agregar</button>
-    </div>
-
-    <div class="md-filtros" id="md-filtros-tiempo">
-      <button class="md-filtro-btn activo" data-tiempo="todas" onclick="_setFiltroTiempoMd('todas')">Todas</button>
-      <button class="md-filtro-btn" data-tiempo="hoy" onclick="_setFiltroTiempoMd('hoy')">Hoy</button>
-      <button class="md-filtro-btn" data-tiempo="vencidas" onclick="_setFiltroTiempoMd('vencidas')">Vencidas</button>
-      <button class="md-filtro-btn" data-tiempo="semana" onclick="_setFiltroTiempoMd('semana')">Esta semana</button>
-    </div>
-    <div class="md-filtros" id="md-filtros-origen">
-      <button class="md-filtro-btn activo" data-origen="todos" onclick="_setFiltroOrigenMd('todos')">Todos</button>
-      <button class="md-filtro-btn" data-origen="ventas" onclick="_setFiltroOrigenMd('ventas')">📦 Ventas</button>
-      <button class="md-filtro-btn" data-origen="servicio" onclick="_setFiltroOrigenMd('servicio')">🔧 Servicio</button>
-      <button class="md-filtro-btn" data-origen="eventos" onclick="_setFiltroOrigenMd('eventos')">🎪 Eventos</button>
-      <button class="md-filtro-btn" data-origen="tarea" onclick="_setFiltroOrigenMd('tarea')">📝 Tareas</button>
-    </div>
-
     <div id="md-lista">
       <div class="md-loading">Cargando...</div>
     </div>
