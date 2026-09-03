@@ -2,9 +2,10 @@
 // Se carga desde todos los módulos (index.html, cotizaciones.html,
 // servicio.html, selector-dispositivos.html, presupuesto.html,
 // orden-servicio.html, remito-ingreso.html, ficha-equipo.html,
-// empresas.html) para que exista un solo número de versión que
-// sincronizar en cada actualización, en vez de repetirlo en cada archivo.
+// empresas.html, eventos.html, mi-dia.html) para que exista un solo
+// número de versión que sincronizar en cada actualización, en vez de
+// repetirlo en cada archivo.
 //
 // Al subir un cambio: actualizar SOLO esta línea. El console.log y el
 // texto visible en el menú de avatar de cada módulo lo leen de acá.
-const PORTAL_TLC_VERSION = "2026.08.13.73";
+const PORTAL_TLC_VERSION = "2026.08.30.1";

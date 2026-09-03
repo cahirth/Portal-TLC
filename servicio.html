@@ -8,6 +8,7 @@
 <!-- Portal TLC | servicio.html | v2026.08.10.3 (Tope en "+ Agregar Caja" del modal "Asignación de Cajas" — no se puede tener más cajas que equipos (cada equipo entra en una sola caja, cualquier caja de más quedaría vacía sí o sí). Botón se deshabilita visualmente al llegar al tope, y avisa si de todas formas se intenta pasar. Pedido por Cristian: "cantidad máxima a agregar cajas, la cantidad de ítems, topealo". Confirmado con test: con 3 equipos, permite hasta 3 cajas, se deshabilita ahí, y avisa si se intenta una 4ta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.2 (Candado Preparación/CC → Para Instalar APAGADO temporalmente — pedido por Cristian: "me pide muchas condiciones... liberame temporalmente". El requisito de Checklist no se puede cumplir en la práctica todavía (falta conectar los formularios individuales de checklist, prerrequisito pendiente). Toda la lógica del candado sigue intacta en _validarGate, controlada por un interruptor nuevo (GATE_PARA_INSTALAR_ACTIVO = false) — para reactivarlo alcanza con volver ese valor a true, sin tocar nada más. Confirmado con test: con el interruptor apagado, deja pasar aunque no haya nada completo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.27.1 (BUG REAL — "se queda un rato en generando etiqueta y no la muestra despues". Al guardar la asignación de cajas con éxito, se abría la pestaña de la etiqueta con window.open() JUSTO DESPUÉS de esperar la respuesta del backend (fetch async) — varios navegadores bloquean esto como popup no solicitado, porque ya no lo consideran un gesto directo del usuario (mismo patrón ya documentado en _iaEnviarPregunta, este mismo archivo). Ahora, en vez de abrir la pestaña sola, se muestra un bloque de éxito con un link real "↗ Abrir Etiquetas de Despacho" (target=_blank) — el TOQUE del vendedor sobre ese link sí es un gesto directo, ningún navegador lo bloquea nunca. El modal ya no se cierra solo al guardar con éxito; se cierra cuando el vendedor toca el link. Al reabrir el modal (para el mismo ticket u otro) se resetea el estado de éxito, para no quedar pegado en la pantalla vieja. Confirmado con 5 tests: no se llama a window.open() directamente, se muestra el link real con la URL correcta, el formulario queda oculto durante el éxito, tocar el link cierra el modal, y reabrir resetea el estado.) -->
+<!-- Portal TLC | servicio.html | v2026.08.30.3 (PASO 1 del módulo nuevo "Cuenta Corriente y Rendición de Gastos" — cada gasto ahora tiene a_favor_de (quién debe cobrarlo, por default quien lo cargó) y estado (PENDIENTE/PAGADO), completados automáticamente al crear. Un gasto PAGADO (liquidado desde el módulo nuevo, todavía por construir en pasos siguientes) pasa a solo lectura acá — con badge "✅ Liquidado" — y no se puede editar/eliminar/cambiar de moneda (avisa con alert en el intento). Los gastos viejos, sin estos campos, no rompen nada — se tratan como pendientes al leerlos. Backward-compatible: no requiere ninguna migración de datos existentes. Confirmado con test: un gasto viejo sigue viéndose y editándose normal, uno PAGADO muestra el badge y bloquea edición/eliminación con aviso, y uno nuevo se crea con a_favor_de=usuario logueado y estado=PENDIENTE.) -->
 <!-- Portal TLC | servicio.html | v2026.08.30.2 (Cada gasto nuevo ahora registra automáticamente quién lo cargó y cuándo — "Nombre · fecha/hora" arriba de la descripción, mismo estilo visual que Notas de Seguimiento (reusa .nota-meta y _formatFechaISO, sin CSS nuevo). Se completa solo al crear el gasto (_agregarGasto), leyendo el usuario logueado (_session.name) — no es un campo editable a mano. Los gastos viejos, sin creado_por, no muestran esa línea (no rompen nada). Pedido por Cristian: "quiero agregar al modulo servicio, en gastos, quien hace el gastos de acuerdo al usuario logueado y fecha y hora, fijate en imagen 3 como lo hicimos en notas". Confirmado con test: un gasto viejo sin autor sigue viéndose normal, uno nuevo muestra el nombre+fecha/hora reales, y lo que se guarda en el backend incluye ambos campos.) -->
 <!-- Portal TLC | servicio.html | v2026.08.30.1 (Gastos del Servicio rediseñado con el mismo estilo/mecanismo que eventos.html/presupuesto-editor.html — Cristian: "hacer igual que en eventos en servicio, que asi esta genial". (1) Layout: tabla reemplazada por tarjetas responsive con .campo/label, colapsa a 1 columna en mobile. (2) Moneda por fila (USD/AR$) con el mismo moneda-switch clickeable — el importe SIEMPRE se guarda en USD internamente, la moneda es solo una preferencia de display/tipeo. (3) TC oficial desde el mismo endpoint (dolarapi.com/v1/dolares/oficial), mostrado en gris y chico junto al total (TC_OFICIAL_ST, _cargarTCSt). (4) El Total tiene su propio toggle USD/AR$. (5) Los gastos se ordenan ascendente por fecha automáticamente — se ordena el array real, no una copia, para que los índices de editar/borrar/cambiar-moneda sigan apuntando al gasto correcto. Se conservó la rama de solo-lectura para tickets finalizados/cancelados (que eventos.html no tenía, por no aplicar ahí) — muestra los gastos con su moneda real pero sin ningún control editable. Confirmado con test: se ve el TC junto al total, los gastos aparecen ordenados ascendente, tipear en AR$ se convierte y guarda en USD vía el backend real, y un ticket finalizado muestra todo en solo lectura sin poder agregar ni editar.) -->
 <!-- Portal TLC | servicio.html | v2026.08.29.3 (El pin 📌 ahora TAMBIÉN se ve directo en cada tarjeta (Kanban y Lista), no solo en el botón de filtro de arriba (v2026.08.29.2) — Cristian tras esa entrega: "no veo ningun pin", esperaba verlo en la tarjeta misma, igual que en cotizaciones.html. El pin es clickeable: alterna la prioridad entre "urgente" y "media" con un solo toque, reusando el mecanismo genérico _guardarCampoSiCambio que YA existía (el mismo que actualiza "prioridad" desde el detalle del ticket) — sin backend nuevo. Rojo/activo si prioridad="urgente", gris/apagado si no. Confirmado con test: el pin se ve en rojo en el ticket urgente y en gris en el normal, tocarlo guarda el cambio correcto vía el mecanismo ya existente, y también aparece en la vista Lista.) -->
@@ -3808,14 +3809,21 @@ function _renderGastos(t) {
 
   var tarjetas = gastos.length ? gastos.map(function(g, i) {
     var moneda = g.moneda || 'USD';
+    var pagado = g.estado === 'PAGADO';
+    // Un gasto ya liquidado (Paso 1 del módulo nuevo "Cuenta
+    // Corriente y Rendición de Gastos") pasa a solo lectura acá,
+    // INDEPENDIENTE de si el ticket en sí está finalizado — no se
+    // puede seguir editando algo que ya se le pagó a la persona.
+    var soloLecturaEsteGasto = soloLectura || pagado;
+    var badgePagadoHtml = pagado ? '<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;background:rgba(6,214,160,.15);color:var(--accent-green);margin-left:6px;">✅ Liquidado</span>' : '';
     // Quién cargó el gasto y cuándo — mismo patrón visual que Notas de
     // Seguimiento (.nota-meta + _formatFechaISO). Se completa SOLO al
     // crear el gasto (_agregarGasto), leyendo el usuario logueado —
     // no es editable a mano, es un registro automático. Pedido por
     // Cristian: "quien hace el gastos de acuerdo al usuario logueado
     // y fecha y hora, fijate en imagen 3 como lo hicimos en notas".
-    var metaAutorHtml = g.creado_por ? '<div class="nota-meta">' + _esc(g.creado_por) + (g.creado_en ? ' · ' + _formatFechaISO(g.creado_en) : '') + '</div>' : '';
-    if (soloLectura) {
+    var metaAutorHtml = g.creado_por ? '<div class="nota-meta">' + _esc(g.creado_por) + (g.creado_en ? ' · ' + _formatFechaISO(g.creado_en) : '') + badgePagadoHtml + '</div>' : (badgePagadoHtml ? '<div class="nota-meta">' + badgePagadoHtml + '</div>' : '');
+    if (soloLecturaEsteGasto) {
       var importeSoloLectura = _aMonedaGastoSt(parseFloat(g.importe)||0, moneda);
       return '<div class="gastos-card">' +
         metaAutorHtml +
@@ -3871,6 +3879,11 @@ window._toggleMonedaGasto = function(id, idx) {
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
   if (!t || !Array.isArray(t.gastos) || !t.gastos[idx]) return;
   var g = t.gastos[idx];
+  // Un gasto ya PAGADO (liquidado a través de Cuenta Corriente) no se
+  // puede seguir editando desde acá — evita que se descuadre lo que
+  // ya se le liquidó a la persona. Paso 1 del módulo nuevo "Cuenta
+  // Corriente y Rendición de Gastos".
+  if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
   if (g.moneda !== 'ARS' && !TC_OFICIAL_ST) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
   g.moneda = (g.moneda === 'ARS') ? 'USD' : 'ARS';
   var cont = document.getElementById('det-gastos-card');
@@ -3883,7 +3896,14 @@ window._agregarGasto = function(id) {
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
   var hoy = new Date().toISOString().split('T')[0];
   var autor = (_session && (_session.name || _session.username)) || 'Desconocido';
-  t.gastos.push({ fecha: hoy, descripcion: '', importe: '', moneda: 'USD', creado_por: autor, creado_en: new Date().toISOString() });
+  // a_favor_de/estado — Paso 1 del módulo nuevo "Cuenta Corriente y
+  // Rendición de Gastos": quién debe cobrar este gasto (por default,
+  // quien lo cargó — reasignar a otra persona vive en el módulo
+  // nuevo, no acá) y si ya se le liquidó o sigue pendiente. Los
+  // gastos viejos (de antes de este cambio) no tienen estos campos —
+  // se tratan como PENDIENTE/a favor de quien figure en creado_por al
+  // leerlos (ver _renderGastos), sin necesidad de migrar nada.
+  t.gastos.push({ fecha: hoy, descripcion: '', importe: '', moneda: 'USD', creado_por: autor, creado_en: new Date().toISOString(), a_favor_de: autor, estado: 'PENDIENTE' });
   if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual = t;
   _renderDetalle(t);
   _guardarGastos(id, t.gastos);
@@ -3895,6 +3915,7 @@ window._editarGasto = function(id, idx, campo, valor) {
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
   var g = t.gastos[idx];
   if (!g) return;
+  if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
   if (campo === 'importe') {
     var num = parseFloat(valor) || 0;
     // g.importe SIEMPRE se guarda en USD internamente — si el toggle
@@ -3917,6 +3938,8 @@ window._eliminarGasto = function(id, idx) {
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
   if (!t) return;
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
+  var g = t.gastos[idx];
+  if (g && g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede eliminar.'); return; }
   t.gastos.splice(idx, 1);
   if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual = t;
   _renderDetalle(t);

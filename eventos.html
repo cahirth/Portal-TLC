@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.30.7 (PASO 1 del módulo nuevo "Cuenta Corriente y Rendición de Gastos" — mismo cambio exacto que servicio.html v2026.08.30.3: a_favor_de/estado en cada gasto, completados automático al crear; un gasto PAGADO pasa a solo lectura con badge "✅ Liquidado" y bloquea edición/eliminación con aviso. Backward-compatible, sin migración necesaria. Confirmado con los mismos 4 tests que servicio.html.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.6 (Cada gasto nuevo ahora registra automáticamente quién lo cargó y cuándo — "Por: Nombre — fecha hs" arriba de la descripción, mismo estilo/formato que ya usan las Notas Generales de este archivo (.ft, "Por: X — fecha hs"). Se completa solo al crear el gasto (_agregarGastoEv), leyendo el usuario logueado — no editable a mano. Los gastos viejos, sin creado_por, no muestran esa línea (no rompen nada). Réplica de lo mismo hecho en servicio.html v2026.08.30.2 — Cristian: "Podes replicarlo en eventos.html". Confirmado con test: un gasto viejo sin autor sigue viéndose normal, uno nuevo muestra el nombre+fecha/hora reales con el mismo formato que las Notas, y lo que se guarda en el backend incluye ambos campos.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.5 (BUG REAL sobre lo entregado en v2026.08.30.4 — Cristian: "con la ficha abierta no encuentro el pin para tildarlo, solo con la ficha cerrada". El pin solo se había agregado a la tarjeta CERRADA (Kanban), faltaba en el header del detalle ABIERTO — mismo gap que hubo que corregir en su momento para el modo=cliente de ficha-equipo.html. Agregado junto al título, dentro de _renderOverlayTarjeta — mismo criterio visual (gris/apagado sin marcar, sin filtro cuando está activo) y misma función _toggleUrgenteDesdeTarjetaEv ya existente, sin necesidad de nada nuevo. Confirmado con test: el pin aparece en el header del detalle abierto, tocarlo desde ahí marca la tarjeta correcta, y el header se actualiza solo (sin cerrar el modal) reflejando el cambio.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.4 (Paso 1 del módulo nuevo "Mis Tareas / Mi Día" — pin 📌 en tarjetas de Eventos, cerrando la trilogía junto con Ventas (cotizaciones.html) y Servicio Técnico (servicio.html). Mismo patrón exacto: tocar el pin marca/desmarca con una nota corta opcional, borde rojo en la tarjeta si está marcada, filtro toggle "📌 Solo urgentes (N)" con contador en vivo en la barra de filtros, y la nota queda registrada en Notas Generales de la tarjeta (reusando ev_agregarNota, ya existente — no hizo falta ningún mecanismo nuevo para eso). Guarda vía la nueva acción marcarTarjetaUrgenteEv (FotoMap.gs v200). Confirmado con 4 tests: los pines arrancan en gris, marcar con nota llama al backend correcto y agrega la nota en Notas Generales, el contador y el filtro funcionan mostrando solo la tarjeta marcada, y cancelar el prompt no marca nada.) -->
@@ -582,7 +583,7 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 // diagnosticando bugs que en realidad eran "el archivo todavía no se
 // volvió a subir". Guardado como constante con nombre (no un string
 // suelto dentro del console.log) — actualizar ACÁ en cada entrega.
-const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.6';
+const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.7';
 console.log("%c TLC Eventos v" + _VERSION_ARCHIVO_EVENTOS + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1984,6 +1985,7 @@ function _renderGastosEv(t) {
 
   var tarjetas = gastos.length ? gastos.map(function(g, i) {
     var moneda = g.moneda || 'USD';
+    var pagado = g.estado === 'PAGADO';
     var importeMostrado = moneda === 'ARS' ? _aMonedaGastoEv(parseFloat(g.importe)||0, 'ARS') : (g.importe||'');
     // Quién cargó el gasto y cuándo — mismo patrón que las Notas
     // Generales de este archivo (.ft, "Por: X — fecha hs"). Se
@@ -1993,7 +1995,18 @@ function _renderGastosEv(t) {
     // gastos de acuerdo al usuario logueado y fecha y hora... Podes
     // replicarlo en eventos.html".
     var fechaCreacion = g.creado_en ? new Date(g.creado_en).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-    var metaAutorHtml = g.creado_por ? '<div class="ev-gasto-autor">Por: ' + _esc(g.creado_por) + (fechaCreacion ? ' — ' + fechaCreacion + ' hs' : '') + '</div>' : '';
+    var badgePagadoHtml = pagado ? '<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;background:rgba(6,214,160,.15);color:var(--accent-green);margin-left:6px;">✅ Liquidado</span>' : '';
+    var metaAutorHtml = g.creado_por ? '<div class="ev-gasto-autor">Por: ' + _esc(g.creado_por) + (fechaCreacion ? ' — ' + fechaCreacion + ' hs' : '') + badgePagadoHtml + '</div>' : (badgePagadoHtml ? '<div class="ev-gasto-autor">' + badgePagadoHtml + '</div>' : '');
+    // Paso 1 del módulo nuevo "Cuenta Corriente y Rendición de
+    // Gastos" — un gasto ya liquidado pasa a solo lectura acá, no se
+    // puede seguir editando algo que ya se le pagó a la persona.
+    if (pagado) {
+      return '<div class="ev-gasto-card">' +
+        metaAutorHtml +
+        '<div class="ev-gasto-top"><b style="font-size:13px;">' + _esc(g.descripcion || '—') + '</b></div>' +
+        '<div style="font-size:11px;color:var(--text-muted);">' + _esc(g.fecha || '—') + ' · ' + (moneda === 'ARS' ? 'AR$ ' : 'USD ') + importeMostrado.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</div>' +
+      '</div>';
+    }
     return '<div class="ev-gasto-card">' +
       metaAutorHtml +
       '<div class="ev-gasto-top">' +
@@ -2041,6 +2054,9 @@ window._toggleMonedaGastoEv = function(idx) {
   var t = _tarjetaActual();
   if (!t || !Array.isArray(t.gastos) || !t.gastos[idx]) return;
   var g = t.gastos[idx];
+  // Paso 1 del módulo nuevo "Cuenta Corriente y Rendición de Gastos"
+  // — un gasto ya PAGADO (liquidado) no se puede seguir editando.
+  if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
   if (g.moneda !== 'ARS' && !TC_OFICIAL_EV) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
   g.moneda = (g.moneda === 'ARS') ? 'USD' : 'ARS';
   var cont = document.getElementById('ev-gastos-cont');
@@ -2053,7 +2069,11 @@ window._agregarGastoEv = function() {
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
   var hoy = new Date().toISOString().split('T')[0];
   var autor = (_session && (_session.name || _session.username)) || 'Desconocido';
-  t.gastos.push({ fecha: hoy, descripcion: '', importe: '', moneda: 'USD', creado_por: autor, creado_en: new Date().toISOString() });
+  // a_favor_de/estado — mismo criterio que servicio.html: quién debe
+  // cobrar el gasto (por default, quien lo cargó) y si ya se liquidó.
+  // Los gastos viejos, sin estos campos, se leen como PENDIENTE/a
+  // favor de creado_por al mostrarlos, sin necesidad de migrar nada.
+  t.gastos.push({ fecha: hoy, descripcion: '', importe: '', moneda: 'USD', creado_por: autor, creado_en: new Date().toISOString(), a_favor_de: autor, estado: 'PENDIENTE' });
   var cont = document.getElementById('ev-gastos-cont');
   if (cont) cont.innerHTML = _renderGastosEv(t);
   _guardarGastosEv(t);
@@ -2065,6 +2085,7 @@ window._editarGastoEv = function(idx, campo, valor) {
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
   var g = t.gastos[idx];
   if (!g) return;
+  if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
   if (campo === 'importe') {
     var num = parseFloat(valor) || 0;
     // g.importe SIEMPRE se guarda en USD internamente — si el toggle
@@ -2087,6 +2108,8 @@ window._eliminarGastoEv = function(idx) {
   var t = _tarjetaActual();
   if (!t) return;
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
+  var g = t.gastos[idx];
+  if (g && g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede eliminar.'); return; }
   t.gastos.splice(idx, 1);
   var cont = document.getElementById('ev-gastos-cont');
   if (cont) cont.innerHTML = _renderGastosEv(t);
