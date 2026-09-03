@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.08.30.2 (2 BUGS REALES sobre la entrega del Paso 3 — Cristian: "subido el paso 3, que falta para que traiga los gastos de las tarjetas?". (1) Los gastos cargados ANTES de este cambio (servicio.html v2026.08.30.3 / eventos.html v2026.08.30.8) no tienen los campos a_favor_de/estado en absoluto — el filtro original (comparación estricta contra 'PENDIENTE') los descartaba TODOS sin excepción, aunque fueran del beneficiario correcto — por eso no traía nada. Nuevo helper _esPendienteParaBeneficiario() trata la ausencia de estos campos como "pendiente, a favor de quien lo cargó" (mismo criterio de compatibilidad ya documentado en el Paso 1). (2) El grupo GENERAL (carga manual) desaparecía de la pantalla en cuanto no tenía ningún gasto pendiente — cortando la única forma de empezar a cargar el primero. Ahora GENERAL se muestra siempre, con su formulario "+Cargar gasto" accesible, tenga o no items todavía. Confirmado con 2 tests nuevos: un gasto viejo (sin los campos nuevos) se trae correctamente, y el grupo GENERAL sigue visible con su formulario aunque no haya ningún gasto pendiente en ningún lado. Batería completa de regresión (6 tests del Paso 3) sigue pasando sin cambios.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.08.30.1 (archivo nuevo
      — PASO 3 del módulo "Cuenta Corriente y Rendición de Gastos".
      El HTML/CSS y todas las funciones de render son las que mandó
@@ -118,7 +119,7 @@ function icon(t){return t==="SERVICE"?"🛠️":t==="EVENTO"?"🎪":"📌"}
 function sub(g){let ars=0,usd=0;g.items.forEach(i=>{if(i.estado!=="PENDIENTE")return;i.moneda==="USD"?usd+=i.monto:ars+=i.monto});return{ars,usd}}
 function row(i){return`<div class="row"><input type="checkbox" ${i.estado==="PAGADO"?"disabled":""} ${selected.has(i.id)?"checked":""} onchange="toggleItem('${i.id}',this.checked)"><div class="date">${fmt(i.fecha)}</div><div class="concept-wrap"><div class="concept">${esc(i.concepto)}</div><div class="audit">Cargado por: ${esc(i.cargado_por)}</div></div><div class="amount">${money(i.monto,i.moneda)}</div><div class="tools"><span class="audit">Sin comprobante</span></div></div>`}
 function newForm(g){let opts=USERS.map(u=>`<option value="${esc(u.nombre)}">${esc(u.nombre)}</option>`).join("");return`<div class="new-expense"><div class="new-title">+ Cargar gasto en esta tarjeta</div><div class="new-grid"><input type="date" id="d-${g.tarjeta_id}" value="${today()}"><input id="c-${g.tarjeta_id}" placeholder="Concepto / descripción"><select id="m-${g.tarjeta_id}"><option>ARS</option><option>USD</option></select><input id="a-${g.tarjeta_id}" type="number" placeholder="Monto"><select id="b-${g.tarjeta_id}" ${CURRENT.permisos.Internos?"":"style='display:none'"}>${opts}</select><button class="add" onclick="addExpense('${g.tarjeta_id}')">+ Agregar</button></div><div class="audit">Cargado por: <strong>${esc(CURRENT.nombre)}</strong>${CURRENT.permisos.Internos?" · Puede asignar a otro beneficiario":""}</div></div>`}
-function renderGroups(){let allGroups=visible(),gs=allGroups.map(g=>({...g,items:g.items.filter(i=>i.estado==="PENDIENTE")})).filter(g=>g.items.length),count=0;$("groups").innerHTML=gs.length?gs.map((g,idx)=>{let s=sub(g),p=g.items;count+=p.length;let all=p.length&&p.every(i=>selected.has(i.id));return`<div class="card group ${idx===0?"open":""}" data-g="${g.tarjeta_id}"><div class="group-head" onclick="toggleGroup('${g.tarjeta_id}')"><input class="group-check" type="checkbox" ${all?"checked":""} onclick="event.stopPropagation()" onchange="toggleGroupSel('${g.tarjeta_id}',this.checked)"><div><div class="group-type">${icon(g.tipo_origen)} ${g.tipo_origen} · ${esc(g.tarjeta_id)}</div><div class="group-title">${esc(g.titulo_origen)}</div></div><div class="subtotal">${s.ars?`<strong>${money(s.ars,"ARS")}</strong>`:""}${s.usd?`<strong>${money(s.usd,"USD")}</strong>`:""}<small>Subtotal pendiente</small></div><div class="chev">▼</div></div><div class="content">${g.items.map(row).join("")}${newForm(g)}</div></div>`}).join(""):`<div class="card" style="padding:18px;text-align:center;color:var(--muted);font-size:12px">✅ No hay gastos pendientes para ${esc(userName())}.</div>`;$("count").textContent=`${count} ${count===1?"movimiento":"movimientos"}`}
+function renderGroups(){let allGroups=visible(),gs=allGroups.map(g=>({...g,items:g.items.filter(i=>i.estado==="PENDIENTE")})).filter(g=>g.items.length||g.tarjeta_id==="GENERAL"),count=0;$("groups").innerHTML=gs.length?gs.map((g,idx)=>{let s=sub(g),p=g.items;count+=p.length;let all=p.length&&p.every(i=>selected.has(i.id));return`<div class="card group ${idx===0?"open":""}" data-g="${g.tarjeta_id}"><div class="group-head" onclick="toggleGroup('${g.tarjeta_id}')"><input class="group-check" type="checkbox" ${all?"checked":""} onclick="event.stopPropagation()" onchange="toggleGroupSel('${g.tarjeta_id}',this.checked)"><div><div class="group-type">${icon(g.tipo_origen)} ${g.tipo_origen} · ${esc(g.tarjeta_id)}</div><div class="group-title">${esc(g.titulo_origen)}</div></div><div class="subtotal">${s.ars?`<strong>${money(s.ars,"ARS")}</strong>`:""}${s.usd?`<strong>${money(s.usd,"USD")}</strong>`:""}<small>Subtotal pendiente</small></div><div class="chev">▼</div></div><div class="content">${g.items.map(row).join("")}${newForm(g)}</div></div>`}).join(""):`<div class="card" style="padding:18px;text-align:center;color:var(--muted);font-size:12px">✅ No hay gastos pendientes para ${esc(userName())}.</div>`;$("count").textContent=`${count} ${count===1?"movimiento":"movimientos"}`}
 
 window.toggleGroup=id=>document.querySelector(`[data-g="${id}"]`)?.classList.toggle("open");
 window.toggleItem=(id,ch)=>{ch?selected.add(id):selected.delete(id);renderSummary();renderGroups()};
@@ -253,6 +254,23 @@ async function _obtenerTCOficialCC() {
   } catch(e) { return null; }
 }
 
+// BUG REAL — los gastos cargados ANTES del Paso 1 (servicio.html
+// v2026.08.30.3 / eventos.html v2026.08.30.8) no tienen los campos
+// a_favor_de/estado en absoluto — el filtro original (comparación
+// estricta contra 'PENDIENTE') los descartaba TODOS, incluso siendo
+// del beneficiario correcto. Mismo criterio de compatibilidad que ya
+// dejamos documentado en el Paso 1: "los gastos viejos... se tratan
+// como PENDIENTE/a favor de quien figure en creado_por al leerlos".
+// Reportado por Cristian: "subido el paso 3, que falta para que
+// traiga los gastos de las tarjetas?" — no traía NADA porque todo lo
+// que tenía cargado era de antes de este cambio.
+function _esPendienteParaBeneficiario(g, beneficiarioNombre) {
+  if (!g) return false;
+  const estadoEfectivo = g.estado || 'PENDIENTE'; // sin campo = viejo = pendiente
+  const beneficiarioEfectivo = g.a_favor_de || g.creado_por || ''; // sin campo = a favor de quien lo cargó
+  return estadoEfectivo === 'PENDIENTE' && beneficiarioEfectivo === beneficiarioNombre;
+}
+
 async function _cargarUsuarios() {
   const r = await fetch(RTDB_URL + '/permisos.json?_=' + Date.now());
   const data = await r.json();
@@ -284,7 +302,7 @@ async function cargarTodo() {
       const gastosCompletos = Array.isArray(t.gastos) ? t.gastos : Object.values(t.gastos);
       const pendientes = [];
       gastosCompletos.forEach(function(g, idx) {
-        if (g && g.a_favor_de === beneficiarioNombre && g.estado === 'PENDIENTE') {
+        if (_esPendienteParaBeneficiario(g, beneficiarioNombre)) {
           pendientes.push({
             id: 'servicio:' + id + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
             moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'),
@@ -314,7 +332,7 @@ async function cargarTodo() {
         const gastosCompletos = Array.isArray(t.gastos) ? t.gastos : (t.gastos ? Object.values(t.gastos) : []);
         const pendientes = [];
         gastosCompletos.forEach(function(g, idx) {
-          if (g && g.a_favor_de === beneficiarioNombre && g.estado === 'PENDIENTE') {
+          if (_esPendienteParaBeneficiario(g, beneficiarioNombre)) {
             pendientes.push({
               id: 'evento:' + idEvento + ':' + t.id + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
               moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'),
