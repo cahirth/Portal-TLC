@@ -8,6 +8,7 @@
 <!-- Portal TLC | servicio.html | v2026.08.10.3 (Tope en "+ Agregar Caja" del modal "Asignación de Cajas" — no se puede tener más cajas que equipos (cada equipo entra en una sola caja, cualquier caja de más quedaría vacía sí o sí). Botón se deshabilita visualmente al llegar al tope, y avisa si de todas formas se intenta pasar. Pedido por Cristian: "cantidad máxima a agregar cajas, la cantidad de ítems, topealo". Confirmado con test: con 3 equipos, permite hasta 3 cajas, se deshabilita ahí, y avisa si se intenta una 4ta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.2 (Candado Preparación/CC → Para Instalar APAGADO temporalmente — pedido por Cristian: "me pide muchas condiciones... liberame temporalmente". El requisito de Checklist no se puede cumplir en la práctica todavía (falta conectar los formularios individuales de checklist, prerrequisito pendiente). Toda la lógica del candado sigue intacta en _validarGate, controlada por un interruptor nuevo (GATE_PARA_INSTALAR_ACTIVO = false) — para reactivarlo alcanza con volver ese valor a true, sin tocar nada más. Confirmado con test: con el interruptor apagado, deja pasar aunque no haya nada completo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.27.1 (BUG REAL — "se queda un rato en generando etiqueta y no la muestra despues". Al guardar la asignación de cajas con éxito, se abría la pestaña de la etiqueta con window.open() JUSTO DESPUÉS de esperar la respuesta del backend (fetch async) — varios navegadores bloquean esto como popup no solicitado, porque ya no lo consideran un gesto directo del usuario (mismo patrón ya documentado en _iaEnviarPregunta, este mismo archivo). Ahora, en vez de abrir la pestaña sola, se muestra un bloque de éxito con un link real "↗ Abrir Etiquetas de Despacho" (target=_blank) — el TOQUE del vendedor sobre ese link sí es un gesto directo, ningún navegador lo bloquea nunca. El modal ya no se cierra solo al guardar con éxito; se cierra cuando el vendedor toca el link. Al reabrir el modal (para el mismo ticket u otro) se resetea el estado de éxito, para no quedar pegado en la pantalla vieja. Confirmado con 5 tests: no se llama a window.open() directamente, se muestra el link real con la URL correcta, el formulario queda oculto durante el éxito, tocar el link cierra el modal, y reabrir resetea el estado.) -->
+<!-- Portal TLC | servicio.html | v2026.08.30.4 (El campo de Importe en Gastos ahora se muestra con formato es-AR (miles con punto, decimales con coma — ej. "1.234,56") en vez del type="number" del navegador, que no permite ese formato. Se reformatea solo al salir del campo, y selecciona todo el texto al enfocar (para tipear encima sin borrar a mano). BUG REAL encontrado por el propio test: los helpers nuevos (_formatMontoARS/_parseMontoARS) no eran visibles desde los atributos onblur inline porque este archivo tiene su código envuelto en un IIFE — corregido exponiéndolos en window, mismo criterio que el resto de los handlers usados desde HTML. Pedido por Cristian: "en gastos de servicio, eventos podes darle formato al numero con miles y centavos". Confirmado con test: el importe se ve formateado correctamente, y tipear un monto nuevo se re-formatea y se guarda parseado correctamente (2500,5 → guarda 2500.5, no se confunde con miles).) -->
 <!-- Portal TLC | servicio.html | v2026.08.30.3 (PASO 1 del módulo nuevo "Cuenta Corriente y Rendición de Gastos" — cada gasto ahora tiene a_favor_de (quién debe cobrarlo, por default quien lo cargó) y estado (PENDIENTE/PAGADO), completados automáticamente al crear. Un gasto PAGADO (liquidado desde el módulo nuevo, todavía por construir en pasos siguientes) pasa a solo lectura acá — con badge "✅ Liquidado" — y no se puede editar/eliminar/cambiar de moneda (avisa con alert en el intento). Los gastos viejos, sin estos campos, no rompen nada — se tratan como pendientes al leerlos. Backward-compatible: no requiere ninguna migración de datos existentes. Confirmado con test: un gasto viejo sigue viéndose y editándose normal, uno PAGADO muestra el badge y bloquea edición/eliminación con aviso, y uno nuevo se crea con a_favor_de=usuario logueado y estado=PENDIENTE.) -->
 <!-- Portal TLC | servicio.html | v2026.08.30.2 (Cada gasto nuevo ahora registra automáticamente quién lo cargó y cuándo — "Nombre · fecha/hora" arriba de la descripción, mismo estilo visual que Notas de Seguimiento (reusa .nota-meta y _formatFechaISO, sin CSS nuevo). Se completa solo al crear el gasto (_agregarGasto), leyendo el usuario logueado (_session.name) — no es un campo editable a mano. Los gastos viejos, sin creado_por, no muestran esa línea (no rompen nada). Pedido por Cristian: "quiero agregar al modulo servicio, en gastos, quien hace el gastos de acuerdo al usuario logueado y fecha y hora, fijate en imagen 3 como lo hicimos en notas". Confirmado con test: un gasto viejo sin autor sigue viéndose normal, uno nuevo muestra el nombre+fecha/hora reales, y lo que se guarda en el backend incluye ambos campos.) -->
 <!-- Portal TLC | servicio.html | v2026.08.30.1 (Gastos del Servicio rediseñado con el mismo estilo/mecanismo que eventos.html/presupuesto-editor.html — Cristian: "hacer igual que en eventos en servicio, que asi esta genial". (1) Layout: tabla reemplazada por tarjetas responsive con .campo/label, colapsa a 1 columna en mobile. (2) Moneda por fila (USD/AR$) con el mismo moneda-switch clickeable — el importe SIEMPRE se guarda en USD internamente, la moneda es solo una preferencia de display/tipeo. (3) TC oficial desde el mismo endpoint (dolarapi.com/v1/dolares/oficial), mostrado en gris y chico junto al total (TC_OFICIAL_ST, _cargarTCSt). (4) El Total tiene su propio toggle USD/AR$. (5) Los gastos se ordenan ascendente por fecha automáticamente — se ordena el array real, no una copia, para que los índices de editar/borrar/cambiar-moneda sigan apuntando al gasto correcto. Se conservó la rama de solo-lectura para tickets finalizados/cancelados (que eventos.html no tenía, por no aplicar ahí) — muestra los gastos con su moneda real pero sin ningún control editable. Confirmado con test: se ve el TC junto al total, los gastos aparecen ordenados ascendente, tipear en AR$ se convierte y guarda en USD vía el backend real, y un ticket finalizado muestra todo en solo lectura sin poder agregar ni editar.) -->
@@ -3794,6 +3795,26 @@ function _aMonedaGastoSt(montoUSD, moneda) {
 
 var _monedaTotalGastosSt = 'USD'; // preferencia de display del Total — no se guarda, es solo visual
 
+// Formatea/parsea el importe con separador de miles (.) y 2
+// decimales (,) — formato es-AR. El input pasa de type="number" (que
+// el navegador no deja mostrar con separadores) a type="text" con
+// este formateo manual. Pedido por Cristian: "en gastos de servicio,
+// eventos podes darle formato al numero con miles y centavos".
+// BUG REAL encontrado por el propio test — este archivo tiene su
+// código envuelto en un IIFE; una función común (sin "window.") no es
+// visible desde atributos onblur inline (que resuelven contra el
+// scope global, no el privado del IIFE) — por eso van expuestas en
+// window explícitamente, mismo criterio que el resto de los handlers
+// usados desde HTML inline en este archivo.
+window._formatMontoARS = function(n) {
+  return Number(n||0).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+};
+window._parseMontoARS = function(s) {
+  if (!s) return 0;
+  var limpio = String(s).trim().replace(/\./g, '').replace(',', '.');
+  return parseFloat(limpio) || 0;
+};
+
 function _renderGastos(t) {
   var finalizado = (t.deposito === 'finalizado' || t.deposito === 'cancelado');
   var soloLectura = finalizado;
@@ -3846,7 +3867,7 @@ function _renderGastos(t) {
               '<span class="' + (moneda !== 'ARS' ? 'activo' : '') + '">USD</span>' +
               '<span class="' + (moneda === 'ARS' ? 'activo' : '') + '">AR$</span>' +
             '</div>' +
-            '<input type="number" class="gastos-input" value="' + importeMostrado + '" placeholder="0" onblur="_editarGasto(\'' + t.id_ticket + '\',' + i + ',\'importe\',this.value)" min="0" step="0.01">' +
+            '<input type="text" inputmode="decimal" class="gastos-input" value="' + _formatMontoARS(importeMostrado) + '" placeholder="0,00" onfocus="this.select()" onblur="this.value=_formatMontoARS(_parseMontoARS(this.value)); _editarGasto(\'' + t.id_ticket + '\',' + i + ',\'importe\',this.value)">' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -3917,7 +3938,7 @@ window._editarGasto = function(id, idx, campo, valor) {
   if (!g) return;
   if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
   if (campo === 'importe') {
-    var num = parseFloat(valor) || 0;
+    var num = _parseMontoARS(valor);
     // g.importe SIEMPRE se guarda en USD internamente — si el toggle
     // de esta fila está en AR$, lo que tipeó el operador es un monto
     // en pesos, hay que convertirlo antes de guardar (mismo criterio

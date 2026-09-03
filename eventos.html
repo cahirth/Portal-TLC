@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.30.9 (El campo de Importe en Gastos ahora se muestra con formato es-AR (miles con punto, decimales con coma), mismo cambio exacto que servicio.html v2026.08.30.4. Confirmado con los mismos 2 tests.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.8 (Sumado avatar.js (archivo nuevo, mismo patrón que version.js/permisos.js) — Cristian: "mi dia y eventos no tienen avatar, podria haber 1 solo avatar flotante". Un solo <script src="avatar.js"> agregado justo después de version.js, sin tocar nada más del archivo. Confirmado con test de integración real (avatar.js corriendo DENTRO de eventos.html completo, no aislado): el avatar aparece con las iniciales correctas y el menú funciona.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.7 (PASO 1 del módulo nuevo "Cuenta Corriente y Rendición de Gastos" — mismo cambio exacto que servicio.html v2026.08.30.3: a_favor_de/estado en cada gasto, completados automático al crear; un gasto PAGADO pasa a solo lectura con badge "✅ Liquidado" y bloquea edición/eliminación con aviso. Backward-compatible, sin migración necesaria. Confirmado con los mismos 4 tests que servicio.html.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.6 (Cada gasto nuevo ahora registra automáticamente quién lo cargó y cuándo — "Por: Nombre — fecha hs" arriba de la descripción, mismo estilo/formato que ya usan las Notas Generales de este archivo (.ft, "Por: X — fecha hs"). Se completa solo al crear el gasto (_agregarGastoEv), leyendo el usuario logueado — no editable a mano. Los gastos viejos, sin creado_por, no muestran esa línea (no rompen nada). Réplica de lo mismo hecho en servicio.html v2026.08.30.2 — Cristian: "Podes replicarlo en eventos.html". Confirmado con test: un gasto viejo sin autor sigue viéndose normal, uno nuevo muestra el nombre+fecha/hora reales con el mismo formato que las Notas, y lo que se guarda en el backend incluye ambos campos.) -->
@@ -585,7 +586,7 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 // diagnosticando bugs que en realidad eran "el archivo todavía no se
 // volvió a subir". Guardado como constante con nombre (no un string
 // suelto dentro del console.log) — actualizar ACÁ en cada entrega.
-const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.8';
+const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.9';
 console.log("%c TLC Eventos v" + _VERSION_ARCHIVO_EVENTOS + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
@@ -1970,6 +1971,22 @@ function _aMonedaGastoEv(montoUSD, moneda) {
 
 var _monedaTotalGastosEv = 'USD'; // preferencia de display del Total — no se guarda, es solo visual
 
+// Formatea/parsea el importe con separador de miles (.) y 2
+// decimales (,) — formato es-AR. El input pasa de type="number" a
+// type="text" con este formateo manual. Pedido por Cristian: "en
+// gastos de servicio, eventos podes darle formato al numero con
+// miles y centavos". Expuestos en window (mismo criterio que
+// servicio.html) para que sean visibles desde los atributos onblur
+// inline sin importar el scope donde se declaren.
+window._formatMontoARS = function(n) {
+  return Number(n||0).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+};
+window._parseMontoARS = function(s) {
+  if (!s) return 0;
+  var limpio = String(s).trim().replace(/\./g, '').replace(',', '.');
+  return parseFloat(limpio) || 0;
+};
+
 function _renderGastosEv(t) {
   // Se normaliza y ordena el array REAL (t.gastos), no una copia — los
   // índices que usan _editarGastoEv/_eliminarGastoEv/_toggleMonedaGastoEv
@@ -2023,7 +2040,7 @@ function _renderGastosEv(t) {
               '<span class="' + (moneda !== 'ARS' ? 'activo' : '') + '">USD</span>' +
               '<span class="' + (moneda === 'ARS' ? 'activo' : '') + '">AR$</span>' +
             '</div>' +
-            '<input type="number" class="ev-gastos-input" value="' + importeMostrado + '" placeholder="0" onblur="_editarGastoEv(' + i + ',\'importe\',this.value)" min="0" step="0.01">' +
+            '<input type="text" inputmode="decimal" class="ev-gastos-input" value="' + _formatMontoARS(importeMostrado) + '" placeholder="0,00" onfocus="this.select()" onblur="this.value=_formatMontoARS(_parseMontoARS(this.value)); _editarGastoEv(' + i + ',\'importe\',this.value)">' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -2089,7 +2106,7 @@ window._editarGastoEv = function(idx, campo, valor) {
   if (!g) return;
   if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
   if (campo === 'importe') {
-    var num = parseFloat(valor) || 0;
+    var num = _parseMontoARS(valor);
     // g.importe SIEMPRE se guarda en USD internamente — si el toggle
     // de esta fila está en AR$, lo que tipeó el operador es un monto
     // en pesos, hay que convertirlo antes de guardar (mismo criterio
