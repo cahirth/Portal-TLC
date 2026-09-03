@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.08.30.3 (Nuevo ítem "Cuenta Corriente" dentro del submenú de Administración, junto a Eventos/Reportes/Regulatoria/Comercio Exterior — navega a cuenta-corriente.html (archivo nuevo, Paso 3 del módulo "Cuenta Corriente y Rendición de Gastos") vía abrirUrlConPermiso, reusando el mismo permiso "Administracion" (userPermisos.admin) que ya chequea la pantalla en sí. Pedido por Cristian: "pone el acceso dentro de Administracion". Confirmado con 3 tests: el ítem vive físicamente dentro del submenú de Administración, queda habilitado/bloqueado según el mismo permiso real, y bloqueado no navega (avisa con toast).) -->
 <!-- Portal TLC | index.html | v2026.08.30.2 (Restaurado el botón "Tareas" → navega a mi-dia.html (con el mismo permiso ya existente), que se había perdido al recibir una versión de index.html sin ese cambio aplicado — ver el bloque de v2026.08.30.1 más abajo para el resto (permisos vía Firebase). Confirmado con test: con "Tareas"=true el botón no muestra ningún error al abrirlo; con "Tareas"=false queda gris y avisa con un toast, sin navegar.) -->
 <!-- Portal TLC | index.html | v2026.08.30.1 (BUG DE FONDO REAL — cargarPermisosUsuario() hacía su propio pedido en vivo a Google Sheets (gviz), separado del de permisos.js, pagando el mismo riesgo de lentitud/falla intermitente en CADA login (misma familia de problemas que los pipelines "a veces no aparecen"). Cristian: "quiero que todos los permisos del excel que ahora creo estas en permisos.js y no esta funcionando OK, los subamis a firebase manualmente con un boton script como el lista de precios, y asi los cambios son immediatos" — confirmado que "inmediato" es apenas se toca el botón de sincronizar (mismo criterio que Lista_Precios), no en vivo sin tocar nada. Ahora lee directo de Firebase RTDB (/permisos/{emailSeguro}, sincronizado por sincronizarPermisosAFirebase en FotoMap.gs v202) — nuevos helpers _emailKeySeguroIdx/_headerSeguroIdx, réplica exacta de _rtdbKeySeguro/_rtdbHeaderSeguro del backend (mismo criterio que usa permisos.js v2026.08.30.1). Usuario no encontrado en /permisos → acceso mínimo (todo en false); falla de red → fail-open (mantiene el permiso completo por default, no bloquea a nadie por un problema de conexión ajeno a los permisos en sí). Confirmado con test de punta a punta: lee la fila real de Firebase con la clave/columnas correctamente saneadas, arma userPermisos con los valores reales, y aplicarPermisosMenu() grisea/habilita el menú según corresponda.) -->
 <!-- Portal TLC | index.html | v2026.08.19.3 (Corrección de nombre de columna — la v2026.08.19.2 (recién anterior) usaba "Ver Comisiones" por error; Cristian confirmó con captura del Excel real que la columna se llama simplemente "Comisiones", sin "Ver" adelante. Corregido en cols.indexOf() y en el arreglo de diagnóstico de columnas faltantes. Ver comisiones.html (misma corrección, para que ambos lados lean la MISMA columna real).) -->
@@ -881,6 +882,11 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
                     <div class="item-text-box"><h3>Gestión Eventos / Congresos</h3><p>Tablero de tareas para Facoextrema y otros eventos</p></div>
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
+                <div class="menu-item-row" id="menu-cuenta-corriente" onclick="abrirUrlConPermiso('cuenta-corriente.html', 'Cuenta Corriente y Rendición de Gastos', 'cuenta-corriente')">
+                    <div class="item-logo-container" style="background:rgba(6,214,160,0.15); border:1px solid rgba(6,214,160,0.4); color:#06d6a0;"><i class="fa-solid fa-wallet"></i></div>
+                    <div class="item-text-box"><h3>Cuenta Corriente</h3><p>Rendición de gastos y liquidaciones</p></div>
+                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
                 <div class="menu-item-row" id="menu-reportes" onclick="abrirModuloConPermiso('view-placeholder', 'Reportes', 'Resúmenes y análisis', 'reportes')">
                     <div class="item-logo-container" style="background:rgba(248,150,30,0.15); border:1px solid rgba(248,150,30,0.4); color:#f8961e;"><i class="fa-solid fa-chart-bar"></i></div>
                     <div class="item-text-box"><h3>Reportes</h3><p>Resúmenes y análisis</p></div>
@@ -1569,6 +1575,7 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
             { id: 'menu-servicio', permiso: userPermisos.servicio },
             { id: 'menu-comex',    permiso: userPermisos.comex },
             { id: 'menu-admin',    permiso: userPermisos.admin },
+            { id: 'menu-cuenta-corriente', permiso: userPermisos.admin },
             { id: 'menu-tareas',   permiso: userPermisos.tareas },
             { id: 'menu-eventos',  permiso: userPermisos.eventos },
             { id: 'menu-regulatoria', permiso: userPermisos.regulatoria },

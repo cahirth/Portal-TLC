@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.08.30.1 (archivo nuevo
+     — PASO 3 del módulo "Cuenta Corriente y Rendición de Gastos".
+     El HTML/CSS y todas las funciones de render son las que mandó
+     Cristian (cuenta-corriente-gastos-TLC_3_.html) tal cual — no se
+     tocó el diseño. Lo único que cambió fue TODA la capa de datos:
+     CURRENT/USERS/DATA hardcodeados → sesión real + /permisos.json +
+     Firebase directo (servicio_tecnico, eventos) + las acciones del
+     Apps Script de los Pasos 1 y 2 (crearLiquidacion,
+     listarLiquidaciones, obtenerSaldoInicial,
+     listarGastosGeneralesPendientes/agregarGastoGeneral). Junta los 3
+     orígenes reales (Servicio Técnico, Eventos, General/manual),
+     filtrando por a_favor_de+estado=PENDIENTE, con la conversión de
+     moneda usando el TC oficial en vivo (mismo criterio que
+     servicio.html/eventos.html). El selector de colaborador y el
+     botón Liquidar quedan deshabilitados para quien no es "Interno"
+     — mismo permiso que ya usa el backend. Pedido por Cristian: "usa
+     el que te envie, o adaptalo, y pone el acceso dentro de
+     Administracion" — el acceso queda gateado con
+     validarAccesoModulo('Administracion') (ver index.html para el
+     link real dentro del menú de Administración). Se sacó el campo
+     de subir archivo de comprobante (sin backend de almacenamiento
+     construido todavía) — queda la referencia/N° de comprobante como
+     texto, que sí se guarda. Confirmado con 6 tests de punta a
+     punta: agrega los 3 orígenes reales filtrando correctamente por
+     beneficiario, la conversión de moneda con el TC oficial es
+     correcta, el selector y el botón Liquidar quedan bloqueados sin
+     el permiso Interno (y habilitados con él), cargar un gasto
+     manual en General llama al backend real, y liquidar arma el
+     payload real con el origen de cada ítem correctamente parseado
+     de vuelta a su ticket/tarjeta/gasto general real. -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cuenta Corriente y Rendición de Gastos — TLC</title>
+<script src="version.js"></script>
+<script src="permisos.js"></script>
+<script src="avatar.js"></script>
+<style>
+:root{--bg:#f0f4f8;--surface:#ffffff;--surface2:#f8fafc;--hover:#eef4fb;--text:#0f172a;--muted:#64748b;--faint:#94a3b8;--border:#e2e8f0;--primary:#3a86ff;--accent:#06d6a0;--warning:#f59e0b;--warning2:#fff7ed;--info:#1a4b8c;--info2:#eff6ff;--paid:#059669;--paid2:#ecfdf5;--shadow:0 4px 16px rgba(15,23,42,.06);--shadow2:0 18px 50px rgba(15,23,42,.18);--header-bg:rgba(255,255,255,.96)}
+[data-theme="dark"]{--bg:#080d14;--surface:#0f1a30;--surface2:#0a1424;--hover:#14233d;--text:#f1f5f9;--muted:#94a3b8;--faint:#64748b;--border:#1e3050;--primary:#3a86ff;--accent:#06d6a0;--warning:#f59e0b;--warning2:#302411;--info:#60a5fa;--info2:#10233e;--paid:#06d6a0;--paid2:#0a302a;--shadow:0 5px 18px rgba(0,0,0,.24);--shadow2:0 20px 60px rgba(0,0,0,.45);--header-bg:rgba(8,13,20,.96)}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%}body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}button,input,select{font:inherit}.topbar{position:sticky;top:0;z-index:30;background:var(--header-bg);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}.topbar-in{max-width:1180px;margin:auto;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{display:flex;gap:11px;align-items:center;min-width:0}.back-btn{width:34px;height:34px;border-radius:50%;border:0;background:var(--primary);color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}.logo-img{height:30px;width:auto;max-width:150px;object-fit:contain}.brand-copy{min-width:0}.brand b{display:block;font-size:14px;line-height:1.2}.brand small{color:var(--muted);font-size:10px}.tlc-tag{display:inline-flex;align-items:center;margin-top:3px;padding:2px 7px;border-radius:999px;background:rgba(58,134,255,.12);color:var(--primary);font-size:8px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}.controls{display:flex;gap:8px;align-items:end}.controls label{display:flex;flex-direction:column;gap:4px;font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase}.controls select,.theme{height:38px;border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px}.controls select{padding:0 10px}.theme{width:38px;cursor:pointer}.page{max-width:1180px;margin:auto;padding:20px 14px 50px}.summary{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:12px;margin-bottom:24px}.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}.summary .card{padding:16px;position:relative;overflow:hidden}.summary .card:before{content:"";position:absolute;left:0;top:0;width:100%;height:3px;background:linear-gradient(90deg,var(--primary),var(--accent))}.lbl{font-size:9px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.6px}.big{font-size:27px;font-weight:900;margin-top:10px}.big.usd{color:var(--accent)}.note{font-size:10px;color:var(--faint);margin-top:5px}.selected{display:flex;flex-direction:column}.selected strong{font-size:16px;margin:10px 0 12px}.btn{border:0;border-radius:8px;min-height:40px;padding:9px 14px;font-weight:800;cursor:pointer}.btn-primary{background:var(--primary);color:#fff;box-shadow:0 4px 14px rgba(58,134,255,.22)}.btn-primary:hover{background:#2a76ef}[data-theme="dark"] .btn-primary{background:var(--primary);color:#fff}.btn:disabled{opacity:.35;cursor:not-allowed}.section{margin-bottom:26px}.sec-head{display:flex;justify-content:space-between;align-items:end;margin-bottom:10px}.sec-head h2{margin:2px 0 0;font-size:18px}.eyebrow{font-size:8px;color:var(--muted);font-weight:900;letter-spacing:1px}.badge{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:8px;font-weight:900}.pending{background:var(--warning2);color:var(--warning)}.paid{background:var(--paid2);color:var(--paid)}.receipt{background:var(--info2);color:var(--info);cursor:pointer}.initial{padding:15px;border-left:4px solid var(--primary)}.initial-top{display:flex;gap:10px;align-items:center}.initial-top input,.group-check,.row input{accent-color:var(--primary)}.initial-info{display:flex;flex-direction:column;gap:2px}.initial-info small{color:var(--muted)}.initial-values{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}.mini{padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:9px}.mini span{display:block;color:var(--muted);font-size:9px;font-weight:800}.mini strong{font-size:16px}.partial{margin-top:12px;padding:12px;background:var(--warning2);border-radius:9px}.partial-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.partial label{display:flex;flex-direction:column;gap:4px;font-size:9px;color:var(--muted);font-weight:800}.partial input{height:36px;padding:6px 9px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px}.groups{display:flex;flex-direction:column;gap:10px}.group{overflow:hidden;transition:border-color .15s ease,transform .12s ease}.group:hover{border-color:var(--primary)}.group-head{padding:13px 14px;display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;cursor:pointer}.group-head:hover{background:var(--hover)}.group-type{font-size:8px;color:var(--muted);font-weight:900;letter-spacing:.6px}.group-title{font-size:13px;font-weight:800}.subtotal{text-align:right;font-size:12px}.subtotal small{display:block;color:var(--muted);font-size:8px}.chev{color:var(--muted)}.group.open .chev{transform:rotate(180deg)}.content{display:none;border-top:1px solid var(--border)}.group.open .content{display:block}.row{display:grid;grid-template-columns:auto 80px minmax(160px,1fr) 110px 105px;gap:10px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border)}.row:hover{background:var(--hover)}.date{font-size:9px;color:var(--muted)}.concept{font-size:12px;font-weight:750}.audit{font-size:8.5px;color:var(--faint);margin-top:3px}.amount{text-align:right;font-weight:850;font-size:12px}.tools{text-align:right}.new-expense{padding:13px 14px;background:var(--surface2)}.new-title{font-size:9px;font-weight:900;color:var(--muted);text-transform:uppercase;margin-bottom:8px}.new-grid{display:grid;grid-template-columns:110px minmax(160px,2fr) 80px 110px minmax(140px,1fr) auto;gap:7px}.new-grid input,.new-grid select{height:36px;padding:6px 8px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;font-size:11px;min-width:0}.add{background:var(--accent);color:#071a15;border:0;border-radius:8px;font-weight:850;padding:0 12px;box-shadow:0 3px 10px rgba(6,214,160,.16)}.history{display:flex;flex-direction:column;gap:8px}.history-item{padding:11px 13px;display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;cursor:pointer;transition:border-color .15s ease,transform .1s ease,background .15s ease}.history-item:hover{border-color:var(--primary);background:var(--hover);transform:translateY(-1px)}.history-item small{color:var(--muted)}.history-open{font-size:9px;color:var(--primary);font-weight:800;margin-top:4px}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.detail-box{padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:9px}.detail-box span{display:block;font-size:8px;color:var(--muted);font-weight:800;text-transform:uppercase;margin-bottom:3px}.detail-box strong{font-size:12px}.detail-items{border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-top:8px}.detail-item{padding:10px 11px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.detail-item:last-child{border-bottom:0}.detail-item small{display:block;color:var(--muted);margin-top:3px}.receipt-link{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:9px 12px;border-radius:8px;background:var(--info2);color:var(--info);font-size:11px;font-weight:800;text-decoration:none;border:1px solid color-mix(in srgb,var(--info) 28%,transparent)}.modal-wrap{position:fixed;inset:0;background:rgba(2,6,23,.58);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}.modal-wrap[hidden]{display:none}.modal{width:min(620px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow2)}.modal-head,.modal-foot{padding:16px 18px;display:flex;justify-content:space-between;align-items:center}.modal-head{border-bottom:1px solid var(--border)}.modal-foot{border-top:1px solid var(--border);justify-content:flex-end;gap:8px}.close{width:34px;height:34px;border:0;border-radius:8px;background:var(--surface2);color:var(--text);font-size:20px}.modal-body{padding:16px 18px}.pay-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.pay-summary div{padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:9px}.pay-summary span{display:block;font-size:9px;color:var(--muted);font-weight:800}.items{max-height:160px;overflow:auto;border:1px solid var(--border);border-radius:9px;margin-bottom:12px}.modal-item{padding:8px 10px;display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--border);font-size:10px}.form{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field{display:flex;flex-direction:column;gap:4px;font-size:9px;color:var(--muted);font-weight:800}.field.full{grid-column:1/-1}.field input,.field select{height:38px;padding:7px 9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px}.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;background:var(--accent);color:#053128;padding:10px 14px;border-radius:9px;font-size:11px;font-weight:800;box-shadow:var(--shadow2);transition:.2s;z-index:200}.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.comp-box{display:none;margin:12px 0;padding:12px;border:1px solid rgba(58,134,255,.35);background:rgba(58,134,255,.08);border-radius:10px}
+.comp-box.show{display:block}.comp-title{font-size:10px;font-weight:900;color:var(--primary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px}.comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.comp-card{padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px}.comp-card>span{display:block;font-size:8px;color:var(--muted);font-weight:800;text-transform:uppercase;margin-bottom:5px}.comp-line{display:flex;justify-content:space-between;gap:8px;font-size:10px;padding:2px 0}.comp-line strong{font-size:11px}.comp-line.restante{margin-top:4px;padding-top:5px;border-top:1px solid var(--border);color:var(--accent)}.comp-note{font-size:9px;color:var(--muted);margin-top:8px;line-height:1.4}.field.hidden{display:none!important}
+@media(max-width:820px){.summary{grid-template-columns:1fr 1fr}.selected{grid-column:1/-1}.row{grid-template-columns:auto 72px minmax(130px,1fr) 90px}.tools{grid-column:3/5;text-align:left}.new-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.topbar-in{align-items:center;padding:9px 10px}.logo-img{height:27px;max-width:118px}.brand small{display:none}.tlc-tag{display:none}.controls{flex:1}.controls label{flex:1}.controls select{width:100%;min-width:0}.summary{grid-template-columns:1fr}.selected{grid-column:auto}.initial-values,.partial-grid,.pay-summary,.form,.comp-grid,.detail-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.group-head{grid-template-columns:auto 1fr auto}.subtotal{grid-column:2;text-align:left}.chev{grid-column:3;grid-row:1/3}.row{grid-template-columns:auto 1fr auto;padding:10px 11px}.date,.concept-wrap{grid-column:2}.amount{grid-column:3;grid-row:1/4}.tools{grid-column:2/4}.new-grid{grid-template-columns:1fr}.history-item{grid-template-columns:1fr auto}.history-item .badge{grid-column:1/-1;justify-self:start}.page{padding:14px 9px 45px}}
+
+.sec-head h2{color:var(--text);font-weight:800}.group-type{color:var(--primary)}.receipt{border:1px solid rgba(58,134,255,.22)}.paid{border:1px solid rgba(6,214,160,.22)}.theme:hover{border-color:var(--primary)}.controls select:focus,.new-grid input:focus,.new-grid select:focus,.field input:focus,.field select:focus,.partial input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(58,134,255,.12)}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in"><div class="brand"><button class="back-btn" type="button" onclick="history.length>1?history.back():void(0)" aria-label="Volver">←</button><img class="logo-img" src="https://lh3.googleusercontent.com/d/1rKdDTv8Ka5NiXs1-pYd5bA6WWZ6ifT25" alt="Tecnología Láser Corneal"><div class="brand-copy"><b>Cuenta Corriente</b><small>Rendición de Gastos</small><span class="tlc-tag">Administración TLC</span></div></div><div class="controls"><label>Colaborador<select id="collab"><option value="cristian@tlcsrl.com.ar">Cristian Hirth</option><option value="damian@tlcsrl.com.ar">Damián</option><option value="juan@tlcsrl.com.ar">Juan</option><option value="fernando@tlcsrl.com.ar">Fernando</option><option value="veronica@tlcsrl.com.ar">Verónica</option></select></label><button class="theme" id="theme">🌙</button></div></div></header>
+<main class="page">
+<section class="summary"><div class="card"><div class="lbl">Saldo pendiente ARS</div><div class="big" id="saldoArs">$ 0</div><div class="note">A favor del colaborador</div></div><div class="card"><div class="lbl">Saldo pendiente USD</div><div class="big usd" id="saldoUsd">U$S 0</div><div class="note">Cuenta independiente</div></div><div class="card selected"><div class="lbl">Seleccionado para liquidar</div><strong id="selTotal">$ 0</strong><button class="btn btn-primary" id="liquidar" disabled>Liquidar Selección</button></div></section>
+<section class="section"><div class="sec-head"><div><div class="eyebrow">SALDO HISTÓRICO</div><h2>Saldo Inicial</h2></div><span class="badge pending">PENDIENTE</span></div><div class="card initial"><div class="initial-top"><input type="checkbox" id="saldoCheck"><div class="initial-info"><strong>Reconocimiento de saldo anterior</strong><small>Corte al <span id="fechaCorte"></span></small></div></div><div class="initial-values"><div class="mini"><span>ARS</span><strong id="iniArs"></strong></div><div class="mini"><span>USD</span><strong id="iniUsd"></strong></div></div><div class="partial" id="partial" hidden><div class="new-title">Importe a liquidar del saldo inicial</div><div class="partial-grid"><label>ARS<input id="partArs" type="number" min="0"></label><label>USD<input id="partUsd" type="number" min="0"></label></div></div></div></section>
+<section class="section"><div class="sec-head"><div><div class="eyebrow">MOVIMIENTOS</div><h2>Gastos pendientes</h2></div><div id="count" class="note"></div></div><div id="groups" class="groups"></div></section>
+<section class="section"><div class="sec-head"><div><div class="eyebrow">HISTORIAL</div><h2>Comprobantes y liquidaciones</h2></div></div><div id="history" class="history"></div></section>
+</main><footer style="text-align:center;padding:8px 12px 22px;color:var(--muted);font-size:10px;line-height:1.5"><strong style="color:var(--text)">Tecnología Láser Corneal S.R.L.</strong><br>Cuenta Corriente y Rendición de Gastos · Maqueta interactiva</footer>
+<div id="modalWrap" class="modal-wrap" hidden><div class="modal"><div class="modal-head"><div><div class="eyebrow">RENDICIÓN</div><h2 style="margin:3px 0 0">Registrar liquidación</h2></div><button class="close" id="close">×</button></div><div class="modal-body"><div class="pay-summary"><div><span>ARS</span><strong id="mArs"></strong></div><div><span>USD</span><strong id="mUsd"></strong></div></div><div id="modalItems" class="items"></div><div class="form"><label class="field">Fecha de pago<input type="date" id="payDate"></label><label class="field">Medio de pago<select id="payMethod"><option value="Transferencia">Transferencia</option><option value="Efectivo">Efectivo</option><option value="Compensación con saldo a favor">Compensación con saldo a favor</option></select></label><div id="compBox" class="comp-box field full"><div class="comp-title">↔ Compensación interna</div><div class="comp-grid"><div class="comp-card"><span>Cuenta ARS</span><div class="comp-line"><span>Saldo actual</span><strong id="compArsActual">$ 0</strong></div><div class="comp-line"><span>A compensar</span><strong id="compArsPago">$ 0</strong></div><div class="comp-line restante"><span>Saldo restante</span><strong id="compArsRestante">$ 0</strong></div></div><div class="comp-card"><span>Cuenta USD</span><div class="comp-line"><span>Saldo actual</span><strong id="compUsdActual">U$S 0</strong></div><div class="comp-line"><span>A compensar</span><strong id="compUsdPago">U$S 0</strong></div><div class="comp-line restante"><span>Saldo restante</span><strong id="compUsdRestante">U$S 0</strong></div></div></div><div class="comp-note">No genera movimiento bancario. ARS compensa únicamente ARS y USD únicamente USD.</div></div><label class="field full" id="payRefField">N° de comprobante / referencia bancaria<input id="payRef" placeholder="Ej. TRANSF-845920"></label><label class="field full" id="payFileField">Recibo / comprobante de pago<input id="payFile" type="file" accept="image/*,.pdf"><small id="fileName">Sin archivo seleccionado</small></label></div></div><div class="modal-foot"><button class="btn" id="cancel">Cancelar</button><button class="btn btn-primary" id="confirm">Confirmar liquidación</button></div></div></div>
+<div id="detailWrap" class="modal-wrap" hidden><div class="modal"><div class="modal-head"><div><div class="eyebrow">COMPROBANTE / LIQUIDACIÓN</div><h2 style="margin:3px 0 0" id="detailTitle">Detalle de pago</h2></div><button class="close" id="detailClose">×</button></div><div class="modal-body" id="detailBody"></div><div class="modal-foot"><button class="btn" id="detailOk">Cerrar</button></div></div></div>
+<div id="toast" class="toast"></div>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Portal TLC — Cuenta Corriente y Rendición de Gastos
+// Adaptado del mockup real de Cristian, reemplazando TODA la capa de
+// datos (CURRENT/USERS/DATA hardcodeados) por el backend construido
+// en los Pasos 1 y 2: Firebase directo (servicio_tecnico, eventos,
+// permisos) + acciones del Apps Script (crearLiquidacion,
+// listarLiquidaciones, guardarSaldoInicial/obtenerSaldoInicial,
+// agregarGastoGeneral/editarGastoGeneral/eliminarGastoGeneral,
+// listarGastosGeneralesPendientes). El HTML/CSS y las funciones de
+// render se mantuvieron tal cual las mandó Cristian — solo cambió DE
+// DÓNDE sale la información y A DÓNDE va cuando se guarda algo.
+// ══════════════════════════════════════════════════════════════════
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+const RTDB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
+const SESSION_KEY = 'tlc_session_v1';
+
+let CURRENT = { nombre: '', email: '', permisos: { Internos: false } };
+let USERS = [];
+let TC_OFICIAL_CC = null;
+
+// Mapas auxiliares — arman el puente entre "qué se ve en pantalla" y
+// "a qué gasto real, en qué origen real, hay que ir a buscar" cuando
+// se agrega o se liquida algo. Se reconstruyen en cada carga.
+let _origenInfo = {};           // tarjeta_id -> {tipo, id_ticket, id_evento, id_tarjeta}
+let _origenGastosCompletos = {}; // tarjeta_id -> array COMPLETO de gastos de ese origen (no solo los pendientes de esta persona) — hace falta para poder agregar sin pisar los de otros
+
+const DATA = { usuario_seleccionado: '', saldo_inicial: { monto_ars:0, monto_usd:0, fecha_corte:'', estado:'PAGADO' }, grupos_gastos: [], liquidaciones: [] };
+const state = JSON.parse(JSON.stringify(DATA));
+const selected = new Set(); let selInitial = false;
+
+const $=id=>document.getElementById(id), money=(n,c)=>c==="USD"?"U$S "+Number(n||0).toLocaleString("es-AR",{maximumFractionDigits:2}):"$ "+Number(n||0).toLocaleString("es-AR",{maximumFractionDigits:0}), fmt=d=>{if(!d)return"—";let[a,b,c]=d.split("-");return`${c}/${b}/${a}`}, esc=s=>{let d=document.createElement("div");d.textContent=String(s??"");return d.innerHTML}, today=()=>new Date().toISOString().slice(0,10);
+
+// Convierte el importe interno (siempre en USD) a la moneda en la que
+// se cargó cada gasto (mismo criterio que servicio.html/eventos.html).
+function _aMoneda(montoUSD, moneda) {
+  if (moneda === 'ARS' && TC_OFICIAL_CC) return montoUSD * TC_OFICIAL_CC;
+  return montoUSD;
+}
+
+function _parseItemId(id) {
+  const partes = id.split(':');
+  if (partes[0] === 'servicio') return { origen_tipo:'servicio', id_ticket:partes[1], gasto_index:parseInt(partes[2],10) };
+  if (partes[0] === 'evento') return { origen_tipo:'evento', id_evento:partes[1], id_tarjeta:partes[2], gasto_index:parseInt(partes[3],10) };
+  return { origen_tipo:'general', id_gasto:partes[1] };
+}
+
+function userName(){return USERS.find(u=>u.email===state.usuario_seleccionado)?.nombre||""}
+function visible(){return state.grupos_gastos} // ya vienen filtrados por beneficiario al cargar — no hace falta re-filtrar acá
+function totals(){let ars=0,usd=0;visible().forEach(g=>g.items.forEach(i=>{if(i.estado!=="PENDIENTE")return;i.moneda==="USD"?usd+=i.monto:ars+=i.monto}));if(state.saldo_inicial.estado==="PENDIENTE"){ars+=state.saldo_inicial.monto_ars;usd+=state.saldo_inicial.monto_usd}return{ars,usd}}
+function selTotals(){let ars=0,usd=0;visible().forEach(g=>g.items.forEach(i=>{if(!selected.has(i.id)||i.estado!=="PENDIENTE")return;i.moneda==="USD"?usd+=i.monto:ars+=i.monto}));if(selInitial){ars+=Number($("partArs").value||0);usd+=Number($("partUsd").value||0)}return{ars,usd}}
+
+function renderSummary(){let t=totals(),s=selTotals();$("saldoArs").textContent=money(t.ars,"ARS");$("saldoUsd").textContent=money(t.usd,"USD");let txt=(s.ars?money(s.ars,"ARS"):"")+(s.usd?(s.ars?" · ":"")+money(s.usd,"USD"):"");$("selTotal").textContent=txt||"$ 0";$("liquidar").disabled=!(s.ars||s.usd)||!CURRENT.permisos.Internos;$("liquidar").textContent=(s.ars||s.usd)?`Liquidar Selección (${txt})`:"Liquidar Selección ($ 0)"}
+function icon(t){return t==="SERVICE"?"🛠️":t==="EVENTO"?"🎪":"📌"}
+function sub(g){let ars=0,usd=0;g.items.forEach(i=>{if(i.estado!=="PENDIENTE")return;i.moneda==="USD"?usd+=i.monto:ars+=i.monto});return{ars,usd}}
+function row(i){return`<div class="row"><input type="checkbox" ${i.estado==="PAGADO"?"disabled":""} ${selected.has(i.id)?"checked":""} onchange="toggleItem('${i.id}',this.checked)"><div class="date">${fmt(i.fecha)}</div><div class="concept-wrap"><div class="concept">${esc(i.concepto)}</div><div class="audit">Cargado por: ${esc(i.cargado_por)}</div></div><div class="amount">${money(i.monto,i.moneda)}</div><div class="tools"><span class="audit">Sin comprobante</span></div></div>`}
+function newForm(g){let opts=USERS.map(u=>`<option value="${esc(u.nombre)}">${esc(u.nombre)}</option>`).join("");return`<div class="new-expense"><div class="new-title">+ Cargar gasto en esta tarjeta</div><div class="new-grid"><input type="date" id="d-${g.tarjeta_id}" value="${today()}"><input id="c-${g.tarjeta_id}" placeholder="Concepto / descripción"><select id="m-${g.tarjeta_id}"><option>ARS</option><option>USD</option></select><input id="a-${g.tarjeta_id}" type="number" placeholder="Monto"><select id="b-${g.tarjeta_id}" ${CURRENT.permisos.Internos?"":"style='display:none'"}>${opts}</select><button class="add" onclick="addExpense('${g.tarjeta_id}')">+ Agregar</button></div><div class="audit">Cargado por: <strong>${esc(CURRENT.nombre)}</strong>${CURRENT.permisos.Internos?" · Puede asignar a otro beneficiario":""}</div></div>`}
+function renderGroups(){let allGroups=visible(),gs=allGroups.map(g=>({...g,items:g.items.filter(i=>i.estado==="PENDIENTE")})).filter(g=>g.items.length),count=0;$("groups").innerHTML=gs.length?gs.map((g,idx)=>{let s=sub(g),p=g.items;count+=p.length;let all=p.length&&p.every(i=>selected.has(i.id));return`<div class="card group ${idx===0?"open":""}" data-g="${g.tarjeta_id}"><div class="group-head" onclick="toggleGroup('${g.tarjeta_id}')"><input class="group-check" type="checkbox" ${all?"checked":""} onclick="event.stopPropagation()" onchange="toggleGroupSel('${g.tarjeta_id}',this.checked)"><div><div class="group-type">${icon(g.tipo_origen)} ${g.tipo_origen} · ${esc(g.tarjeta_id)}</div><div class="group-title">${esc(g.titulo_origen)}</div></div><div class="subtotal">${s.ars?`<strong>${money(s.ars,"ARS")}</strong>`:""}${s.usd?`<strong>${money(s.usd,"USD")}</strong>`:""}<small>Subtotal pendiente</small></div><div class="chev">▼</div></div><div class="content">${g.items.map(row).join("")}${newForm(g)}</div></div>`}).join(""):`<div class="card" style="padding:18px;text-align:center;color:var(--muted);font-size:12px">✅ No hay gastos pendientes para ${esc(userName())}.</div>`;$("count").textContent=`${count} ${count===1?"movimiento":"movimientos"}`}
+
+window.toggleGroup=id=>document.querySelector(`[data-g="${id}"]`)?.classList.toggle("open");
+window.toggleItem=(id,ch)=>{ch?selected.add(id):selected.delete(id);renderSummary();renderGroups()};
+window.toggleGroupSel=(id,ch)=>{let g=visible().find(x=>x.tarjeta_id===id);g?.items.filter(i=>i.estado==="PENDIENTE").forEach(i=>ch?selected.add(i.id):selected.delete(i.id));renderGroups();renderSummary()};
+
+// addExpense — real: para GENERAL llama a agregarGastoGeneral; para
+// SERVICE/EVENTO agrega al array COMPLETO del origen real (no solo a
+// los pendientes filtrados en pantalla) y lo guarda vía
+// st_actualizarGastos/ev_actualizarGastos, para no pisar gastos de
+// otras personas que puedan estar en la misma tarjeta.
+window.addExpense = async function(id) {
+  const c = $("c-"+id).value.trim(), a = Number($("a-"+id).value);
+  if (!c || !a) { toast("Completá concepto y monto"); return; }
+  const ben = CURRENT.permisos.Internos ? $("b-"+id).value : CURRENT.nombre;
+  const fecha = $("d-"+id).value, moneda = $("m-"+id).value;
+  const btn = document.querySelector(`[data-g="${id}"] .add`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+  try {
+    const info = _origenInfo[id];
+    if (info.tipo === 'general') {
+      const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+        accion:'agregarGastoGeneral', a_favor_de: ben, descripcion: c, fecha: fecha, importe: a, moneda: moneda, creado_por: CURRENT.nombre,
+      }) });
+      const rr = await r.json();
+      if (!rr.ok) { toast('Error: ' + (rr.error||'')); return; }
+    } else {
+      const ruta = info.tipo === 'servicio' ? ('servicio_tecnico/'+info.id_ticket+'/gastos') : ('eventos/'+info.id_evento+'/tarjetas/'+info.id_tarjeta+'/gastos');
+      const gastosCompletos = _origenGastosCompletos[id] || [];
+      // El importe que tipeó el usuario está en SU moneda elegida — si
+      // es ARS, hay que guardarlo como equivalente en USD (mismo
+      // criterio interno que ya usan servicio.html/eventos.html).
+      const importeAGuardar = (moneda === 'ARS' && TC_OFICIAL_CC) ? (a / TC_OFICIAL_CC) : a;
+      gastosCompletos.push({ fecha, descripcion:c, importe:importeAGuardar, moneda, creado_por:CURRENT.nombre, creado_en:new Date().toISOString(), a_favor_de: ben, estado:'PENDIENTE' });
+      const accion = info.tipo === 'servicio' ? 'st_actualizarGastos' : 'ev_actualizarGastos';
+      const payload = info.tipo === 'servicio' ? { accion, id_ticket: info.id_ticket, gastos: gastosCompletos } : { accion, id_evento: info.id_evento, id_tarjeta: info.id_tarjeta, gastos: gastosCompletos };
+      const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+      const rr = await r.json();
+      if (!rr.ok) { toast('Error: ' + (rr.error||'')); return; }
+    }
+    toast("Gasto agregado");
+    await cargarTodo();
+  } catch(e) {
+    toast('Error de conexión al guardar el gasto');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '+ Agregar'; }
+  }
+};
+
+function renderInitial(){let s=state.saldo_inicial;$("fechaCorte").textContent=fmt(s.fecha_corte);$("iniArs").textContent=money(s.monto_ars,"ARS");$("iniUsd").textContent=money(s.monto_usd,"USD");$("partArs").max=s.monto_ars;$("partUsd").max=s.monto_usd;if(!selInitial){$("partArs").value=s.monto_ars;$("partUsd").value=s.monto_usd}}
+$("saldoCheck").addEventListener("change",e=>{selInitial=e.target.checked;$("partial").hidden=!selInitial;if(selInitial){$("partArs").value=state.saldo_inicial.monto_ars;$("partUsd").value=state.saldo_inicial.monto_usd}renderSummary()});
+["partArs","partUsd"].forEach(id=>$(id).addEventListener("input",renderSummary));
+
+function renderHistory(){if(!state.liquidaciones.length){$("history").innerHTML=`<div class="card history-item" style="cursor:default"><div><strong>Todavía no hay liquidaciones registradas.</strong><br><small>Los pagos confirmados aparecerán acá.</small></div></div>`;return}$("history").innerHTML=state.liquidaciones.map(p=>{let a=(p.monto_ars?money(p.monto_ars,"ARS"):"")+(p.monto_usd?(p.monto_ars?" · ":"")+money(p.monto_usd,"USD"):"");return`<div class="card history-item" onclick="openPaymentDetail('${p.id}')"><div><strong>${esc(p.medio)} · ${esc(p.beneficiario_nombre)}</strong><br><small>${fmt(p.fecha)}${p.referencia?" · Ref. "+esc(p.referencia):""}</small><div class="history-open">Ver detalle →</div></div><strong>${a}</strong><span class="badge paid">PAGADO</span></div>`}).join("")}
+function openPaymentDetail(id){let p=state.liquidaciones.find(x=>x.id===id);if(!p)return;let total=(p.monto_ars?money(p.monto_ars,"ARS"):"")+(p.monto_usd?(p.monto_ars?" · ":"")+money(p.monto_usd,"USD"):"");let items=(p.detalle_items||[]).map(i=>`<div class="detail-item"><div><strong>${esc(i.concepto)}</strong><small>${i.origen_label?esc(i.origen_label)+" · ":""}${fmt(i.fecha)}${i.cargado_por?" · Cargado por: "+esc(i.cargado_por):""}</small></div><strong>${money(i.monto,i.moneda)}</strong></div>`).join("");if(p.saldo_inicial_detalle){let si=p.saldo_inicial_detalle;if(si.ars)items+=`<div class="detail-item"><div><strong>Saldo inicial histórico</strong><small>Compensación / liquidación parcial</small></div><strong>${money(si.ars,"ARS")}</strong></div>`;if(si.usd)items+=`<div class="detail-item"><div><strong>Saldo inicial histórico</strong><small>Compensación / liquidación parcial</small></div><strong>${money(si.usd,"USD")}</strong></div>`}$("detailTitle").textContent=p.medio==="Compensación con saldo a favor"?"Detalle de compensación":"Detalle de liquidación";$("detailBody").innerHTML=`<div class="detail-grid"><div class="detail-box"><span>Beneficiario</span><strong>${esc(p.beneficiario_nombre)}</strong></div><div class="detail-box"><span>Fecha</span><strong>${fmt(p.fecha)}</strong></div><div class="detail-box"><span>Medio</span><strong>${esc(p.medio)}</strong></div><div class="detail-box"><span>Total</span><strong>${total||"—"}</strong></div>${p.referencia?`<div class="detail-box" style="grid-column:1/-1"><span>Referencia</span><strong>${esc(p.referencia)}</strong></div>`:""}</div><div class="eyebrow" style="margin:4px 0 7px">DETALLE PAGADO</div><div class="detail-items">${items||'<div class="detail-item"><span>Sin detalle disponible</span></div>'}</div>`;$("detailWrap").hidden=false}
+function closePaymentDetail(){$("detailWrap").hidden=true}
+window.openPaymentDetail=openPaymentDetail;
+
+function updatePaymentMethodUI(){let comp=$("payMethod").value==="Compensación con saldo a favor",pend=totals(),sel=selTotals();$("compBox").classList.toggle("show",comp);$("payRefField").classList.toggle("hidden",comp);$("payFileField").classList.toggle("hidden",true);$("confirm").textContent=comp?"Confirmar compensación":"Confirmar liquidación";if(comp){$("compArsActual").textContent=money(pend.ars,"ARS");$("compArsPago").textContent=money(sel.ars,"ARS");$("compArsRestante").textContent=money(Math.max(0,pend.ars-sel.ars),"ARS");$("compUsdActual").textContent=money(pend.usd,"USD");$("compUsdPago").textContent=money(sel.usd,"USD");$("compUsdRestante").textContent=money(Math.max(0,pend.usd-sel.usd),"USD");$("payRef").value="";}}
+function openModal(){if(!CURRENT.permisos.Internos){toast('Solo usuarios Internos pueden liquidar gastos');return}let s=selTotals();$("mArs").textContent=money(s.ars,"ARS");$("mUsd").textContent=money(s.usd,"USD");$("payDate").value=today();$("payMethod").value="Transferencia";updatePaymentMethodUI();let rows=[];if(selInitial){let a=Number($("partArs").value||0),u=Number($("partUsd").value||0);if(a)rows.push(["Saldo inicial histórico",money(a,"ARS")]);if(u)rows.push(["Saldo inicial histórico",money(u,"USD")])}visible().forEach(g=>g.items.forEach(i=>{if(selected.has(i.id))rows.push([i.concepto,money(i.monto,i.moneda)])}));$("modalItems").innerHTML=rows.map(r=>`<div class="modal-item"><span>${esc(r[0])}</span><strong>${r[1]}</strong></div>`).join("");$("modalWrap").hidden=false}
+function closeModal(){$("modalWrap").hidden=true}
+
+$("detailClose").onclick=closePaymentDetail;$("detailOk").onclick=closePaymentDetail;$("detailWrap").onclick=e=>{if(e.target===$("detailWrap"))closePaymentDetail()};
+$("liquidar").onclick=openModal;$("close").onclick=closeModal;$("cancel").onclick=closeModal;$("modalWrap").onclick=e=>{if(e.target===$("modalWrap"))closeModal()};
+$("payMethod").onchange=updatePaymentMethodUI;
+
+// confirm — real: arma el payload de items[] a partir de los ids
+// seleccionados (parseados de vuelta a su origen real) y llama a
+// crearLiquidacion. El backend es quien marca cada gasto como PAGADO
+// en su origen real y calcula los montos con el TC oficial — acá solo
+// se arma el pedido.
+$("confirm").onclick = async function() {
+  if (!$("payDate").value) { toast("Seleccioná la fecha"); return; }
+  const btn = $("confirm");
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    const items = [];
+    visible().forEach(g => g.items.forEach(i => {
+      if (!selected.has(i.id) || i.estado !== 'PENDIENTE') return;
+      const info = _parseItemId(i.id);
+      info.origen_label = g.tarjeta_id + ' · ' + g.titulo_origen;
+      items.push(info);
+    }));
+    const payload = {
+      accion: 'crearLiquidacion',
+      solicitante_es_interno: CURRENT.permisos.Internos,
+      beneficiario_email: state.usuario_seleccionado, beneficiario_nombre: userName(),
+      fecha: $("payDate").value, medio: $("payMethod").value, referencia: $("payRef").value,
+      items: items,
+      saldo_inicial_ars: selInitial ? Number($("partArs").value||0) : 0,
+      saldo_inicial_usd: selInitial ? Number($("partUsd").value||0) : 0,
+      creado_por_email: CURRENT.email, creado_por_nombre: CURRENT.nombre,
+    };
+    const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+    const rr = await r.json();
+    if (!rr.ok) { toast('Error: ' + (rr.error||'')); return; }
+    selected.clear(); selInitial=false; $("saldoCheck").checked=false; $("partial").hidden=true; $("payRef").value="";
+    const fueCompensacion = payload.medio === "Compensación con saldo a favor";
+    closeModal();
+    await cargarTodo();
+    toast(fueCompensacion ? "Compensación interna registrada" : "Liquidación registrada");
+  } catch(e) {
+    toast('Error de conexión al liquidar');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Confirmar liquidación';
+  }
+};
+
+$("collab").onchange = async function(e) {
+  state.usuario_seleccionado = e.target.value;
+  selected.clear(); selInitial = false; $("saldoCheck").checked = false; $("partial").hidden = true;
+  await cargarTodo();
+};
+
+const THEME_KEY_CC = "tlc_tema"; // misma clave compartida que usa el resto del Portal
+function applyTheme(t){document.documentElement.setAttribute("data-theme",t);$("theme").textContent=t==="dark"?"☀️":"🌙"}
+applyTheme(localStorage.getItem(THEME_KEY_CC)==='light' ? 'light' : 'dark');
+$("theme").onclick=()=>{let t=document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark";localStorage.setItem(THEME_KEY_CC,t);applyTheme(t)};
+
+let tt; function toast(m){let el=$("toast");el.textContent=m;el.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>el.classList.remove("show"),2300)}
+function render(){renderInitial();renderGroups();renderSummary();renderHistory()}
+
+// ══════════════════════════════════════════════════════════════════
+// CARGA REAL — reemplaza los datos hardcodeados del mockup por todo
+// lo que ya existe en Firebase (Pasos 1 y 2).
+// ══════════════════════════════════════════════════════════════════
+async function _obtenerTCOficialCC() {
+  try {
+    const r = await fetch('https://dolarapi.com/v1/dolares/oficial');
+    if (!r.ok) return null;
+    const d = await r.json();
+    return parseFloat(d.venta) || null;
+  } catch(e) { return null; }
+}
+
+async function _cargarUsuarios() {
+  const r = await fetch(RTDB_URL + '/permisos.json?_=' + Date.now());
+  const data = await r.json();
+  const lista = [];
+  Object.keys(data || {}).forEach(function(clave) {
+    const fila = data[clave];
+    if (!fila || !fila['Email']) return;
+    lista.push({ email: String(fila['Email']).trim().toLowerCase(), nombre: fila['Nombre_Vendedor'] || fila['Email'] });
+  });
+  lista.sort(function(a,b){ return a.nombre.localeCompare(b.nombre, 'es'); });
+  return lista;
+}
+
+async function cargarTodo() {
+  $("groups").innerHTML = '<div class="card" style="padding:18px;text-align:center;color:var(--muted);font-size:12px">Cargando...</div>';
+
+  const beneficiarioEmail = state.usuario_seleccionado;
+  const beneficiarioNombre = userName();
+
+  // ── Servicio Técnico — gastos PENDIENTES a favor de este beneficiario ──
+  const grupos = [];
+  _origenInfo = {}; _origenGastosCompletos = {};
+  try {
+    const rSt = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now());
+    const dataSt = await rSt.json();
+    Object.keys(dataSt || {}).forEach(function(id) {
+      const t = dataSt[id];
+      if (!t || !Array.isArray(t.gastos) && !t.gastos) return;
+      const gastosCompletos = Array.isArray(t.gastos) ? t.gastos : Object.values(t.gastos);
+      const pendientes = [];
+      gastosCompletos.forEach(function(g, idx) {
+        if (g && g.a_favor_de === beneficiarioNombre && g.estado === 'PENDIENTE') {
+          pendientes.push({
+            id: 'servicio:' + id + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
+            moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'),
+            cargado_por: g.creado_por || '', estado: 'PENDIENTE',
+          });
+        }
+      });
+      if (pendientes.length) {
+        const tarjetaId = t.id_ticket || id;
+        grupos.push({ tarjeta_id: tarjetaId, tipo_origen: 'SERVICE', titulo_origen: (t.cliente||'—') + (t.equipo_modelo ? ' — ' + t.equipo_modelo : ''), items: pendientes });
+        _origenInfo[tarjetaId] = { tipo: 'servicio', id_ticket: tarjetaId };
+        _origenGastosCompletos[tarjetaId] = gastosCompletos;
+      }
+    });
+  } catch(e) { console.warn('Error cargando gastos de Servicio Técnico:', e); }
+
+  // ── Eventos — gastos PENDIENTES a favor de este beneficiario ──
+  try {
+    const rEv = await fetch(RTDB_URL + '/eventos.json?_=' + Date.now());
+    const dataEv = await rEv.json();
+    Object.keys(dataEv || {}).forEach(function(idEvento) {
+      const ev = dataEv[idEvento];
+      const tarjetas = (ev && ev.tarjetas) ? Object.values(ev.tarjetas) : [];
+      const tarjetasKeys = (ev && ev.tarjetas) ? Object.keys(ev.tarjetas) : [];
+      tarjetas.forEach(function(t, ti) {
+        if (!t) return;
+        const gastosCompletos = Array.isArray(t.gastos) ? t.gastos : (t.gastos ? Object.values(t.gastos) : []);
+        const pendientes = [];
+        gastosCompletos.forEach(function(g, idx) {
+          if (g && g.a_favor_de === beneficiarioNombre && g.estado === 'PENDIENTE') {
+            pendientes.push({
+              id: 'evento:' + idEvento + ':' + t.id + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
+              moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'),
+              cargado_por: g.creado_por || '', estado: 'PENDIENTE',
+            });
+          }
+        });
+        if (pendientes.length) {
+          const tarjetaId = t.id || tarjetasKeys[ti];
+          grupos.push({ tarjeta_id: tarjetaId, tipo_origen: 'EVENTO', titulo_origen: (ev.nombre||'—') + ' — ' + (t.titulo||'—'), items: pendientes });
+          _origenInfo[tarjetaId] = { tipo: 'evento', id_evento: idEvento, id_tarjeta: tarjetaId };
+          _origenGastosCompletos[tarjetaId] = gastosCompletos;
+        }
+      });
+    });
+  } catch(e) { console.warn('Error cargando gastos de Eventos:', e); }
+
+  // ── Generales (carga manual) ──
+  try {
+    const rGen = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+      accion:'listarGastosGeneralesPendientes', a_favor_de: beneficiarioNombre, a_favor_de_email: beneficiarioEmail,
+      solicitante_email: CURRENT.email, solicitante_es_interno: CURRENT.permisos.Internos,
+    }) });
+    const rrGen = await rGen.json();
+    if (rrGen.ok && rrGen.gastos.length) {
+      grupos.push({
+        tarjeta_id: 'GENERAL', tipo_origen: 'GENERAL', titulo_origen: 'Gastos generales / directos',
+        items: rrGen.gastos.map(function(g) {
+          return { id: 'general:' + g.id, fecha: g.fecha||'', concepto: g.descripcion||'', moneda: g.moneda||'USD',
+            monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'), cargado_por: g.creado_por||'', estado:'PENDIENTE' };
+        }),
+      });
+      _origenInfo['GENERAL'] = { tipo: 'general' };
+    } else {
+      _origenInfo['GENERAL'] = { tipo: 'general' }; // igual queda disponible el formulario, aunque no haya nada pendiente todavía
+    }
+  } catch(e) { console.warn('Error cargando gastos generales:', e); }
+
+  // Siempre mostramos GENERAL como grupo disponible para cargar, tenga
+  // o no gastos pendientes ahora mismo.
+  if (!grupos.some(function(g){ return g.tarjeta_id === 'GENERAL'; })) {
+    grupos.push({ tarjeta_id: 'GENERAL', tipo_origen: 'GENERAL', titulo_origen: 'Gastos generales / directos', items: [] });
+  }
+
+  state.grupos_gastos = grupos;
+
+  // ── Saldo inicial ──
+  try {
+    const rSaldo = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+      accion:'obtenerSaldoInicial', usuario_email: beneficiarioEmail,
+      solicitante_email: CURRENT.email, solicitante_es_interno: CURRENT.permisos.Internos,
+    }) });
+    const rrSaldo = await rSaldo.json();
+    state.saldo_inicial = rrSaldo.ok ? rrSaldo.saldo_inicial : { monto_ars:0, monto_usd:0, fecha_corte:'', estado:'PAGADO' };
+  } catch(e) { state.saldo_inicial = { monto_ars:0, monto_usd:0, fecha_corte:'', estado:'PAGADO' }; }
+
+  // ── Historial de liquidaciones ──
+  try {
+    const rHist = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+      accion:'listarLiquidaciones', usuario_email: beneficiarioEmail,
+      solicitante_email: CURRENT.email, solicitante_es_interno: CURRENT.permisos.Internos,
+    }) });
+    const rrHist = await rHist.json();
+    state.liquidaciones = rrHist.ok ? rrHist.liquidaciones : [];
+  } catch(e) { state.liquidaciones = []; }
+
+  render();
+}
+
+async function _initCC() {
+  const raw = localStorage.getItem(SESSION_KEY);
+  if (!raw) { location.href = 'index.html'; return; }
+  let payload;
+  try { payload = JSON.parse(raw); } catch(e) { location.href = 'index.html'; return; }
+  if (payload && payload.expira && Date.now() > payload.expira) { location.href = 'index.html'; return; }
+  const account = payload.account || payload;
+  if (!account || !account.username) { location.href = 'index.html'; return; }
+
+  let tieneAcceso = true;
+  try { if (typeof validarAccesoModulo === 'function') tieneAcceso = await validarAccesoModulo('Administracion'); } catch(e) {}
+  if (!tieneAcceso) return; // validarAccesoModulo ya avisó y redirigió
+
+  let esInterno = false;
+  try { if (typeof consultarPermisoModulo === 'function') esInterno = await consultarPermisoModulo('Internos'); } catch(e) {}
+
+  CURRENT = { nombre: account.name || account.username, email: (account.username||'').toLowerCase(), permisos: { Internos: esInterno } };
+
+  TC_OFICIAL_CC = await _obtenerTCOficialCC();
+  USERS = await _cargarUsuarios();
+  if (!USERS.some(function(u){ return u.email === CURRENT.email; })) USERS.unshift({ email: CURRENT.email, nombre: CURRENT.nombre });
+
+  // El selector de colaborador: si NO es Interno, queda fijo en uno
+  // mismo (sin poder ver la cuenta corriente de otra persona).
+  const selectorHtml = (esInterno ? USERS : USERS.filter(function(u){ return u.email === CURRENT.email; }))
+    .map(function(u){ return '<option value="' + esc(u.email) + '">' + esc(u.nombre) + '</option>'; }).join('');
+  $("collab").innerHTML = selectorHtml;
+  $("collab").disabled = !esInterno;
+  state.usuario_seleccionado = CURRENT.email;
+  $("collab").value = CURRENT.email;
+
+  await cargarTodo();
+}
+_initCC();
+</script>
+</body></html>
