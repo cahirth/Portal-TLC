@@ -538,7 +538,7 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
         <div class="header-title-block">
             <h1 id="txt-main-title">Portal TLC</h1>
             <p id="txt-sub-title" style="font-size:11px; color:var(--text-muted);">Menú Principal</p>
-            <p id="footer-version-idx" style="font-size:9px; color:var(--text-muted); opacity:.6; margin-top:1px;">v2026.07.05.7</p>
+            <p id="footer-version-header-idx" style="font-size:9px; color:var(--text-muted); opacity:.6; margin-top:1px;">v2026.07.05.7</p>
         </div>
         <!-- Campanita de notificaciones -->
         <div style="position:relative;" id="campana-wrap">
@@ -2141,10 +2141,23 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
         });
     }
 
-    // Mostrar versión en el pie del menú de avatar
+    // Mostrar versión en el pie del header Y en el pie del menú de
+    // avatar — BUG REAL: los 2 elementos compartían el mismo
+    // id="footer-version-idx" (HTML inválido — los IDs tienen que ser
+    // únicos), así que getElementById solo encontraba al primero (el
+    // del header) y lo actualizaba bien; el segundo (adentro del menú
+    // de avatar) se quedaba vacío para siempre, sin que el código
+    // nunca se enterara del problema. Reportado por Cristian: "no me
+    // estas dando la version.js, ni tampoco aparece e numero de
+    // version en los avatar". Renombrado el del header a
+    // "footer-version-header-idx"; el del menú de avatar mantiene su
+    // id original, ahora sin colisión.
     try {
+        const elFooterVerHeader = document.getElementById('footer-version-header-idx');
+        const version = (typeof PORTAL_TLC_VERSION !== 'undefined') ? PORTAL_TLC_VERSION : '?';
+        if (elFooterVerHeader) elFooterVerHeader.textContent = 'v' + version;
         const elFooterVer = document.getElementById('footer-version-idx');
-        if (elFooterVer) elFooterVer.textContent = (typeof PORTAL_TLC_VERSION !== 'undefined') ? PORTAL_TLC_VERSION : '?';
+        if (elFooterVer) elFooterVer.textContent = version;
     } catch(e) {}
 
     // ─── MOSTRAR NOMBRE USUARIO DESDE SESIÓN COMPARTIDA ────────────────────

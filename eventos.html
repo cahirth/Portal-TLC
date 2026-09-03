@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.08.30.8 (Sumado avatar.js (archivo nuevo, mismo patrón que version.js/permisos.js) — Cristian: "mi dia y eventos no tienen avatar, podria haber 1 solo avatar flotante". Un solo <script src="avatar.js"> agregado justo después de version.js, sin tocar nada más del archivo. Confirmado con test de integración real (avatar.js corriendo DENTRO de eventos.html completo, no aislado): el avatar aparece con las iniciales correctas y el menú funciona.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.7 (PASO 1 del módulo nuevo "Cuenta Corriente y Rendición de Gastos" — mismo cambio exacto que servicio.html v2026.08.30.3: a_favor_de/estado en cada gasto, completados automático al crear; un gasto PAGADO pasa a solo lectura con badge "✅ Liquidado" y bloquea edición/eliminación con aviso. Backward-compatible, sin migración necesaria. Confirmado con los mismos 4 tests que servicio.html.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.6 (Cada gasto nuevo ahora registra automáticamente quién lo cargó y cuándo — "Por: Nombre — fecha hs" arriba de la descripción, mismo estilo/formato que ya usan las Notas Generales de este archivo (.ft, "Por: X — fecha hs"). Se completa solo al crear el gasto (_agregarGastoEv), leyendo el usuario logueado — no editable a mano. Los gastos viejos, sin creado_por, no muestran esa línea (no rompen nada). Réplica de lo mismo hecho en servicio.html v2026.08.30.2 — Cristian: "Podes replicarlo en eventos.html". Confirmado con test: un gasto viejo sin autor sigue viéndose normal, uno nuevo muestra el nombre+fecha/hora reales con el mismo formato que las Notas, y lo que se guarda en el backend incluye ambos campos.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.5 (BUG REAL sobre lo entregado en v2026.08.30.4 — Cristian: "con la ficha abierta no encuentro el pin para tildarlo, solo con la ficha cerrada". El pin solo se había agregado a la tarjeta CERRADA (Kanban), faltaba en el header del detalle ABIERTO — mismo gap que hubo que corregir en su momento para el modo=cliente de ficha-equipo.html. Agregado junto al título, dentro de _renderOverlayTarjeta — mismo criterio visual (gris/apagado sin marcar, sin filtro cuando está activo) y misma función _toggleUrgenteDesdeTarjetaEv ya existente, sin necesidad de nada nuevo. Confirmado con test: el pin aparece en el header del detalle abierto, tocarlo desde ahí marca la tarjeta correcta, y el header se actualiza solo (sin cerrar el modal) reflejando el cambio.) -->
@@ -48,6 +49,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Eventos / Congresos — Portal TLC</title>
 <script src="version.js"></script>
+<script src="avatar.js"></script>
 <script src="permisos.js"></script>
 <style>
 :root {
@@ -583,7 +585,7 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
 // diagnosticando bugs que en realidad eran "el archivo todavía no se
 // volvió a subir". Guardado como constante con nombre (no un string
 // suelto dentro del console.log) — actualizar ACÁ en cada entrega.
-const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.7';
+const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.8';
 console.log("%c TLC Eventos v" + _VERSION_ARCHIVO_EVENTOS + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
