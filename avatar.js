@@ -1,5 +1,20 @@
-// Portal TLC | avatar.js | v3 (2026.09.04) | Avatar único, fuente de verdad de TODO el Portal.
+// Portal TLC | avatar.js | v4 (2026.09.04) | Avatar único, fuente de verdad de TODO el Portal.
 // ══════════════════════════════════════════════════════════════════
+// v4 — Cristian, con captura: "mejor, pero revisa en todos los modulos
+// que se solapa arriba a la derecha con la campana de mensajes, si
+// queres no lo hagas flotante y corré a la iza todos los iconos y
+// deja el avatar a la derecha arriba". El intento anterior (v3, .phone-
+// container) resolvía SOLO index.html — en los módulos con header y
+// campana propios (servicio/cotizaciones/empresas/cuenta-corriente),
+// el avatar seguía siendo position:fixed y quedaba pegado ENCIMA de la
+// campanita en vez de al lado. Cambio real: el avatar ahora busca un
+// lugar DENTRO del header real de cada módulo (.app-header, .st-header,
+// .header, o .controls — el que exista) y se cuelga ahí como el
+// último hijo, con position:relative — cae en el flujo normal del
+// flex de ESE header, después de todo lo demás (campana incluida), en
+// vez de flotar por encima tapando algo. Si el módulo no tiene ninguno
+// de esos (hoy solo eventos.html, que no tiene header propio), sigue
+// flotante como estaba — no hay nada ahí con qué se solape.
 // v3 — 2 arreglos con captura de Cristian: (1) "esta solapado los dos
 // botones abajo a la derecha" + "pone el avatar en todos los modulos
 // en el corner arriba a la derecha, mantene el estilo en todos y el
@@ -153,17 +168,21 @@
   function inyectarCSS() {
     var css = '' +
       '.tlc-avatar-flotante{position:fixed;top:14px;right:14px;z-index:600;}' +
-      // Cuando el módulo tiene un "marco de teléfono" propio (hoy solo
-      // index.html, .phone-container) el avatar tiene que anclarse a
-      // ESE marco, no a la ventana entera del navegador — si no, en
-      // desktop el marco queda centrado y chico, pero position:fixed
-      // igual pega el avatar en la esquina de la ventana real,
-      // quedando afuera del marco, flotando solo en el fondo oscuro.
-      // Reportado por Cristian con captura: "esta solapado los dos
-      // botones abajo a la derecha" + "pone el avatar en todos los
-      // modulos en el corner arriba a la derecha, mantene el estilo
-      // en todos y el mismo corner en todos los modulos".
-      '.tlc-avatar-flotante.tlc-avatar-en-marco{position:absolute;top:14px;right:14px;}' +
+      // Cuando el módulo tiene un header real con sus propios iconos
+      // (campanita, toggle Lista/Kanban, etc.) el avatar se cuelga
+      // ADENTRO de ese header como el último elemento — así cae en el
+      // flujo normal del flex, después de todo lo demás, sin
+      // superponerse a nada. Sin esto, position:fixed pegaba el avatar
+      // en la esquina de la VENTANA real (no del contenido), quedando
+      // arriba de la campana o —en index.html, que tiene un marco de
+      // teléfono simulado más chico que la ventana en desktop—
+      // flotando afuera del marco. Reportado por Cristian con
+      // captura: "esta solapado los dos botones abajo a la derecha" +
+      // "pone el avatar en todos los modulos en el corner arriba a la
+      // derecha, mantene el estilo en todos y el mismo corner en
+      // todos los modulos, si queres no lo hagas flotante y corré a
+      // la iza todos los iconos y deja el avatar a la derecha arriba".
+      '.tlc-avatar-flotante.tlc-avatar-en-header{position:relative;top:auto;right:auto;flex-shrink:0;z-index:auto;}' +
       '.tlc-avatar-btn{width:38px;height:38px;border-radius:50%;background:#1c2541;color:#3a86ff;' +
         'border:1px solid #222e50;font-size:12px;font-weight:800;cursor:pointer;' +
         'display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.28);}' +
@@ -259,14 +278,21 @@
         '<div class="tlc-avatar-menu-ver">Portal TLC · v' + version + '</div>' +
       '</div>';
 
-    // El propio .phone-container (index.html) ya es position:relative
-    // y overflow:hidden — si existe, el avatar se cuelga ahí adentro
-    // con position:absolute en vez de fixed, para quedar anclado al
-    // marco visual en vez de a la ventana real del navegador.
-    var marco = document.querySelector('.phone-container');
-    if (marco) {
-      marco.appendChild(wrap);
-      wrap.classList.add('tlc-avatar-en-marco');
+    // Se busca el header REAL del módulo, en orden de probabilidad, y
+    // el avatar se cuelga ADENTRO como último elemento (cae solo a la
+    // derecha, después de la campana y demás iconos, gracias al mismo
+    // flex que ya arma cada header). Si el módulo no tiene ninguno de
+    // estos (hoy solo eventos.html/mi-dia.html, que no tienen header
+    // propio), se cae al comportamiento flotante de siempre.
+    var HEADER_SELECTORS = ['.app-header', '.st-header', '.header', '.controls'];
+    var header = null;
+    for (var i = 0; i < HEADER_SELECTORS.length; i++) {
+      header = document.querySelector(HEADER_SELECTORS[i]);
+      if (header) break;
+    }
+    if (header) {
+      header.appendChild(wrap);
+      wrap.classList.add('tlc-avatar-en-header');
     } else {
       document.body.appendChild(wrap);
     }
