@@ -5,6 +5,7 @@
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.4 (Nuevo pin 📌 "Urgente / Atender hoy" — Cristian: "como puedo marcar algunos negocios para atenderlos con urgencia, o para programar el dia de trabajo... no importa en q etapa estén", eligió la opción "marca + nota corta" entre 3 propuestas, con pin rojo. Toca el pin (Kanban, Lista, o el header del detalle) para marcar/desmarcar — al marcar pide una nota corta opcional (ej. "Llamar antes de las 15hs"), guardada vía la nueva acción marcarNegocioUrgente (FotoMap.gs v196). Se ve como un pin rojo (gris/apagado si no está marcado) + un borde rojo en el costado de la tarjeta, cruzando TODAS las etapas y pipelines — no depende de la columna del Kanban. Nuevo filtro toggle "📌 Solo urgentes (N)" en la barra de filtros, combinable con los demás (vendedor/pipeline/colaborador/fechas), con contador en vivo. Bug real encontrado por el propio test: "null || ''" convertía el cancelar del prompt en string vacío ANTES de poder chequear si había cancelado — corregido chequeando null primero. Confirmado con 5 tests: pines rojo/gris correctos cruzando 2 etapas distintas, el contador y el filtro funcionan, marcar llama al backend con los datos correctos, cancelar el prompt no marca nada, y desmarcar no pide ningún prompt.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.3 (2da vuelta del fix de v2026.08.29.2 — Cristian: primero "en notas anda OK y no lo pisa pero en mensajes internos si lo pisa" (causa: #det-mensajes-panel es HERMANO de #det-body, no descendiente — el chequeo de foco de la v2 solo miraba dentro de #det-body); arreglado eso, después "en notas tbien se borra" — causa de fondo real: el chequeo se basaba en el FOCO en el instante exacto del polling, así que si el vendedor sacaba la vista un segundo (miraba otra pestaña, tocaba otra cosa) justo cuando caía el refresco cada 25s, el texto seguía ahí sin guardar pero ya no estaba "enfocado", y se borraba igual. Reemplazado _hayFocoEnTextoDentroDelDetalle() por _hayTextoSinGuardarEnDetalle(idNegocio) — chequea directo si HAY TEXTO CARGADO (no vacío) en la nota o el mensaje de ESE negocio, sin importar dónde esté el foco en ese instante, que es lo que realmente hay que proteger. Ambos campos se vacían apenas se envían/guardan (antes de la respuesta del servidor), así que el chequeo nunca queda bloqueado para siempre. Confirmado con 4 tests: nota sin guardar y SIN foco (el escenario real reportado) no se borra; mismo caso para mensaje interno; y con los 2 campos vacíos el próximo ciclo actualiza con normalidad.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.2 (BUG REAL — "si estoy escribiendo una nota o un mensaje interno, de repente, se borra lo que estoy escribiendo... sospecho que es por el polling que le agregamos para actualizar la preparacion desde servicio". Confirmado: _recargarHistoricoYRerenderizarSiAbierto (el polling de progreso ST cada 25s, v2026.08.29.1) llamaba a _renderDetalle() sin condición, que reemplaza TODO el HTML de #det-body de una — incluida cualquier <textarea>/<input> donde el vendedor estuviera escribiendo (una nota nueva, un mensaje interno), borrándole el texto a mitad de camino sin guardar nada. Ya existía una protección similar pero solo para el panel de mensajes (_renderPanelMensajesCot, con guard sobre _idCotActual) — la nota nueva no tenía ninguna. Nueva función _hayFocoEnTextoDentroDelDetalle() — si el foco está en cualquier <textarea>/<input> de texto dentro de #det-body al momento de refrescar, se salta el repintado de esa vuelta entera (se reintenta en el próximo ciclo, 25s después); el Kanban/Lista de atrás se siguen actualizando igual, no dependen de este re-render. Confirmado con test: escribir en el campo de nota y forzar un ciclo de refresco NO borra el texto; sacar el foco y forzar otro ciclo SÍ actualiza el detalle con normalidad.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.09.03.1 (Nuevo: checks de cierre "Facturado/Entregado/Cobrado" en negocios que llegan a Cierre (90%) — propuesta de Cristian: "En negocio cerrado, pienso agregar check facturado, entregado, cobrado, hacer una linea de tiempo de comprobacion en la tarjeta abierta y cerrada, si no estan completados los 3 check no permite pasar a Ganada". (1) Tarjeta CERRADA (Kanban y Lista): 3 puntitos chicos (verde=hecho, gris=pendiente) al pie, solo visibles desde Cierre en adelante. (2) Tarjeta ABIERTA (detalle): línea de tiempo completa — cada check es un ítem clickeable que tilda/destilda, con "quién · cuándo" debajo cuando está hecho, mismo estilo visual que Notas de seguimiento. Cualquiera con acceso al negocio puede tildar/destildar libremente (sin restricción de rol — el objetivo es trazabilidad, no control de acceso), y destildar limpia el registro sin dejar rastro de quién lo sacó. (3) CANDADO — _mutarEstadoCotizacion (el único choke point real de los 3 caminos de cambio de etapa: drag&drop, el <select> de la tarjeta Kanban, y el del detalle) ahora bloquea el pase a "Ganada" si falta algún check, con alert indicando cuáles, y revierte el <select> a su valor real (para no dejarlo mostrando "Ganada" visualmente sin haberse movido). Nuevos helpers _checksCierrePendientes/_renderChecksCierreCompacto/_renderChecksCierreDetalle/_toggleCheckCierre, y la acción nueva actualizarCheckCierre en FotoMap.gs (mismo patrón exacto que marcarNegocioUrgente). Confirmado con 8 tests aislados: el candado bloquea con checks incompletos y revierte el select, permite pasar con los 3 completos, no interfiere con otras etapas; el compacto no aparece antes de Cierre y muestra los puntos correctos; la timeline detallada arma los 3 ítems con su estado; tildar/destildar actualiza el estado, manda el payload correcto al backend, y re-renderiza si el detalle está abierto.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.1 (PASO 2 de "trazabilidad y sincronización entre Ventas y Servicio Técnico" (Paso 1 en FotoMap.gs v195). Muestra en 3 lugares el progreso_st que ya viene calculado con cada negocio: (1) Tarjeta Kanban — barra full-width al pie, con "📦 Prep. ST: X/Y Listos" + "XX%", color reactivo (gris en 0%, azul en proceso, verde en 100%). Solo aparece si el negocio ya tiene una Orden de Preparación vinculada — no se muestra nada en negocios que nunca llegaron ahí. (2) Vista Lista — misma barra en versión compacta, debajo de cada fila. (3) Modal de detalle — bloque nuevo "📦 Estado de Preparación y Despacho" con la barra grande + desglose por equipo (SKU, N° de Serie o "Pendiente", badge de Calidad ✅/⏳, estado individual con su color) — el desglose se trae en vivo con un fetch directo a Firebase (mismo mecanismo que ya usa el resto de la pantalla), ya que el agregado que viaja con el negocio no incluye el detalle por equipo. Nuevo helper _renderBarraProgresoST() reusado en los 3 lugares, y _cargarDetalleEquiposST() para el desglose del modal. Polling cada 25s (_iniciarPollingProgresoST, pausado si la pestaña está en segundo plano) que refresca Kanban/Lista/Detalle solo — el Portal no usa listeners en vivo de Firebase en ningún lado, así que esto es el approach de "casi tiempo real" acordado con Cristian en vez de meter ese cambio de arquitectura de entrada. _recargarHistoricoYRerenderizarSiAbierto() extraída de abrirDetalle() para poder reusarla también desde el polling. Confirmado con test de punta a punta: sin progreso_st no aparece nada, en proceso muestra barra azul con el texto/% correctos, al 100% muestra verde, la vista Lista también lo trae, el modal de detalle carga el desglose real por equipo (serie/calidad/estado), y las funciones de polling existen y no rompen.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.15 (Al ir a editar un presupuesto, el borrador que se manda a presupuesto-editor.html ahora incluye modalidadPago (el adelanto/anticipo real de TLC6/TLC12/Leasing) — antes se perdía y siempre volvía al default genérico al reabrir. Ver presupuesto-editor.html v2026.08.27.1 y FotoMap.gs v194 para el resto del fix. Reportado por Cristian: "todos los descuentos y adelanto, forma de pago, tal cual están en el presupuesto a editar, ahora no lo trae".) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.19.14 (Separación de responsabilidades: tocar la caja "Cliente" (con empresa ya asignada) sigue precargando ESA MISMA empresa en empresas.html — es para cambiar el CONTACTO. Nuevo botón aparte "🔄 Cambiar Empresa", chiquito debajo de la caja, que NO precarga ninguna — arranca directo en la lista de Empresas para buscar y elegir una totalmente distinta. Aclarado por Cristian tras la entrega anterior: "no me entendiste... quiero que agregues un boton para cambiar de empresa, que me lleve al modulo empresas y poder elegir otra empresa totalmente diferente, que lo que hisicste esta ok y dejalo, es para cambiar el contacto". Nueva función _irACambiarEmpresaDeNegocio(), separada de _irAEmpresaDesdeNegocio() (que sigue igual). Confirmado con test: tocar la caja Cliente arma la URL CON ?empresa=actual (precarga), el botón nuevo arma la URL SIN ese parámetro (arranca en la lista).) -->
@@ -241,6 +242,20 @@
         .nueva-nota-input { width:100%; background:#0f1a30; border:1px solid #1e3050; border-radius:10px; padding:10px 12px; color:#f1f5f9; font-size:12px; resize:vertical; min-height:72px; outline:none; font-family:inherit; transition:border-color .15s; box-sizing:border-box; }
         .nueva-nota-input:focus { border-color:#3a86ff; }
         .btn-guardar-nota { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; padding:11px; border-radius:10px; background:#3a86ff; border:none; color:white; font-size:13px; font-weight:700; cursor:pointer; margin-top:8px; }
+
+        /* CHECKS DE CIERRE — Facturado/Entregado/Cobrado, candado para pasar a Ganada */
+        .checks-cierre-wrap { display:flex; flex-direction:column; gap:8px; }
+        .check-cierre-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; background:#0f1a30; border:1px solid #1e3050; cursor:pointer; transition:border-color .15s; }
+        .check-cierre-item:hover { border-color:#3a86ff55; }
+        .check-cierre-item.activo { border-color:#06d6a055; background:rgba(6,214,160,.06); }
+        .check-cierre-circulo { width:20px; height:20px; border-radius:50%; border:2px solid #475569; display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; color:transparent; }
+        .check-cierre-item.activo .check-cierre-circulo { border-color:#06d6a0; background:#06d6a0; color:#08111f; }
+        .check-cierre-info { display:flex; flex-direction:column; gap:1px; min-width:0; }
+        .check-cierre-label { font-size:12px; font-weight:700; color:#f1f5f9; }
+        .check-cierre-meta { font-size:10px; color:#334155; }
+        body.tema-claro .check-cierre-item { background:#ffffff !important; border-color:#e2e8f0 !important; }
+        body.tema-claro .check-cierre-label { color:#0f172a !important; }
+        body.tema-claro .check-cierre-meta { color:#64748b !important; }
 
         /* HISTORIAL */
         .historial-wrap { padding:0 16px 100px; }
@@ -2410,6 +2425,7 @@ function renderLista() {
                 </div>
             </div>
             ${_renderBarraProgresoST(c, {compacta:true})}
+            ${_renderChecksCierreCompacto(c)}
             ${c.notes ? `<div class="cot-notas">📝 ${c.notes}</div>` : ''}
         </div>`;
     }).join('');
@@ -2511,10 +2527,11 @@ function renderKanban() {
                 <div class="k-fecha">📅 ${fecha}</div>
                 <select class="cambio-etapa-select"
                     onclick="event.stopPropagation()"
-                    onchange="event.stopPropagation(); _mutarEstadoCotizacion('${id}', this.value)">
+                    onchange="event.stopPropagation(); _mutarEstadoCotizacion('${id}', this.value, this)">
                     ${etapasOpts}
                 </select>${linkHtml}
                 ${_renderBarraProgresoST(c)}
+                ${_renderChecksCierreCompacto(c)}
             </div>`;
         }).join('') : `<div class="kanban-empty-col">Sin cotizaciones</div>`;
 
@@ -2883,7 +2900,7 @@ function _renderDetalle(c) {
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:100%;">
                 <div class="det-hero-badge-wrap" style="color:${colData.color||'#3a86ff'};max-width:100%;">
                     <select class="det-hero-badge-select" style="${badgeStyle}"
-                        onchange="_cambiarEstadoDesdeDetalle('${id}', this.value)">
+                        onchange="_cambiarEstadoDesdeDetalle('${id}', this.value, this)">
                         ${etapasOptsHero}
                     </select>
                 </div>
@@ -3050,6 +3067,8 @@ function _renderDetalle(c) {
             </div>
         </div>`;
     }
+
+    html += _renderChecksCierreDetalle(c, id);
 
     // ── NOTAS ─────────────────────────────────────────────────────
     const notas = (c.notas_papiro || c.Notas_Papiro || []);
@@ -3394,7 +3413,31 @@ function cerrarDetalle() {
 // Cola de mutaciones — evita SHA conflicts al escribir rápido
 let _mutacionQueue  = Promise.resolve();
 
-function _mutarEstadoCotizacion(id, nuevoEstado) {
+function _mutarEstadoCotizacion(id, nuevoEstado, elSelect) {
+    // Candado: no se puede pasar a Ganada si faltan los 3 checks de
+    // cierre (Facturado/Entregado/Cobrado). Pedido por Cristian: "si
+    // no estan completados los 3 check no permite pasar a Ganada".
+    // Se valida ACÁ porque este es el único choke point real por el
+    // que pasan los 3 caminos de cambio de etapa (drag&drop, el
+    // <select> de la tarjeta Kanban, y el del detalle) — bloquear más
+    // arriba en cada uno por separado se desincroniza tarde o
+    // temprano (mismo motivo que TECNICOS_LISTA venía duplicada en 4
+    // lugares del otro módulo).
+    if (nuevoEstado === 'Ganada') {
+        const cActual = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || '') === String(id) || String(x.id || '') === String(id))
+                     || historicoCompleto.find(x => String(x.idCot || x.id_cotizacion || '') === String(id) || String(x.id || '') === String(id));
+        const pendientes = cActual ? _checksCierrePendientes(cActual) : [];
+        if (pendientes.length) {
+            alert('No se puede pasar a Ganada — todavía falta: ' + pendientes.join(', ') + '.');
+            // El <select> ya cambió su valor visible por la interacción
+            // nativa del navegador ANTES de que este handler corra —
+            // hay que devolverlo a mano al estado real, si no queda
+            // mostrando "Ganada" aunque el negocio no se movió.
+            if (elSelect && cActual) elSelect.value = cActual.estado;
+            return;
+        }
+    }
+
     // Paso A: actualizar en memoria a 0ms — buscar por idCot O por id (dealId HubSpot)
     [historicoCompleto, todasLasCot].forEach(arr => {
         const c = arr.find(x =>
@@ -3467,8 +3510,8 @@ function _irACambiarEmpresaDeNegocio(idCot) {
   window.location.href = 'empresas.html?volverA=negocio&idNegocio=' + encodeURIComponent(idCot);
 }
 
-function _cambiarEstadoDesdeDetalle(id, nuevoEstado) {
-    _mutarEstadoCotizacion(id, nuevoEstado);
+function _cambiarEstadoDesdeDetalle(id, nuevoEstado, elSelect) {
+    _mutarEstadoCotizacion(id, nuevoEstado, elSelect);
     setTimeout(() => {
         // Buscar en todas las fuentes disponibles — idCot, id_cotizacion o id numérico HubSpot
         const buscar = arr => arr && arr.find(x =>
@@ -3833,6 +3876,94 @@ async function _toggleUrgenteDesdeTarjeta(id, activar) {
     } catch(e) { alert('Error de conexión al actualizar.'); }
 }
 
+
+// ─── CHECKS DE CIERRE (Facturado/Entregado/Cobrado) ──────────────
+// Pedido por Cristian: "En negocio cerrado, pienso agregar check
+// facturado, entregado, cobrado, hacer una linea de tiempo... si no
+// estan completados los 3 check no permite pasar a Ganada". Aparecen
+// recién al llegar a Cierre (90%) — mismo criterio que ya usaba el
+// botón "Enviar Orden de Preparación" para esa etapa — y se pueden
+// tildar/destildar libremente por cualquiera con acceso al negocio
+// (no hay restricción de rol; el objetivo es trazabilidad — quién y
+// cuándo — no control de acceso). El candado real (bloquear el pase a
+// Ganada) vive en _mutarEstadoCotizacion.
+const CIERRE_CHECKS_DEF = [
+  { key: 'facturado', label: 'Facturado', icono: '🧾' },
+  { key: 'entregado',  label: 'Entregado', icono: '📦' },
+  { key: 'cobrado',    label: 'Cobrado',   icono: '💵' },
+];
+
+function _checksCierrePendientes(c) {
+  const checks = c.checks_cierre || {};
+  return CIERRE_CHECKS_DEF.filter(d => !(checks[d.key] && checks[d.key].activo)).map(d => d.label);
+}
+
+// Indicador chico (3 puntos) para la tarjeta CERRADA — Kanban y Lista.
+function _renderChecksCierreCompacto(c) {
+  if (!(c.estado === '90%' || c.estado === 'Ganada')) return '';
+  const checks = c.checks_cierre || {};
+  const puntos = CIERRE_CHECKS_DEF.map(d => {
+    const activo = !!(checks[d.key] && checks[d.key].activo);
+    return `<span title="${d.label}${activo ? ' ✓' : ' — pendiente'}"
+        style="width:7px;height:7px;border-radius:50%;background:${activo ? '#06d6a0' : '#334155'};display:inline-block;"></span>`;
+  }).join('');
+  return `<div style="display:flex;gap:4px;align-items:center;margin-top:6px;">${puntos}</div>`;
+}
+
+// Línea de tiempo completa para la tarjeta ABIERTA (detalle) — mismo
+// patrón visual que Notas de seguimiento (nota-item + nota-meta).
+function _renderChecksCierreDetalle(c, id) {
+  if (!(c.estado === '90%' || c.estado === 'Ganada')) return '';
+  const checks = c.checks_cierre || {};
+  return `<div style="padding:0 16px 10px;">
+    <div class="sec-titulo">✅ Facturación, entrega y cobro</div>
+    <div class="checks-cierre-wrap">
+      ${CIERRE_CHECKS_DEF.map(d => {
+        const chk = checks[d.key];
+        const activo = !!(chk && chk.activo);
+        return `<div class="check-cierre-item${activo ? ' activo' : ''}" onclick="_toggleCheckCierre('${id}','${d.key}')">
+          <span class="check-cierre-circulo">✓</span>
+          <div class="check-cierre-info">
+            <span class="check-cierre-label">${d.icono} ${d.label}</span>
+            ${activo ? `<span class="check-cierre-meta">📅 ${_fmtFechaHora(chk.fecha)} · 👤 ${_escCot(chk.autor || '—')}</span>` : `<span class="check-cierre-meta">Pendiente — tocá para marcar</span>`}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+// Tilda/destilda un check — se guarda como {activo,autor,fecha} (o se
+// borra al destildar, no queda rastro de "quién lo sacó" — Cristian:
+// "sí, libremente, por si se tildó por error").
+function _toggleCheckCierre(id, checkKey) {
+  const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || '') === String(id) || String(x.id || '') === String(id))
+         || historicoCompleto.find(x => String(x.idCot || x.id_cotizacion || '') === String(id) || String(x.id || '') === String(id));
+  if (!c) return;
+  if (!c.checks_cierre) c.checks_cierre = {};
+  const actual = c.checks_cierre[checkKey];
+  const nuevoActivo = !(actual && actual.activo);
+  const nuevoValor = nuevoActivo ? { activo: true, autor: currentUserNombre || '', fecha: new Date().toISOString() } : null;
+
+  [historicoCompleto, todasLasCot].forEach(arr => {
+    const x = arr.find(y => String(y.idCot || y.id_cotizacion || '') === String(id) || String(y.id || '') === String(id));
+    if (x) { if (!x.checks_cierre) x.checks_cierre = {}; x.checks_cierre[checkKey] = nuevoValor; }
+  });
+
+  if (cotActual && (cotActual.idCot || cotActual.id_cotizacion || String(cotActual.id || '')) === id) _renderDetalle(c);
+  aplicarFiltros(); // refresca los puntitos de la tarjeta cerrada
+
+  fetch(APPS_SCRIPT_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body:    JSON.stringify({ accion: 'actualizarCheckCierre', idCot: id, check: checkKey, activo: nuevoActivo, autor: currentUserNombre || '' }),
+  })
+  .then(r => r.text()).then(t => {
+    try { const r = JSON.parse(t); if (!r.ok) console.warn('Check de cierre ⚠️', r.error); }
+    catch(e) {}
+  })
+  .catch(e => console.warn('Check de cierre:', e));
+}
 
 function _renderBarraProgresoST(c, opts) {
     const p = c.progreso_st;
