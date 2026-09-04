@@ -8,6 +8,7 @@
 <!-- Portal TLC | servicio.html | v2026.08.10.3 (Tope en "+ Agregar Caja" del modal "Asignación de Cajas" — no se puede tener más cajas que equipos (cada equipo entra en una sola caja, cualquier caja de más quedaría vacía sí o sí). Botón se deshabilita visualmente al llegar al tope, y avisa si de todas formas se intenta pasar. Pedido por Cristian: "cantidad máxima a agregar cajas, la cantidad de ítems, topealo". Confirmado con test: con 3 equipos, permite hasta 3 cajas, se deshabilita ahí, y avisa si se intenta una 4ta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.2 (Candado Preparación/CC → Para Instalar APAGADO temporalmente — pedido por Cristian: "me pide muchas condiciones... liberame temporalmente". El requisito de Checklist no se puede cumplir en la práctica todavía (falta conectar los formularios individuales de checklist, prerrequisito pendiente). Toda la lógica del candado sigue intacta en _validarGate, controlada por un interruptor nuevo (GATE_PARA_INSTALAR_ACTIVO = false) — para reactivarlo alcanza con volver ese valor a true, sin tocar nada más. Confirmado con test: con el interruptor apagado, deja pasar aunque no haya nada completo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.27.1 (BUG REAL — "se queda un rato en generando etiqueta y no la muestra despues". Al guardar la asignación de cajas con éxito, se abría la pestaña de la etiqueta con window.open() JUSTO DESPUÉS de esperar la respuesta del backend (fetch async) — varios navegadores bloquean esto como popup no solicitado, porque ya no lo consideran un gesto directo del usuario (mismo patrón ya documentado en _iaEnviarPregunta, este mismo archivo). Ahora, en vez de abrir la pestaña sola, se muestra un bloque de éxito con un link real "↗ Abrir Etiquetas de Despacho" (target=_blank) — el TOQUE del vendedor sobre ese link sí es un gesto directo, ningún navegador lo bloquea nunca. El modal ya no se cierra solo al guardar con éxito; se cierra cuando el vendedor toca el link. Al reabrir el modal (para el mismo ticket u otro) se resetea el estado de éxito, para no quedar pegado en la pantalla vieja. Confirmado con 5 tests: no se llama a window.open() directamente, se muestra el link real con la URL correcta, el formulario queda oculto durante el éxito, tocar el link cierra el modal, y reabrir resetea el estado.) -->
+<!-- Portal TLC | servicio.html | v2026.08.30.6 (BUG REAL — el filtro "Asignación" de la barra de filtros solo mostraba 3 técnicos (Juan Garro, Damián Sosa, Fernando Del Campo) en vez de los 7 habilitados. Causa raíz: la lista de técnicos estaba duplicada a mano en 4 lugares del archivo (TECNICOS_LISTA, el <select> del filtro en el HTML, _optsTecnico, _optsTecnicoResponsableNombre) y una de esas copias — justo la del filtro — nunca se actualizó cuando se sumaron Cristian/Verónica/Lourdes/Lucio a las otras 3. Solución: TECNICOS_LISTA pasa a ser la ÚNICA fuente — el filtro ahora se arma en JS (_poblarFiltroTecnico, llamada en el arranque) a partir de esa lista, y _optsTecnico/_optsTecnicoResponsableNombre se reescribieron para leer de ahí en vez de tener su propio array hardcodeado. De acá en más, sumar un técnico a TECNICOS_LISTA alcanza para que aparezca en los 4 lugares a la vez — no puede volver a desincronizarse. Reportado por Cristian: "en este filtro solo aparecen estos usuarios y no todos los permitidos". Confirmado con test: el filtro genera las 10 opciones esperadas (3 meta + 7 técnicos) con los 7 códigos presentes, y los otros dos selects (_optsTecnico/_optsTecnicoResponsableNombre) siguen generando las mismas 8 opciones de siempre, ahora derivadas de la misma fuente.) -->
 <!-- Portal TLC | servicio.html | v2026.08.30.5 (El toggle de moneda de un gasto NUEVO ahora arranca en AR$ en vez de USD — solo cambia el valor por default al crear (_agregarGasto), el importe se sigue guardando SIEMPRE en USD internamente igual que antes, sin tocar el mecanismo de conversión ni el toggle en sí. Gastos ya cargados no se ven afectados. Pedido por Cristian: "cambiar el toggle de moneda por default de un gasto nuevo, hoy arranca en USD, tiene que arrancar en AR$". Confirmado con test: un gasto nuevo se crea con moneda:'ARS', y el toggle _toggleMonedaGasto sigue alternando correctamente entre ARS/USD sin regresiones.) -->
 <!-- Portal TLC | servicio.html | v2026.08.30.4 (El campo de Importe en Gastos ahora se muestra con formato es-AR (miles con punto, decimales con coma — ej. "1.234,56") en vez del type="number" del navegador, que no permite ese formato. Se reformatea solo al salir del campo, y selecciona todo el texto al enfocar (para tipear encima sin borrar a mano). BUG REAL encontrado por el propio test: los helpers nuevos (_formatMontoARS/_parseMontoARS) no eran visibles desde los atributos onblur inline porque este archivo tiene su código envuelto en un IIFE — corregido exponiéndolos en window, mismo criterio que el resto de los handlers usados desde HTML. Pedido por Cristian: "en gastos de servicio, eventos podes darle formato al numero con miles y centavos". Confirmado con test: el importe se ve formateado correctamente, y tipear un monto nuevo se re-formatea y se guarda parseado correctamente (2500,5 → guarda 2500.5, no se confunde con miles).) -->
 <!-- Portal TLC | servicio.html | v2026.08.30.3 (PASO 1 del módulo nuevo "Cuenta Corriente y Rendición de Gastos" — cada gasto ahora tiene a_favor_de (quién debe cobrarlo, por default quien lo cargó) y estado (PENDIENTE/PAGADO), completados automáticamente al crear. Un gasto PAGADO (liquidado desde el módulo nuevo, todavía por construir en pasos siguientes) pasa a solo lectura acá — con badge "✅ Liquidado" — y no se puede editar/eliminar/cambiar de moneda (avisa con alert en el intento). Los gastos viejos, sin estos campos, no rompen nada — se tratan como pendientes al leerlos. Backward-compatible: no requiere ninguna migración de datos existentes. Confirmado con test: un gasto viejo sigue viéndose y editándose normal, uno PAGADO muestra el badge y bloquea edición/eliminación con aviso, y uno nuevo se crea con a_favor_de=usuario logueado y estado=PENDIENTE.) -->
@@ -597,9 +598,6 @@ body.tema-claro #st-wsp-saludo { background:#f8fafc !important; border-color:#cb
       <option value="todos">Todos</option>
       <option value="__asignados_a_mi__">Asignados a mí</option>
       <option value="sin_asignar">Sin asignar</option>
-      <option value="juan_garro">Juan Garro</option>
-      <option value="damian_sosa">Damián Sosa</option>
-      <option value="fernando_del_campo">Fernando Del Campo</option>
     </select>
   </div>
   <div class="filtro-dd-wrap">
@@ -1019,6 +1017,31 @@ var TECNICOS_LISTA = [
 ];
 var _pendienteMovimientoEtapa = null; // { t, nuevaCol, depositoAnterior } — mientras el modal de ambigüedad está abierto
 
+// BUG REAL reportado por Cristian: "en este filtro solo aparecen estos
+// usuarios y no todos los permitidos" — el <select id="dd-tecnico"> del
+// HTML tenía una lista propia, hardcodeada y desactualizada (solo 3 de
+// los 7 técnicos), copiada a mano y nunca sincronizada con
+// TECNICOS_LISTA (la que sí se usa para asignar responsables por etapa)
+// ni con _optsTecnico/_optsTecnicoResponsableNombre (los selects DENTRO
+// de cada ticket, que sí tenían los 7). Se agregar un técnico nuevo acá
+// no lo actualizaba en el filtro. Solución: el filtro ahora se llena en
+// JS a partir de TECNICOS_LISTA (misma fuente que ya usan los otros 3
+// lugares) en vez de tener su propia copia en el HTML — de acá en más,
+// agregar un técnico a TECNICOS_LISTA alcanza para que aparezca en TODOS
+// los lugares, filtro incluido.
+function _poblarFiltroTecnico() {
+  var dd = document.getElementById('dd-tecnico');
+  if (!dd) return;
+  var opcionSeleccionada = dd.value;
+  dd.innerHTML = '<option value="todos">Todos</option>' +
+    '<option value="__asignados_a_mi__">Asignados a mí</option>' +
+    '<option value="sin_asignar">Sin asignar</option>' +
+    TECNICOS_LISTA.map(function(tec) {
+      return '<option value="' + tec.v + '">' + tec.l + '</option>';
+    }).join('');
+  if (opcionSeleccionada) dd.value = opcionSeleccionada;
+}
+
 var TECNICO_LABEL = {
   sin_asignar:'—', fernando_del_campo:'FC', cristian_hirth:'CH',
   veronica_ribaita:'VR', lourdes_davalos:'LD', juan_garro:'JG',
@@ -1040,6 +1063,7 @@ var _ticketActual = null;
 // ── Arranque ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   _aplicarTema();
+  _poblarFiltroTecnico();
   _cargarSesion();
   _chequearInstalacionIOS();
 });
@@ -2477,12 +2501,12 @@ function _renderSeccionOrdenPreparacion(t) {
   '</div>';
 }
 
-// Igual criterio que _optsTecnico (misma gente), pero guarda el NOMBRE
-// como texto plano en vez del id — el campo tecnico_responsable_nombre
-// de la Orden de Preparación siempre fue un string de display, no un id
-// referenciado en otro lado.
+// Igual criterio que _optsTecnico (misma gente, misma fuente única
+// TECNICOS_LISTA), pero guarda el NOMBRE como texto plano en vez del
+// id — el campo tecnico_responsable_nombre de la Orden de Preparación
+// siempre fue un string de display, no un id referenciado en otro lado.
 function _optsTecnicoResponsableNombre(sel) {
-  return ['Sin asignar','Juan Garro','Damián Sosa','Fernando Del Campo','Cristian Hirth','Verónica Ribaita','Lourdes Dávalos','Lucio Raineri']
+  return ['Sin asignar'].concat(TECNICOS_LISTA.map(function(t){ return t.l; }))
     .map(function(nom){ return '<option' + (nom===sel?' selected':'') + '>' + nom + '</option>'; }).join('');
 }
 
@@ -4017,13 +4041,12 @@ function _optsDeposito(sel) {
     {v:'finalizado',l:'Finalizado'},{v:'cancelado',l:'Cancelado'},
   ].map(function(o){ return '<option value="' + o.v + '"' + (o.v===sel?' selected':'') + '>' + o.l + '</option>'; }).join('');
 }
+// Fuente única: TECNICOS_LISTA (definida arriba, junto a la asignación
+// por etapa). Antes esta función tenía su propia copia hardcodeada de
+// la misma gente — quedaban 3 listas idénticas para mantener a mano.
 function _optsTecnico(sel) {
-  return [
-    {v:'sin_asignar',l:'Sin asignar'},{v:'juan_garro',l:'Juan Garro'},
-    {v:'damian_sosa',l:'Damián Sosa'},{v:'fernando_del_campo',l:'Fernando Del Campo'},
-    {v:'cristian_hirth',l:'Cristian Hirth'},{v:'veronica_ribaita',l:'Verónica Ribaita'},
-    {v:'lourdes_davalos',l:'Lourdes Dávalos'},{v:'lucio_raineri',l:'Lucio Raineri'},
-  ].map(function(o){ return '<option value="' + o.v + '"' + (o.v===sel?' selected':'') + '>' + o.l + '</option>'; }).join('');
+  return [{v:'sin_asignar',l:'Sin asignar'}].concat(TECNICOS_LISTA)
+    .map(function(o){ return '<option value="' + o.v + '"' + (o.v===sel?' selected':'') + '>' + o.l + '</option>'; }).join('');
 }
 function _optsPrio(sel) {
   return [{v:'urgente',l:'🔴 Urgente'},{v:'importante',l:'🟠 Importante'},{v:'media',l:'🟡 Media'},{v:'baja',l:'Baja'}]
