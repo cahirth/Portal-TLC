@@ -1,5 +1,27 @@
-// Portal TLC | avatar.js | v2 (2026.09.04) | Avatar único, fuente de verdad de TODO el Portal.
+// Portal TLC | avatar.js | v3 (2026.09.04) | Avatar único, fuente de verdad de TODO el Portal.
 // ══════════════════════════════════════════════════════════════════
+// v3 — 2 arreglos con captura de Cristian: (1) "esta solapado los dos
+// botones abajo a la derecha" + "pone el avatar en todos los modulos
+// en el corner arriba a la derecha, mantene el estilo en todos y el
+// mismo corner en todos los modulos" — el avatar usaba position:fixed
+// (relativo a la ventana REAL del navegador). En index.html, que
+// simula un "marco de teléfono" centrado (.phone-container, más chico
+// que la ventana en desktop), eso hacía que el avatar se escapara
+// afuera del marco, flotando solo en el fondo oscuro — coincidía ahí
+// con otro botón flotante preexistente (#ia-btn-flotante, el del chat
+// IA, que tiene el mismo problema de origen — no se tocó, es un bug
+// previo y aparte). Ahora avatar.js busca un .phone-container; si
+// existe, se cuelga ADENTRO con position:absolute (mismo resultado
+// visual, pero anclado al marco); si no existe (los otros 5 módulos,
+// que no simulan un teléfono), sigue con position:fixed como antes —
+// mismo estilo y misma esquina visual en los 6. (2) "Como cambio modo
+// claro oscuro? y el saludo de whatsapp? desaparecio" — la captura
+// mostraba el menú viejo (sin Apariencia ni Saludo WhatsApp), que es
+// exactamente la forma del avatar.js ANTERIOR a la unificación — el
+// HTML de este archivo ya los tiene armados sin condición, así que
+// probablemente el navegador tenía en caché la versión vieja. Se
+// agregó ?v=2 al <script src="avatar.js"> en los 6 módulos para forzar
+// la descarga de esta versión nueva.
 // Pedido por Cristian: "quiero unificar los avatares que estan en
 // todos los modulos, lo quiero solo en index" — hasta acá había 4
 // copias casi idénticas (index.html, servicio.html, cotizaciones.html,
@@ -131,6 +153,17 @@
   function inyectarCSS() {
     var css = '' +
       '.tlc-avatar-flotante{position:fixed;top:14px;right:14px;z-index:600;}' +
+      // Cuando el módulo tiene un "marco de teléfono" propio (hoy solo
+      // index.html, .phone-container) el avatar tiene que anclarse a
+      // ESE marco, no a la ventana entera del navegador — si no, en
+      // desktop el marco queda centrado y chico, pero position:fixed
+      // igual pega el avatar en la esquina de la ventana real,
+      // quedando afuera del marco, flotando solo en el fondo oscuro.
+      // Reportado por Cristian con captura: "esta solapado los dos
+      // botones abajo a la derecha" + "pone el avatar en todos los
+      // modulos en el corner arriba a la derecha, mantene el estilo
+      // en todos y el mismo corner en todos los modulos".
+      '.tlc-avatar-flotante.tlc-avatar-en-marco{position:absolute;top:14px;right:14px;}' +
       '.tlc-avatar-btn{width:38px;height:38px;border-radius:50%;background:#1c2541;color:#3a86ff;' +
         'border:1px solid #222e50;font-size:12px;font-weight:800;cursor:pointer;' +
         'display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.28);}' +
@@ -225,7 +258,18 @@
         '</div>' +
         '<div class="tlc-avatar-menu-ver">Portal TLC · v' + version + '</div>' +
       '</div>';
-    document.body.appendChild(wrap);
+
+    // El propio .phone-container (index.html) ya es position:relative
+    // y overflow:hidden — si existe, el avatar se cuelga ahí adentro
+    // con position:absolute en vez de fixed, para quedar anclado al
+    // marco visual en vez de a la ventana real del navegador.
+    var marco = document.querySelector('.phone-container');
+    if (marco) {
+      marco.appendChild(wrap);
+      wrap.classList.add('tlc-avatar-en-marco');
+    } else {
+      document.body.appendChild(wrap);
+    }
 
     var btn  = document.getElementById('tlc-avatar-btn');
     var menu = document.getElementById('tlc-avatar-menu');
