@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.08.19.7 (Todos los botones que mutan datos ahora se deshabilitan al primer click para evitar acciones repetidas (doble-click / doble-tap) — extiende a los que todavía no lo tenían el mismo patrón que ya usaban _crearNuevaEmpresa/_guardarCambiosEmpresa/_guardarContacto/_confirmarImportacion/_confirmarNuevoNegocio: se deshabilita al entrar, se reactiva en cualquier salida por error (fetch fallido, respuesta ok:false), y en el camino feliz queda deshabilitado hasta que la UI se re-renderiza o navega (no hace falta reactivarlo a mano). Cubre: _borrarEmpresaActual (🗑 Borrar empresa), _borrarContacto (✕ por contacto, ahora recibe el botón como 2do parámetro), _usarEmpresaParaNegocio (✅ por contacto, ídem), _guardarContactoQREmpresas (💾 Guardar del modal QR — se reactiva también al abrir un escaneo nuevo, por si quedó deshabilitado de un guardado previo en la misma sesión), y _iaEnviarPregunta (➤ enviar + el input de texto — esta consulta puede tardar 10-20s, así que sin el guard se podían mandar preguntas duplicadas tocando varias veces o con Enter). NO se tocaron los botones de navegación/toggle (⟵ volver, tema claro/oscuro, avatar, Cancelar, abrir/cerrar modales, mic, "Mostrar más") — deshabilitarlos permanentemente rompería su uso normal sin prevenir ninguna acción duplicada real. Pedido por Cristian: "todos los botones una vez clickeados deben deshabilitarse, para no hacer acciones repetidas". Confirmado con 5 tests aislados: cada función bloquea un 2do click mientras la 1ra sigue pendiente (no dispara un 2do fetch/consulta), y se reactiva correctamente tras un error de red o de respuesta.) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.6 (Fix de contraste — el texto del banner "Usar esta empresa" (v2026.08.19.5) tenía color claro fijo (#e2f8ef, pensado para fondo oscuro) sobre un fondo verde muy clarito, quedando casi invisible en modo claro — se veía el botón pero no se entendía la instrucción de arriba. Reportado por Cristian con captura: "como cambio de empresa?" (la función ya estaba, pero no se leía la explicación). Nueva clase banner-usar-empresa-texto con override de tema-claro (#0d4a38, verde oscuro legible). Confirmado con test: el color del texto ya no es el clarito original, pasa a ser el oscuro nuevo con buen contraste.) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.5 (Nuevo flujo "cambiar empresa de un negocio" — cuando se llega desde cotizaciones.html con ?volverA=negocio&idNegocio=X (ver ese archivo v2026.08.19.13), se muestra un banner "✅ Usar esta empresa" en el detalle, y cada contacto de la lista suma su propio botón "✅ Usar este contacto". Al elegir, llama a la acción nueva reasignarEmpresaNegocio (FotoMap.gs v192) con la empresa+contacto realmente elegidos (no los que tenía antes el negocio) y vuelve directo a cotizaciones.html?id=X. Se puede navegar libremente a CUALQUIER otra empresa desde acá (buscador, lista) antes de elegir — no queda pegado a la que tenía el negocio originalmente. Pedido por Cristian con captura: "a un negocio existente permitime poder cambiar la empresa, si ya tiene una empresa asignada, permitime cambiarla llevandome al modulo empresas y elegir otra con sus contactos asociados". Confirmado con test de punta a punta: abre la empresa vieja de contexto, permite abrir una empresa totalmente distinta, el botón por contacto aparece, elegir un contacto llama al backend con la empresa+contacto nuevos, y arma bien la URL de vuelta al negocio de origen.) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.4 (BUG REAL — "lo guardo pero no aparece... después de minutos aparecieron 4 empresas todas con el mismo nombre" (Cristian creó la misma empresa 4 veces creyendo que no se guardaba, cuando en realidad SÍ se guardaba las 4 veces). Causa: carrera entre pedidos concurrentes a listarEmpresas — el fetch de fondo de _cargarEmpresasCacheFirst (arranca solo al abrir la página) podía tardar más que el fetch fresco que dispara _cargarEmpresas() al crear una empresa nueva; si el pedido VIEJO y lento resolvía DESPUÉS del nuevo, su respuesta (sin la empresa recién creada) sobreescribía el array EMPRESAS entero, haciendo "desaparecer" lo que se acababa de crear aunque ya estuviera bien guardado en Firebase. Fix: número de secuencia global (_cargaEmpresasSeq) — cada pedido de listarEmpresas guarda cuál era el número vigente al arrancar, y descarta su propia respuesta en silencio si mientras tanto arrancó un pedido más nuevo. Confirmado con test reproduciendo el escenario exacto: pedido lento (300ms, lista vieja) arrancado por la página al abrir, empresa nueva creada mientras tanto (fetch rápido, 20ms, lista completa) — la empresa nueva se ve de inmediato y SIGUE viéndose después de que el pedido viejo finalmente resuelve.) -->
@@ -952,16 +953,18 @@ window._abrirDetalleEmpresa = function(id) {
 // contacto en _renderContactos. Pedido por Cristian con captura: "a
 // un negocio existente permitime poder cambiar la empresa... elegir
 // otra con sus contactos asociados".
-window._usarEmpresaParaNegocio = async function(contactoId) {
+window._usarEmpresaParaNegocio = async function(contactoId, btn) {
   if (!_volverANegocioId || !_empresaActualId) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
   try {
     const resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'reasignarEmpresaNegocio', idCot: _volverANegocioId, empresaId: _empresaActualId, contactoId: contactoId || '' }) });
     const r = await resp.json();
-    if (!r.ok) { alert('No se pudo cambiar la empresa del negocio: ' + (r.error||'')); return; }
+    if (!r.ok) { alert('No se pudo cambiar la empresa del negocio: ' + (r.error||'')); if (btn) btn.disabled = false; return; }
     window.location.href = 'cotizaciones.html?id=' + encodeURIComponent(_volverANegocioId);
   } catch(e) {
     alert('Error de conexión al cambiar la empresa del negocio.');
+    if (btn) btn.disabled = false;
   }
 };
 
@@ -1005,16 +1008,18 @@ window._borrarEmpresaActual = function() {
   var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
   if (!e) return;
   if (!confirm('¿Borrar "' + e.razonSocial + '" y todos sus contactos? Esta acción no se puede deshacer.')) return;
+  var btn = document.getElementById('btn-borrar-empresa-actual');
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
   var sesionBorrar = _leerSesionCompartida();
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'borrarEmpresa', id:e.id, vendedorRol: (sesionBorrar && sesionBorrar.rol) || '' }) })
     .then(function(r){ return r.json(); })
     .then(async function(r) {
-      if (!r.ok) { alert('Error al borrar: ' + (r.error||'desconocido')); return; }
+      if (!r.ok) { alert('Error al borrar: ' + (r.error||'desconocido')); if (btn) btn.disabled = false; return; }
       EMPRESAS = EMPRESAS.filter(function(x){ return x.id !== _empresaActualId; });
-      _cerrarDetalle();
+      _cerrarDetalle(); // sale de la ficha; al volver a entrar el botón se recrea habilitado
     })
-    .catch(function(){ alert('Error de conexión al borrar.'); });
+    .catch(function(){ alert('Error de conexión al borrar.'); if (btn) btn.disabled = false; });
 };
 
 // ── CONTACTOS ──
@@ -1037,9 +1042,9 @@ function _renderContactos(e) {
         '<div class="datos">' + emailTxt + ' · ' + telefonoTxt + '</div>' +
       '</div>' +
       '<div class="contacto-acciones">' +
-        (_volverANegocioId ? '<button class="btn-icon-mini" style="color:#06d6a0;border-color:#06d6a033;" onclick="_usarEmpresaParaNegocio(\'' + c.id + '\')" title="Usar este contacto para el negocio">✅</button>' : '') +
+        (_volverANegocioId ? '<button class="btn-icon-mini" style="color:#06d6a0;border-color:#06d6a033;" onclick="_usarEmpresaParaNegocio(\'' + c.id + '\', this)" title="Usar este contacto para el negocio">✅</button>' : '') +
         '<button class="btn-icon-mini" onclick="_editarContacto(\'' + c.id + '\')" title="Editar">✎</button>' +
-        '<button class="btn-icon-mini danger" onclick="_borrarContacto(\'' + c.id + '\')" title="Borrar">✕</button>' +
+        '<button class="btn-icon-mini danger" onclick="_borrarContacto(\'' + c.id + '\', this)" title="Borrar">✕</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -1122,6 +1127,8 @@ window._abrirScannerQREmpresasDirecto = function() {
     if (yaTeniaTelefono) datos.telefono = telefonoExistente;
     _datosQrEmpActuales = datos;
     _renderDatosQrEmpresas(yaTeniaTelefono);
+    var btnQr = document.querySelector('#emp-qr-datos-modal .qr-btn-guardar');
+    if (btnQr) btnQr.disabled = false; // por si quedó deshabilitado de un guardado anterior en la misma sesión
     document.getElementById('emp-qr-datos-modal').classList.add('abierto');
   });
 };
@@ -1159,13 +1166,15 @@ function _escQr(s) { var div = document.createElement('div'); div.textContent = 
 window._guardarContactoQREmpresas = function() {
   var datos = _datosQrEmpActuales;
   if (!datos) return;
+  var btn = document.querySelector('#emp-qr-datos-modal .qr-btn-guardar');
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
   var nombreCompleto = ((datos.nombre||'') + ' ' + (datos.apellido||'')).trim() || 'Sin nombre';
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
     accion:'guardarEmpresaContactoQR', id: datos.id||'', nombre: datos.nombre||'', apellido: datos.apellido||'',
     dni: datos.dni||'', email: datos.email||'', telefono: datos.telefono||'', vip: !!datos.vip, categoria: datos.categoria||''
   }) }).then(function(r){ return r.json(); }).then(function(r) {
-    if (!r || !r.ok) { alert('No se pudo guardar la empresa. Probá de nuevo.'); return; }
-    _cerrarModalQREmpresas();
+    if (!r || !r.ok) { alert('No se pudo guardar la empresa. Probá de nuevo.'); if (btn) btn.disabled = false; return; }
+    _cerrarModalQREmpresas(); // el modal se cierra; al reabrirlo el botón vuelve a estar habilitado
     alert('✅ "' + nombreCompleto + '" guardado como empresa/contacto.');
     // Refrescar la lista para que aparezca al toque, sin tener que
     // salir y volver a entrar al módulo — _cargarEmpresas() ya
@@ -1174,6 +1183,7 @@ window._guardarContactoQREmpresas = function() {
     _cargarEmpresas();
   }).catch(function() {
     alert('Error de conexión al guardar. Probá de nuevo.');
+    if (btn) btn.disabled = false;
   });
 };
 
@@ -1224,19 +1234,20 @@ window._guardarContacto = function() {
     .finally(function() { if (btnContacto) { btnContacto.disabled = false; btnContacto.textContent = textoOrigContacto; } });
 };
 
-window._borrarContacto = function(contactoId) {
+window._borrarContacto = function(contactoId, btn) {
   var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
   if (!e) return;
   if (!confirm('¿Borrar este contacto?')) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'borrarContacto', id:contactoId }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert('Error al borrar el contacto: ' + (r.error||'desconocido')); return; }
+      if (!r.ok) { alert('Error al borrar el contacto: ' + (r.error||'desconocido')); if (btn) btn.disabled = false; return; }
       e.contactos = e.contactos.filter(function(c){ return c.id !== contactoId; });
-      _renderContactos(e);
+      _renderContactos(e); // el botón viejo se destruye junto con la tarjeta al re-renderizar
     })
-    .catch(function(){ alert('Error de conexión al borrar el contacto.'); });
+    .catch(function(){ alert('Error de conexión al borrar el contacto.'); if (btn) btn.disabled = false; });
 };
 
 // ── NEGOCIOS ASOCIADOS — cruce real (ver _cargarNegociosCruzados) ──
@@ -1922,6 +1933,15 @@ async function _iaEnviarPregunta() {
   const pregunta = (elInput.value || '').trim();
   if (!pregunta) return;
 
+  // Esta respuesta puede tardar 10-20s (ver comentario más abajo) —
+  // sin este guard, tocar el botón (o Enter) varias veces mientras
+  // espera mandaba la misma pregunta repetida. Se reactiva siempre en
+  // el finally, tanto si responde bien como si da error.
+  const elBtnEnviar = document.getElementById('ia-btn-enviar');
+  if (elBtnEnviar && elBtnEnviar.disabled) return;
+  if (elBtnEnviar) elBtnEnviar.disabled = true;
+  if (elInput) elInput.disabled = true;
+
   const elHint = document.getElementById('ia-hint');
   const elHist = document.getElementById('ia-historial');
   if (elHint) elHint.style.display = 'none';
@@ -1984,6 +2004,9 @@ async function _iaEnviarPregunta() {
     elResp.classList.remove('ia-pensando');
     console.error('Asistente IA — error en _iaEnviarPregunta:', e);
     elResp.textContent = '⚠️ Error: ' + (e && e.message ? e.message : String(e));
+  } finally {
+    if (elBtnEnviar) elBtnEnviar.disabled = false;
+    if (elInput) elInput.disabled = false;
   }
 }
 
