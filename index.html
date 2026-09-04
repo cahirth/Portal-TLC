@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.09.04.1 (UNIFICACIÓN DE AVATAR — Cristian: "quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos". index.html GANÓ como referencia de diseño (menú completo: tema, Saludo WhatsApp, Push, Instalar app, cerrar sesión) — se extrajo esa lógica a avatar.js (archivo compartido que ya usaban eventos.html/cuenta-corriente.html en su versión simple) y ahora los 6 módulos del Portal usan la MISMA fuente. Se sacó el avatar propio de este archivo (HTML/CSS/JS con ids -idx, ~180 líneas) y se reemplazó por <script src="avatar.js">, agregado justo después de version.js. _aplicarTemaIdx queda (la sigue usando el arranque y la sincronización entre pestañas), solo se le sacaron las partes que tocaban los botones del avatar viejo. updateUserDisplay() se recortó para solo actualizar el saludo del subtítulo — el avatar en sí lo arma avatar.js solo. Confirmado con integración real: avatar.js corriendo DENTRO del HTML completo (servido localmente, sesión real, sin mocks) — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
 <!-- Portal TLC | index.html | v2026.08.30.3 (Nuevo ítem "Cuenta Corriente" dentro del submenú de Administración, junto a Eventos/Reportes/Regulatoria/Comercio Exterior — navega a cuenta-corriente.html (archivo nuevo, Paso 3 del módulo "Cuenta Corriente y Rendición de Gastos") vía abrirUrlConPermiso, reusando el mismo permiso "Administracion" (userPermisos.admin) que ya chequea la pantalla en sí. Pedido por Cristian: "pone el acceso dentro de Administracion". Confirmado con 3 tests: el ítem vive físicamente dentro del submenú de Administración, queda habilitado/bloqueado según el mismo permiso real, y bloqueado no navega (avisa con toast).) -->
 <!-- Portal TLC | index.html | v2026.08.30.2 (Restaurado el botón "Tareas" → navega a mi-dia.html (con el mismo permiso ya existente), que se había perdido al recibir una versión de index.html sin ese cambio aplicado — ver el bloque de v2026.08.30.1 más abajo para el resto (permisos vía Firebase). Confirmado con test: con "Tareas"=true el botón no muestra ningún error al abrirlo; con "Tareas"=false queda gris y avisa con un toast, sin navegar.) -->
 <!-- Portal TLC | index.html | v2026.08.30.1 (BUG DE FONDO REAL — cargarPermisosUsuario() hacía su propio pedido en vivo a Google Sheets (gviz), separado del de permisos.js, pagando el mismo riesgo de lentitud/falla intermitente en CADA login (misma familia de problemas que los pipelines "a veces no aparecen"). Cristian: "quiero que todos los permisos del excel que ahora creo estas en permisos.js y no esta funcionando OK, los subamis a firebase manualmente con un boton script como el lista de precios, y asi los cambios son immediatos" — confirmado que "inmediato" es apenas se toca el botón de sincronizar (mismo criterio que Lista_Precios), no en vivo sin tocar nada. Ahora lee directo de Firebase RTDB (/permisos/{emailSeguro}, sincronizado por sincronizarPermisosAFirebase en FotoMap.gs v202) — nuevos helpers _emailKeySeguroIdx/_headerSeguroIdx, réplica exacta de _rtdbKeySeguro/_rtdbHeaderSeguro del backend (mismo criterio que usa permisos.js v2026.08.30.1). Usuario no encontrado en /permisos → acceso mínimo (todo en false); falla de red → fail-open (mantiene el permiso completo por default, no bloquea a nadie por un problema de conexión ajeno a los permisos en sí). Confirmado con test de punta a punta: lee la fila real de Firebase con la clave/columnas correctamente saneadas, arma userPermisos con los valores reales, y aplicarPermisosMenu() grisea/habilita el menú según corresponda.) -->
@@ -18,6 +19,7 @@
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="avatar.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal TLC</title>
@@ -335,19 +337,6 @@
             border-color:#cbd5e1; color:#475569;
         }
     
-/* ── Avatar menu tema claro ── */
-body.tema-claro #avatar-menu-idx { background:#ffffff !important; border-color:#e2e8f0 !important; box-shadow:0 16px 48px rgba(0,0,0,.12) !important; }
-body.tema-claro #avatar-menu-idx > div:first-child { background:#f8fafc !important; border-bottom-color:#e2e8f0 !important; }
-body.tema-claro #avatar-nombre-idx { color:#0f172a !important; }
-body.tema-claro #avatar-email-idx  { color:#64748b !important; }
-body.tema-claro #avatar-rol-idx    { background:rgba(26,75,140,.08) !important; color:#1a4b8c !important; border-color:rgba(26,75,140,.2) !important; }
-body.tema-claro #avatar-icon-idx   { background:#e8f0fc !important; color:#1a4b8c !important; }
-body.tema-claro #idx-btn-tema-oscuro,
-body.tema-claro #idx-btn-tema-claro { border: 1px solid #e2e8f0 !important; }
-body.tema-claro #idx-avatar-tema-wrap,
-body.tema-claro #idx-avatar-wsp-wrap { background:#ffffff !important; border-color:#cbd5e1 !important; }
-body.tema-claro #avatar-menu-idx [style*="background:#0a1628"] { background:#f8fafc !important; border-color:#e2e8f0 !important; }
-body.tema-claro #btn-activar-push, body.tema-claro #btn-como-instalar { border-color:#cbd5e1 !important; }
 body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { color:#0f172a !important; }
 body.tema-claro #campana-wrap > button { background:#ffffff !important; border-color:#cbd5e1 !important; color:#374151 !important; }
 body.tema-claro #campana-panel { background:#ffffff !important; border-color:#e2e8f0 !important; }
@@ -565,112 +554,6 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
                 </div>
             </div>
         </div>
-        <div style="position:relative;" id="avatar-wrap-idx">
-            <button id="header-avatar" onclick="toggleAvatarMenuIdx(event)"
-                style="background:#1c2541; border:1px solid #222e50; border-radius:50%;
-                       width:38px; height:38px; display:flex; align-items:center; justify-content:center;
-                       cursor:pointer; font-size:12px; font-weight:800; color:#3a86ff; flex-shrink:0;">
-                <span id="idx-avatar-initials">CH</span>
-            </button>
-
-            <div id="avatar-menu-idx" style="display:none; position:absolute; top:48px; right:0;
-                 background:#0d1520; border:1px solid #1e3050; border-radius:16px;
-                 width:300px; z-index:600; box-shadow:0 16px 48px rgba(0,0,0,0.6);
-                 overflow:hidden; animation:fadeSlideDown .15s ease;">
-
-                <!-- Cabecera usuario -->
-                <div style="padding:16px; border-bottom:1px solid #1e3050; display:flex; align-items:center; gap:12px; background:#080d14;">
-                    <div style="width:40px; height:40px; border-radius:50%; background:#1c2541; border:2px solid #3a86ff33;
-                                display:flex; align-items:center; justify-content:center;
-                                font-size:14px; font-weight:800; color:#3a86ff; flex-shrink:0;" id="avatar-icon-idx">CH</div>
-                    <div style="min-width:0;">
-                        <div style="font-size:13px; font-weight:700; color:#f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="avatar-nombre-idx">—</div>
-                        <div style="font-size:10px; color:#64748b; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="avatar-email-idx">—</div>
-                        <div id="avatar-rol-idx" style="display:inline-block; margin-top:4px; font-size:9px; font-weight:700;
-                             text-transform:uppercase; letter-spacing:0.6px; padding:1px 7px; border-radius:20px;
-                             background:rgba(58,134,255,.15); color:#3a86ff; border:1px solid rgba(58,134,255,.25);">—</div>
-                    </div>
-                <button onclick="toggleAvatarMenuIdx(event)" title="Cerrar" style="background:rgba(100,116,139,.15); border:1px solid #1e3050; border-radius:8px; color:#94a3b8; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:16px; line-height:1;">✕</button>
-                </div>
-
-                <div style="padding:12px; display:flex; flex-direction:column; gap:10px;">
-
-                    <!-- Switch Tema -->
-                    <div id="idx-avatar-tema-wrap" style="background:#080d14; border:1px solid #1e3050; border-radius:10px; padding:10px 12px;">
-                        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#64748b; margin-bottom:8px;">Apariencia</div>
-                        <div style="display:flex; background:#0a1628; border-radius:8px; overflow:hidden; border:1px solid #1e3050;">
-                            <button id="idx-btn-tema-oscuro" onclick="_setTemaIdx('dark')"
-                                style="flex:1; padding:8px; border:none; cursor:pointer; font-size:12px; font-weight:600;
-                                       display:flex; align-items:center; justify-content:center; gap:5px;
-                                       background:#3a86ff; color:#fff; border-radius:7px 0 0 7px; transition:all .15s;">
-                                🌙 Oscuro
-                            </button>
-                            <button id="idx-btn-tema-claro" onclick="_setTemaIdx('light')"
-                                style="flex:1; padding:8px; border:none; cursor:pointer; font-size:12px; font-weight:600;
-                                       display:flex; align-items:center; justify-content:center; gap:5px;
-                                       background:transparent; color:#64748b; transition:all .15s;">
-                                ☀️ Claro
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Saludo WhatsApp -->
-                    <div id="idx-avatar-wsp-wrap" style="background:#080d14; border:1px solid #1e3050; border-radius:10px; padding:10px 12px;">
-                        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;
-                                    color:#64748b; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                            Saludo WhatsApp
-                        </div>
-                        <textarea id="idx-wsp-saludo" rows="2"
-                            style="width:100%; background:#0a1628; border:1px solid #1e3050; border-radius:8px;
-                                   color:#f1f5f9; font-size:12px; padding:8px 10px; resize:none;
-                                   line-height:1.4; outline:none; font-family:inherit;"
-                            placeholder="Hola, le compartimos el presupuesto de TLC SRL: "
-                            oninput="_guardarSaludoWspIdx(this.value)"></textarea>
-                        <div style="font-size:10px; color:#334155; margin-top:3px;">Se guarda automáticamente · URL se agrega al final</div>
-                    </div>
-
-                    <!-- Notificaciones push -->
-                    <button id="btn-activar-push" onclick="_activarNotificacionesPush()"
-                        style="width:100%; padding:11px; border-radius:10px; background:transparent;
-                               border:1px solid #1e3050; color:#f1f5f9; font-size:13px; font-weight:600;
-                               cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
-                               transition:background .15s; margin-bottom:8px;"
-                        onmouseover="this.style.background='rgba(58,134,255,.08)'"
-                        onmouseout="this.style.background='transparent'">
-                        <span id="btn-activar-push-txt">🔔 Activar notificaciones</span>
-                    </button>
-
-                    <!-- Cómo instalar la app -->
-                    <button id="btn-como-instalar" onclick="_manejarClickInstalarApp()"
-                        ontouchend="event.preventDefault(); _manejarClickInstalarAppUnaVez();"
-                        style="width:100%; padding:11px; border-radius:10px; background:transparent;
-                               border:1px solid #1e3050; color:#f1f5f9; font-size:13px; font-weight:600;
-                               cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
-                               transition:background .15s; margin-bottom:8px;"
-                        onmouseover="this.style.background='rgba(58,134,255,.08)'"
-                        onmouseout="this.style.background='transparent'">
-                        <span id="btn-como-instalar-txt">📲 Cómo instalar la app</span>
-                    </button>
-
-                    <!-- Cerrar sesión -->
-                    <button onclick="cerrarSesionIdx()"
-                        style="width:100%; padding:11px; border-radius:10px; background:transparent;
-                               border:1px solid #2d1a1a; color:#f87171; font-size:13px; font-weight:600;
-                               cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
-                               transition:background .15s;"
-                        onmouseover="this.style.background='rgba(248,113,113,.08)'"
-                        onmouseout="this.style.background='transparent'">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                        Cerrar sesión
-                    </button>
-
-                    <!-- Versión de la app -->
-                    <div style="text-align:center; font-size:9px; color:#334155; padding-top:2px;">Portal TLC · v<span id="footer-version-idx"></span></div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div id="phone-app-content" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
     <div class="app-content">
@@ -2173,11 +2056,9 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
             const account = currentUserIndex || _leerSesionIdx();
             if (account) {
                 const nombre = account.name || account.username || '';
-                const iniciales = nombre.split(' ').filter(Boolean).map(p => p[0]).join('').substring(0,2).toUpperCase() || 'TL';
-                document.getElementById('header-avatar').textContent = iniciales;
-                document.getElementById('avatar-nombre-idx').textContent = nombre;
-                document.getElementById('avatar-email-idx').textContent = account.username || '';
-                _inicializarAvatarIdx(account);
+                // El avatar en sí (iniciales/nombre/email/menú) ahora lo arma
+                // avatar.js solo, leyendo la misma sesión — unificado en los
+                // 6 módulos del Portal. Acá solo queda el saludo del subtítulo.
                 // Solo actualizar subtitle si estamos en home
                 const active = document.querySelector('.app-view.active');
                 if (!active || active.id === 'view-home') {
@@ -2187,82 +2068,18 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
         } catch(e) { console.warn('updateUserDisplay:', e); }
     }
 
-    function toggleAvatarMenuIdx(e) {
-        if (e) e.stopPropagation();
-        const menu = document.getElementById('avatar-menu-idx');
-        const abierto = menu.style.display !== 'none';
-        menu.style.display = abierto ? 'none' : 'block';
-        if (!abierto) _initSaludoWspIdx();
-    }
-
-    function cerrarSesionIdx() {
-        try { localStorage.removeItem(SESSION_KEY_IDX); } catch(e) {}
-        location.reload();
-    }
-
-    // ── Inicializar avatar con datos del usuario ──────────────────
-    function _inicializarAvatarIdx(account) {
-        const nombre   = account.name || account.username || '—';
-        const email    = account.username || '—';
-        const partes   = nombre.trim().split(' ');
-        const iniciales = partes.length >= 2
-            ? (partes[0][0] + partes[partes.length-1][0]).toUpperCase()
-            : nombre.substring(0,2).toUpperCase();
-        var _haSp = document.getElementById('idx-avatar-initials'); if(_haSp) _haSp.textContent = iniciales;
-        document.getElementById('avatar-icon-idx').textContent = iniciales;
-        document.getElementById('avatar-nombre-idx').textContent = nombre;
-        document.getElementById('avatar-email-idx').textContent  = email;
-        // Rol (viene de la sesión — antes buscaba una variable global
-        // "currentRolIdx" que nunca se definía en ningún lado, así que
-        // el badge se quedaba vacío siempre)
-        const rolEl = document.getElementById('avatar-rol-idx');
-        if (rolEl) rolEl.textContent = account.rol || 'Usuario';
-        _aplicarTemaIdx();
-        _initSaludoWspIdx();
-    }
-
     // ── Tema ──────────────────────────────────────────────────────
-    function _setTemaIdx(tema) {
-        try { localStorage.setItem('tlc_tema', tema); } catch(e) {}
-        _aplicarTemaIdx();
-        setTimeout(function() { const m = document.getElementById('avatar-menu-idx'); if(m) m.style.display='none'; }, 150);
-    }
-
+    // _aplicarTemaIdx queda — sigue aplicando la clase body.tema-claro
+    // en el arranque y al sincronizar entre pestañas (más abajo), que
+    // es independiente del avatar. El resto de las funciones propias
+    // del avatar viejo (toggleAvatarMenuIdx, cerrarSesionIdx,
+    // _inicializarAvatarIdx, _setTemaIdx, _guardarSaludoWspIdx,
+    // _initSaludoWspIdx) se sacaron — avatar.js hace todo eso solo.
     function _aplicarTemaIdx() {
         const tema = (() => { try { return localStorage.getItem('tlc_tema') || 'dark'; } catch(e) { return 'dark'; } })();
         if (tema === 'light') { document.body.classList.add('tema-claro'); }
         else { document.body.classList.remove('tema-claro'); }
-        const btnOsc = document.getElementById('idx-btn-tema-oscuro');
-        const btnCla = document.getElementById('idx-btn-tema-claro');
-        if (btnOsc && btnCla) {
-            if (tema === 'light') {
-                btnOsc.style.background = 'transparent'; btnOsc.style.color = '#64748b';
-                btnCla.style.background = '#1a4b8c';     btnCla.style.color = '#fff';
-            } else {
-                btnOsc.style.background = '#3a86ff'; btnOsc.style.color = '#fff';
-                btnCla.style.background = 'transparent'; btnCla.style.color = '#64748b';
-            }
-        }
     }
-
-    // ── Saludo WhatsApp ───────────────────────────────────────────
-    function _guardarSaludoWspIdx(val) {
-        try { localStorage.setItem('tlc_wsp_saludo', val.trim()); } catch(e) {}
-    }
-
-    function _initSaludoWspIdx() {
-        const ta = document.getElementById('idx-wsp-saludo');
-        if (!ta) return;
-        try { ta.value = localStorage.getItem('tlc_wsp_saludo') || ''; } catch(e) {}
-    }
-
-    document.addEventListener('click', (e) => {
-        const wrap = document.getElementById('avatar-wrap-idx');
-        if (wrap && !wrap.contains(e.target)) {
-            const menu = document.getElementById('avatar-menu-idx');
-            if (menu) menu.style.display = 'none';
-        }
-    });
 
     // Sincronizar tema desde otras pestañas
     window.addEventListener('storage', (e) => {

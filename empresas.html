@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.09.04.1 (UNIFICACIÓN DE AVATAR — Cristian: "quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos". Se sacó el avatar propio (era la versión más chica de las 4 — solo iniciales fijas + toggle de tema, sin nombre/email/rol/menú real) y se reemplazó por <script src="avatar.js">, la misma fuente única que ahora usan los 6 módulos del Portal — index.html "ganó" como referencia: menú completo con tema, Saludo WhatsApp, Push, Instalar app y cerrar sesión (empresas.html no tenía ninguna de esas 3 últimas antes). _aplicarTema queda (la sigue usando el arranque), solo se le sacaron las partes que tocaban los botones del menú viejo. Push/Instalar NO aparecen todavía acá — este módulo no tiene la infraestructura de Firebase Cloud Messaging que sí tienen index/servicio/cotizaciones (avatar.js los oculta solos vía feature-detection); agregarla es un paso aparte, acordado con Cristian. Confirmado con integración real: avatar.js corriendo DENTRO del HTML completo (servido localmente, sesión real, sin mocks) — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.7 (Todos los botones que mutan datos ahora se deshabilitan al primer click para evitar acciones repetidas (doble-click / doble-tap) — extiende a los que todavía no lo tenían el mismo patrón que ya usaban _crearNuevaEmpresa/_guardarCambiosEmpresa/_guardarContacto/_confirmarImportacion/_confirmarNuevoNegocio: se deshabilita al entrar, se reactiva en cualquier salida por error (fetch fallido, respuesta ok:false), y en el camino feliz queda deshabilitado hasta que la UI se re-renderiza o navega (no hace falta reactivarlo a mano). Cubre: _borrarEmpresaActual (🗑 Borrar empresa), _borrarContacto (✕ por contacto, ahora recibe el botón como 2do parámetro), _usarEmpresaParaNegocio (✅ por contacto, ídem), _guardarContactoQREmpresas (💾 Guardar del modal QR — se reactiva también al abrir un escaneo nuevo, por si quedó deshabilitado de un guardado previo en la misma sesión), y _iaEnviarPregunta (➤ enviar + el input de texto — esta consulta puede tardar 10-20s, así que sin el guard se podían mandar preguntas duplicadas tocando varias veces o con Enter). NO se tocaron los botones de navegación/toggle (⟵ volver, tema claro/oscuro, avatar, Cancelar, abrir/cerrar modales, mic, "Mostrar más") — deshabilitarlos permanentemente rompería su uso normal sin prevenir ninguna acción duplicada real. Pedido por Cristian: "todos los botones una vez clickeados deben deshabilitarse, para no hacer acciones repetidas". Confirmado con 5 tests aislados: cada función bloquea un 2do click mientras la 1ra sigue pendiente (no dispara un 2do fetch/consulta), y se reactiva correctamente tras un error de red o de respuesta.) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.6 (Fix de contraste — el texto del banner "Usar esta empresa" (v2026.08.19.5) tenía color claro fijo (#e2f8ef, pensado para fondo oscuro) sobre un fondo verde muy clarito, quedando casi invisible en modo claro — se veía el botón pero no se entendía la instrucción de arriba. Reportado por Cristian con captura: "como cambio de empresa?" (la función ya estaba, pero no se leía la explicación). Nueva clase banner-usar-empresa-texto con override de tema-claro (#0d4a38, verde oscuro legible). Confirmado con test: el color del texto ya no es el clarito original, pasa a ser el oscuro nuevo con buen contraste.) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.5 (Nuevo flujo "cambiar empresa de un negocio" — cuando se llega desde cotizaciones.html con ?volverA=negocio&idNegocio=X (ver ese archivo v2026.08.19.13), se muestra un banner "✅ Usar esta empresa" en el detalle, y cada contacto de la lista suma su propio botón "✅ Usar este contacto". Al elegir, llama a la acción nueva reasignarEmpresaNegocio (FotoMap.gs v192) con la empresa+contacto realmente elegidos (no los que tenía antes el negocio) y vuelve directo a cotizaciones.html?id=X. Se puede navegar libremente a CUALQUIER otra empresa desde acá (buscador, lista) antes de elegir — no queda pegado a la que tenía el negocio originalmente. Pedido por Cristian con captura: "a un negocio existente permitime poder cambiar la empresa, si ya tiene una empresa asignada, permitime cambiarla llevandome al modulo empresas y elegir otra con sus contactos asociados". Confirmado con test de punta a punta: abre la empresa vieja de contexto, permite abrir una empresa totalmente distinta, el botón por contacto aparece, elegir un contacto llama al backend con la empresa+contacto nuevos, y arma bien la URL de vuelta al negocio de origen.) -->
@@ -26,6 +27,7 @@
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="avatar.js"></script>
 <script src="permisos.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- Font Awesome — agregado solo para poder usar el mismo ícono
@@ -53,17 +55,6 @@
   .logo { height:30px; width:auto; flex-shrink:0; cursor:pointer; }
   .header-text h1 { font-size:14px; font-weight:700; }
   .header-text p { font-size:10px; color:var(--text-muted); margin-top:1px; }
-
-  .avatar-wrap { position:relative; margin-left:auto; flex-shrink:0; }
-  .avatar-btn { width:36px; height:36px; border-radius:50%; background:#1c2541; border:1px solid #222e50; color:#3a86ff;
-    font-size:13px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; }
-  .avatar-menu { display:none; position:absolute; top:44px; right:0; width:220px; background:#0d1520; border:1px solid var(--border-glow);
-    border-radius:14px; padding:14px; z-index:200; box-shadow:0 16px 48px rgba(0,0,0,.5); }
-  .avatar-menu.open { display:block; }
-  .avatar-menu-label { font-size:9px; color:var(--text-dim); text-transform:uppercase; font-weight:700; margin-bottom:8px; }
-  .tema-toggle { display:flex; background:#080d14; border:1px solid var(--border-glow); border-radius:8px; overflow:hidden; }
-  .tema-toggle button { flex:1; padding:8px; font-size:11px; font-weight:700; border:none; background:transparent; color:var(--text-muted); cursor:pointer; }
-  .tema-toggle button.active { background:var(--accent-blue); color:#fff; }
 
   .wrap { max-width:900px; margin:0 auto; padding:20px 16px 60px; }
 
@@ -177,10 +168,6 @@
   body.tema-claro .banner-usar-empresa-texto { color:#0d4a38 !important; }
   body.tema-claro .header { background:linear-gradient(135deg,#ffffff,#f1f5f9); border-bottom-color:#cbd5e1; }
   body.tema-claro .header-text h1 { color:#0f172a; }
-  body.tema-claro .avatar-btn { background:#ffffff; border-color:#cbd5e1; }
-  body.tema-claro .avatar-menu { background:#ffffff; border-color:#e2e8f0; }
-  body.tema-claro .tema-toggle { background:#f1f5f9; border-color:#cbd5e1; }
-  body.tema-claro .tema-toggle button { color:#64748b; }
   body.tema-claro .buscador-input, body.tema-claro .empresa-card, body.tema-claro .section,
   body.tema-claro .det-campo input, body.tema-claro .det-campo textarea, body.tema-claro .contacto-card, body.tema-claro .form-contacto,
   body.tema-claro .negocio-card, body.tema-claro .modal-panel, body.tema-claro .modal-campo select,
@@ -203,16 +190,6 @@
     <div class="header-text">
       <h1 id="hdr-titulo">Empresas</h1>
       <p id="hdr-sub">Base de clientes y contactos</p>
-    </div>
-    <div class="avatar-wrap">
-      <button class="avatar-btn" id="avatar-initials-emp" onclick="_toggleAvatarMenu(event)">CH</button>
-      <div class="avatar-menu" id="avatar-menu">
-        <div class="avatar-menu-label">Apariencia</div>
-        <div class="tema-toggle">
-          <button id="btn-tema-oscuro" onclick="_setTema('dark')">🌙 Oscuro</button>
-          <button id="btn-tema-claro" onclick="_setTema('light')">☀️ Claro</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -422,21 +399,10 @@ function _leerSesionCompartida() {
     return payload.account;
   } catch(e) { return null; }
 }
-// Avatar con iniciales reales — antes decía "CH" fijo siempre, sin
-// importar quién estuviera logueado. Mismo patrón (sin ningún costo
-// de red, es solo texto) que ya usan servicio.html/cotizaciones.html.
-// Reportado por Cristian: "este avatar en empresas no hace nada, es
-// fijo para CH... o lo ponemos de verdad que lea el usuario".
-function _actualizarAvatarEmp(account) {
-  var el = document.getElementById('avatar-initials-emp');
-  if (!el || !account) return;
-  var nombre = account.name || account.username || '—';
-  var partes = nombre.trim().split(' ');
-  var iniciales = partes.length >= 2
-    ? (partes[0][0] + partes[partes.length-1][0]).toUpperCase()
-    : nombre.substring(0,2).toUpperCase();
-  el.textContent = iniciales;
-}
+// El avatar en sí (iniciales/nombre/email/menú) ahora lo arma
+// avatar.js solo, leyendo la sesión — unificado en los 6 módulos del
+// Portal (antes lo hacía _actualizarAvatarEmp acá, con su propio
+// botón fijo "CH").
 
 var EMPRESAS = []; // se llena con _cargarEmpresas() — ya no hay datos de prueba
 
@@ -721,17 +687,15 @@ async function _cargarNegociosCruzados() {
 }
 
 // ── Tema ──
-window._toggleAvatarMenu = function(ev) { ev.stopPropagation(); document.getElementById('avatar-menu').classList.toggle('open'); };
-document.addEventListener('click', function(ev) { if (!ev.target.closest('.avatar-wrap')) document.getElementById('avatar-menu').classList.remove('open'); });
-window._setTema = function(tema) { try { localStorage.setItem('tlc_tema', tema); } catch(e) {} _aplicarTema(); };
+// _aplicarTema queda — la sigue usando el arranque (línea de abajo) de
+// forma independiente del avatar; solo se le sacaron las partes que
+// tocaban los botones del menú viejo (ya no existen — avatar.js hace
+// su propio switch de tema ahora, unificado con el resto del Portal).
 function _aplicarTema() {
   var tema = 'dark';
   try { tema = localStorage.getItem('tlc_tema') || 'dark'; } catch(e) {}
   document.body.classList.toggle('tema-claro', tema === 'light');
   document.documentElement.style.colorScheme = tema === 'light' ? 'light' : 'dark';
-  var bo = document.getElementById('btn-tema-oscuro'), bc = document.getElementById('btn-tema-claro');
-  if (bo) bo.classList.toggle('active', tema !== 'light');
-  if (bc) bc.classList.toggle('active', tema === 'light');
 }
 _aplicarTema();
 
@@ -1672,7 +1636,7 @@ var _volverANegocioId = null;
 (async function() {
   var acceso = await validarAccesoModulo('Empresas');
   if (!acceso) return; // ya mostró el alert y redirigió a index.html
-  _actualizarAvatarEmp(_leerSesionCompartida());
+  // El avatar lo arma avatar.js solo (unificado, ver comentario más arriba)
   var params = new URLSearchParams(window.location.search);
   var empresaId = params.get('empresa');
   if (params.get('volverA') === 'negocio' && params.get('idNegocio')) {

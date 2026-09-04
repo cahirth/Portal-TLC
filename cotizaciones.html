@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.09.04.1 (UNIFICACIÓN DE AVATAR — Cristian: "quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos". Se sacó el avatar propio (HTML/CSS/JS con ids -cot) y se reemplazó por <script src="avatar.js">, la misma fuente única que ahora usan los 6 módulos del Portal — index.html "ganó" como referencia: menú completo con tema, Saludo WhatsApp, Push, Instalar app y cerrar sesión. Posición: fija arriba a la derecha en los 6 módulos. Detalle importante: _aplicarTemaCot también re-pintaba el Kanban al cambiar de tema (aplicarFiltros()) — avatar.js no puede saber eso, así que ahora dispara un evento genérico 'tlc-tema-cambiado' al cambiar de tema, y _aplicarTemaCot quedó como listener de ese evento (mismo efecto de siempre, sin que avatar.js necesite conocer nada específico de este módulo). Push/Instalar en el menú nuevo siguen llamando a las funciones reales de este archivo sin tocar, vía feature-detection de avatar.js. Confirmado con integración real: avatar.js corriendo DENTRO del HTML completo (servido localmente, sesión real, sin mocks) — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.7 (Mismo BUG REAL que ficha-equipo.html v2026.08.29.4 — Cristian: "a veces no aparecen los pipelines... a veces en cotizaciones tampoco". _cargarPipelines() ya tenía un fix parcial (v2026.08.19.1: defaults fijos + caché), pero si el pedido fallaba (Apps Script "despertándose", un hipo de red), PIPELINES se quedaba vacío en silencio y nunca reintentaba, dejando solo los 2 fijos (Ver Todos/General) sin la lista real — sobre todo en la primera visita, sin caché todavía. Ahora reintenta UNA vez más, 1.5s después, antes de rendirse; también detecta {ok:false} como error real (antes lo trataba como "sin pipelines"). Confirmado con test: con el primer intento fallando a propósito, reintenta solo y termina mostrando el pipeline real, no solo los 2 fijos.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.6 (BUG REAL — al agregar el estado "Enviado" (FotoMap.gs v197 / servicio.html v2026.08.29.1), el badge de estado por equipo en "Estado de Preparación y Despacho" se quedó sin contemplarlo, cayendo al color por defecto: un fondo SÓLIDO oscuro fijo (#1e293b) que no se adapta a modo claro — se veía como un cuadro negro raro en la pantalla clara. Reportado por Cristian con captura: "se ve en modo oscuro el estado de enviado, etc". "Enviado" ahora usa el mismo verde que "Listo para despacho" (ambos representan avance completo); el color por defecto (para "Pendiente" o cualquier estado no contemplado) pasa a ser un tinte semi-transparente rgba — el mismo patrón que ya usaba bien el badge de Calidad de al lado, funciona en los 2 temas. Confirmado con test: "Enviado" usa el verde correcto, "Pendiente" ya no usa el fondo sólido oscuro viejo, y no queda ningún badge de estado con el color #1e293b como fondo.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.5 (El motivo de marcar/desmarcar urgente (v2026.08.29.4) ahora también queda como una NOTA REAL en la misma lista de "Notas de Seguimiento" que ya se ve en el detalle — antes solo vivía en el tooltip del pin (invisible en el celular, donde no hay hover). Cristian: "funciona OK, como veo la nota que me pide opcional dentro del negocio?" → "agregalo en notas generales del negocio". Reusa el mismo mecanismo agregarNota que ya usa el resto de la pantalla — sin cartel ni sección aparte. Texto: "📌 Marcado como urgente: [motivo]" (o sin ":" si no hay motivo) al marcar, "📌 Desmarcado como urgente" al desmarcar; se refleja en memoria al toque, sin esperar un refresh completo. Confirmado con 4 tests: la nota se agrega con el motivo real, aparece en el detalle sin recargar nada, sin motivo no queda un ":" colgando, y desmarcar también deja su propio registro.) -->
@@ -29,6 +30,7 @@
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="avatar.js"></script>
 <script src="permisos.js"></script>
 <script src="adjuntos.js"></script>
 <!-- SheetJS — solo para el botón "Exportar Excel" del Dashboard de
@@ -404,21 +406,6 @@
         body.tema-claro .k-btn      { background:#f1f5f9 !important; border-color:#e2e8f0 !important; color:#475569 !important; }
         body.tema-claro .cambio-etapa-select { background:#ffffff !important; border-color:#e2e8f0 !important; color:#374151 !important; }
 
-/* ── Avatar menu tema claro ── */
-body.tema-claro #cot-avatar-menu { background:#ffffff !important; border-color:#e2e8f0 !important; box-shadow:0 16px 48px rgba(0,0,0,.12) !important; }
-body.tema-claro #cot-avatar-menu > div:first-child { background:#f8fafc !important; border-bottom-color:#e2e8f0 !important; }
-body.tema-claro #cot-avatar-nombre { color:#0f172a !important; }
-body.tema-claro #cot-avatar-email  { color:#64748b !important; }
-body.tema-claro #cot-avatar-rol    { background:rgba(26,75,140,.08) !important; color:#1a4b8c !important; border-color:rgba(26,75,140,.2) !important; }
-body.tema-claro #cot-avatar-menu-icon { background:#e8f0fc !important; color:#1a4b8c !important; border-color:rgba(26,75,140,.2) !important; }
-body.tema-claro #cot-btn-tema-oscuro,
-body.tema-claro #cot-btn-tema-claro { border: 1px solid #e2e8f0 !important; }
-body.tema-claro #cot-wsp-saludo { background:#f8fafc !important; border-color:#cbd5e1 !important; color:#0f172a !important; }
-body.tema-claro #cot-avatar-tema-wrap,
-body.tema-claro #cot-avatar-wsp-wrap { background:#ffffff !important; border-color:#cbd5e1 !important; }
-body.tema-claro #cot-avatar-menu [style*="background:#0a1628"] { background:#f8fafc !important; border-color:#e2e8f0 !important; }
-body.tema-claro #btn-activar-push, body.tema-claro #btn-como-instalar { border-color:#cbd5e1 !important; }
-body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { color:#0f172a !important; }
         /* Detalle overlay */
         body.tema-claro .detalle-overlay { background:#f8fafc !important; }
         body.tema-claro .detalle-header  { background:#ffffff !important; border-bottom-color:#e2e8f0 !important; }
@@ -645,112 +632,6 @@ body.tema-claro #btn-activar-push-txt, body.tema-claro #btn-como-instalar-txt { 
         </div>
     </div>
 
-    <!-- AVATAR CON DROPDOWN DE PERFIL -->
-    <div style="position:relative;" id="cot-avatar-wrap">
-        <button id="cot-btn-avatar" onclick="toggleAvatarMenuCot()"
-            style="background:#1c2541; border:1px solid #222e50; border-radius:50%;
-                   width:38px; height:38px; display:flex; align-items:center; justify-content:center;
-                   cursor:pointer; font-size:12px; font-weight:800; color:#3a86ff; flex-shrink:0;">
-            <span id="cot-avatar-initials">?</span>
-        </button>
-
-        <div id="cot-avatar-menu" style="display:none; position:absolute; top:46px; right:0;
-             background:#0d1520; border:1px solid #1e3050; border-radius:16px;
-             width:300px; z-index:600; box-shadow:0 16px 48px rgba(0,0,0,0.6);
-             overflow:hidden; animation:fadeSlideDown .15s ease;">
-
-            <!-- Cabecera usuario -->
-            <div style="padding:16px; border-bottom:1px solid #1e3050; display:flex; align-items:center; gap:12px; background:#080d14;">
-                <div style="width:40px; height:40px; border-radius:50%; background:#1c2541; border:2px solid #3a86ff33;
-                            display:flex; align-items:center; justify-content:center;
-                            font-size:14px; font-weight:800; color:#3a86ff; flex-shrink:0;" id="cot-avatar-menu-icon">?</div>
-                <div style="min-width:0; flex:1;">
-                    <div style="font-size:13px; font-weight:700; color:#f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="cot-avatar-nombre">—</div>
-                    <div style="font-size:10px; color:#64748b; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="cot-avatar-email">—</div>
-                    <div id="cot-avatar-rol" style="display:inline-block; margin-top:4px; font-size:9px; font-weight:700;
-                         text-transform:uppercase; letter-spacing:0.6px; padding:1px 7px; border-radius:20px;
-                         background:rgba(58,134,255,.15); color:#3a86ff; border:1px solid rgba(58,134,255,.25);">—</div>
-                </div>
-                <button onclick="toggleAvatarMenuCot()" title="Cerrar"
-                    style="background:rgba(100,116,139,.15); border:1px solid #1e3050; border-radius:8px; color:#94a3b8; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:16px; line-height:1;">✕</button>
-            </div>
-
-            <div style="padding:12px; display:flex; flex-direction:column; gap:10px;">
-
-                <!-- Switch Tema -->
-                <div id="cot-avatar-tema-wrap" style="background:#080d14; border:1px solid #1e3050; border-radius:10px; padding:10px 12px;">
-                    <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#64748b; margin-bottom:8px;">Apariencia</div>
-                    <div style="display:flex; background:#0a1628; border-radius:8px; overflow:hidden; border:1px solid #1e3050;">
-                        <button id="cot-btn-tema-oscuro" onclick="_setTemaCot('dark')"
-                            style="flex:1; padding:8px; border:none; cursor:pointer; font-size:12px; font-weight:600;
-                                   display:flex; align-items:center; justify-content:center; gap:5px;
-                                   background:#3a86ff; color:#fff; border-radius:7px 0 0 7px; transition:all .15s;">
-                            🌙 Oscuro
-                        </button>
-                        <button id="cot-btn-tema-claro" onclick="_setTemaCot('light')"
-                            style="flex:1; padding:8px; border:none; cursor:pointer; font-size:12px; font-weight:600;
-                                   display:flex; align-items:center; justify-content:center; gap:5px;
-                                   background:transparent; color:#64748b; transition:all .15s;">
-                            ☀️ Claro
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Saludo WhatsApp -->
-                <div id="cot-avatar-wsp-wrap" style="background:#080d14; border:1px solid #1e3050; border-radius:10px; padding:10px 12px;">
-                    <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;
-                                color:#64748b; margin-bottom:6px; display:flex; align-items:center; gap:5px;">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                        Saludo WhatsApp
-                    </div>
-                    <textarea id="cot-wsp-saludo" rows="2"
-                        style="width:100%; background:#0a1628; border:1px solid #1e3050; border-radius:8px;
-                               color:#f1f5f9; font-size:12px; padding:8px 10px; resize:none;
-                               line-height:1.4; outline:none; font-family:inherit;"
-                        placeholder="Hola, le compartimos el presupuesto de TLC SRL: "
-                        oninput="_guardarSaludoWspCot(this.value)"></textarea>
-                    <div style="font-size:10px; color:#334155; margin-top:3px;">Se guarda automáticamente · URL se agrega al final</div>
-                </div>
-
-                <!-- Notificaciones push -->
-                <button id="btn-activar-push" onclick="_activarNotificacionesPush()"
-                    style="width:100%; padding:11px; border-radius:10px; background:transparent;
-                           border:1px solid #1e3050; color:#f1f5f9; font-size:13px; font-weight:600;
-                           cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
-                           transition:background .15s; margin-bottom:8px;"
-                    onmouseover="this.style.background='rgba(58,134,255,.08)'"
-                    onmouseout="this.style.background='transparent'">
-                    <span id="btn-activar-push-txt">🔔 Activar notificaciones</span>
-                </button>
-
-                <!-- Cómo instalar la app -->
-                <button id="btn-como-instalar" onclick="_manejarClickInstalarApp()"
-                    style="width:100%; padding:11px; border-radius:10px; background:transparent;
-                           border:1px solid #1e3050; color:#f1f5f9; font-size:13px; font-weight:600;
-                           cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
-                           transition:background .15s; margin-bottom:8px;"
-                    onmouseover="this.style.background='rgba(58,134,255,.08)'"
-                    onmouseout="this.style.background='transparent'">
-                    <span id="btn-como-instalar-txt">📲 Cómo instalar la app</span>
-                </button>
-
-                <!-- Cerrar sesión -->
-                <button onclick="_cerrarSesionCot()"
-                    style="width:100%; padding:11px; border-radius:10px; background:transparent;
-                           border:1px solid #2d1a1a; color:#f87171; font-size:13px; font-weight:600;
-                           cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
-                           transition:background .15s;"
-                    onmouseover="this.style.background='rgba(248,113,113,.08)'"
-                    onmouseout="this.style.background='transparent'">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                    Cerrar sesión
-                </button>
-
-                <!-- Versión de la app -->
-                <div style="text-align:center; font-size:9px; color:#334155; padding-top:2px;">Portal TLC · v<span id="footer-version-cot"></span></div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <!-- ZONA SUPERIOR FIJA (stats + filtros + buscador) -->
@@ -2060,7 +1941,9 @@ async function init() {
     if (_aplicarPipelinesDesdeCache()) _renderSelectPipeline();
     _cargarPipelines();
     _getPrecios(); // cargar precios.json en background para folletos/videos
-    _inicializarAvatarCot(); // poblar avatar con datos del usuario logueado
+    // El avatar en sí (iniciales/nombre/email/menú) ahora lo arma
+    // avatar.js solo, leyendo la sesión — unificado en los 6 módulos
+    // del Portal (antes lo hacía _inicializarAvatarCot acá).
 }
 
 // ─── CARGA DE VENDEDORES DESDE SHEET ────────────────────────────
@@ -5013,44 +4896,14 @@ function _pcMostrarStatus(msg, tipo) {
     el.style.color  = tipo === 'ok' ? '#06d6a0' : tipo === 'error' ? '#f87171' : '#94a3b8';
 }
 
-// ─── AVATAR DROPDOWN — cotizaciones.html ─────────────────────────
-
-function toggleAvatarMenuCot() {
-    const menu = document.getElementById('cot-avatar-menu');
-    const abierto = menu.style.display !== 'none';
-    menu.style.display = abierto ? 'none' : 'block';
-    if (!abierto) _initSaludoWspCot();
-}
-
-function _inicializarAvatarCot() {
-    const nombre   = currentUserNombre || currentUser?.name || currentUser?.username || '—';
-    const email    = currentUser?.username || '—';
-    const partes   = nombre.trim().split(' ');
-    const iniciales = partes.length >= 2
-        ? (partes[0][0] + partes[partes.length-1][0]).toUpperCase()
-        : nombre.substring(0,2).toUpperCase();
-
-    document.getElementById('cot-avatar-initials').textContent  = iniciales;
-    document.getElementById('cot-avatar-menu-icon').textContent = iniciales;
-    document.getElementById('cot-avatar-nombre').textContent    = nombre;
-    document.getElementById('cot-avatar-email').textContent     = email;
-    document.getElementById('cot-avatar-rol').textContent       = currentUserRol || 'Usuario';
-
-    _aplicarTemaCot();
-    _initSaludoWspCot();
-}
-
 // ── Tema ──────────────────────────────────────────────────────────
-function _setTemaCot(tema) {
-    try { localStorage.setItem('tlc_tema', tema); } catch(e) {}
-    _aplicarTemaCot();
-    // Cierre automático al elegir tema
-    setTimeout(function() {
-        const m = document.getElementById('cot-avatar-menu');
-        if (m) m.style.display = 'none';
-    }, 150);
-}
-
+// _aplicarTemaCot queda (sin las partes que tocaban los botones del
+// avatar viejo, ya no existen) — la sigue usando la sincronización
+// entre pestañas de acá abajo, y ahora también el evento
+// tlc-tema-cambiado que dispara avatar.js al tocar el switch de tema
+// del menú unificado (re-pinta el Kanban con los colores del tema
+// nuevo, algo específico de esta pantalla que avatar.js no sabe hacer
+// por su cuenta).
 function _aplicarTemaCot() {
     const tema = (() => { try { return localStorage.getItem('tlc_tema') || 'dark'; } catch(e) { return 'dark'; } })();
     if (tema === 'light') {
@@ -5058,49 +4911,12 @@ function _aplicarTemaCot() {
     } else {
         document.body.classList.remove('tema-claro');
     }
-    // Actualizar botones del switch
-    const btnOsc = document.getElementById('cot-btn-tema-oscuro');
-    const btnCla = document.getElementById('cot-btn-tema-claro');
-    if (btnOsc && btnCla) {
-        if (tema === 'light') {
-            btnOsc.style.background = 'transparent'; btnOsc.style.color = '#64748b';
-            btnCla.style.background = '#1a4b8c';     btnCla.style.color = '#fff';
-        } else {
-            btnOsc.style.background = '#3a86ff'; btnOsc.style.color = '#fff';
-            btnCla.style.background = 'transparent'; btnCla.style.color = '#64748b';
-        }
-    }
     // Re-renderizar si hay datos
     if (todasLasCot && todasLasCot.length > 0 && typeof aplicarFiltros === 'function') {
         aplicarFiltros();
     }
 }
-
-// ── Saludo WhatsApp ───────────────────────────────────────────────
-function _guardarSaludoWspCot(val) {
-    try { localStorage.setItem('tlc_wsp_saludo', val.trim()); } catch(e) {}
-}
-
-function _initSaludoWspCot() {
-    const ta = document.getElementById('cot-wsp-saludo');
-    if (!ta) return;
-    try { ta.value = localStorage.getItem('tlc_wsp_saludo') || ''; } catch(e) {}
-}
-
-// ── Cerrar sesión ─────────────────────────────────────────────────
-function _cerrarSesionCot() {
-    try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
-    window.location.href = 'index.html';
-}
-
-// ── Cerrar dropdown al click afuera ──────────────────────────────
-document.addEventListener('click', (e) => {
-    const wrap = document.getElementById('cot-avatar-wrap');
-    if (wrap && !wrap.contains(e.target)) {
-        const menu = document.getElementById('cot-avatar-menu');
-        if (menu) menu.style.display = 'none';
-    }
-});
+window.addEventListener('tlc-tema-cambiado', _aplicarTemaCot);
 
 // Sincronizar tema si cambia desde otra pestaña (selector.html)
 window.addEventListener('storage', (e) => {
