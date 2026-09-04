@@ -8,6 +8,7 @@
 <!-- Portal TLC | servicio.html | v2026.08.10.3 (Tope en "+ Agregar Caja" del modal "Asignación de Cajas" — no se puede tener más cajas que equipos (cada equipo entra en una sola caja, cualquier caja de más quedaría vacía sí o sí). Botón se deshabilita visualmente al llegar al tope, y avisa si de todas formas se intenta pasar. Pedido por Cristian: "cantidad máxima a agregar cajas, la cantidad de ítems, topealo". Confirmado con test: con 3 equipos, permite hasta 3 cajas, se deshabilita ahí, y avisa si se intenta una 4ta.) -->
 <!-- Portal TLC | servicio.html | v2026.08.10.2 (Candado Preparación/CC → Para Instalar APAGADO temporalmente — pedido por Cristian: "me pide muchas condiciones... liberame temporalmente". El requisito de Checklist no se puede cumplir en la práctica todavía (falta conectar los formularios individuales de checklist, prerrequisito pendiente). Toda la lógica del candado sigue intacta en _validarGate, controlada por un interruptor nuevo (GATE_PARA_INSTALAR_ACTIVO = false) — para reactivarlo alcanza con volver ese valor a true, sin tocar nada más. Confirmado con test: con el interruptor apagado, deja pasar aunque no haya nada completo.) -->
 <!-- Portal TLC | servicio.html | v2026.08.27.1 (BUG REAL — "se queda un rato en generando etiqueta y no la muestra despues". Al guardar la asignación de cajas con éxito, se abría la pestaña de la etiqueta con window.open() JUSTO DESPUÉS de esperar la respuesta del backend (fetch async) — varios navegadores bloquean esto como popup no solicitado, porque ya no lo consideran un gesto directo del usuario (mismo patrón ya documentado en _iaEnviarPregunta, este mismo archivo). Ahora, en vez de abrir la pestaña sola, se muestra un bloque de éxito con un link real "↗ Abrir Etiquetas de Despacho" (target=_blank) — el TOQUE del vendedor sobre ese link sí es un gesto directo, ningún navegador lo bloquea nunca. El modal ya no se cierra solo al guardar con éxito; se cierra cuando el vendedor toca el link. Al reabrir el modal (para el mismo ticket u otro) se resetea el estado de éxito, para no quedar pegado en la pantalla vieja. Confirmado con 5 tests: no se llama a window.open() directamente, se muestra el link real con la URL correcta, el formulario queda oculto durante el éxito, tocar el link cierra el modal, y reabrir resetea el estado.) -->
+<!-- Portal TLC | servicio.html | v2026.08.30.7 (3 pedidos de Cristian: (1) NOTAS DE SEGUIMIENTO — ahora se pueden editar y borrar (antes quedaban fijas para siempre). Botones ✎/✕ junto a cada nota, visibles solo para quien puede editar el ticket. Editar reemplaza el texto por un textarea in-place con Guardar/Cancelar (nada de prompt() del navegador); una nota editada queda marcada "(editado)". Guardado con el mismo patrón que ya usan los gastos: se reescribe el array completo (_guardarNotas → acción nueva de backend st_actualizarNotas, mirror de st_actualizarGastos). (2) BOTONES SEGUROS — auditados los ~58 botones del archivo: se agregó guard de deshabilitar-al-click (con reactivación solo en error) a los que mutan datos y no lo tenían: _eliminarFotoTicket, _borrarVersionPresupuestoTicket, _separarEquipoOrden, y el envío al Asistente IA (_iaEnviarPregunta, que puede tardar 10-20s — se bloquea el botón Y el input mientras espera). Los botones de navegación/toggle (volver, tema, avatar, cancelar, abrir/cerrar modales) se dejaron sin tocar a propósito — deshabilitarlos rompería su uso normal sin prevenir ninguna acción duplicada real. (3) MENSAJES INTERNOS — durante los primeros 2 minutos después de enviarlo, el AUTOR de un mensaje propio ve botones ✎/✕ para editarlo o borrarlo; pasados los 2 minutos desaparecen solos (reusa el polling de 8s que ya existía para mensajes nuevos, ahora también re-pinta cuando un mensaje propio cruza la ventana de 2 min — sin pisar una edición en curso). Nadie edita/borra mensajes ajenos, mismo criterio que cualquier chat. Nuevas acciones de backend st_editarMensaje/st_borrarMensaje, mirror exacto de st_reaccionarMensaje (mismo formato id_ticket+indice+autor_email, misma respuesta con el array mensajes actualizado). PENDIENTE — FotoMap.gs necesita las 3 acciones nuevas (st_actualizarNotas, st_editarMensaje, st_borrarMensaje) del lado del servidor para que esto funcione de punta a punta; el frontend ya está listo y testeado. Confirmado con 9 tests aislados: notas — borra el índice correcto y deshabilita el botón, arma el formulario de edición con el texto actual, guarda y marca editado:true, bloquea guardar vacío; mensajes — distingue autor+ventana de tiempo, los botones aparecen solo en mensajes propios recientes, bloquea edición expirada como defensa en profundidad, manda el payload correcto al backend, bloquea doble-click.) -->
 <!-- Portal TLC | servicio.html | v2026.08.30.6 (BUG REAL — el filtro "Asignación" de la barra de filtros solo mostraba 3 técnicos (Juan Garro, Damián Sosa, Fernando Del Campo) en vez de los 7 habilitados. Causa raíz: la lista de técnicos estaba duplicada a mano en 4 lugares del archivo (TECNICOS_LISTA, el <select> del filtro en el HTML, _optsTecnico, _optsTecnicoResponsableNombre) y una de esas copias — justo la del filtro — nunca se actualizó cuando se sumaron Cristian/Verónica/Lourdes/Lucio a las otras 3. Solución: TECNICOS_LISTA pasa a ser la ÚNICA fuente — el filtro ahora se arma en JS (_poblarFiltroTecnico, llamada en el arranque) a partir de esa lista, y _optsTecnico/_optsTecnicoResponsableNombre se reescribieron para leer de ahí en vez de tener su propio array hardcodeado. De acá en más, sumar un técnico a TECNICOS_LISTA alcanza para que aparezca en los 4 lugares a la vez — no puede volver a desincronizarse. Reportado por Cristian: "en este filtro solo aparecen estos usuarios y no todos los permitidos". Confirmado con test: el filtro genera las 10 opciones esperadas (3 meta + 7 técnicos) con los 7 códigos presentes, y los otros dos selects (_optsTecnico/_optsTecnicoResponsableNombre) siguen generando las mismas 8 opciones de siempre, ahora derivadas de la misma fuente.) -->
 <!-- Portal TLC | servicio.html | v2026.08.30.5 (El toggle de moneda de un gasto NUEVO ahora arranca en AR$ en vez de USD — solo cambia el valor por default al crear (_agregarGasto), el importe se sigue guardando SIEMPRE en USD internamente igual que antes, sin tocar el mecanismo de conversión ni el toggle en sí. Gastos ya cargados no se ven afectados. Pedido por Cristian: "cambiar el toggle de moneda por default de un gasto nuevo, hoy arranca en USD, tiene que arrancar en AR$". Confirmado con test: un gasto nuevo se crea con moneda:'ARS', y el toggle _toggleMonedaGasto sigue alternando correctamente entre ARS/USD sin regresiones.) -->
 <!-- Portal TLC | servicio.html | v2026.08.30.4 (El campo de Importe en Gastos ahora se muestra con formato es-AR (miles con punto, decimales con coma — ej. "1.234,56") en vez del type="number" del navegador, que no permite ese formato. Se reformatea solo al salir del campo, y selecciona todo el texto al enfocar (para tipear encima sin borrar a mano). BUG REAL encontrado por el propio test: los helpers nuevos (_formatMontoARS/_parseMontoARS) no eran visibles desde los atributos onblur inline porque este archivo tiene su código envuelto en un IIFE — corregido exponiéndolos en window, mismo criterio que el resto de los handlers usados desde HTML. Pedido por Cristian: "en gastos de servicio, eventos podes darle formato al numero con miles y centavos". Confirmado con test: el importe se ve formateado correctamente, y tipear un monto nuevo se re-formatea y se guarda parseado correctamente (2500,5 → guarda 2500.5, no se confunde con miles).) -->
@@ -267,6 +268,23 @@ body.tema-claro .btn-icon:hover{background:#cbd5e1;border-color:#3a86ff;}
 .nota-item:last-child{border-bottom:none;}
 .nota-meta{font-size:10px;color:var(--text-muted);margin-bottom:3px;}
 .nota-texto{font-size:12px;color:var(--text-main);line-height:1.5;}
+.nota-meta-fila{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.nota-editado-tag{font-style:italic;opacity:.75;}
+.nota-acciones{display:flex;gap:4px;flex-shrink:0;}
+.nota-btn-editar,.nota-btn-borrar{background:transparent;border:none;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:5px;color:var(--text-muted);}
+.nota-btn-editar:hover{color:var(--accent-blue);background:rgba(58,134,255,.1);}
+.nota-btn-borrar:hover{color:#ef4444;background:rgba(239,68,68,.1);}
+.nota-btn-editar:disabled,.nota-btn-borrar:disabled{opacity:.4;cursor:not-allowed;}
+.nota-edit-textarea{width:100%;min-height:56px;padding:6px 8px;border-radius:8px;background:var(--bg);
+  border:1px solid var(--border-glow);color:var(--text-main);font-size:12px;font-family:inherit;resize:vertical;margin-top:4px;}
+.nota-edit-acciones{display:flex;gap:6px;margin-top:6px;}
+.nota-edit-guardar,.nota-edit-cancelar{padding:5px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;border:none;}
+.nota-edit-guardar{background:var(--accent-blue);color:#fff;}
+.nota-edit-cancelar{background:transparent;color:var(--text-muted);border:1px solid var(--border-glow);}
+.msg-acciones-editar{display:flex;gap:2px;}
+.msg-btn-editar,.msg-btn-borrar{background:transparent;border:none;cursor:pointer;font-size:11px;padding:2px 5px;border-radius:5px;color:var(--text-muted);}
+.msg-btn-editar:hover{color:var(--accent-blue);background:rgba(58,134,255,.1);}
+.msg-btn-borrar:hover{color:#ef4444;background:rgba(239,68,68,.1);}
 .btn-guardar-nota{width:100%;padding:10px;border-radius:10px;background:var(--accent-blue);
   color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;}
 .btn-orden-row{display:flex;gap:8px;margin-bottom:8px;}
@@ -1946,10 +1964,22 @@ function _renderDetalle(t) {
 
   var notasHtml = '';
   if (t.notas_comentarios && t.notas_comentarios.length) {
-    notasHtml = t.notas_comentarios.map(function(n){
-      return '<div class="nota-item">' +
-        '<div class="nota-meta">' + _esc(n.autor||'—') + ' · ' + _formatFechaISO(n.fecha) + '</div>' +
-        '<div class="nota-texto">' + _esc(n.texto) + '</div>' +
+    notasHtml = t.notas_comentarios.map(function(n, i){
+      // Botones editar/borrar solo para quien puede editar el ticket —
+      // mismo gate que ya se usaba para agregar notas. Pedido por
+      // Cristian: "en serv tecnico permitir borrar o editar notas".
+      var accionesHtml = puedeEditar
+        ? '<div class="nota-acciones">' +
+            '<button type="button" class="nota-btn-editar" onclick="_editarNotaClick(\'' + t.id_ticket + '\',' + i + ')" title="Editar">✎</button>' +
+            '<button type="button" class="nota-btn-borrar" onclick="_borrarNota(\'' + t.id_ticket + '\',' + i + ',this)" title="Borrar">✕</button>' +
+          '</div>'
+        : '';
+      return '<div class="nota-item" id="nota-item-' + t.id_ticket + '-' + i + '">' +
+        '<div class="nota-meta-fila">' +
+          '<div class="nota-meta">' + _esc(n.autor||'—') + ' · ' + _formatFechaISO(n.fecha) + (n.editado ? ' <span class="nota-editado-tag">(editado)</span>' : '') + '</div>' +
+          accionesHtml +
+        '</div>' +
+        '<div class="nota-texto" id="nota-texto-' + t.id_ticket + '-' + i + '">' + _esc(n.texto) + '</div>' +
       '</div>';
     }).join('');
   } else {
@@ -2436,7 +2466,7 @@ function _renderSeccionOrdenPreparacion(t) {
     var checklistCompletado = !!eq.checklist_completado;
     return '<tr>' +
       '<td data-th="Cant.">' + (eq.cantidad || 1) +
-        ((eq.cantidad||1) > 1 ? '<button type="button" onclick="_separarEquipoOrden(\'' + t.id_ticket + '\',' + i + ',' + (eq.cantidad||1) + ')" title="Separar en ' + (eq.cantidad||1) + ' filas independientes, una por N° de Serie" style="display:block;margin-top:4px;background:none;border:none;color:var(--accent-blue,#3a86ff);font-size:9.5px;text-decoration:underline;cursor:pointer;padding:0;white-space:nowrap;">✂️ Separar</button>' : '') +
+        ((eq.cantidad||1) > 1 ? '<button type="button" onclick="_separarEquipoOrden(\'' + t.id_ticket + '\',' + i + ',' + (eq.cantidad||1) + ',this)" title="Separar en ' + (eq.cantidad||1) + ' filas independientes, una por N° de Serie" style="display:block;margin-top:4px;background:none;border:none;color:var(--accent-blue,#3a86ff);font-size:9.5px;text-decoration:underline;cursor:pointer;padding:0;white-space:nowrap;">✂️ Separar</button>' : '') +
       '</td>' +
       '<td data-th="SKU"><input type="text" value="' + _esc(eq.sku||'') + '" placeholder="—" onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'sku\',this.value)"></td>' +
       '<td data-th="Equipo"><input type="text" value="' + _esc(eq.descripcion||'') + '" placeholder="Descripción del equipo..." onchange="_actualizarFilaOrden(\'' + t.id_ticket + '\',' + i + ',\'descripcion\',this.value)"></td>' +
@@ -2567,20 +2597,21 @@ window._avanzarPasoPrep = function(idTicket, nuevaEtapa) {
 // desdoblara esto automáticamente al crearse. Reportado por Cristian
 // con captura: "el ítem 2 tiene 2 equipos, por favor separarlos,
 // siempre debe haber 1 equipo en cada renglón".
-window._separarEquipoOrden = function(idTicket, indice, cantidad) {
+window._separarEquipoOrden = function(idTicket, indice, cantidad, btn) {
   if (!confirm('¿Separar esta fila en ' + cantidad + ' filas independientes, una por cada N° de Serie?\n\nEl N° de Serie que tenga cargado ahora se borra — hay que volver a cargarlo por separado en cada fila nueva.')) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_separarEquipoOrden', id_ticket:idTicket, indice:indice }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert('No se pudo separar: ' + (r.error||'')); return; }
+      if (!r.ok) { alert('No se pudo separar: ' + (r.error||'')); if (btn) btn.disabled = false; return; }
       if (_ticketActual && _ticketActual.id_ticket === idTicket) {
         _ticketActual.equipos = r.equipos;
-        _renderDetalle(_ticketActual);
+        _renderDetalle(_ticketActual); // re-renderiza la grilla; el botón viejo se destruye con ella
       }
       _toastServicio('✅ Separado en ' + cantidad + ' filas');
     })
-    .catch(function(){ alert('Error de conexión al separar.'); });
+    .catch(function(){ alert('Error de conexión al separar.'); if (btn) btn.disabled = false; });
 };
 
 window._actualizarFilaOrden = function(idTicket, indice, campo, valor) {
@@ -2719,7 +2750,21 @@ async function _refrescarMensajesTicket(idTicket) {
     if (!_ticketActual || _ticketActual.id_ticket !== idTicket) return; // pudo cerrarse mientras esperaba la respuesta
 
     var actuales = Array.isArray(_ticketActual.mensajes) ? _ticketActual.mensajes : [];
-    if (mensajesNuevos.length === actuales.length) return; // sin cambios, no re-pintar innecesariamente
+    // Antes solo se re-pintaba si cambió la CANTIDAD de mensajes. Ahora
+    // también se re-pinta mientras exista un mensaje PROPIO reciente
+    // (menos de ~2m10s) — así el botón ✎/✕ desaparece solo en cuanto
+    // se cumplen los 2 minutos, sin esperar a que llegue un mensaje
+    // nuevo. Reusa este mismo polling de 8s (ya existía) en vez de
+    // agregar un timer aparte. Si hay una edición en curso (textarea de
+    // mensaje abierto), se salta el re-render de este ciclo para no
+    // pisarle lo que está escribiendo — vuelve a intentar 8s después.
+    var cambioCantidad = mensajesNuevos.length !== actuales.length;
+    var emailActual = (_session && _session.username) || '';
+    var hayMsgPropioReciente = emailActual && actuales.some(function(m){
+      return m.autor_email === emailActual && (Date.now() - new Date(m.fecha||0).getTime()) < (MSG_VENTANA_EDICION_MS + 10000);
+    });
+    if (!cambioCantidad && !hayMsgPropioReciente) return; // sin cambios reales, no re-pintar innecesariamente
+    if (document.querySelector('[id^="msg-edit-input-"]')) return; // hay una edición abierta — no pisarla
 
     _ticketActual.mensajes = mensajesNuevos;
     var t2 = _tickets.find(function(x){ return x.id_ticket === idTicket; });
@@ -2768,21 +2813,46 @@ window._mostrarQuienReacciono = function(ev, emoji, nombresStr) {
   }); }, 50);
 };
 
+// Ventana de 2 minutos para editar/borrar un mensaje propio — pasado
+// ese tiempo, el mensaje queda fijo (mismo comportamiento de siempre).
+// Pedido por Cristian: "Chats durante 2 minutos permitir editar o
+// borrar mensajes, luego transformar a no editable, como ahora". Solo
+// el AUTOR del mensaje puede editarlo/borrarlo (no cualquier interno
+// con acceso al ticket) — mismo criterio que cualquier chat (WhatsApp,
+// Slack): nadie edita mensajes ajenos.
+var MSG_VENTANA_EDICION_MS = 2 * 60 * 1000;
+function _puedeEditarMensajePropio(m) {
+  if (!m || !m.fecha) return false;
+  var email = (_session && _session.username) || '';
+  if (!email || m.autor_email !== email) return false;
+  return (Date.now() - new Date(m.fecha).getTime()) < MSG_VENTANA_EDICION_MS;
+}
+
 function _construirHtmlListaMensajes(t) {
   var mensajes = Array.isArray(t.mensajes) ? t.mensajes : [];
   if (!mensajes.length) return '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:16px 0;">Todavía no hay mensajes en este ticket.</div>';
   return mensajes.map(function(m, i) {
     var fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    var puedeEditarMsg = _puedeEditarMensajePropio(m);
+    var accionesMsgHtml = puedeEditarMsg
+      ? '<div class="msg-acciones-editar">' +
+          '<button type="button" class="msg-btn-editar" onclick="_editarMensajeClick(\'' + t.id_ticket + '\',' + i + ')" title="Editar (disponible por 2 min)">✎</button>' +
+          '<button type="button" class="msg-btn-borrar" onclick="_borrarMensaje(\'' + t.id_ticket + '\',' + i + ',this)" title="Borrar (disponible por 2 min)">✕</button>' +
+        '</div>'
+      : '';
     return '<div class="msg-fila" tabindex="0" style="padding:8px 10px;border-radius:10px;background:var(--panel-dark);border:1px solid var(--border-glow);margin-bottom:8px;">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
         '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
-        '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + '</span>' +
+        '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + (m.editado ? ' <i>(editado)</i>' : '') + '</span>' +
       '</div>' +
-      '<div class="msg-texto" style="color:var(--text-main);white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTexto(_esc(m.texto || '')) + '</div>' +
+      '<div class="msg-texto" id="msg-texto-' + t.id_ticket + '-' + i + '" style="color:var(--text-main);white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTexto(_esc(m.texto || '')) + '</div>' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
         _resumenReacciones(m.reacciones) +
-        '<div class="reaccion-trigger-wrap">' +
-          '<button class="reaccion-trigger-btn" onclick="_abrirReaccionPicker(event,this,\'msg\',\'' + t.id_ticket + '\',' + i + ')" title="Reaccionar">🙂</button>' +
+        '<div style="display:flex;align-items:center;gap:4px;">' +
+          accionesMsgHtml +
+          '<div class="reaccion-trigger-wrap">' +
+            '<button class="reaccion-trigger-btn" onclick="_abrirReaccionPicker(event,this,\'msg\',\'' + t.id_ticket + '\',' + i + ')" title="Reaccionar">🙂</button>' +
+          '</div>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -2883,6 +2953,69 @@ window._reaccionarMensajeTicket = function(ev, idTicket, indice, tipo) {
         if (lista) lista.innerHTML = _construirHtmlListaMensajes(_ticketActual);
       }
     });
+};
+
+// Reemplaza el texto del mensaje (modo lectura) por un textarea
+// editable in-place, mismo criterio visual que la edición de notas.
+window._editarMensajeClick = function(idTicket, idx) {
+  var t = _ticketActual;
+  if (!t || t.id_ticket !== idTicket || !Array.isArray(t.mensajes)) return;
+  var m = t.mensajes[idx];
+  if (!m || !_puedeEditarMensajePropio(m)) { _stMostrarError('Ya pasaron los 2 minutos — este mensaje no se puede editar.'); return; }
+  var elTexto = document.getElementById('msg-texto-' + idTicket + '-' + idx);
+  if (!elTexto) return;
+  elTexto.innerHTML =
+    '<textarea class="nota-edit-textarea" id="msg-edit-input-' + idTicket + '-' + idx + '">' + _esc(m.texto) + '</textarea>' +
+    '<div class="nota-edit-acciones">' +
+      '<button type="button" class="nota-edit-guardar" onclick="_guardarMensajeEditado(\'' + idTicket + '\',' + idx + ',this)">Guardar</button>' +
+      '<button type="button" class="nota-edit-cancelar" onclick="_renderPanelMensajes(_ticketActual)">Cancelar</button>' +
+    '</div>';
+  var ta = document.getElementById('msg-edit-input-' + idTicket + '-' + idx);
+  if (ta) { ta.focus(); ta.selectionStart = ta.value.length; }
+};
+
+window._guardarMensajeEditado = function(idTicket, idx, btn) {
+  var t = _ticketActual;
+  if (!t || t.id_ticket !== idTicket || !Array.isArray(t.mensajes)) return;
+  var m = t.mensajes[idx];
+  if (!m || !_puedeEditarMensajePropio(m)) { _stMostrarError('Ya pasaron los 2 minutos — este mensaje no se puede editar.'); _renderPanelMensajes(t); return; }
+  var ta = document.getElementById('msg-edit-input-' + idTicket + '-' + idx);
+  var textoNuevo = (ta ? ta.value : '').trim();
+  if (!textoNuevo) { alert('El mensaje no puede quedar vacío — si querés eliminarlo, usá ✕ Borrar.'); return; }
+  if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Guardando...'; }
+  var email = (_session && _session.username) || '';
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_editarMensaje', id_ticket:idTicket, indice:idx, texto:textoNuevo, autor_email:email }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok || !Array.isArray(r.mensajes)) { alert('No se pudo editar el mensaje: ' + (r.error||'')); if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; } return; }
+      if (_ticketActual && _ticketActual.id_ticket === idTicket) {
+        _ticketActual.mensajes = r.mensajes;
+        _renderPanelMensajes(_ticketActual); // el botón viejo se destruye con el re-render
+      }
+    })
+    .catch(function(){ alert('Error de conexión al editar el mensaje.'); if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; } });
+};
+
+window._borrarMensaje = function(idTicket, idx, btn) {
+  var t = _ticketActual;
+  if (!t || t.id_ticket !== idTicket || !Array.isArray(t.mensajes)) return;
+  var m = t.mensajes[idx];
+  if (!m || !_puedeEditarMensajePropio(m)) { _stMostrarError('Ya pasaron los 2 minutos — este mensaje no se puede borrar.'); _renderPanelMensajes(t); return; }
+  if (!confirm('¿Borrar este mensaje? No se puede deshacer.')) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
+  var email = (_session && _session.username) || '';
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_borrarMensaje', id_ticket:idTicket, indice:idx, autor_email:email }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok || !Array.isArray(r.mensajes)) { alert('No se pudo borrar el mensaje: ' + (r.error||'')); if (btn) btn.disabled = false; return; }
+      if (_ticketActual && _ticketActual.id_ticket === idTicket) {
+        _ticketActual.mensajes = r.mensajes;
+        _renderPanelMensajes(_ticketActual);
+      }
+    })
+    .catch(function(){ alert('Error de conexión al borrar el mensaje.'); if (btn) btn.disabled = false; });
 };
 
 function _renderPanelMensajes(t) {
@@ -3554,7 +3687,7 @@ function _renderCamposTecnicos(t, puedeEditar) {
             'style="font-size:15px;text-decoration:none;padding:2px;">👁️</a>' +
           (esUltima ? '<button onclick="_generarPresupuestoTecnico(\'' + t.id_ticket + '\')" title="Editar presupuesto" ' +
             'style="background:transparent;border:none;font-size:15px;cursor:pointer;padding:2px;">✏️</button>' : '') +
-          '<button onclick="_borrarVersionPresupuestoTicket(\'' + t.id_ticket + '\', ' + v.version + ')" title="Borrar esta versión" ' +
+          '<button onclick="_borrarVersionPresupuestoTicket(\'' + t.id_ticket + '\', ' + v.version + ', this)" title="Borrar esta versión" ' +
             'style="background:transparent;border:none;font-size:15px;cursor:pointer;padding:2px;">🗑️</button>' +
         '</div>';
       }).join('') +
@@ -3616,18 +3749,20 @@ function _renderCamposTecnicos(t, puedeEditar) {
 // Borra una versión puntual del historial de presupuestos de ESTE
 // ticket (no toca la cotización de Ventas en sí, solo el registro
 // dentro del ticket) — mismo patrón que ya existe en cotizaciones.html.
-window._borrarVersionPresupuestoTicket = async function(ticketId, nroVersion) {
+window._borrarVersionPresupuestoTicket = async function(ticketId, nroVersion, btn) {
   if (!confirm('¿Borrar la versión v' + nroVersion + ' del historial? No se puede deshacer.')) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
   try {
     const resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'eliminarVersionPresupuestoTicket', ticketId: ticketId, version: nroVersion }) });
     const r = await resp.json();
-    if (!r.ok) { alert('No se pudo borrar la versión: ' + (r.error || r.message || 'error desconocido')); return; }
+    if (!r.ok) { alert('No se pudo borrar la versión: ' + (r.error || r.message || 'error desconocido')); if (btn) btn.disabled = false; return; }
     var t = _tickets.find(function(x){ return x.id_ticket === ticketId; });
     if (t) t.presupuestos = r.presupuestos;
-    _renderDetalle(t);
+    _renderDetalle(t); // re-renderiza; el botón viejo se destruye con el resto de la lista
   } catch(e) {
     alert('Error de conexión al borrar la versión.');
+    if (btn) btn.disabled = false;
   }
 };
 
@@ -4105,6 +4240,70 @@ window._guardarNota = function(id) {
   .finally(function(){ if(input) input.disabled = false; });
 };
 
+// ── EDITAR / BORRAR NOTAS ──────────────────────────────────────────
+// Pedido por Cristian: "en serv tecnico permitir borrar o editar
+// notas" — hasta ahora una nota, una vez guardada, quedaba fija para
+// siempre (mismo criterio que tenían los gastos ANTES del Paso 1 de
+// Cuenta Corriente). Mismo patrón que ya usa _guardarGastos: se
+// reescribe el array completo (_guardarNotas → st_actualizarNotas),
+// en vez de una acción por-índice en el backend — más simple y
+// consistente con lo que ya existe para gastos.
+function _guardarNotas(id, notas) {
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_actualizarNotas', id_ticket:id, notas:notas }) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){ if(!r.ok) console.warn('Error guardando notas:', r.error); })
+  .catch(function(e){ console.warn(e); });
+}
+
+// Reemplaza el texto de la nota (modo lectura) por un textarea editable
+// in-place, con Guardar/Cancelar — mismo criterio visual que el resto
+// del detalle (nada de prompt() del navegador).
+window._editarNotaClick = function(idTicket, idx) {
+  var t = _tickets.find(function(x){ return x.id_ticket === idTicket; });
+  if (!t || !Array.isArray(t.notas_comentarios)) return;
+  var n = t.notas_comentarios[idx];
+  if (!n) return;
+  var elTexto = document.getElementById('nota-texto-' + idTicket + '-' + idx);
+  if (!elTexto) return;
+  elTexto.innerHTML =
+    '<textarea class="nota-edit-textarea" id="nota-edit-input-' + idTicket + '-' + idx + '">' + _esc(n.texto) + '</textarea>' +
+    '<div class="nota-edit-acciones">' +
+      '<button type="button" class="nota-edit-guardar" onclick="_guardarNotaEditada(\'' + idTicket + '\',' + idx + ',this)">Guardar</button>' +
+      '<button type="button" class="nota-edit-cancelar" onclick="_renderDetalle(_ticketActual)">Cancelar</button>' +
+    '</div>';
+  var ta = document.getElementById('nota-edit-input-' + idTicket + '-' + idx);
+  if (ta) { ta.focus(); ta.selectionStart = ta.value.length; }
+};
+
+window._guardarNotaEditada = function(idTicket, idx, btn) {
+  var t = _tickets.find(function(x){ return x.id_ticket === idTicket; });
+  if (!t || !Array.isArray(t.notas_comentarios)) return;
+  var n = t.notas_comentarios[idx];
+  if (!n) return;
+  var ta = document.getElementById('nota-edit-input-' + idTicket + '-' + idx);
+  var textoNuevo = (ta ? ta.value : '').trim();
+  if (!textoNuevo) { alert('La nota no puede quedar vacía — si querés eliminarla, usá ✕ Borrar.'); return; }
+  if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Guardando...'; }
+  n.texto = textoNuevo;
+  n.editado = true;
+  if (_ticketActual && _ticketActual.id_ticket === idTicket) _ticketActual = t;
+  _guardarNotas(idTicket, t.notas_comentarios);
+  _renderDetalle(t); // re-renderiza toda la sección; el botón viejo se destruye con ella
+};
+
+window._borrarNota = function(idTicket, idx, btn) {
+  var t = _tickets.find(function(x){ return x.id_ticket === idTicket; });
+  if (!t || !Array.isArray(t.notas_comentarios)) return;
+  if (!t.notas_comentarios[idx]) return;
+  if (!confirm('¿Borrar esta nota? No se puede deshacer.')) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
+  t.notas_comentarios.splice(idx, 1);
+  if (_ticketActual && _ticketActual.id_ticket === idTicket) _ticketActual = t;
+  _guardarNotas(idTicket, t.notas_comentarios);
+  _renderDetalle(t);
+};
+
 window._confirmarEliminar = function(id) {
   if (!confirm('¿Eliminar este ticket permanentemente? Esta acción no se puede deshacer.')) return;
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
@@ -4429,7 +4628,7 @@ function _renderFotosTicket(t, puedeEditar, campo) {
       (protegida
         ? '<span title="Foto del ingreso — no se puede borrar" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#64748b;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;">🔒</span>'
         : (puedeEditar
-            ? '<button type="button" onclick="_eliminarFotoTicket(\'' + t.id_ticket + '\',' + i + ',\'' + campo + '\')" ' +
+            ? '<button type="button" onclick="_eliminarFotoTicket(\'' + t.id_ticket + '\',' + i + ',\'' + campo + '\',this)" ' +
                 'style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:12px;cursor:pointer;line-height:1;">✕</button>'
             : '')) +
     '</div>';
@@ -4478,7 +4677,7 @@ window._onDetFotoSeleccionada = function(event) {
   });
 };
 
-window._eliminarFotoTicket = function(idTicket, idx, campo) {
+window._eliminarFotoTicket = function(idTicket, idx, campo, btn) {
   campo = campo || 'fotos';
   var bloqueadas = (campo === 'fotos' && _ticketActual && _ticketActual.id_ticket === idTicket) ? (_ticketActual.fotos_bloqueadas || 0) : 0;
   if (idx < bloqueadas) {
@@ -4486,6 +4685,7 @@ window._eliminarFotoTicket = function(idTicket, idx, campo) {
     return;
   }
   if (!confirm('¿Eliminar esta foto?')) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_eliminarFoto', id_ticket:idTicket, indice:idx, campo:campo }) })
   .then(function(r){ return r.json(); })
@@ -4496,13 +4696,14 @@ window._eliminarFotoTicket = function(idTicket, idx, campo) {
       if (t2) t2[campo] = fotosNuevas;
       if (_ticketActual && _ticketActual.id_ticket === idTicket) {
         _ticketActual[campo] = fotosNuevas;
-        _renderDetalle(_ticketActual);
+        _renderDetalle(_ticketActual); // re-renderiza toda la sección; el botón viejo se destruye con ella
       }
     } else {
       _stMostrarError('Error al eliminar foto: ' + (r.error||'desconocido'));
+      if (btn) btn.disabled = false;
     }
   })
-  .catch(function(){ _stMostrarError('Error de conexión'); });
+  .catch(function(){ _stMostrarError('Error de conexión'); if (btn) btn.disabled = false; });
 };
 
 window._verFotoGrande = function(campo, idx) {
@@ -4865,6 +5066,14 @@ async function _iaEnviarPregunta() {
   const pregunta = (elInput.value || '').trim();
   if (!pregunta) return;
 
+  // Esta respuesta puede tardar 10-20s — sin este guard, tocar el botón
+  // (o Enter) varias veces mientras espera mandaba la misma pregunta
+  // repetida. Se reactiva siempre en el finally.
+  const elBtnEnviar = document.getElementById('ia-btn-enviar');
+  if (elBtnEnviar && elBtnEnviar.disabled) return;
+  if (elBtnEnviar) elBtnEnviar.disabled = true;
+  if (elInput) elInput.disabled = true;
+
   const elHint = document.getElementById('ia-hint');
   const elHist = document.getElementById('ia-historial');
   if (elHint) elHint.style.display = 'none';
@@ -4926,6 +5135,9 @@ async function _iaEnviarPregunta() {
     elResp.classList.remove('ia-pensando');
     console.error('Asistente IA — error en _iaEnviarPregunta:', e);
     elResp.textContent = '⚠️ Error: ' + (e && e.message ? e.message : String(e));
+  } finally {
+    if (elBtnEnviar) elBtnEnviar.disabled = false;
+    if (elInput) elInput.disabled = false;
   }
 }
 
