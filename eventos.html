@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.09.05.1 (Responder a un mensaje puntual — mismo feature que servicio.html v2026.09.05.1 / cotizaciones.html v2026.09.05.1. Cristian: "es espectacular, podemos hacerlo en cotizaciones, eventos tambien?". Cada mensaje ahora tiene un botón ↩ — al tocarlo aparece un banner "Respondiendo a {autor}: {recorte}" arriba del campo, con ✕ para cancelar. Al enviar, el autor original se agrega como una @mención más (salvo que te respondas a vos mismo), reusando el mecanismo de notificación que ya existía. Se encontró y corrigió una regresión propia en el camino: al agregar la limpieza instantánea del campo de texto (para que el "Respondiendo a..." se sienta igual de responsivo que en los otros 2 módulos), un error de red hubiera perdido el mensaje tipeado — antes no pasaba porque este módulo nunca limpiaba el campo hasta que el envío confirmaba OK. Ahora, si falla, se restaura tanto el texto como el estado de "respondiendo a" completo. Backend: ev_agregarMensaje (FotoMap.gs) ahora acepta y guarda respuesta_a. Confirmado con 4 tests: el envío arma el payload correcto, auto-menciona y limpia el input al instante; si falla, restaura texto Y el estado de respuesta (la regresión detectada); el render muestra el botón responder y la cita clickeable; y el backend guarda respuesta_a.) -->
 <!-- Portal TLC | eventos.html | v2026.09.04.2 (Sin cambios de código — trazabilidad: avatar.js v4 corrigió cómo se posiciona en los módulos CON header propio (se cuelga adentro del header en vez de flotar fijo). Este módulo no tiene header propio, así que sigue igual que en v2026.09.04.1 — flotante abajo-derecha, sin nada ahí con qué solaparse. Solo se actualizó ?v=4 en el <script src="avatar.js"> para bajar la versión nueva.) -->
 <!-- Portal TLC | eventos.html | v2026.09.04.1 (Sin cambios de código en este archivo — mencionado igual por trazabilidad: avatar.js (el script que ya se sumó en v2026.08.30.8) se reescribió completo como parte de la unificación de avatares pedida por Cristian ("quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos"). Este módulo hereda automáticamente: menú enriquecido (antes solo tenía nombre/email/rol/cerrar sesión — ahora también tema, Saludo WhatsApp, y Push/Instalar si el módulo los tuviera, que no es el caso acá) y nueva posición fija arriba a la derecha (antes flotaba abajo a la derecha). Confirmado con integración real: avatar.js corriendo dentro de este HTML completo — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
 <!-- Portal TLC | eventos.html | v2026.08.30.9 (El campo de Importe en Gastos ahora se muestra con formato es-AR (miles con punto, decimales con coma), mismo cambio exacto que servicio.html v2026.08.30.4. Confirmado con los mismos 2 tests.) -->
@@ -1697,6 +1698,7 @@ function _renderOverlayTarjeta() {
       '<div class="ev-msg-titulo">💬 Mensajes internos</div>' +
       '<div class="ev-msg-lista-box" id="ev-msg-lista">' + _construirHtmlListaMensajesEv(t) + '</div>' +
       '<div style="margin-top:10px;">' +
+        '<div id="respuesta-preview-wrap-ev"></div>' +
         '<textarea id="ev-msg-nuevo" class="ev-msg-textarea" placeholder="Escribí un mensaje... usá @ para mencionar a alguien del equipo" ' +
           'oninput="_onMsgInputEv(event)" onkeydown="_onMsgKeydownEv(event)" ' +
           'onclick="_mencionUltimoCursorEv=this.selectionStart;" onkeyup="_mencionUltimoCursorEv=this.selectionStart;" ontouchend="_mencionUltimoCursorEv=this.selectionStart;"></textarea>' +
@@ -2326,21 +2328,83 @@ window._mostrarQuienReaccionoEv = function(ev, emoji, nombresStr) {
   }); }, 50);
 };
 
+// ── RESPONDER A UN MENSAJE PUNTUAL (mismo mecanismo que servicio.html/cotizaciones.html) ──
+var _respondiendoAMensajeEv = null; // { indice, autor_nombre, autor_email, texto_snippet } o null
+
+window._responderMensajeClickEv = function(indice) {
+  var t = _tarjetaActual();
+  var m = t && Array.isArray(t.mensajes) ? t.mensajes[indice] : null;
+  if (!m) return;
+  _respondiendoAMensajeEv = {
+    indice: indice,
+    autor_nombre: m.autor_nombre || m.autor_email || '—',
+    autor_email: m.autor_email || '',
+    texto_snippet: (m.texto || '').slice(0, 120),
+  };
+  _renderRespuestaPreviewEv();
+  var ta = document.getElementById('ev-msg-nuevo');
+  if (ta) ta.focus();
+};
+
+window._cancelarRespuestaEv = function() {
+  _respondiendoAMensajeEv = null;
+  _renderRespuestaPreviewEv();
+};
+
+function _renderRespuestaPreviewEv() {
+  var wrap = document.getElementById('respuesta-preview-wrap-ev');
+  if (!wrap) return;
+  if (!_respondiendoAMensajeEv) { wrap.innerHTML = ''; return; }
+  var r = _respondiendoAMensajeEv;
+  wrap.innerHTML =
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;background:var(--panel-dark);' +
+      'border-left:3px solid #3a86ff;border-radius:6px;padding:6px 8px;margin-bottom:6px;">' +
+      '<div style="min-width:0;">' +
+        '<div style="font-size:10px;font-weight:700;color:#3a86ff;">↩ Respondiendo a ' + _esc(r.autor_nombre) + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(r.texto_snippet) + '</div>' +
+      '</div>' +
+      '<button type="button" onclick="_cancelarRespuestaEv()" title="Cancelar respuesta" ' +
+        'style="background:none;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>' +
+    '</div>';
+}
+
+window._irAMensajeOriginalEv = function(indice) {
+  var el = document.querySelectorAll('#ev-msg-lista .msg-fila')[indice];
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.style.transition = 'background-color .3s';
+  var fondoOriginal = el.style.backgroundColor;
+  el.style.backgroundColor = 'rgba(58,134,255,.18)';
+  setTimeout(function() { el.style.backgroundColor = fondoOriginal; }, 1200);
+};
+
 function _construirHtmlListaMensajesEv(t) {
   var mensajes = Array.isArray(t.mensajes) ? t.mensajes : [];
   if (!mensajes.length) return '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:16px 0;">Todavía no hay mensajes en esta tarjeta.</div>';
   return mensajes.map(function(m, i) {
     var fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    var citaHtml = '';
+    if (m.respuesta_a && typeof m.respuesta_a.indice === 'number') {
+      citaHtml = '<div onclick="_irAMensajeOriginalEv(' + m.respuesta_a.indice + ')" ' +
+        'style="cursor:pointer;font-size:10px;color:var(--text-muted);border-left:2px solid var(--border-glow);padding:2px 6px;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+        '↩ ' + _esc(m.respuesta_a.autor_nombre || '') + ': ' + _esc(m.respuesta_a.texto_snippet || '') +
+      '</div>';
+    }
     return '<div class="msg-fila" tabindex="0">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
         '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
         '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + '</span>' +
       '</div>' +
+      citaHtml +
       '<div class="msg-texto">' + _esc(m.texto || '') + '</div>' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
         _resumenReaccionesEv(m.reacciones) +
-        '<div class="reaccion-trigger-wrap">' +
-          '<button class="reaccion-trigger-btn" onclick="_abrirReaccionPicker(event,this,\'msg\',' + i + ')" title="Reaccionar">🙂</button>' +
+        '<div style="display:flex;align-items:center;gap:4px;">' +
+          '<button type="button" onclick="_responderMensajeClickEv(' + i + ')" title="Responder" ' +
+            'style="background:transparent;border:none;cursor:pointer;font-size:11px;padding:2px 5px;border-radius:5px;color:var(--text-muted);">↩</button>' +
+          '<div class="reaccion-trigger-wrap">' +
+            '<button class="reaccion-trigger-btn" onclick="_abrirReaccionPicker(event,this,\'msg\',' + i + ')" title="Reaccionar">🙂</button>' +
+          '</div>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -2373,14 +2437,47 @@ function _enviarMensajeEv() {
   if (!texto) return;
   var menciones = _extraerMencionesDeTexto(texto);
   var t = _tarjetaActual();
+
+  // Responder a un mensaje puntual — mismo mecanismo que servicio.html/
+  // cotizaciones.html: el autor original se agrega como una @mención
+  // más, reusando el aviso que ya existe. Pedido por Cristian:
+  // "podemos hacerlo en cotizaciones, eventos tambien?"
+  var respuestaAEnviar = null;
+  var respondiendoOriginalEv = _respondiendoAMensajeEv; // completo, por si hay que restaurar en error
+  var autorEmailActual = _session.username;
+  if (_respondiendoAMensajeEv) {
+    respuestaAEnviar = { indice: _respondiendoAMensajeEv.indice, autor_nombre: _respondiendoAMensajeEv.autor_nombre, texto_snippet: _respondiendoAMensajeEv.texto_snippet };
+    if (_respondiendoAMensajeEv.autor_email && _respondiendoAMensajeEv.autor_email !== autorEmailActual && menciones.indexOf(_respondiendoAMensajeEv.autor_email) === -1) {
+      menciones.push(_respondiendoAMensajeEv.autor_email);
+    }
+  }
+
+  // Limpieza inmediata (feedback instantáneo) — se restaura el texto Y
+  // el estado de "respondiendo a" si falla, para no perder ninguno de
+  // los dos (antes de este cambio no había limpieza instantánea, así
+  // que el texto quedaba solo si fallaba; ahora que se limpia al
+  // toque, hay que devolverlo a mano en el error).
+  input.value = '';
+  _respondiendoAMensajeEv = null;
+  _renderRespuestaPreviewEv();
+
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'ev_agregarMensaje', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, texto:texto, menciones:menciones, autor_nombre:_session.name, autor_email:_session.username }) })
+    body: JSON.stringify({ accion:'ev_agregarMensaje', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, texto:texto, menciones:menciones, autor_nombre:_session.name, autor_email:_session.username, respuesta_a:respuestaAEnviar }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert(r.error||'Error'); return; }
+      if (!r.ok) {
+        alert(r.error||'Error');
+        input.value = texto;
+        if (respondiendoOriginalEv) { _respondiendoAMensajeEv = respondiendoOriginalEv; _renderRespuestaPreviewEv(); }
+        return;
+      }
       t.mensajes = r.mensajes;
       document.getElementById('ev-msg-lista').innerHTML = _construirHtmlListaMensajesEv(t);
-      input.value = '';
+    })
+    .catch(function() {
+      alert('Error de conexión al enviar mensaje');
+      input.value = texto;
+      if (respondiendoOriginalEv) { _respondiendoAMensajeEv = respondiendoOriginalEv; _renderRespuestaPreviewEv(); }
     });
 }
 

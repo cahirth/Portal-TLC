@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.09.05.1 (Responder a un mensaje puntual — mismo feature que servicio.html v2026.09.05.1. Cristian: "es espectacular, podemos hacerlo en cotizaciones, eventos tambien?". Cada mensaje ahora tiene un botón ↩ — al tocarlo aparece un banner "Respondiendo a {autor}: {recorte}" arriba del campo, con ✕ para cancelar. Al enviar, el autor original se agrega como una @mención más (salvo que te respondas a vos mismo), reusando 100% el mecanismo de notificación que ya existía para menciones. El mensaje nuevo guarda un respuesta_a liviano para mostrar la cita, clickeable (hace scroll y resalta el mensaje original). A diferencia de servicio.html, esta pantalla no tenía editar/borrar mensajes, así que el botón ↩ quedó solo, sin compartir fila con otros. Backend: cot_agregarMensaje (FotoMap.gs) ahora acepta y guarda respuesta_a. Confirmado con 3 tests: el envío arma el payload correcto y auto-menciona, el render muestra el botón responder y la cita clickeable, y el backend guarda respuesta_a.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.04.2 (Fix de posición del avatar — Cristian: "se solapa arriba a la derecha con la campana de mensajes, corré a la izq todos los iconos y deja el avatar a la derecha arriba". avatar.js v4 ahora se cuelga DENTRO de .header como último hijo (position:relative, fluye en el flex normal) en vez de position:fixed — cae después de la campanita, empujándola a la izquierda, sin taparla. ?v=4 en el <script src="avatar.js"> para forzar la descarga de la versión nueva. Confirmado con integración real: el avatar queda dentro de .header, es su último hijo, cero errores propios.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.04.1 (UNIFICACIÓN DE AVATAR — Cristian: "quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos". Se sacó el avatar propio (HTML/CSS/JS con ids -cot) y se reemplazó por <script src="avatar.js">, la misma fuente única que ahora usan los 6 módulos del Portal — index.html "ganó" como referencia: menú completo con tema, Saludo WhatsApp, Push, Instalar app y cerrar sesión. Posición: fija arriba a la derecha en los 6 módulos. Detalle importante: _aplicarTemaCot también re-pintaba el Kanban al cambiar de tema (aplicarFiltros()) — avatar.js no puede saber eso, así que ahora dispara un evento genérico 'tlc-tema-cambiado' al cambiar de tema, y _aplicarTemaCot quedó como listener de ese evento (mismo efecto de siempre, sin que avatar.js necesite conocer nada específico de este módulo). Push/Instalar en el menú nuevo siguen llamando a las funciones reales de este archivo sin tocar, vía feature-detection de avatar.js. Confirmado con integración real: avatar.js corriendo DENTRO del HTML completo (servido localmente, sesión real, sin mocks) — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.08.29.7 (Mismo BUG REAL que ficha-equipo.html v2026.08.29.4 — Cristian: "a veces no aparecen los pipelines... a veces en cotizaciones tampoco". _cargarPipelines() ya tenía un fix parcial (v2026.08.19.1: defaults fijos + caché), pero si el pedido fallaba (Apps Script "despertándose", un hipo de red), PIPELINES se quedaba vacío en silencio y nunca reintentaba, dejando solo los 2 fijos (Ver Todos/General) sin la lista real — sobre todo en la primera visita, sin caché todavía. Ahora reintenta UNA vez más, 1.5s después, antes de rendirse; también detecta {ok:false} como error real (antes lo trataba como "sin pipelines"). Confirmado con test: con el primer intento fallando a propósito, reintenta solo y termina mostrando el pipeline real, no solo los 2 fijos.) -->
@@ -1246,19 +1247,80 @@ window._mostrarQuienReaccionoCot = function(ev, emoji, nombresStr) {
     }); }, 50);
 };
 
+// ── RESPONDER A UN MENSAJE PUNTUAL (mismo mecanismo que servicio.html) ──
+var _respondiendoAMensajeCot = null; // { indice, autor_nombre, autor_email, texto_snippet } o null
+
+window._responderMensajeClickCot = function(indice) {
+  var m = _mensajesCotActual[indice];
+  if (!m) return;
+  _respondiendoAMensajeCot = {
+    indice: indice,
+    autor_nombre: m.autor_nombre || m.autor_email || '—',
+    autor_email: m.autor_email || '',
+    texto_snippet: (m.texto || '').slice(0, 120),
+  };
+  _renderRespuestaPreviewCot();
+  var ta = document.getElementById('mensaje-nuevo-txt-cot');
+  if (ta) ta.focus();
+};
+
+window._cancelarRespuestaCot = function() {
+  _respondiendoAMensajeCot = null;
+  _renderRespuestaPreviewCot();
+};
+
+function _renderRespuestaPreviewCot() {
+  var wrap = document.getElementById('respuesta-preview-wrap-cot');
+  if (!wrap) return;
+  if (!_respondiendoAMensajeCot) { wrap.innerHTML = ''; return; }
+  var r = _respondiendoAMensajeCot;
+  wrap.innerHTML =
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;background:#0f1b2e;' +
+      'border-left:3px solid #3a86ff;border-radius:6px;padding:6px 8px;margin-bottom:6px;">' +
+      '<div style="min-width:0;">' +
+        '<div style="font-size:10px;font-weight:700;color:#3a86ff;">↩ Respondiendo a ' + _escCot(r.autor_nombre) + '</div>' +
+        '<div style="font-size:11px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _escCot(r.texto_snippet) + '</div>' +
+      '</div>' +
+      '<button type="button" onclick="_cancelarRespuestaCot()" title="Cancelar respuesta" ' +
+        'style="background:none;border:none;color:#94a3b8;font-size:14px;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>' +
+    '</div>';
+}
+
+window._irAMensajeOriginalCot = function(indice) {
+  var el = document.querySelectorAll('#mensajes-lista-cot .msg-fila')[indice];
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.style.transition = 'background-color .3s';
+  var fondoOriginal = el.style.backgroundColor;
+  el.style.backgroundColor = 'rgba(58,134,255,.18)';
+  setTimeout(function() { el.style.backgroundColor = fondoOriginal; }, 1200);
+};
+
 function _construirHtmlListaMensajesCot() {
     if (!_mensajesCotActual.length) return '<div style="font-size:12px;color:#94a3b8;text-align:center;padding:16px 0;">Todavía no hay mensajes en esta cotización.</div>';
     return _mensajesCotActual.map(function(m, i) {
+        var citaHtml = '';
+        if (m.respuesta_a && typeof m.respuesta_a.indice === 'number') {
+            citaHtml = '<div onclick="_irAMensajeOriginalCot(' + m.respuesta_a.indice + ')" ' +
+                'style="cursor:pointer;font-size:10px;color:#64748b;border-left:2px solid #1e3050;padding:2px 6px;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+                '↩ ' + _escCot(m.respuesta_a.autor_nombre || '') + ': ' + _escCot(m.respuesta_a.texto_snippet || '') +
+            '</div>';
+        }
         return '<div class="msg-fila" tabindex="0" style="padding:8px 10px;border-radius:10px;background:#0f1b2e;border:1px solid #1e3050;margin-bottom:8px;">' +
             '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
                 '<span style="font-size:11px;font-weight:700;color:#f1f5f9;">' + _escCot(m.autor_nombre || m.autor_email || '—') + '</span>' +
                 '<span style="font-size:10px;color:#64748b;white-space:nowrap;">' + _tiempoRelativoCot(m.fecha) + '</span>' +
             '</div>' +
+            citaHtml +
             '<div class="msg-texto" style="color:#f1f5f9;white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTextoCot(_escCot(m.texto || '')) + '</div>' +
             '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
                 _resumenReaccionesCot(m.reacciones) +
-                '<div class="reaccion-trigger-wrap">' +
-                    '<button class="reaccion-trigger-btn" onclick="_abrirReaccionPicker(event,this,\'msg\',' + i + ')" title="Reaccionar">🙂</button>' +
+                '<div style="display:flex;align-items:center;gap:4px;">' +
+                    '<button type="button" onclick="_responderMensajeClickCot(' + i + ')" title="Responder" ' +
+                        'style="background:transparent;border:none;cursor:pointer;font-size:11px;padding:2px 5px;border-radius:5px;color:#94a3b8;">↩</button>' +
+                    '<div class="reaccion-trigger-wrap">' +
+                        '<button class="reaccion-trigger-btn" onclick="_abrirReaccionPicker(event,this,\'msg\',' + i + ')" title="Reaccionar">🙂</button>' +
+                    '</div>' +
                 '</div>' +
             '</div>' +
         '</div>';
@@ -1377,6 +1439,7 @@ async function _renderPanelMensajesCot(id) {
     }
     _idCotActual = id;
     _mensajesCotActual = [];
+    _respondiendoAMensajeCot = null; // por si venías respondiendo algo en la cotización anterior
 
     panel.innerHTML =
         '<div style="font-size:13px;font-weight:800;color:#f1f5f9;margin:0 0 8px;">💬 Mensajes internos</div>' +
@@ -1384,6 +1447,7 @@ async function _renderPanelMensajesCot(id) {
             '<div style="font-size:12px;color:#94a3b8;text-align:center;padding:16px 0;">Cargando...</div>' +
         '</div>' +
         '<div style="background:#0a1424;border:1px solid #1e3050;border-radius:12px;padding:10px;position:relative;">' +
+            '<div id="respuesta-preview-wrap-cot"></div>' +
             '<textarea id="mensaje-nuevo-txt-cot" placeholder="Escribí un mensaje… usá @ para mencionar a alguien del equipo" ' +
                 'style="width:100%;min-height:64px;padding:8px 10px;border-radius:8px;background:#0f1b2e;border:1px solid #1e3050;' +
                 'color:#f1f5f9;font-size:12px;font-family:inherit;resize:vertical;" oninput="_onMensajeInputCot(event)" onkeydown="_onMensajeKeydownCot(event)" ' +
@@ -1528,12 +1592,26 @@ window._enviarMensajeCot = function() {
     if (!texto || !idParaEnviar) return;
     _idCotActual = idParaEnviar;
 
-    var menciones = [];
-    (_internosCacheCot || []).forEach(function(p) { if (texto.indexOf('@' + p.nombre) !== -1) menciones.push(p.email); });
-
     var cuenta = _leerSesionCompartida();
     var autorNombre = cuenta ? cuenta.name : '';
     var autorEmail  = cuenta ? cuenta.username : '';
+
+    var menciones = [];
+    (_internosCacheCot || []).forEach(function(p) { if (texto.indexOf('@' + p.nombre) !== -1) menciones.push(p.email); });
+
+    // Responder a un mensaje puntual — mismo mecanismo que servicio.html:
+    // el autor original se agrega como una @mención más, reusando el
+    // aviso que ya existe, sin canal aparte. Pedido por Cristian: "es
+    // espectacular, podemos hacerlo en cotizaciones, eventos tambien?"
+    var respuestaAEnviar = null;
+    var respondiendoOriginalCot = _respondiendoAMensajeCot; // completo, por si hay que restaurar en error
+    if (_respondiendoAMensajeCot) {
+        respuestaAEnviar = { indice: _respondiendoAMensajeCot.indice, autor_nombre: _respondiendoAMensajeCot.autor_nombre, texto_snippet: _respondiendoAMensajeCot.texto_snippet };
+        if (_respondiendoAMensajeCot.autor_email && _respondiendoAMensajeCot.autor_email !== autorEmail && menciones.indexOf(_respondiendoAMensajeCot.autor_email) === -1) {
+            menciones.push(_respondiendoAMensajeCot.autor_email);
+        }
+    }
+
     var tituloEl = document.getElementById('det-titulo');
     var titulo = tituloEl ? tituloEl.textContent : '';
 
@@ -1543,12 +1621,14 @@ window._enviarMensajeCot = function() {
     var btnEnviar = document.getElementById('btn-enviar-mensaje-cot');
     if (btnEnviar) { btnEnviar.disabled = true; btnEnviar.textContent = 'Enviando...'; btnEnviar.style.opacity = '.6'; }
     ta.value = '';
+    _respondiendoAMensajeCot = null;
+    _renderRespuestaPreviewCot();
     var boxSugerencias = document.getElementById('mencion-sugerencias-cot');
     if (boxSugerencias) boxSugerencias.style.display = 'none';
 
     fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ accion:'cot_agregarMensaje', id_cotizacion:idParaEnviar, texto:texto,
-            autor_nombre:autorNombre, autor_email:autorEmail, menciones:menciones, titulo:titulo }) })
+            autor_nombre:autorNombre, autor_email:autorEmail, menciones:menciones, titulo:titulo, respuesta_a:respuestaAEnviar }) })
     .then(function(r){ return r.json(); })
     .then(function(r){
         if (r.ok) {
@@ -1559,12 +1639,14 @@ window._enviarMensajeCot = function() {
             alert('Error al enviar mensaje: ' + (r.error || 'desconocido'));
             var taRestore = document.getElementById('mensaje-nuevo-txt-cot');
             if (taRestore) taRestore.value = texto;
+            if (respondiendoOriginalCot) { _respondiendoAMensajeCot = respondiendoOriginalCot; _renderRespuestaPreviewCot(); }
         }
     })
     .catch(function(){
         alert('Error de conexión al enviar mensaje');
         var taRestore = document.getElementById('mensaje-nuevo-txt-cot');
         if (taRestore) taRestore.value = texto;
+        if (respondiendoOriginalCot) { _respondiendoAMensajeCot = respondiendoOriginalCot; _renderRespuestaPreviewCot(); }
     })
     .finally(function() {
         _enviandoMensajeCot = false;
