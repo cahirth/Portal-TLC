@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.09.04.6 (BUG DE FONDO encontrado por Cristian probando el candado de la vez pasada — confirmó una "Compensación con saldo a favor" de $238.598 y preguntó: "explicame como pude pagarlo sin plata?". La respuesta real: esa comparación (seleccionado vs. saldo PENDIENTE de reintegro) es circular — "saldo pendiente" es plata que la empresa LE DEBE al colaborador, no plata disponible para compensar contra algo. Confirmado con Cristian: "no, no existe" ningún concepto real de deuda del colaborador hacia la empresa contra el cual cruzar. Se sacó la opción "Compensación con saldo a favor" del todo (select, CSS box, toda la lógica en updatePaymentMethodUI y en el handler de confirm) — solo quedan Transferencia y Efectivo, los dos medios que sí representan un pago real. Además, agregado un botón "↺ Deshacer liquidación" en el modal de detalle (solo visible para Internos) para poder revertir la liquidación de $238.598 que ya se había confirmado por error — llama a la acción nueva revertirLiquidacion en FotoMap.gs, que devuelve el/los gasto(s) a PENDIENTE (sacándoles liquidacion_id), devuelve el saldo inicial histórico si correspondía, y borra el registro de la liquidación. Confirmado con 2 tests: manda el payload correcto y cierra/recarga bien, y cancelar el confirm() del navegador no llega a tocar el backend.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.04.5 (3 pedidos de Cristian: (1) "hacer todos los botones seguros a 1 click, deshabilitandolos al presionar e indicando la accion que estan haciendo" — auditados los 12 botones del archivo: los 3 que mutan datos (addExpense, guardarEdicionItem, confirmar liquidación) YA tenían el patrón de deshabilitar-al-click con texto descriptivo ("Guardando...") de trabajo anterior en esta misma sesión, confirmados con re-habilitación correcta en error vía finally. Los demás (volver, tema, abrir/cerrar modales, editar/cancelar edición, expandir grupo) son navegación/toggle sin mutación — se dejaron sin tocar a propósito, deshabilitarlos no prevendría ninguna acción duplicada real. De paso, corregido un detalle menor: si fallaba una Compensación, el botón volvía a decir "Confirmar liquidación" en vez de "Confirmar compensación" — ahora respeta el modo actual. (2) "no permitir hacer el pago con plata propia a favor si no tiene saldo suficiente, directamente deshabilitar el boton CONFIRMAR LIQUIDACION" — updatePaymentMethodUI() antes calculaba el restante con Math.max(0, pendiente-seleccionado), que ocultaba el problema mostrando "$0" en vez de impedir la acción (el campo "Importe a liquidar del saldo inicial" es texto libre, no respeta el atributo HTML max). Ahora, en el método "Compensación con saldo a favor", si lo seleccionado supera el saldo pendiente real (ARS o USD), el botón Confirmar se deshabilita solo y aparece un aviso en rojo — más una validación de respaldo en el propio handler del botón, por si se re-habilita solo visualmente desde otro lado. (3) "siempre mantener cerrados los grupos de gastos... quiero me muestres a todos los gastos No desplegados a menos que yo lo despliegue" — se sacó el idx===0?"open":"" que abría automáticamente el primer grupo (que en la práctica siempre terminaba siendo el de Cristian). Ahora los 3 arrancan cerrados, toggleGroup() ya andaba bien para abrir/cerrar a mano sin cambios. Confirmado con 3 tests: compensación con saldo insuficiente deshabilita el botón y muestra el aviso, con saldo suficiente lo deja habilitado, y Transferencia/Efectivo nunca se ven afectados por este candado (es específico de Compensación).) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.04.4 (Performance — Cristian: "podemos hacer que gastos pendientes no tarde tanto en cargar en el modulo cuenta corriente? se toma su tiempo y es molesto". Causa real: cargarTodo() pedia 5 llamadas de red totalmente INDEPENDIENTES entre si (Servicio Tecnico, Eventos, Generales, Saldo inicial, Liquidaciones) con await secuencial, una atras de la otra — sumaban sus tiempos en vez de superponerse. Lo mismo pasaba en _initCC() con otras 3 (permiso Internos, TC oficial, lista de usuarios). Ahora las 5 y las 3 respectivamente salen juntas con Promise.all — mismo resultado final, mismo aislamiento de errores (si una falla, las demas igual completan bien, ya estaba asi antes y se preservo), pero mucho mas rapido en total: en un test con 5 llamadas de 50ms cada una, el tiempo total bajo de ~250ms (secuencial) a ~52ms (paralelo). No se tocaron los datos que trae cada llamada ni el backend — es puro reordenamiento de cuando se piden, no que se pida menos. Confirmado con 3 tests: las 5 llamadas de cargarTodo corren en paralelo con el resultado final correcto, el aislamiento de errores se preserva (si Servicio Tecnico falla, Eventos/Generales/Saldo/Liquidaciones se cargan igual), y las 3 llamadas de _initCC tambien corren en paralelo.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.04.3 (2 pedidos de Cristian: (1) "en el modulo cuenta-corriente los usuarios colo quiero visibles los internos" / "ademas que los asignados a los gastos sean solo los internos" — _cargarUsuarios() traia TODOS los que tuvieran fila en /permisos (vendedores externos incluidos, ver captura con Agustin Seery/Alex Velez/etc. mezclados). Ahora usa la accion listarInternos (ya existente en FotoMap.gs, filtra por la columna "Internos" de la hoja Vendedores) — afecta tanto el selector "Colaborador" de arriba como el de "asignar a otro beneficiario" al cargar un gasto, ya que ambos salen del mismo array USERS. (2) "los gastos quiero que sean modificables desde este modulo e impacten en la tarjeta de origen" — cada gasto PENDIENTE ahora tiene un boton "Editar" (los PAGADOS no, ya se liquidaron) que abre una fila inline con fecha/concepto/moneda/monto + Guardar/Cancelar. Al guardar: si es de Servicio Tecnico o Eventos, modifica el gasto DENTRO del array completo de la tarjeta de origen (_origenGastosCompletos, mismo mecanismo que ya usa "+Cargar gasto") y llama st_actualizarGastos/ev_actualizarGastos — el cambio se ve reflejado en servicio.html/eventos.html porque es literalmente el mismo array. Si es un gasto General, llama editarGastoGeneral (ya existia en el backend, no hizo falta tocar FotoMap.gs para nada de esto). _parseItemId (ya existia) resuelve el origen a partir del id compuesto de cada item. Confirmado con 6 tests: _cargarUsuarios llama a listarInternos y filtra correctamente (y no rompe si el backend falla), edicion de gasto de Servicio actualiza solo el indice correcto sin pisar los demas y convierte a USD, edicion de Evento manda id_evento+id_tarjeta correctos, edicion de General manda editarGastoGeneral con el id correcto, y el renderizado de la fila (normal/PAGADO sin boton editar/modo edicion) es correcto.) -->
@@ -65,8 +66,8 @@
 <section class="section"><div class="sec-head"><div><div class="eyebrow">MOVIMIENTOS</div><h2>Gastos pendientes</h2></div><div id="count" class="note"></div></div><div id="groups" class="groups"></div></section>
 <section class="section"><div class="sec-head"><div><div class="eyebrow">HISTORIAL</div><h2>Comprobantes y liquidaciones</h2></div></div><div id="history" class="history"></div></section>
 </main><footer style="text-align:center;padding:8px 12px 22px;color:var(--muted);font-size:10px;line-height:1.5"><strong style="color:var(--text)">Tecnología Láser Corneal S.R.L.</strong><br>Cuenta Corriente y Rendición de Gastos · Maqueta interactiva</footer>
-<div id="modalWrap" class="modal-wrap" hidden><div class="modal"><div class="modal-head"><div><div class="eyebrow">RENDICIÓN</div><h2 style="margin:3px 0 0">Registrar liquidación</h2></div><button class="close" id="close">×</button></div><div class="modal-body"><div class="pay-summary"><div><span>ARS</span><strong id="mArs"></strong></div><div><span>USD</span><strong id="mUsd"></strong></div></div><div id="modalItems" class="items"></div><div class="form"><label class="field">Fecha de pago<input type="date" id="payDate"></label><label class="field">Medio de pago<select id="payMethod"><option value="Transferencia">Transferencia</option><option value="Efectivo">Efectivo</option><option value="Compensación con saldo a favor">Compensación con saldo a favor</option></select></label><div id="compBox" class="comp-box field full"><div class="comp-title">↔ Compensación interna</div><div class="comp-grid"><div class="comp-card"><span>Cuenta ARS</span><div class="comp-line"><span>Saldo actual</span><strong id="compArsActual">$ 0</strong></div><div class="comp-line"><span>A compensar</span><strong id="compArsPago">$ 0</strong></div><div class="comp-line restante"><span>Saldo restante</span><strong id="compArsRestante">$ 0</strong></div></div><div class="comp-card"><span>Cuenta USD</span><div class="comp-line"><span>Saldo actual</span><strong id="compUsdActual">U$S 0</strong></div><div class="comp-line"><span>A compensar</span><strong id="compUsdPago">U$S 0</strong></div><div class="comp-line restante"><span>Saldo restante</span><strong id="compUsdRestante">U$S 0</strong></div></div></div><div class="comp-note">No genera movimiento bancario. ARS compensa únicamente ARS y USD únicamente USD.</div><div class="comp-note" id="compSinSaldo" style="display:none;color:#ef4444;font-weight:700;">⚠ No hay saldo suficiente para compensar este importe — revisá lo seleccionado.</div></div><label class="field full" id="payRefField">N° de comprobante / referencia bancaria<input id="payRef" placeholder="Ej. TRANSF-845920"></label><label class="field full" id="payFileField">Recibo / comprobante de pago<input id="payFile" type="file" accept="image/*,.pdf"><small id="fileName">Sin archivo seleccionado</small></label></div></div><div class="modal-foot"><button class="btn" id="cancel">Cancelar</button><button class="btn btn-primary" id="confirm">Confirmar liquidación</button></div></div></div>
-<div id="detailWrap" class="modal-wrap" hidden><div class="modal"><div class="modal-head"><div><div class="eyebrow">COMPROBANTE / LIQUIDACIÓN</div><h2 style="margin:3px 0 0" id="detailTitle">Detalle de pago</h2></div><button class="close" id="detailClose">×</button></div><div class="modal-body" id="detailBody"></div><div class="modal-foot"><button class="btn" id="detailOk">Cerrar</button></div></div></div>
+<div id="modalWrap" class="modal-wrap" hidden><div class="modal"><div class="modal-head"><div><div class="eyebrow">RENDICIÓN</div><h2 style="margin:3px 0 0">Registrar liquidación</h2></div><button class="close" id="close">×</button></div><div class="modal-body"><div class="pay-summary"><div><span>ARS</span><strong id="mArs"></strong></div><div><span>USD</span><strong id="mUsd"></strong></div></div><div id="modalItems" class="items"></div><div class="form"><label class="field">Fecha de pago<input type="date" id="payDate"></label><label class="field">Medio de pago<select id="payMethod"><option value="Transferencia">Transferencia</option><option value="Efectivo">Efectivo</option></select></label><label class="field full" id="payRefField">N° de comprobante / referencia bancaria<input id="payRef" placeholder="Ej. TRANSF-845920"></label><label class="field full" id="payFileField">Recibo / comprobante de pago<input id="payFile" type="file" accept="image/*,.pdf"><small id="fileName">Sin archivo seleccionado</small></label></div></div><div class="modal-foot"><button class="btn" id="cancel">Cancelar</button><button class="btn btn-primary" id="confirm">Confirmar liquidación</button></div></div></div>
+<div id="detailWrap" class="modal-wrap" hidden><div class="modal"><div class="modal-head"><div><div class="eyebrow">COMPROBANTE / LIQUIDACIÓN</div><h2 style="margin:3px 0 0" id="detailTitle">Detalle de pago</h2></div><button class="close" id="detailClose">×</button></div><div class="modal-body" id="detailBody"></div><div class="modal-foot"><button class="btn" id="detailUndo" style="color:#ef4444;border-color:#ef4444;display:none" title="Vuelve estos gastos a PENDIENTE y borra este registro">↺ Deshacer liquidación</button><button class="btn" id="detailOk">Cerrar</button></div></div></div>
 <div id="toast" class="toast"></div>
 <script>
 // ══════════════════════════════════════════════════════════════════
@@ -271,41 +272,61 @@ $("saldoCheck").addEventListener("change",e=>{selInitial=e.target.checked;$("par
 ["partArs","partUsd"].forEach(id=>$(id).addEventListener("input",renderSummary));
 
 function renderHistory(){if(!state.liquidaciones.length){$("history").innerHTML=`<div class="card history-item" style="cursor:default"><div><strong>Todavía no hay liquidaciones registradas.</strong><br><small>Los pagos confirmados aparecerán acá.</small></div></div>`;return}$("history").innerHTML=state.liquidaciones.map(p=>{let a=(p.monto_ars?money(p.monto_ars,"ARS"):"")+(p.monto_usd?(p.monto_ars?" · ":"")+money(p.monto_usd,"USD"):"");return`<div class="card history-item" onclick="openPaymentDetail('${p.id}')"><div><strong>${esc(p.medio)} · ${esc(p.beneficiario_nombre)}</strong><br><small>${fmt(p.fecha)}${p.referencia?" · Ref. "+esc(p.referencia):""}</small><div class="history-open">Ver detalle →</div></div><strong>${a}</strong><span class="badge paid">PAGADO</span></div>`}).join("")}
-function openPaymentDetail(id){let p=state.liquidaciones.find(x=>x.id===id);if(!p)return;let total=(p.monto_ars?money(p.monto_ars,"ARS"):"")+(p.monto_usd?(p.monto_ars?" · ":"")+money(p.monto_usd,"USD"):"");let items=(p.detalle_items||[]).map(i=>`<div class="detail-item"><div><strong>${esc(i.concepto)}</strong><small>${i.origen_label?esc(i.origen_label)+" · ":""}${fmt(i.fecha)}${i.cargado_por?" · Cargado por: "+esc(i.cargado_por):""}</small></div><strong>${money(i.monto,i.moneda)}</strong></div>`).join("");if(p.saldo_inicial_detalle){let si=p.saldo_inicial_detalle;if(si.ars)items+=`<div class="detail-item"><div><strong>Saldo inicial histórico</strong><small>Compensación / liquidación parcial</small></div><strong>${money(si.ars,"ARS")}</strong></div>`;if(si.usd)items+=`<div class="detail-item"><div><strong>Saldo inicial histórico</strong><small>Compensación / liquidación parcial</small></div><strong>${money(si.usd,"USD")}</strong></div>`}$("detailTitle").textContent=p.medio==="Compensación con saldo a favor"?"Detalle de compensación":"Detalle de liquidación";$("detailBody").innerHTML=`<div class="detail-grid"><div class="detail-box"><span>Beneficiario</span><strong>${esc(p.beneficiario_nombre)}</strong></div><div class="detail-box"><span>Fecha</span><strong>${fmt(p.fecha)}</strong></div><div class="detail-box"><span>Medio</span><strong>${esc(p.medio)}</strong></div><div class="detail-box"><span>Total</span><strong>${total||"—"}</strong></div>${p.referencia?`<div class="detail-box" style="grid-column:1/-1"><span>Referencia</span><strong>${esc(p.referencia)}</strong></div>`:""}</div><div class="eyebrow" style="margin:4px 0 7px">DETALLE PAGADO</div><div class="detail-items">${items||'<div class="detail-item"><span>Sin detalle disponible</span></div>'}</div>`;$("detailWrap").hidden=false}
+let _detailLiquidacionId = null; // liquidación actualmente mostrada en el modal de detalle — la que "Deshacer" revierte
+
+function openPaymentDetail(id){let p=state.liquidaciones.find(x=>x.id===id);if(!p)return;_detailLiquidacionId=id;let total=(p.monto_ars?money(p.monto_ars,"ARS"):"")+(p.monto_usd?(p.monto_ars?" · ":"")+money(p.monto_usd,"USD"):"");let items=(p.detalle_items||[]).map(i=>`<div class="detail-item"><div><strong>${esc(i.concepto)}</strong><small>${i.origen_label?esc(i.origen_label)+" · ":""}${fmt(i.fecha)}${i.cargado_por?" · Cargado por: "+esc(i.cargado_por):""}</small></div><strong>${money(i.monto,i.moneda)}</strong></div>`).join("");if(p.saldo_inicial_detalle){let si=p.saldo_inicial_detalle;if(si.ars)items+=`<div class="detail-item"><div><strong>Saldo inicial histórico</strong><small>Compensación / liquidación parcial</small></div><strong>${money(si.ars,"ARS")}</strong></div>`;if(si.usd)items+=`<div class="detail-item"><div><strong>Saldo inicial histórico</strong><small>Compensación / liquidación parcial</small></div><strong>${money(si.usd,"USD")}</strong></div>`}$("detailTitle").textContent=p.medio==="Compensación con saldo a favor"?"Detalle de compensación":"Detalle de liquidación";$("detailBody").innerHTML=`<div class="detail-grid"><div class="detail-box"><span>Beneficiario</span><strong>${esc(p.beneficiario_nombre)}</strong></div><div class="detail-box"><span>Fecha</span><strong>${fmt(p.fecha)}</strong></div><div class="detail-box"><span>Medio</span><strong>${esc(p.medio)}</strong></div><div class="detail-box"><span>Total</span><strong>${total||"—"}</strong></div>${p.referencia?`<div class="detail-box" style="grid-column:1/-1"><span>Referencia</span><strong>${esc(p.referencia)}</strong></div>`:""}</div><div class="eyebrow" style="margin:4px 0 7px">DETALLE PAGADO</div><div class="detail-items">${items||'<div class="detail-item"><span>Sin detalle disponible</span></div>'}</div>`;
+  // Deshacer — solo para usuarios Internos (mismo permiso que
+  // liquidar). Pedido por Cristian tras probar "Compensación con
+  // saldo a favor" sin respaldo real: "podes dejarme volver a que ese
+  // gasto que pague, vuelva a no pagado, porque es un gasto real".
+  $("detailUndo").style.display = CURRENT.permisos.Internos ? "inline-block" : "none";
+  $("detailWrap").hidden=false;
+}
+
+window.deshacerLiquidacion = async function() {
+  const id = _detailLiquidacionId;
+  if (!id) return;
+  if (!confirm('¿Deshacer esta liquidación? Los gastos incluidos vuelven a PENDIENTE y este registro se borra. No se puede deshacer esta acción.')) return;
+  const btn = $("detailUndo");
+  btn.disabled = true; btn.textContent = 'Deshaciendo...';
+  try {
+    const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+      accion:'revertirLiquidacion', id_liquidacion:id, solicitante_es_interno: CURRENT.permisos.Internos,
+    }) });
+    const rr = await r.json();
+    if (!rr.ok) { toast('Error: ' + (rr.error||'')); return; }
+    closePaymentDetail();
+    await cargarTodo();
+    toast('Liquidación deshecha — el/los gasto(s) volvieron a Pendiente');
+  } catch(e) {
+    toast('Error de conexión al deshacer la liquidación');
+  } finally {
+    btn.disabled = false; btn.textContent = '↺ Deshacer liquidación';
+  }
+};
 function closePaymentDetail(){$("detailWrap").hidden=true}
 window.openPaymentDetail=openPaymentDetail;
 
 function updatePaymentMethodUI(){
-  let comp=$("payMethod").value==="Compensación con saldo a favor",pend=totals(),sel=selTotals();
-  $("compBox").classList.toggle("show",comp);
-  $("payRefField").classList.toggle("hidden",comp);
-  $("payFileField").classList.toggle("hidden",true);
-  $("confirm").textContent=comp?"Confirmar compensación":"Confirmar liquidación";
-  // Pedido por Cristian: "no permitir hacer el pago con plata propia a
-  // favor si no tiene saldo suficiente, directamente deshabilitar el
-  // boton CONFIRMAR LIQUIDACION" — antes esto se calculaba con
-  // Math.max(0, pend-sel), que silenciosamente ocultaba el problema
-  // (mostraba "$0" de restante) en vez de impedir la acción. El campo
-  // "Importe a liquidar del saldo inicial" es un input de texto libre
-  // (no se puede confiar en el atributo HTML max solo) — un valor
-  // tipeado de más ahí es la forma más común de terminar acá.
-  let sinSaldoSuficiente = comp && (sel.ars > pend.ars || sel.usd > pend.usd);
-  $("compSinSaldo").style.display = sinSaldoSuficiente ? "block" : "none";
-  $("confirm").disabled = sinSaldoSuficiente;
-  if(comp){
-    $("compArsActual").textContent=money(pend.ars,"ARS");
-    $("compArsPago").textContent=money(sel.ars,"ARS");
-    $("compArsRestante").textContent=money(Math.max(0,pend.ars-sel.ars),"ARS");
-    $("compUsdActual").textContent=money(pend.usd,"USD");
-    $("compUsdPago").textContent=money(sel.usd,"USD");
-    $("compUsdRestante").textContent=money(Math.max(0,pend.usd-sel.usd),"USD");
-    $("payRef").value="";
-  }
+  // "Compensación con saldo a favor" se sacó del todo — Cristian, tras
+  // probarla: "no, no existe [un saldo real contra el cual compensar],
+  // ... quiero que si funcione bien esto" — no había ningún concepto
+  // de "plata que el colaborador le debe a la empresa" para cruzar
+  // contra el reintegro pendiente, así que la comparación que hacía
+  // esta pantalla (pendiente vs. seleccionado) no representaba una
+  // compensación real — dejaba marcar como PAGADO sin que se moviera
+  // plata de verdad. Por ahora solo quedan Transferencia y Efectivo,
+  // los dos únicos medios que sí representan un pago real.
+  $("payRefField").classList.remove("hidden");
+  $("payFileField").classList.add("hidden");
+  $("confirm").textContent = "Confirmar liquidación";
+  $("confirm").disabled = false;
+  $("payRef").value = "";
 }
 function openModal(){if(!CURRENT.permisos.Internos){toast('Solo usuarios Internos pueden liquidar gastos');return}let s=selTotals();$("mArs").textContent=money(s.ars,"ARS");$("mUsd").textContent=money(s.usd,"USD");$("payDate").value=today();$("payMethod").value="Transferencia";updatePaymentMethodUI();let rows=[];if(selInitial){let a=Number($("partArs").value||0),u=Number($("partUsd").value||0);if(a)rows.push(["Saldo inicial histórico",money(a,"ARS")]);if(u)rows.push(["Saldo inicial histórico",money(u,"USD")])}visible().forEach(g=>g.items.forEach(i=>{if(selected.has(i.id))rows.push([i.concepto,money(i.monto,i.moneda)])}));$("modalItems").innerHTML=rows.map(r=>`<div class="modal-item"><span>${esc(r[0])}</span><strong>${r[1]}</strong></div>`).join("");$("modalWrap").hidden=false}
 function closeModal(){$("modalWrap").hidden=true}
 
-$("detailClose").onclick=closePaymentDetail;$("detailOk").onclick=closePaymentDetail;$("detailWrap").onclick=e=>{if(e.target===$("detailWrap"))closePaymentDetail()};
+$("detailClose").onclick=closePaymentDetail;$("detailOk").onclick=closePaymentDetail;$("detailUndo").onclick=deshacerLiquidacion;$("detailWrap").onclick=e=>{if(e.target===$("detailWrap"))closePaymentDetail()};
 $("liquidar").onclick=openModal;$("close").onclick=closeModal;$("cancel").onclick=closeModal;$("modalWrap").onclick=e=>{if(e.target===$("modalWrap"))closeModal()};
 $("payMethod").onchange=updatePaymentMethodUI;
 
@@ -316,13 +337,6 @@ $("payMethod").onchange=updatePaymentMethodUI;
 // se arma el pedido.
 $("confirm").onclick = async function() {
   if (!$("payDate").value) { toast("Seleccioná la fecha"); return; }
-  // Defensa en profundidad — el botón ya viene deshabilitado visualmente
-  // desde updatePaymentMethodUI() cuando no alcanza el saldo, esto es
-  // solo para no confiar únicamente en el estado visual del botón.
-  if ($("payMethod").value === "Compensación con saldo a favor") {
-    const pend = totals(), sel = selTotals();
-    if (sel.ars > pend.ars || sel.usd > pend.usd) { toast("No hay saldo suficiente para compensar este importe"); return; }
-  }
   const btn = $("confirm");
   btn.disabled = true; btn.textContent = 'Guardando...';
   try {
@@ -347,15 +361,14 @@ $("confirm").onclick = async function() {
     const rr = await r.json();
     if (!rr.ok) { toast('Error: ' + (rr.error||'')); return; }
     selected.clear(); selInitial=false; $("saldoCheck").checked=false; $("partial").hidden=true; $("payRef").value="";
-    const fueCompensacion = payload.medio === "Compensación con saldo a favor";
     closeModal();
     await cargarTodo();
-    toast(fueCompensacion ? "Compensación interna registrada" : "Liquidación registrada");
+    toast("Liquidación registrada");
   } catch(e) {
     toast('Error de conexión al liquidar');
   } finally {
     btn.disabled = false;
-    btn.textContent = $("payMethod").value === "Compensación con saldo a favor" ? "Confirmar compensación" : "Confirmar liquidación";
+    btn.textContent = "Confirmar liquidación";
   }
 };
 
