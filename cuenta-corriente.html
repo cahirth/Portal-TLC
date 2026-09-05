@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.09.04.7 (2 cosas — Cristian con captura: "no aparece COAS que estaba liquidada y la tengo que enviar a no liquidada": el "Deshacer" de la vez pasada borraba el registro de la liquidación IGUAL aunque no encontrara el gasto real (bug real en FotoMap.gs, corregido — ver changelog ahí). Y: "Deshacer liquidación y liquidar gastos solamente tiene que estar permitido para administradores. No, otro no puede, debería estar deshabilitado" — antes ambas acciones (botón "Liquidar Selección" y botón "Deshacer liquidación") se gateaban con el permiso "Internos" (que habilita VARIAS cosas — ver cuenta corriente ajena, asignar gastos a otro beneficiario). Ahora se agregó CURRENT.esAdmin (de account.rol === "Administrador", leído de la sesión) como chequeo SEPARADO y específico para estas 2 acciones puntuales — "Internos" sigue rigiendo todo lo demás (ver/asignar) sin cambios. Gateado en 3 capas: el botón queda disabled/oculto para no-admin, el handler de click revalida antes de llamar al backend, y el backend (crearLiquidacion/revertirLiquidacion) rechaza si solicitante_es_admin !== true — igual que antes, la validación real vive en el servidor.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.04.6 (BUG DE FONDO encontrado por Cristian probando el candado de la vez pasada — confirmó una "Compensación con saldo a favor" de $238.598 y preguntó: "explicame como pude pagarlo sin plata?". La respuesta real: esa comparación (seleccionado vs. saldo PENDIENTE de reintegro) es circular — "saldo pendiente" es plata que la empresa LE DEBE al colaborador, no plata disponible para compensar contra algo. Confirmado con Cristian: "no, no existe" ningún concepto real de deuda del colaborador hacia la empresa contra el cual cruzar. Se sacó la opción "Compensación con saldo a favor" del todo (select, CSS box, toda la lógica en updatePaymentMethodUI y en el handler de confirm) — solo quedan Transferencia y Efectivo, los dos medios que sí representan un pago real. Además, agregado un botón "↺ Deshacer liquidación" en el modal de detalle (solo visible para Internos) para poder revertir la liquidación de $238.598 que ya se había confirmado por error — llama a la acción nueva revertirLiquidacion en FotoMap.gs, que devuelve el/los gasto(s) a PENDIENTE (sacándoles liquidacion_id), devuelve el saldo inicial histórico si correspondía, y borra el registro de la liquidación. Confirmado con 2 tests: manda el payload correcto y cierra/recarga bien, y cancelar el confirm() del navegador no llega a tocar el backend.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.04.5 (3 pedidos de Cristian: (1) "hacer todos los botones seguros a 1 click, deshabilitandolos al presionar e indicando la accion que estan haciendo" — auditados los 12 botones del archivo: los 3 que mutan datos (addExpense, guardarEdicionItem, confirmar liquidación) YA tenían el patrón de deshabilitar-al-click con texto descriptivo ("Guardando...") de trabajo anterior en esta misma sesión, confirmados con re-habilitación correcta en error vía finally. Los demás (volver, tema, abrir/cerrar modales, editar/cancelar edición, expandir grupo) son navegación/toggle sin mutación — se dejaron sin tocar a propósito, deshabilitarlos no prevendría ninguna acción duplicada real. De paso, corregido un detalle menor: si fallaba una Compensación, el botón volvía a decir "Confirmar liquidación" en vez de "Confirmar compensación" — ahora respeta el modo actual. (2) "no permitir hacer el pago con plata propia a favor si no tiene saldo suficiente, directamente deshabilitar el boton CONFIRMAR LIQUIDACION" — updatePaymentMethodUI() antes calculaba el restante con Math.max(0, pendiente-seleccionado), que ocultaba el problema mostrando "$0" en vez de impedir la acción (el campo "Importe a liquidar del saldo inicial" es texto libre, no respeta el atributo HTML max). Ahora, en el método "Compensación con saldo a favor", si lo seleccionado supera el saldo pendiente real (ARS o USD), el botón Confirmar se deshabilita solo y aparece un aviso en rojo — más una validación de respaldo en el propio handler del botón, por si se re-habilita solo visualmente desde otro lado. (3) "siempre mantener cerrados los grupos de gastos... quiero me muestres a todos los gastos No desplegados a menos que yo lo despliegue" — se sacó el idx===0?"open":"" que abría automáticamente el primer grupo (que en la práctica siempre terminaba siendo el de Cristian). Ahora los 3 arrancan cerrados, toggleGroup() ya andaba bien para abrir/cerrar a mano sin cambios. Confirmado con 3 tests: compensación con saldo insuficiente deshabilita el botón y muestra el aviso, con saldo suficiente lo deja habilitado, y Transferencia/Efectivo nunca se ven afectados por este candado (es específico de Compensación).) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.04.4 (Performance — Cristian: "podemos hacer que gastos pendientes no tarde tanto en cargar en el modulo cuenta corriente? se toma su tiempo y es molesto". Causa real: cargarTodo() pedia 5 llamadas de red totalmente INDEPENDIENTES entre si (Servicio Tecnico, Eventos, Generales, Saldo inicial, Liquidaciones) con await secuencial, una atras de la otra — sumaban sus tiempos en vez de superponerse. Lo mismo pasaba en _initCC() con otras 3 (permiso Internos, TC oficial, lista de usuarios). Ahora las 5 y las 3 respectivamente salen juntas con Promise.all — mismo resultado final, mismo aislamiento de errores (si una falla, las demas igual completan bien, ya estaba asi antes y se preservo), pero mucho mas rapido en total: en un test con 5 llamadas de 50ms cada una, el tiempo total bajo de ~250ms (secuencial) a ~52ms (paralelo). No se tocaron los datos que trae cada llamada ni el backend — es puro reordenamiento de cuando se piden, no que se pida menos. Confirmado con 3 tests: las 5 llamadas de cargarTodo corren en paralelo con el resultado final correcto, el aislamiento de errores se preserva (si Servicio Tecnico falla, Eventos/Generales/Saldo/Liquidaciones se cargan igual), y las 3 llamadas de _initCC tambien corren en paralelo.) -->
@@ -121,7 +122,7 @@ function visible(){return state.grupos_gastos} // ya vienen filtrados por benefi
 function totals(){let ars=0,usd=0;visible().forEach(g=>g.items.forEach(i=>{if(i.estado!=="PENDIENTE")return;i.moneda==="USD"?usd+=i.monto:ars+=i.monto}));if(state.saldo_inicial.estado==="PENDIENTE"){ars+=state.saldo_inicial.monto_ars;usd+=state.saldo_inicial.monto_usd}return{ars,usd}}
 function selTotals(){let ars=0,usd=0;visible().forEach(g=>g.items.forEach(i=>{if(!selected.has(i.id)||i.estado!=="PENDIENTE")return;i.moneda==="USD"?usd+=i.monto:ars+=i.monto}));if(selInitial){ars+=Number($("partArs").value||0);usd+=Number($("partUsd").value||0)}return{ars,usd}}
 
-function renderSummary(){let t=totals(),s=selTotals();$("saldoArs").textContent=money(t.ars,"ARS");$("saldoUsd").textContent=money(t.usd,"USD");let txt=(s.ars?money(s.ars,"ARS"):"")+(s.usd?(s.ars?" · ":"")+money(s.usd,"USD"):"");$("selTotal").textContent=txt||"$ 0";$("liquidar").disabled=!(s.ars||s.usd)||!CURRENT.permisos.Internos;$("liquidar").textContent=(s.ars||s.usd)?`Liquidar Selección (${txt})`:"Liquidar Selección ($ 0)"}
+function renderSummary(){let t=totals(),s=selTotals();$("saldoArs").textContent=money(t.ars,"ARS");$("saldoUsd").textContent=money(t.usd,"USD");let txt=(s.ars?money(s.ars,"ARS"):"")+(s.usd?(s.ars?" · ":"")+money(s.usd,"USD"):"");$("selTotal").textContent=txt||"$ 0";$("liquidar").disabled=!(s.ars||s.usd)||!CURRENT.esAdmin;$("liquidar").textContent=(s.ars||s.usd)?`Liquidar Selección (${txt})`:"Liquidar Selección ($ 0)"}
 function icon(t){return t==="SERVICE"?"🛠️":t==="EVENTO"?"🎪":"📌"}
 function sub(g){let ars=0,usd=0;g.items.forEach(i=>{if(i.estado!=="PENDIENTE")return;i.moneda==="USD"?usd+=i.monto:ars+=i.monto});return{ars,usd}}
 let _editandoItemId = null; // id del gasto que esta en modo edicion ahora mismo (o null)
@@ -279,11 +280,12 @@ function openPaymentDetail(id){let p=state.liquidaciones.find(x=>x.id===id);if(!
   // liquidar). Pedido por Cristian tras probar "Compensación con
   // saldo a favor" sin respaldo real: "podes dejarme volver a que ese
   // gasto que pague, vuelva a no pagado, porque es un gasto real".
-  $("detailUndo").style.display = CURRENT.permisos.Internos ? "inline-block" : "none";
+  $("detailUndo").style.display = CURRENT.esAdmin ? "inline-block" : "none";
   $("detailWrap").hidden=false;
 }
 
 window.deshacerLiquidacion = async function() {
+  if (!CURRENT.esAdmin) { toast("Solo Administradores pueden deshacer liquidaciones"); return; }
   const id = _detailLiquidacionId;
   if (!id) return;
   if (!confirm('¿Deshacer esta liquidación? Los gastos incluidos vuelven a PENDIENTE y este registro se borra. No se puede deshacer esta acción.')) return;
@@ -291,7 +293,7 @@ window.deshacerLiquidacion = async function() {
   btn.disabled = true; btn.textContent = 'Deshaciendo...';
   try {
     const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
-      accion:'revertirLiquidacion', id_liquidacion:id, solicitante_es_interno: CURRENT.permisos.Internos,
+      accion:'revertirLiquidacion', id_liquidacion:id, solicitante_es_admin: CURRENT.esAdmin,
     }) });
     const rr = await r.json();
     if (!rr.ok) { toast('Error: ' + (rr.error||'')); return; }
@@ -323,7 +325,7 @@ function updatePaymentMethodUI(){
   $("confirm").disabled = false;
   $("payRef").value = "";
 }
-function openModal(){if(!CURRENT.permisos.Internos){toast('Solo usuarios Internos pueden liquidar gastos');return}let s=selTotals();$("mArs").textContent=money(s.ars,"ARS");$("mUsd").textContent=money(s.usd,"USD");$("payDate").value=today();$("payMethod").value="Transferencia";updatePaymentMethodUI();let rows=[];if(selInitial){let a=Number($("partArs").value||0),u=Number($("partUsd").value||0);if(a)rows.push(["Saldo inicial histórico",money(a,"ARS")]);if(u)rows.push(["Saldo inicial histórico",money(u,"USD")])}visible().forEach(g=>g.items.forEach(i=>{if(selected.has(i.id))rows.push([i.concepto,money(i.monto,i.moneda)])}));$("modalItems").innerHTML=rows.map(r=>`<div class="modal-item"><span>${esc(r[0])}</span><strong>${r[1]}</strong></div>`).join("");$("modalWrap").hidden=false}
+function openModal(){if(!CURRENT.esAdmin){toast('Solo Administradores pueden liquidar gastos');return}let s=selTotals();$("mArs").textContent=money(s.ars,"ARS");$("mUsd").textContent=money(s.usd,"USD");$("payDate").value=today();$("payMethod").value="Transferencia";updatePaymentMethodUI();let rows=[];if(selInitial){let a=Number($("partArs").value||0),u=Number($("partUsd").value||0);if(a)rows.push(["Saldo inicial histórico",money(a,"ARS")]);if(u)rows.push(["Saldo inicial histórico",money(u,"USD")])}visible().forEach(g=>g.items.forEach(i=>{if(selected.has(i.id))rows.push([i.concepto,money(i.monto,i.moneda)])}));$("modalItems").innerHTML=rows.map(r=>`<div class="modal-item"><span>${esc(r[0])}</span><strong>${r[1]}</strong></div>`).join("");$("modalWrap").hidden=false}
 function closeModal(){$("modalWrap").hidden=true}
 
 $("detailClose").onclick=closePaymentDetail;$("detailOk").onclick=closePaymentDetail;$("detailUndo").onclick=deshacerLiquidacion;$("detailWrap").onclick=e=>{if(e.target===$("detailWrap"))closePaymentDetail()};
@@ -336,6 +338,7 @@ $("payMethod").onchange=updatePaymentMethodUI;
 // en su origen real y calcula los montos con el TC oficial — acá solo
 // se arma el pedido.
 $("confirm").onclick = async function() {
+  if (!CURRENT.esAdmin) { toast("Solo Administradores pueden liquidar gastos"); return; }
   if (!$("payDate").value) { toast("Seleccioná la fecha"); return; }
   const btn = $("confirm");
   btn.disabled = true; btn.textContent = 'Guardando...';
@@ -349,7 +352,7 @@ $("confirm").onclick = async function() {
     }));
     const payload = {
       accion: 'crearLiquidacion',
-      solicitante_es_interno: CURRENT.permisos.Internos,
+      solicitante_es_admin: CURRENT.esAdmin,
       beneficiario_email: state.usuario_seleccionado, beneficiario_nombre: userName(),
       fecha: $("payDate").value, medio: $("payMethod").value, referencia: $("payRef").value,
       items: items,
@@ -608,7 +611,7 @@ async function _initCC() {
     _cargarUsuarios(),
   ]);
 
-  CURRENT = { nombre: account.name || account.username, email: (account.username||'').toLowerCase(), permisos: { Internos: esInterno } };
+  CURRENT = { nombre: account.name || account.username, email: (account.username||'').toLowerCase(), permisos: { Internos: esInterno }, esAdmin: account.rol === 'Administrador' };
   TC_OFICIAL_CC = tcOficial;
   USERS = usuarios;
   if (!USERS.some(function(u){ return u.email === CURRENT.email; })) USERS.unshift({ email: CURRENT.email, nombre: CURRENT.nombre });
