@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.09.04.4 (Performance — Cristian: "podemos hacer que gastos pendientes no tarde tanto en cargar en el modulo cuenta corriente? se toma su tiempo y es molesto". Causa real: cargarTodo() pedia 5 llamadas de red totalmente INDEPENDIENTES entre si (Servicio Tecnico, Eventos, Generales, Saldo inicial, Liquidaciones) con await secuencial, una atras de la otra — sumaban sus tiempos en vez de superponerse. Lo mismo pasaba en _initCC() con otras 3 (permiso Internos, TC oficial, lista de usuarios). Ahora las 5 y las 3 respectivamente salen juntas con Promise.all — mismo resultado final, mismo aislamiento de errores (si una falla, las demas igual completan bien, ya estaba asi antes y se preservo), pero mucho mas rapido en total: en un test con 5 llamadas de 50ms cada una, el tiempo total bajo de ~250ms (secuencial) a ~52ms (paralelo). No se tocaron los datos que trae cada llamada ni el backend — es puro reordenamiento de cuando se piden, no que se pida menos. Confirmado con 3 tests: las 5 llamadas de cargarTodo corren en paralelo con el resultado final correcto, el aislamiento de errores se preserva (si Servicio Tecnico falla, Eventos/Generales/Saldo/Liquidaciones se cargan igual), y las 3 llamadas de _initCC tambien corren en paralelo.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.04.3 (2 pedidos de Cristian: (1) "en el modulo cuenta-corriente los usuarios colo quiero visibles los internos" / "ademas que los asignados a los gastos sean solo los internos" — _cargarUsuarios() traia TODOS los que tuvieran fila en /permisos (vendedores externos incluidos, ver captura con Agustin Seery/Alex Velez/etc. mezclados). Ahora usa la accion listarInternos (ya existente en FotoMap.gs, filtra por la columna "Internos" de la hoja Vendedores) — afecta tanto el selector "Colaborador" de arriba como el de "asignar a otro beneficiario" al cargar un gasto, ya que ambos salen del mismo array USERS. (2) "los gastos quiero que sean modificables desde este modulo e impacten en la tarjeta de origen" — cada gasto PENDIENTE ahora tiene un boton "Editar" (los PAGADOS no, ya se liquidaron) que abre una fila inline con fecha/concepto/moneda/monto + Guardar/Cancelar. Al guardar: si es de Servicio Tecnico o Eventos, modifica el gasto DENTRO del array completo de la tarjeta de origen (_origenGastosCompletos, mismo mecanismo que ya usa "+Cargar gasto") y llama st_actualizarGastos/ev_actualizarGastos — el cambio se ve reflejado en servicio.html/eventos.html porque es literalmente el mismo array. Si es un gasto General, llama editarGastoGeneral (ya existia en el backend, no hizo falta tocar FotoMap.gs para nada de esto). _parseItemId (ya existia) resuelve el origen a partir del id compuesto de cada item. Confirmado con 6 tests: _cargarUsuarios llama a listarInternos y filtra correctamente (y no rompe si el backend falla), edicion de gasto de Servicio actualiza solo el indice correcto sin pisar los demas y convierte a USD, edicion de Evento manda id_evento+id_tarjeta correctos, edicion de General manda editarGastoGeneral con el id correcto, y el renderizado de la fila (normal/PAGADO sin boton editar/modo edicion) es correcto.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.04.2 (Fix de posición del avatar — Cristian: "se solapa arriba a la derecha con la campana de mensajes, corré a la izq todos los iconos y deja el avatar a la derecha arriba". avatar.js v4 ahora se cuelga DENTRO de .controls como último hijo (position:relative, fluye en el flex normal) en vez de position:fixed. ?v=4 en el <script src="avatar.js"> para forzar la descarga de la versión nueva. Confirmado con integración real: el avatar queda dentro de .controls, es su último hijo, cero errores propios.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.04.1 (Sin cambios de código en este archivo — mencionado igual por trazabilidad: avatar.js se reescribió completo como parte de la unificación de avatares pedida por Cristian ("quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos"). Este módulo hereda automáticamente el menú enriquecido (tema, Saludo WhatsApp) y la nueva posición fija arriba a la derecha (antes flotaba abajo a la derecha). Confirmado con integración real: avatar.js corriendo DENTRO de este HTML completo — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
@@ -393,114 +394,146 @@ async function cargarTodo() {
   const beneficiarioEmail = state.usuario_seleccionado;
   const beneficiarioNombre = userName();
 
-  // ── Servicio Técnico — gastos PENDIENTES a favor de este beneficiario ──
-  const grupos = [];
-  _origenInfo = {}; _origenGastosCompletos = {};
-  try {
-    const rSt = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now());
-    const dataSt = await rSt.json();
-    Object.keys(dataSt || {}).forEach(function(id) {
-      const t = dataSt[id];
-      if (!t || !Array.isArray(t.gastos) && !t.gastos) return;
-      const gastosCompletos = Array.isArray(t.gastos) ? t.gastos : Object.values(t.gastos);
-      const pendientes = [];
-      gastosCompletos.forEach(function(g, idx) {
-        if (_esPendienteParaBeneficiario(g, beneficiarioNombre)) {
-          pendientes.push({
-            id: 'servicio:' + id + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
-            moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'),
-            cargado_por: g.creado_por || '', estado: 'PENDIENTE',
-          });
-        }
-      });
-      if (pendientes.length) {
-        const tarjetaId = t.id_ticket || id;
-        grupos.push({ tarjeta_id: tarjetaId, tipo_origen: 'SERVICE', titulo_origen: (t.cliente||'—') + (t.equipo_modelo ? ' — ' + t.equipo_modelo : ''), items: pendientes });
-        _origenInfo[tarjetaId] = { tipo: 'servicio', id_ticket: tarjetaId };
-        _origenGastosCompletos[tarjetaId] = gastosCompletos;
-      }
-    });
-  } catch(e) { console.warn('Error cargando gastos de Servicio Técnico:', e); }
+  // Pedido por Cristian: "podemos hacer que gastos pendientes no tarde
+  // tanto en cargar... se toma su tiempo y es molesto". Las 5 llamadas
+  // de abajo (Servicio Tecnico, Eventos, Generales, Saldo inicial,
+  // Liquidaciones) son TOTALMENTE independientes entre si - antes se
+  // pedian una atras de la otra con await secuencial, sumando sus
+  // tiempos en vez de superponerse. Ahora salen las 5 juntas con
+  // Promise.all y la pantalla se arma recien cuando responde la
+  // ultima - mismo resultado final, mismo manejo de errores por
+  // separado en cada una (si una falla, las demas igual completan
+  // bien), pero mucho mas rapido en total.
+  const _origenInfoLocal = {};
+  const _origenGastosCompletosLocal = {};
 
-  // ── Eventos — gastos PENDIENTES a favor de este beneficiario ──
-  try {
-    const rEv = await fetch(RTDB_URL + '/eventos.json?_=' + Date.now());
-    const dataEv = await rEv.json();
-    Object.keys(dataEv || {}).forEach(function(idEvento) {
-      const ev = dataEv[idEvento];
-      const tarjetas = (ev && ev.tarjetas) ? Object.values(ev.tarjetas) : [];
-      const tarjetasKeys = (ev && ev.tarjetas) ? Object.keys(ev.tarjetas) : [];
-      tarjetas.forEach(function(t, ti) {
-        if (!t) return;
-        const gastosCompletos = Array.isArray(t.gastos) ? t.gastos : (t.gastos ? Object.values(t.gastos) : []);
+  async function cargarServicio() {
+    const grupos = [];
+    try {
+      const rSt = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now());
+      const dataSt = await rSt.json();
+      Object.keys(dataSt || {}).forEach(function(id) {
+        const t = dataSt[id];
+        if (!t || !Array.isArray(t.gastos) && !t.gastos) return;
+        const gastosCompletos = Array.isArray(t.gastos) ? t.gastos : Object.values(t.gastos);
         const pendientes = [];
         gastosCompletos.forEach(function(g, idx) {
           if (_esPendienteParaBeneficiario(g, beneficiarioNombre)) {
             pendientes.push({
-              id: 'evento:' + idEvento + ':' + t.id + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
+              id: 'servicio:' + id + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
               moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'),
               cargado_por: g.creado_por || '', estado: 'PENDIENTE',
             });
           }
         });
         if (pendientes.length) {
-          const tarjetaId = t.id || tarjetasKeys[ti];
-          grupos.push({ tarjeta_id: tarjetaId, tipo_origen: 'EVENTO', titulo_origen: (ev.nombre||'—') + ' — ' + (t.titulo||'—'), items: pendientes });
-          _origenInfo[tarjetaId] = { tipo: 'evento', id_evento: idEvento, id_tarjeta: tarjetaId };
-          _origenGastosCompletos[tarjetaId] = gastosCompletos;
+          const tarjetaId = t.id_ticket || id;
+          grupos.push({ tarjeta_id: tarjetaId, tipo_origen: 'SERVICE', titulo_origen: (t.cliente||'—') + (t.equipo_modelo ? ' — ' + t.equipo_modelo : ''), items: pendientes });
+          _origenInfoLocal[tarjetaId] = { tipo: 'servicio', id_ticket: tarjetaId };
+          _origenGastosCompletosLocal[tarjetaId] = gastosCompletos;
         }
       });
-    });
-  } catch(e) { console.warn('Error cargando gastos de Eventos:', e); }
+    } catch(e) { console.warn('Error cargando gastos de Servicio Técnico:', e); }
+    return grupos;
+  }
 
-  // ── Generales (carga manual) ──
-  try {
-    const rGen = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
-      accion:'listarGastosGeneralesPendientes', a_favor_de: beneficiarioNombre, a_favor_de_email: beneficiarioEmail,
-      solicitante_email: CURRENT.email, solicitante_es_interno: CURRENT.permisos.Internos,
-    }) });
-    const rrGen = await rGen.json();
-    if (rrGen.ok && rrGen.gastos.length) {
-      grupos.push({
-        tarjeta_id: 'GENERAL', tipo_origen: 'GENERAL', titulo_origen: 'Gastos generales / directos',
-        items: rrGen.gastos.map(function(g) {
-          return { id: 'general:' + g.id, fecha: g.fecha||'', concepto: g.descripcion||'', moneda: g.moneda||'USD',
-            monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'), cargado_por: g.creado_por||'', estado:'PENDIENTE' };
-        }),
+  async function cargarEventos() {
+    const grupos = [];
+    try {
+      const rEv = await fetch(RTDB_URL + '/eventos.json?_=' + Date.now());
+      const dataEv = await rEv.json();
+      Object.keys(dataEv || {}).forEach(function(idEvento) {
+        const ev = dataEv[idEvento];
+        const tarjetas = (ev && ev.tarjetas) ? Object.values(ev.tarjetas) : [];
+        const tarjetasKeys = (ev && ev.tarjetas) ? Object.keys(ev.tarjetas) : [];
+        tarjetas.forEach(function(t, ti) {
+          if (!t) return;
+          const gastosCompletos = Array.isArray(t.gastos) ? t.gastos : (t.gastos ? Object.values(t.gastos) : []);
+          const pendientes = [];
+          gastosCompletos.forEach(function(g, idx) {
+            if (_esPendienteParaBeneficiario(g, beneficiarioNombre)) {
+              pendientes.push({
+                id: 'evento:' + idEvento + ':' + t.id + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
+                moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'),
+                cargado_por: g.creado_por || '', estado: 'PENDIENTE',
+              });
+            }
+          });
+          if (pendientes.length) {
+            const tarjetaId = t.id || tarjetasKeys[ti];
+            grupos.push({ tarjeta_id: tarjetaId, tipo_origen: 'EVENTO', titulo_origen: (ev.nombre||'—') + ' — ' + (t.titulo||'—'), items: pendientes });
+            _origenInfoLocal[tarjetaId] = { tipo: 'evento', id_evento: idEvento, id_tarjeta: tarjetaId };
+            _origenGastosCompletosLocal[tarjetaId] = gastosCompletos;
+          }
+        });
       });
-      _origenInfo['GENERAL'] = { tipo: 'general' };
-    } else {
-      _origenInfo['GENERAL'] = { tipo: 'general' }; // igual queda disponible el formulario, aunque no haya nada pendiente todavía
-    }
-  } catch(e) { console.warn('Error cargando gastos generales:', e); }
+    } catch(e) { console.warn('Error cargando gastos de Eventos:', e); }
+    return grupos;
+  }
 
+  async function cargarGenerales() {
+    try {
+      const rGen = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+        accion:'listarGastosGeneralesPendientes', a_favor_de: beneficiarioNombre, a_favor_de_email: beneficiarioEmail,
+        solicitante_email: CURRENT.email, solicitante_es_interno: CURRENT.permisos.Internos,
+      }) });
+      const rrGen = await rGen.json();
+      _origenInfoLocal['GENERAL'] = { tipo: 'general' };
+      if (rrGen.ok && rrGen.gastos.length) {
+        return [{
+          tarjeta_id: 'GENERAL', tipo_origen: 'GENERAL', titulo_origen: 'Gastos generales / directos',
+          items: rrGen.gastos.map(function(g) {
+            return { id: 'general:' + g.id, fecha: g.fecha||'', concepto: g.descripcion||'', moneda: g.moneda||'USD',
+              monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'), cargado_por: g.creado_por||'', estado:'PENDIENTE' };
+          }),
+        }];
+      }
+      return []; // igual queda disponible el formulario, aunque no haya nada pendiente todavía
+    } catch(e) {
+      console.warn('Error cargando gastos generales:', e);
+      _origenInfoLocal['GENERAL'] = { tipo: 'general' };
+      return [];
+    }
+  }
+
+  async function cargarSaldoInicial() {
+    try {
+      const rSaldo = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+        accion:'obtenerSaldoInicial', usuario_email: beneficiarioEmail,
+        solicitante_email: CURRENT.email, solicitante_es_interno: CURRENT.permisos.Internos,
+      }) });
+      const rrSaldo = await rSaldo.json();
+      return rrSaldo.ok ? rrSaldo.saldo_inicial : { monto_ars:0, monto_usd:0, fecha_corte:'', estado:'PAGADO' };
+    } catch(e) { return { monto_ars:0, monto_usd:0, fecha_corte:'', estado:'PAGADO' }; }
+  }
+
+  async function cargarLiquidaciones() {
+    try {
+      const rHist = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+        accion:'listarLiquidaciones', usuario_email: beneficiarioEmail,
+        solicitante_email: CURRENT.email, solicitante_es_interno: CURRENT.permisos.Internos,
+      }) });
+      const rrHist = await rHist.json();
+      return rrHist.ok ? rrHist.liquidaciones : [];
+    } catch(e) { return []; }
+  }
+
+  const [gruposSt, gruposEv, gruposGen, saldoInicial, liquidaciones] = await Promise.all([
+    cargarServicio(), cargarEventos(), cargarGenerales(), cargarSaldoInicial(), cargarLiquidaciones(),
+  ]);
+
+  const grupos = [].concat(gruposSt, gruposEv, gruposGen);
   // Siempre mostramos GENERAL como grupo disponible para cargar, tenga
   // o no gastos pendientes ahora mismo.
   if (!grupos.some(function(g){ return g.tarjeta_id === 'GENERAL'; })) {
     grupos.push({ tarjeta_id: 'GENERAL', tipo_origen: 'GENERAL', titulo_origen: 'Gastos generales / directos', items: [] });
   }
 
+  _origenInfo = _origenInfoLocal;
+  _origenGastosCompletos = _origenGastosCompletosLocal;
   state.grupos_gastos = grupos;
-
-  // ── Saldo inicial ──
-  try {
-    const rSaldo = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
-      accion:'obtenerSaldoInicial', usuario_email: beneficiarioEmail,
-      solicitante_email: CURRENT.email, solicitante_es_interno: CURRENT.permisos.Internos,
-    }) });
-    const rrSaldo = await rSaldo.json();
-    state.saldo_inicial = rrSaldo.ok ? rrSaldo.saldo_inicial : { monto_ars:0, monto_usd:0, fecha_corte:'', estado:'PAGADO' };
-  } catch(e) { state.saldo_inicial = { monto_ars:0, monto_usd:0, fecha_corte:'', estado:'PAGADO' }; }
-
-  // ── Historial de liquidaciones ──
-  try {
-    const rHist = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
-      accion:'listarLiquidaciones', usuario_email: beneficiarioEmail,
-      solicitante_email: CURRENT.email, solicitante_es_interno: CURRENT.permisos.Internos,
-    }) });
-    const rrHist = await rHist.json();
-    state.liquidaciones = rrHist.ok ? rrHist.liquidaciones : [];
-  } catch(e) { state.liquidaciones = []; }
+  state.saldo_inicial = saldoInicial;
+  state.liquidaciones = liquidaciones;
 
   render();
 }
@@ -518,13 +551,18 @@ async function _initCC() {
   try { if (typeof validarAccesoModulo === 'function') tieneAcceso = await validarAccesoModulo('Administracion'); } catch(e) {}
   if (!tieneAcceso) return; // validarAccesoModulo ya avisó y redirigió
 
-  let esInterno = false;
-  try { if (typeof consultarPermisoModulo === 'function') esInterno = await consultarPermisoModulo('Internos'); } catch(e) {}
+  // Estas 3 tampoco dependen una de otra - antes iban en fila, ahora
+  // salen juntas (mismo motivo que en cargarTodo: "no tarde tanto en
+  // cargar").
+  const [esInterno, tcOficial, usuarios] = await Promise.all([
+    (async function() { try { return typeof consultarPermisoModulo === 'function' ? await consultarPermisoModulo('Internos') : false; } catch(e) { return false; } })(),
+    _obtenerTCOficialCC(),
+    _cargarUsuarios(),
+  ]);
 
   CURRENT = { nombre: account.name || account.username, email: (account.username||'').toLowerCase(), permisos: { Internos: esInterno } };
-
-  TC_OFICIAL_CC = await _obtenerTCOficialCC();
-  USERS = await _cargarUsuarios();
+  TC_OFICIAL_CC = tcOficial;
+  USERS = usuarios;
   if (!USERS.some(function(u){ return u.email === CURRENT.email; })) USERS.unshift({ email: CURRENT.email, nombre: CURRENT.nombre });
 
   // El selector de colaborador: si NO es Interno, queda fijo en uno
