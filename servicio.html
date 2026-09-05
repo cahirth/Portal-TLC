@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.09.05.1 (Responder a un mensaje puntual — Cristian: "en los mensajes internos, me gustaria pararme en un mensaje y poder responder sobre ese mensaje, obviamente el destinatario es el sender". Cada mensaje ahora tiene un botón ↩ (además de editar/borrar cuando corresponde) — al tocarlo aparece un banner "Respondiendo a {autor}: {recorte}" arriba del campo de texto, con una ✕ para cancelar. Al enviar, el autor original se agrega SOLO como una @mención más al array menciones — reusa 100% el mecanismo de notificación que ya existía (email + push + notificación in-app), sin canal aparte, salvo que te estés respondiendo a vos mismo (no se auto-menciona). El mensaje nuevo guarda un respuesta_a liviano (índice + autor + recorte de texto) para mostrar la cita arriba del texto — clickeable, hace scroll y resalta un momento el mensaje original (_irAMensajeOriginal). Si falla el envío, se restaura tanto el texto como el estado "respondiendo a" completo (con el email), para que un reintento no pierda la auto-mención. Nueva acción de backend: ninguna — reusa st_agregarMensaje (FotoMap.gs), que ahora acepta y guarda el campo respuesta_a opcional. Confirmado con 7 tests: el envío arma el payload correcto y auto-menciona al autor original, no se auto-menciona al responderse a sí mismo, un mensaje normal manda respuesta_a null, todo mensaje (incluso los que no se pueden editar) muestra el botón Responder, un mensaje con respuesta_a muestra la cita clickeable, y el backend guarda/omite respuesta_a correctamente.) -->
 <!-- Portal TLC | servicio.html | v2026.09.04.3 (El toggle del TOTAL de Gastos ahora arranca en AR$ por default en vez de USD — Cristian: "el total de gastos en servicio siempre marcar el toggle en AR$ por default al amanecer". Mismo criterio que ya se usaba para el toggle de moneda de cada gasto individual nuevo (_agregarGasto, v2026.08.30.5) — antes esos dos quedaban inconsistentes: los gastos se tipeaban en AR$ por default pero el Total se mostraba en USD hasta tocarlo a mano. Solo cambió el valor inicial de _monedaTotalGastosSt ('USD' → 'ARS'); el toggle y la conversión con el TC oficial siguen funcionando exactamente igual.) -->
 <!-- Portal TLC | servicio.html | v2026.09.04.2 (Fix de posición del avatar — Cristian: "se solapa arriba a la derecha con la campana de mensajes, corré a la izq todos los iconos y deja el avatar a la derecha arriba". avatar.js v4 ahora se cuelga DENTRO de .st-header como último hijo (position:relative, fluye en el flex normal) en vez de position:fixed — cae después de la campanita, empujándola a la izquierda, sin taparla. ?v=4 en el <script src="avatar.js"> para forzar la descarga de la versión nueva. Confirmado con integración real: el avatar queda dentro de .st-header, es su último hijo, cero errores propios.) -->
 <!-- Portal TLC | servicio.html | v2026.09.04.1 (UNIFICACIÓN DE AVATAR — Cristian: "quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos". Se sacó el avatar propio (HTML/CSS/JS con ids -st, ~180 líneas) y se reemplazó por <script src="avatar.js">, la misma fuente única que ahora usan los 6 módulos del Portal — index.html "ganó" como referencia: menú completo con tema, Saludo WhatsApp, Push, Instalar app y cerrar sesión, en vez de la versión más simple que tenían eventos.html/cuenta-corriente.html hasta ahora. Posición: fija arriba a la derecha en los 6 módulos (antes flotaba abajo a la derecha en eventos/cuenta-corriente). _aplicarTemaSt queda (la sigue usando el arranque), solo se le sacaron las partes que tocaban los botones del avatar viejo — ya no existen, avatar.js tiene los suyos propios. Push/Instalar en el menú nuevo siguen llamando a las funciones reales de este archivo (_activarNotificacionesPush/_manejarClickInstalarApp, sin tocar) vía feature-detection de avatar.js. Confirmado con integración real: avatar.js corriendo DENTRO del HTML completo (servido localmente, sesión real, sin mocks) — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
@@ -2658,17 +2659,29 @@ function _construirHtmlListaMensajes(t) {
   return mensajes.map(function(m, i) {
     var fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
     var puedeEditarMsg = _puedeEditarMensajePropio(m);
-    var accionesMsgHtml = puedeEditarMsg
-      ? '<div class="msg-acciones-editar">' +
-          '<button type="button" class="msg-btn-editar" onclick="_editarMensajeClick(\'' + t.id_ticket + '\',' + i + ')" title="Editar (disponible por 2 min)">✎</button>' +
-          '<button type="button" class="msg-btn-borrar" onclick="_borrarMensaje(\'' + t.id_ticket + '\',' + i + ',this)" title="Borrar (disponible por 2 min)">✕</button>' +
-        '</div>'
-      : '';
+    var accionesMsgHtml =
+      '<div class="msg-acciones-editar">' +
+        '<button type="button" class="msg-btn-editar" onclick="_responderMensajeClick(\'' + t.id_ticket + '\',' + i + ')" title="Responder">↩</button>' +
+        (puedeEditarMsg
+          ? '<button type="button" class="msg-btn-editar" onclick="_editarMensajeClick(\'' + t.id_ticket + '\',' + i + ')" title="Editar (disponible por 2 min)">✎</button>' +
+            '<button type="button" class="msg-btn-borrar" onclick="_borrarMensaje(\'' + t.id_ticket + '\',' + i + ',this)" title="Borrar (disponible por 2 min)">✕</button>'
+          : '') +
+      '</div>';
+    // Si este mensaje responde a otro, muestra una cita chica arriba
+    // del texto — clickeable, salta hasta el mensaje original.
+    var citaHtml = '';
+    if (m.respuesta_a && typeof m.respuesta_a.indice === 'number') {
+      citaHtml = '<div onclick="_irAMensajeOriginal(\'' + t.id_ticket + '\',' + m.respuesta_a.indice + ')" ' +
+        'style="cursor:pointer;font-size:10px;color:var(--text-muted);border-left:2px solid var(--border-glow);padding:2px 6px;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+        '↩ ' + _esc(m.respuesta_a.autor_nombre || '') + ': ' + _esc(m.respuesta_a.texto_snippet || '') +
+      '</div>';
+    }
     return '<div class="msg-fila" tabindex="0" style="padding:8px 10px;border-radius:10px;background:var(--panel-dark);border:1px solid var(--border-glow);margin-bottom:8px;">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
         '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
         '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + (m.editado ? ' <i>(editado)</i>' : '') + '</span>' +
       '</div>' +
+      citaHtml +
       '<div class="msg-texto" id="msg-texto-' + t.id_ticket + '-' + i + '" style="color:var(--text-main);white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTexto(_esc(m.texto || '')) + '</div>' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
         _resumenReacciones(m.reacciones) +
@@ -2842,6 +2855,68 @@ window._borrarMensaje = function(idTicket, idx, btn) {
     .catch(function(){ alert('Error de conexión al borrar el mensaje.'); if (btn) btn.disabled = false; });
 };
 
+// ── RESPONDER A UN MENSAJE PUNTUAL ─────────────────────────────────
+// Pedido por Cristian: "en los mensajes internos, me gustaria pararme
+// en un mensaje y poder responder sobre ese mensaje, obviamente el
+// destinatario es el sender". Reusa el mecanismo de @menciones que ya
+// existe (dispara email + push + notificación in-app) para avisarle
+// al autor original — responder a alguien ya implica notificarlo, no
+// hace falta un canal de notificación aparte.
+var _respondiendoAMensaje = null; // { indice, autor_nombre, autor_email, texto_snippet } o null
+
+window._responderMensajeClick = function(idTicket, indice) {
+  var t = _ticketActual;
+  if (!t || t.id_ticket !== idTicket || !Array.isArray(t.mensajes)) return;
+  var m = t.mensajes[indice];
+  if (!m) return;
+  _respondiendoAMensaje = {
+    indice: indice,
+    autor_nombre: m.autor_nombre || m.autor_email || '—',
+    autor_email: m.autor_email || '',
+    texto_snippet: (m.texto || '').slice(0, 120),
+  };
+  _renderRespuestaPreview();
+  var ta = document.getElementById('mensaje-nuevo-txt');
+  if (ta) ta.focus();
+};
+
+window._cancelarRespuesta = function() {
+  _respondiendoAMensaje = null;
+  _renderRespuestaPreview();
+};
+
+function _renderRespuestaPreview() {
+  var wrap = document.getElementById('respuesta-preview-wrap');
+  if (!wrap) return;
+  if (!_respondiendoAMensaje) { wrap.innerHTML = ''; return; }
+  var r = _respondiendoAMensaje;
+  wrap.innerHTML =
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;background:var(--panel-dark);' +
+      'border-left:3px solid #3a86ff;border-radius:6px;padding:6px 8px;margin-bottom:6px;">' +
+      '<div style="min-width:0;">' +
+        '<div style="font-size:10px;font-weight:700;color:#3a86ff;">↩ Respondiendo a ' + _esc(r.autor_nombre) + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(r.texto_snippet) + '</div>' +
+      '</div>' +
+      '<button type="button" onclick="_cancelarRespuesta()" title="Cancelar respuesta" ' +
+        'style="background:none;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>' +
+    '</div>';
+}
+
+// Desplaza y resalta un momento el mensaje original al tocar la cita
+// de "En respuesta a" arriba de un mensaje — solo UX, no hace ningún
+// pedido al servidor.
+window._irAMensajeOriginal = function(idTicket, indice) {
+  var el = document.getElementById('msg-texto-' + idTicket + '-' + indice);
+  if (!el) return;
+  var fila = el.closest('.msg-fila');
+  if (!fila) return;
+  fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  fila.style.transition = 'background-color .3s';
+  var fondoOriginal = fila.style.backgroundColor;
+  fila.style.backgroundColor = 'rgba(58,134,255,.18)';
+  setTimeout(function() { fila.style.backgroundColor = fondoOriginal; }, 1200);
+};
+
 function _renderPanelMensajes(t) {
   var panel = document.getElementById('det-mensajes-panel');
   if (!panel) return;
@@ -2850,6 +2925,7 @@ function _renderPanelMensajes(t) {
     '<div class="det-section" style="margin-top:0;">💬 Mensajes internos</div>' +
     '<div class="det-card" style="max-height:340px;overflow-y:auto;" id="mensajes-lista">' + _construirHtmlListaMensajes(t) + '</div>' +
     '<div class="det-card" style="position:relative;">' +
+      '<div id="respuesta-preview-wrap"></div>' +
       '<textarea id="mensaje-nuevo-txt" placeholder="Escribí un mensaje… usá @ para mencionar a alguien del equipo" ' +
         'style="width:100%;min-height:64px;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border-glow);' +
         'color:var(--text-main);font-size:12px;font-family:inherit;resize:vertical;" oninput="_onMensajeInput(event)" onkeydown="_onMensajeKeydown(event)" onclick="_mencionUltimoCursor=this.selectionStart;" onkeyup="_mencionUltimoCursor=this.selectionStart;" ontouchend="_mencionUltimoCursor=this.selectionStart;"></textarea>' +
@@ -2858,6 +2934,7 @@ function _renderPanelMensajes(t) {
       '<button type="button" id="btn-enviar-mensaje-st" onclick="_enviarMensajeTicket(\'' + t.id_ticket + '\')" ' +
         'style="margin-top:8px;width:100%;padding:8px;border-radius:8px;background:#3a86ff;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;">Enviar</button>' +
     '</div>';
+  _renderRespuestaPreview(); // por si venías respondiendo algo y el panel se re-renderizó (ej. llegó un mensaje nuevo por polling)
 
   // Carga los internos en segundo plano. Si todavía no estaban en caché,
   // los mensajes recién pintados arriba no tienen las @menciones
@@ -3008,13 +3085,27 @@ window._enviarMensajeTicket = function(idTicket) {
   var texto = (ta.value || '').trim();
   if (!texto) return;
 
+  var autorNombre = (_session && _session.name) || '';
+  var autorEmail  = (_session && _session.username) || '';
+
   var menciones = [];
   (_internosCache || []).forEach(function(p) {
     if (texto.indexOf('@' + p.nombre) !== -1) menciones.push(p.email);
   });
 
-  var autorNombre = (_session && _session.name) || '';
-  var autorEmail  = (_session && _session.username) || '';
+  // Si estás respondiendo un mensaje puntual, el destinatario obvio es
+  // quien lo escribió — se agrega como si lo hubieras @mencionado, así
+  // dispara el mismo email/push/notificación que ya existe para
+  // menciones, sin necesitar un canal aparte. No lo agrega si te estás
+  // respondiendo a vos mismo, ni si ya lo mencionaste a mano.
+  var respuestaAEnviar = null;
+  var respondiendoOriginal = _respondiendoAMensaje; // se guarda completo (con email) por si hay que restaurarlo en error
+  if (_respondiendoAMensaje) {
+    respuestaAEnviar = { indice: _respondiendoAMensaje.indice, autor_nombre: _respondiendoAMensaje.autor_nombre, texto_snippet: _respondiendoAMensaje.texto_snippet };
+    if (_respondiendoAMensaje.autor_email && _respondiendoAMensaje.autor_email !== autorEmail && menciones.indexOf(_respondiendoAMensaje.autor_email) === -1) {
+      menciones.push(_respondiendoAMensaje.autor_email);
+    }
+  }
 
   // Feedback inmediato: limpia el campo y deshabilita el botón apenas
   // tocás Enviar, en vez de esperar la respuesta del servidor — así no
@@ -3023,12 +3114,14 @@ window._enviarMensajeTicket = function(idTicket) {
   var btnEnviar = document.getElementById('btn-enviar-mensaje-st');
   if (btnEnviar) { btnEnviar.disabled = true; btnEnviar.textContent = 'Enviando...'; btnEnviar.style.opacity = '.6'; }
   ta.value = '';
+  _respondiendoAMensaje = null;
+  _renderRespuestaPreview();
   var boxSugerencias = document.getElementById('mencion-sugerencias');
   if (boxSugerencias) boxSugerencias.style.display = 'none';
 
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_agregarMensaje', id_ticket:idTicket, texto:texto,
-      autor_nombre:autorNombre, autor_email:autorEmail, menciones:menciones }) })
+      autor_nombre:autorNombre, autor_email:autorEmail, menciones:menciones, respuesta_a:respuestaAEnviar }) })
   .then(function(r){ return r.json(); })
   .then(function(r){
     if (r.ok) {
@@ -3043,12 +3136,14 @@ window._enviarMensajeTicket = function(idTicket) {
       _stMostrarError('Error al enviar mensaje: ' + (r.error||'desconocido'));
       var taRestore = document.getElementById('mensaje-nuevo-txt');
       if (taRestore) taRestore.value = texto; // devuelve el texto si falló, para no perderlo
+      if (respondiendoOriginal) { _respondiendoAMensaje = respondiendoOriginal; _renderRespuestaPreview(); }
     }
   })
   .catch(function(){
     _stMostrarError('Error de conexión al enviar mensaje');
     var taRestore = document.getElementById('mensaje-nuevo-txt');
     if (taRestore) taRestore.value = texto;
+    if (respondiendoOriginal) { _respondiendoAMensaje = respondiendoOriginal; _renderRespuestaPreview(); }
   })
   .finally(function() {
     _enviandoMensajeTicket = false;
