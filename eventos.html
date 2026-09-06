@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.09.05.2 (Auditoría de TODOS los botones — Cristian: "en eventos botones guard y acciones mientras guard, hacer auditoria de todos los botones y modificarlos con esa condicion". Revisados los ~43 handlers del archivo. Se agregó el patrón deshabilitar-al-click + mostrar la acción a los que mutan datos y no lo tenían: notas (agregar/editar/eliminar), checklist (crear grupo/agregar item/eliminar item/borrar grupo), adjuntos (eliminar), crear evento/columna/tarjeta, y el botón Enviar del chat interno (que no tenía guard, a diferencia de sus equivalentes en servicio.html/cotizaciones.html — ahora usa la misma bandera _enviandoMensajeEv). Para las acciones del menú ⋮ de evento/tarjeta (duplicar, borrar, quitar logo) — que cierran el menú apenas se tocan, sin dejar un botón visible al cual deshabilitar — se agregó una bandera compartida _accionMenuEnCurso que bloquea un doble disparo mientras la acción está en vuelo. Se dejaron sin tocar, a propósito, los botones de navegación/toggle (volver, cambiar vista, tema, menús desplegables, filtros, campana, reaccionar, mencionar) y las acciones idempotentes o de repetición intencional (agregar/eliminar/editar gasto — cada click debe poder agregar una fila nueva, igual que en servicio.html; toggle de ítem de checklist; marcar todas las notificaciones leídas; toggle de urgente — mismo criterio que ya usan cotizaciones.html/servicio.html para estos casos). Confirmado con 6 tests: _agregarNotaEv/_crearChecklistGrupoEv/_eliminarAdjuntoEv/_abrirModalNuevaColumna bloquean un segundo click mientras el primero sigue en vuelo, _borrarTarjetaActual respeta la bandera compartida _accionMenuEnCurso, y _enviarMensajeEv bloquea el doble click mostrando "Enviando...".) -->
 <!-- Portal TLC | eventos.html | v2026.09.05.1 (Responder a un mensaje puntual — mismo feature que servicio.html v2026.09.05.1 / cotizaciones.html v2026.09.05.1. Cristian: "es espectacular, podemos hacerlo en cotizaciones, eventos tambien?". Cada mensaje ahora tiene un botón ↩ — al tocarlo aparece un banner "Respondiendo a {autor}: {recorte}" arriba del campo, con ✕ para cancelar. Al enviar, el autor original se agrega como una @mención más (salvo que te respondas a vos mismo), reusando el mecanismo de notificación que ya existía. Se encontró y corrigió una regresión propia en el camino: al agregar la limpieza instantánea del campo de texto (para que el "Respondiendo a..." se sienta igual de responsivo que en los otros 2 módulos), un error de red hubiera perdido el mensaje tipeado — antes no pasaba porque este módulo nunca limpiaba el campo hasta que el envío confirmaba OK. Ahora, si falla, se restaura tanto el texto como el estado de "respondiendo a" completo. Backend: ev_agregarMensaje (FotoMap.gs) ahora acepta y guarda respuesta_a. Confirmado con 4 tests: el envío arma el payload correcto, auto-menciona y limpia el input al instante; si falla, restaura texto Y el estado de respuesta (la regresión detectada); el render muestra el botón responder y la cita clickeable; y el backend guarda respuesta_a.) -->
 <!-- Portal TLC | eventos.html | v2026.09.04.2 (Sin cambios de código — trazabilidad: avatar.js v4 corrigió cómo se posiciona en los módulos CON header propio (se cuelga adentro del header en vez de flotar fijo). Este módulo no tiene header propio, así que sigue igual que en v2026.09.04.1 — flotante abajo-derecha, sin nada ahí con qué solaparse. Solo se actualizó ?v=4 en el <script src="avatar.js"> para bajar la versión nueva.) -->
 <!-- Portal TLC | eventos.html | v2026.09.04.1 (Sin cambios de código en este archivo — mencionado igual por trazabilidad: avatar.js (el script que ya se sumó en v2026.08.30.8) se reescribió completo como parte de la unificación de avatares pedida por Cristian ("quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos"). Este módulo hereda automáticamente: menú enriquecido (antes solo tenía nombre/email/rol/cerrar sesión — ahora también tema, Saludo WhatsApp, y Push/Instalar si el módulo los tuviera, que no es el caso acá) y nueva posición fija arriba a la derecha (antes flotaba abajo a la derecha). Confirmado con integración real: avatar.js corriendo dentro de este HTML completo — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
@@ -728,7 +729,7 @@ function _volverEventos() {
       '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);">' +
         '<div style="font-size:15px;font-weight:700;margin-bottom:10px;color:var(--text-main);">Todavía no hay eventos cargados</div>' +
         '<div style="font-size:12.5px;margin-bottom:16px;">Creá el primero para arrancar.</div>' +
-        (_session.rol === 'Administrador' ? '<button class="ev-btn-primario" style="width:auto;padding:9px 20px;" onclick="_abrirModalNuevoEvento()">+ Crear evento</button>' : '') +
+        (_session.rol === 'Administrador' ? '<button class="ev-btn-primario" style="width:auto;padding:9px 20px;" onclick="_abrirModalNuevoEvento(this)">+ Crear evento</button>' : '') +
       '</div>';
   }
   _cargarNotificaciones(true);
@@ -758,15 +759,17 @@ async function _cargarEventos() {
   }
 }
 
-function _abrirModalNuevoEvento() {
+function _abrirModalNuevoEvento(btn) {
   var nombre = prompt('Nombre del evento o congreso (ej. "Faco Extrema 2026"):');
   if (!nombre || !nombre.trim()) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Creando...'; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_crearEvento', nombre: nombre.trim(), vendedorRol: _session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert('Error al crear: ' + (r.error||'desconocido')); return; }
-      _abrirEvento(r.id);
-    });
+      if (!r.ok) { alert('Error al crear: ' + (r.error||'desconocido')); if (btn) { btn.disabled = false; btn.textContent = '+ Crear evento'; } return; }
+      _abrirEvento(r.id); // navega — el botón viejo queda atrás
+    })
+    .catch(function(){ alert('Error de conexión al crear el evento'); if (btn) { btn.disabled = false; btn.textContent = '+ Crear evento'; } });
 }
 
 // ── Menú de acciones del evento (⋯) — mismo patrón que el de la
@@ -797,15 +800,19 @@ function _copiarLinkEvento() {
 
 function _duplicarEventoActual() {
   document.getElementById('ev-menu-evento-dropdown').classList.remove('abierto');
+  if (_accionMenuEnCurso) return;
   if (!EVENTO_ACTUAL) return;
   if (!confirm('¿Duplicar el evento "' + EVENTO_ACTUAL.nombre + '" con todas sus tarjetas y checklists (sin tildar)? Las notas, adjuntos y mensajes NO se copian.')) return;
+  _accionMenuEnCurso = true;
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_duplicarEvento', id: EVENTO_ACTUAL.id, vendedorRol: _session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
       _cargarEventos().then(function() { _abrirEvento(r.id); });
-    });
+    })
+    .catch(function(){ alert('Error de conexión al duplicar el evento'); })
+    .finally(function() { _accionMenuEnCurso = false; });
 }
 
 // ── Logo del evento ──
@@ -849,7 +856,9 @@ function _subirLogoEventoJs(ev) {
 }
 function _quitarLogoEventoJs() {
   document.getElementById('ev-menu-evento-dropdown').classList.remove('abierto');
+  if (_accionMenuEnCurso) return;
   if (!EVENTO_ACTUAL || !confirm('¿Quitar el logo de este evento?')) return;
+  _accionMenuEnCurso = true;
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
     accion:'ev_quitarLogoEvento', id: EVENTO_ACTUAL.id, vendedorRol: _session.rol,
   }) })
@@ -864,7 +873,9 @@ function _quitarLogoEventoJs() {
       var btnQuitarLogoEv = document.getElementById('ev-menu-quitar-logo-evento');
       if (btnLogoEv) btnLogoEv.textContent = '🖼️ Agregar logo al evento';
       if (btnQuitarLogoEv) btnQuitarLogoEv.style.display = 'none';
-    });
+    })
+    .catch(function(){ alert('Error de conexión al quitar el logo'); })
+    .finally(function() { _accionMenuEnCurso = false; });
 }
 
 function _confirmarBorrarEvento() {
@@ -873,15 +884,19 @@ function _confirmarBorrarEvento() {
 }
 
 function _borrarEventoActual() {
+  if (_accionMenuEnCurso) return;
   if (!EVENTO_ACTUAL) return;
   if (!confirm('¿Borrar el evento "' + EVENTO_ACTUAL.nombre + '" con TODAS sus tarjetas, checklists y adjuntos? No se puede deshacer.')) return;
+  _accionMenuEnCurso = true;
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_borrarEvento', id: EVENTO_ACTUAL.id, vendedorRol: _session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
       _volverASelectorEventos();
-    });
+    })
+    .catch(function(){ alert('Error de conexión al borrar el evento'); })
+    .finally(function() { _accionMenuEnCurso = false; });
 }
 
 // Aplica los datos de un evento (de caché o recién bajados) al DOM —
@@ -1078,9 +1093,9 @@ function _renderTablero() {
         '<button class="ev-col-menu-btn" onclick="_menuColumna(event,\'' + col.id + '\')">⋯</button>' +
       '</div>' +
       tarjetas.map(_renderCard).join('') +
-      '<button class="ev-col-add-tarjeta" onclick="_abrirModalNuevaTarjeta(\'' + col.id + '\')">+ Nueva tarjeta</button>' +
+      '<button class="ev-col-add-tarjeta" onclick="_abrirModalNuevaTarjeta(\'' + col.id + '\',this)">+ Nueva tarjeta</button>' +
     '</div>';
-  }).join('') + (_esAdministradorEv() ? '<div class="ev-col-nueva" onclick="_abrirModalNuevaColumna()">+ Nueva columna</div>' : '');
+  }).join('') + (_esAdministradorEv() ? '<div class="ev-col-nueva" onclick="_abrirModalNuevaColumna(this)">+ Nueva columna</div>' : '');
   _aplicarFiltrosEv();
 }
 
@@ -1324,18 +1339,20 @@ function _dropEnCol(ev, idCol) {
 // acá además no se ofrece el botón "+ Nueva columna" a quien no lo
 // es). Renombrar/recolorear queda abierto a cualquier interno. ──
 var COLORES_COLUMNA_EV = ['#3a86ff', '#f8961e', '#06d6a0', '#8b5cf6', '#ef4444', '#38bdf8', '#ec4899'];
-function _abrirModalNuevaColumna() {
+function _abrirModalNuevaColumna(btn) {
   var nombre = prompt('Nombre de la columna:');
   if (!nombre || !nombre.trim()) return;
   var color = COLORES_COLUMNA_EV[(EVENTO_ACTUAL.columnas || []).length % COLORES_COLUMNA_EV.length];
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_crearColumna', id_evento:EVENTO_ACTUAL.id, nombre:nombre.trim(), color:color, vendedorRol:_session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+      if (!r.ok) { alert('Error: ' + (r.error||'')); if (btn) btn.disabled = false; return; }
       EVENTO_ACTUAL.columnas = r.columnas;
-      _renderTablero();
-    });
+      _renderTablero(); // el botón viejo se destruye con el re-render
+    })
+    .catch(function(){ alert('Error de conexión al crear la columna'); if (btn) btn.disabled = false; });
 }
 function _menuColumna(ev, idCol) {
   ev.stopPropagation();
@@ -1367,25 +1384,31 @@ function _menuColumna(ev, idCol) {
 }
 
 // ── Tarjetas: crear ──
-async function _abrirModalNuevaTarjeta(idCol) {
+async function _abrirModalNuevaTarjeta(idCol, btn) {
   var titulo = prompt('Título de la tarjeta:');
   if (!titulo || !titulo.trim()) return;
-  var btnRes = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'ev_crearTarjeta', id_evento:EVENTO_ACTUAL.id, titulo:titulo.trim(), columna_id:idCol }) });
-  var r = await btnRes.json();
-  if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
-  // El backend devuelve "adjuntos" como objeto vacío {} (formato
-  // crudo de Firebase) — todo el resto del código (_renderCard,
-  // filtros, búsqueda) espera un ARRAY. Sin esto, pintar la tarjeta
-  // recién creada tiraba un error (.find no es función) que cortaba
-  // en seco el resto del refresco del tablero — quedaba viejo hasta
-  // volver a entrar (ahí sí pasa por ev_obtenerEvento, que normaliza
-  // bien este campo). Mismo criterio acá. Reportado por Cristian: "no
-  // se ve en el kanban a menos que salga y vuelva a entrar".
-  r.tarjeta.adjuntos = [];
-  EVENTO_ACTUAL.tarjetas.push(r.tarjeta);
-  _renderTablero();
-  _abrirTarjeta(r.tarjeta.id);
+  if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Creando...'; }
+  try {
+    var btnRes = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'ev_crearTarjeta', id_evento:EVENTO_ACTUAL.id, titulo:titulo.trim(), columna_id:idCol }) });
+    var r = await btnRes.json();
+    if (!r.ok) { alert('Error: ' + (r.error||'')); if (btn) { btn.disabled = false; btn.textContent = '+ Nueva tarjeta'; } return; }
+    // El backend devuelve "adjuntos" como objeto vacío {} (formato
+    // crudo de Firebase) — todo el resto del código (_renderCard,
+    // filtros, búsqueda) espera un ARRAY. Sin esto, pintar la tarjeta
+    // recién creada tiraba un error (.find no es función) que cortaba
+    // en seco el resto del refresco del tablero — quedaba viejo hasta
+    // volver a entrar (ahí sí pasa por ev_obtenerEvento, que normaliza
+    // bien este campo). Mismo criterio acá. Reportado por Cristian: "no
+    // se ve en el kanban a menos que salga y vuelva a entrar".
+    r.tarjeta.adjuntos = [];
+    EVENTO_ACTUAL.tarjetas.push(r.tarjeta);
+    _renderTablero(); // el botón viejo se destruye con el re-render
+    _abrirTarjeta(r.tarjeta.id);
+  } catch(e) {
+    alert('Error de conexión al crear la tarjeta');
+    if (btn) { btn.disabled = false; btn.textContent = '+ Nueva tarjeta'; }
+  }
 }
 
 // ── Menú de acciones de la tarjeta (⋯) — reemplaza el botón de
@@ -1416,18 +1439,34 @@ function _copiarLinkTarjeta() {
   }
 }
 
+// Guard compartido para las acciones del menú ⋮ de evento/tarjeta
+// (duplicar, borrar, quitar logo) — el menú se cierra apenas se toca
+// una opción, así que no hay un botón visible al que deshabilitar
+// (ya desapareció del DOM); en su lugar, una bandera simple evita que
+// un doble-toque dispare la acción 2 veces mientras la primera todavía
+// está en vuelo.
+var _accionMenuEnCurso = false;
+
 async function _duplicarTarjetaActual() {
   document.getElementById('ev-menu-tarjeta-dropdown').classList.remove('abierto');
+  if (_accionMenuEnCurso) return;
   var t = _tarjetaActual();
   if (!t || !EVENTO_ACTUAL) return;
   if (!confirm('¿Duplicar esta tarjeta? Se copian título, descripción, categoría y checklists (sin tildar) — no las notas, adjuntos ni mensajes.')) return;
-  var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'ev_duplicarTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id }) });
-  var r = await resp.json();
-  if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
-  EVENTO_ACTUAL.tarjetas.push(r.tarjeta);
-  _renderTablero();
-  _abrirTarjeta(r.tarjeta.id);
+  _accionMenuEnCurso = true;
+  try {
+    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'ev_duplicarTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id }) });
+    var r = await resp.json();
+    if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+    EVENTO_ACTUAL.tarjetas.push(r.tarjeta);
+    _renderTablero();
+    _abrirTarjeta(r.tarjeta.id);
+  } catch(e) {
+    alert('Error de conexión al duplicar la tarjeta');
+  } finally {
+    _accionMenuEnCurso = false;
+  }
 }
 
 function _confirmarBorrarTarjeta() {
@@ -1436,8 +1475,10 @@ function _confirmarBorrarTarjeta() {
 }
 
 function _borrarTarjetaActual() {
+  if (_accionMenuEnCurso) return;
   if (!TARJETA_ACTUAL_ID) return;
   if (!confirm('¿Borrar esta tarjeta? No se puede deshacer.')) return;
+  _accionMenuEnCurso = true;
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_borrarTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:TARJETA_ACTUAL_ID }) })
     .then(function(r){ return r.json(); })
@@ -1446,7 +1487,9 @@ function _borrarTarjetaActual() {
       EVENTO_ACTUAL.tarjetas = EVENTO_ACTUAL.tarjetas.filter(function(t){ return t.id !== TARJETA_ACTUAL_ID; });
       _cerrarOverlayTarjeta();
       _renderTablero();
-    });
+    })
+    .catch(function(){ alert('Error de conexión al borrar la tarjeta'); })
+    .finally(function() { _accionMenuEnCurso = false; });
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1674,12 +1717,12 @@ function _renderOverlayTarjeta() {
       '<div class="ev-det-card"><div class="ev-det-card-label">Responsable Principal</div><select id="ev-t-resp" onchange="_guardarResponsable(this.value)"><option value="">Sin asignar</option>' + opcionesResp + '</select></div>' +
 
       '<div class="ev-section-titulo">✅ Checklists</div>' +
-      '<button class="ev-btn-crear-checklist" onclick="_crearChecklistGrupoEv()">+ Crear nuevo Checklist</button>' +
+      '<button class="ev-btn-crear-checklist" onclick="_crearChecklistGrupoEv(this)">+ Crear nuevo Checklist</button>' +
       '<div id="ev-checklists-cont">' + _renderChecklistsGrupos(t) + '</div>' +
 
       '<div class="ev-section-titulo">📌 Notas Generales</div>' +
       '<textarea class="ev-textarea-nota" id="ev-t-nueva-nota" rows="3" placeholder="Escribí una nota de seguimiento..."></textarea>' +
-      '<button class="ev-btn-secundario" style="margin-top:8px;" onclick="_agregarNotaEv()">+ Agregar Nota</button>' +
+      '<button class="ev-btn-secundario" style="margin-top:8px;" onclick="_agregarNotaEv(this)">+ Agregar Nota</button>' +
       '<div id="ev-notas-cont" style="margin-top:10px;">' + _renderNotasGenerales(t) + '</div>' +
 
       '<div class="ev-section-titulo">📎 Archivos Adjuntos</div>' +
@@ -1703,7 +1746,7 @@ function _renderOverlayTarjeta() {
           'oninput="_onMsgInputEv(event)" onkeydown="_onMsgKeydownEv(event)" ' +
           'onclick="_mencionUltimoCursorEv=this.selectionStart;" onkeyup="_mencionUltimoCursorEv=this.selectionStart;" ontouchend="_mencionUltimoCursorEv=this.selectionStart;"></textarea>' +
         '<div id="ev-msg-sugerencias" class="ev-mencion-sug"></div>' +
-        '<button type="button" class="ev-btn-primario" style="margin-top:8px;" onclick="_enviarMensajeEv()">Enviar</button>' +
+        '<button type="button" id="ev-btn-enviar-mensaje" class="ev-btn-primario" style="margin-top:8px;" onclick="_enviarMensajeEv()">Enviar</button>' +
       '</div>' +
     '</div>';
 }
@@ -1741,18 +1784,20 @@ function _autoResizeTodosItemsChecklistEv() {
   document.querySelectorAll('.ev-check-item-texto-fija').forEach(_autoResizeTextareaEv);
 }
 
-function _crearChecklistGrupoEv() {
+function _crearChecklistGrupoEv(btn) {
   var t = _tarjetaActual();
   if (!t) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Creando...'; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_crearChecklistGrupo', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, titulo:'Nuevo Checklist' }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert(r.error||'Error'); return; }
+      if (!r.ok) { alert(r.error||'Error'); if (btn) { btn.disabled = false; btn.textContent = '+ Crear nuevo Checklist'; } return; }
       t.checklists = r.checklists;
-      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); // el botón viejo se destruye con el re-render
       _renderTablero();
-    });
+    })
+    .catch(function(){ alert('Error de conexión'); if (btn) { btn.disabled = false; btn.textContent = '+ Crear nuevo Checklist'; } });
 }
 function _renombrarChecklistGrupoEv(idGrupo, nuevoTitulo) {
   var t = _tarjetaActual();
@@ -1762,19 +1807,21 @@ function _renombrarChecklistGrupoEv(idGrupo, nuevoTitulo) {
     .then(function(r){ return r.json(); })
     .then(function(r) { if (r.ok) t.checklists = r.checklists; });
 }
-function _borrarChecklistGrupoEv(idGrupo) {
+function _borrarChecklistGrupoEv(idGrupo, btn) {
   var t = _tarjetaActual();
   if (!t) return;
   if (!confirm('¿Borrar este checklist completo con todos sus ítems?')) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_borrarChecklistGrupo', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert(r.error||'Error'); return; }
+      if (!r.ok) { alert(r.error||'Error'); if (btn) btn.disabled = false; return; }
       t.checklists = r.checklists;
-      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); // el botón viejo se destruye con el re-render
       _renderTablero();
-    });
+    })
+    .catch(function(){ alert('Error de conexión'); if (btn) btn.disabled = false; });
 }
 function _renderChecklistsGrupos(t) {
   var grupos = Array.isArray(t.checklists) ? t.checklists : [];
@@ -1786,19 +1833,19 @@ function _renderChecklistsGrupos(t) {
       '<div class="ev-checklist-grupo-header">' +
         '<input class="ev-checklist-titulo-input" value="' + _esc(g.titulo) + '" onchange="_renombrarChecklistGrupoEv(\'' + g.id + '\', this.value)">' +
         (items.length ? '<span class="ev-checklist-progreso-chico">' + hechos + '/' + items.length + '</span>' : '') +
-        '<button class="ev-btn-borrar-checklist" onclick="_borrarChecklistGrupoEv(\'' + g.id + '\')" title="Borrar checklist">🗑</button>' +
+        '<button class="ev-btn-borrar-checklist" onclick="_borrarChecklistGrupoEv(\'' + g.id + '\',this)" title="Borrar checklist">🗑</button>' +
       '</div>' +
       '<div>' + items.map(function(item) {
         return '<div class="ev-check-item-fila' + (item.hecho?' hecho':'') + '">' +
           '<input type="checkbox"' + (item.hecho?' checked':'') + ' onchange="_toggleChecklistItem(\'' + g.id + '\',\'' + item.id + '\')">' +
           '<textarea rows="1" class="ev-check-item-texto-fija" placeholder="(sin texto — tocá para escribir o el ✕ para borrarlo)" oninput="_autoResizeTextareaEv(this)" onchange="_editarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\',this.value)">' + _esc(item.texto) + '</textarea>' +
-          '<button class="ev-btn-borrar-item" onclick="_eliminarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\')" title="Eliminar ítem">✕</button>' +
+          '<button class="ev-btn-borrar-item" onclick="_eliminarChecklistItemEv(\'' + g.id + '\',\'' + item.id + '\',this)" title="Eliminar ítem">✕</button>' +
         '</div>';
       }).join('') + '</div>' +
       '<div class="ev-check-add-row-chico">' +
         '<input type="text" id="ev-cl-nuevo-' + g.id + '" placeholder="Agregar ítem... @ para mencionar" ' +
           'oninput="_onChecklistInput(event,\'' + g.id + '\')" onkeydown="_onChecklistKeydown(event,\'' + g.id + '\')">' +
-        '<button onclick="_agregarChecklistItem(\'' + g.id + '\')">+ Agregar</button>' +
+        '<button onclick="_agregarChecklistItem(\'' + g.id + '\',this)">+ Agregar</button>' +
       '</div>' +
       '<div id="ev-cl-sug-' + g.id + '" class="ev-mencion-sug"></div>' +
       '<div class="ev-mencion-aviso">Al mencionar con @ a un colaborador en un ítem, se le enviará un correo y una notificación Push.</div>' +
@@ -1817,17 +1864,19 @@ function _toggleChecklistItem(idGrupo, idItem) {
       _renderTablero();
     });
 }
-function _eliminarChecklistItemEv(idGrupo, idItem) {
+function _eliminarChecklistItemEv(idGrupo, idItem, btn) {
   var t = _tarjetaActual();
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_eliminarChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, id_item:idItem }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert(r.error||'Error'); return; }
+      if (!r.ok) { alert(r.error||'Error'); if (btn) btn.disabled = false; return; }
       t.checklists = r.checklists;
-      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); // el botón viejo se destruye con el re-render
       _renderTablero();
-    });
+    })
+    .catch(function(){ alert('Error de conexión'); if (btn) btn.disabled = false; });
 }
 function _editarChecklistItemEv(idGrupo, idItem, nuevoTexto) {
   var t = _tarjetaActual();
@@ -1852,22 +1901,24 @@ function _onChecklistKeydown(ev, idGrupo) {
   // agregar ítem" (nada, hasta ahora).
   if (!boxAbierto && ev.key === 'Enter') { ev.preventDefault(); _agregarChecklistItem(idGrupo); }
 }
-function _agregarChecklistItem(idGrupo) {
+function _agregarChecklistItem(idGrupo, btn) {
   var input = document.getElementById('ev-cl-nuevo-' + idGrupo);
   var texto = input.value.trim();
   if (!texto) return;
   var menciones = _extraerMencionesDeTexto(texto);
   var t = _tarjetaActual();
+  if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Agregando...'; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_agregarChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, texto:texto, menciones:menciones, autor_email:_session.username, autor_nombre:_session.name }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert(r.error||'Error'); return; }
+      if (!r.ok) { alert(r.error||'Error'); if (btn) { btn.disabled = false; btn.textContent = '+ Agregar'; } return; }
       t.checklists = r.checklists;
-      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); // el botón viejo se destruye con el re-render
       input.value = '';
       _renderTablero();
-    });
+    })
+    .catch(function(){ alert('Error de conexión'); if (btn) { btn.disabled = false; btn.textContent = '+ Agregar'; } });
 }
 
 // ── Notas Generales ──
@@ -1881,57 +1932,63 @@ function _renderNotasGenerales(t) {
       '<div class="txt">' + _esc(n.texto) + '</div>' +
       '<div class="ft-fila">' +
         '<div class="ft">Por: ' + _esc(n.autor||'—') + ' — ' + fecha + ' hs' + (n.editada_en ? ' (editada)' : '') + '</div>' +
-        (esAdmin ? '<div class="acciones"><button onclick="_editarNotaEv(\'' + n.id + '\')">✎ Editar</button><button class="rojo" onclick="_eliminarNotaEv(\'' + n.id + '\')">🗑 Borrar</button></div>' : '') +
+        (esAdmin ? '<div class="acciones"><button onclick="_editarNotaEv(\'' + n.id + '\',this)">✎ Editar</button><button class="rojo" onclick="_eliminarNotaEv(\'' + n.id + '\',this)">🗑 Borrar</button></div>' : '') +
       '</div>' +
     '</div>';
   }).join('');
 }
-function _agregarNotaEv() {
+function _agregarNotaEv(btn) {
   var input = document.getElementById('ev-t-nueva-nota');
   var texto = input.value.trim();
   if (!texto) return;
   var t = _tarjetaActual();
+  if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Agregando...'; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_agregarNota', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, texto:texto, autor_nombre:_session.name }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert(r.error||'Error'); return; }
+      if (!r.ok) { alert(r.error||'Error'); if (btn) { btn.disabled = false; btn.textContent = '+ Agregar Nota'; } return; }
       t.notas = r.notas;
-      document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t);
+      document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t); // el botón viejo se destruye con el re-render
       input.value = '';
-    });
+    })
+    .catch(function(){ alert('Error de conexión'); if (btn) { btn.disabled = false; btn.textContent = '+ Agregar Nota'; } });
 }
 
 // Editar/borrar notas — solo Administrador (el backend también lo
 // exige, esto es solo para no mostrar el botón a quien no puede
 // usarlo). Pedido por Cristian: "solo para administradores permiso
 // para borrar o modificar notas generales".
-function _editarNotaEv(idNota) {
+function _editarNotaEv(idNota, btn) {
   var t = _tarjetaActual();
   var nota = (t.notas || []).find(function(n) { return n.id === idNota; });
   if (!nota) return;
   var nuevoTexto = prompt('Editar nota:', nota.texto);
   if (nuevoTexto === null || !nuevoTexto.trim() || nuevoTexto.trim() === nota.texto) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Guardando...'; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_editarNota', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_nota:idNota, texto:nuevoTexto.trim(), vendedorRol:_session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert(r.error||'Error'); return; }
+      if (!r.ok) { alert(r.error||'Error'); if (btn) { btn.disabled = false; btn.textContent = '✎ Editar'; } return; }
       t.notas = r.notas;
       document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t);
-    });
+    })
+    .catch(function(){ alert('Error de conexión'); if (btn) { btn.disabled = false; btn.textContent = '✎ Editar'; } });
 }
-function _eliminarNotaEv(idNota) {
+function _eliminarNotaEv(idNota, btn) {
   if (!confirm('¿Borrar esta nota? No se puede deshacer.')) return;
   var t = _tarjetaActual();
+  if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Borrando...'; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_eliminarNota', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_nota:idNota, vendedorRol:_session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert(r.error||'Error'); return; }
+      if (!r.ok) { alert(r.error||'Error'); if (btn) { btn.disabled = false; btn.textContent = '🗑 Borrar'; } return; }
       t.notas = r.notas;
       document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t);
-    });
+    })
+    .catch(function(){ alert('Error de conexión'); if (btn) { btn.disabled = false; btn.textContent = '🗑 Borrar'; } });
 }
 
 // ── Adjuntos + portada ──
@@ -2174,7 +2231,7 @@ function _renderAdjuntos(t) {
         '<div class="n">' + _esc(a.nombre) + '</div><div class="s">' + kb + ' KB</div>' +
       '</a>' +
       '<button class="ev-btn-portada' + (a.esPortada?' activo':'') + '" onclick="' + (a.esPortada ? '_marcarPortadaEv(null)' : "_marcarPortadaEv('" + a.id + "')") + '">📌 ' + (a.esPortada?'Portada (tocá para sacarla)':'Usar como portada') + '</button>' +
-      '<button class="ev-btn-borrar-item" onclick="_eliminarAdjuntoEv(\'' + a.id + '\')" title="Eliminar">✕</button>' +
+      '<button class="ev-btn-borrar-item" onclick="_eliminarAdjuntoEv(\'' + a.id + '\',this)" title="Eliminar">✕</button>' +
     '</div>';
   }).join('');
 }
@@ -2248,19 +2305,21 @@ function _subirAdjuntoEv(ev) {
     reader.readAsDataURL(file);
   }
 }
-function _eliminarAdjuntoEv(adjId) {
+function _eliminarAdjuntoEv(adjId, btn) {
   var t = _tarjetaActual();
   if (!confirm('¿Eliminar este archivo?')) return;
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
     accion:'eliminarAdjunto', modulo:'eventos', idRegistro: EVENTO_ACTUAL.id + '/tarjetas/' + t.id, adjId:adjId,
   }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+      if (!r.ok) { alert('Error: ' + (r.error||'')); if (btn) btn.disabled = false; return; }
       t.adjuntos = (t.adjuntos||[]).filter(function(a){ return a.id !== adjId; });
-      document.getElementById('ev-adjuntos-cont').innerHTML = _renderAdjuntos(t);
+      document.getElementById('ev-adjuntos-cont').innerHTML = _renderAdjuntos(t); // el botón viejo se destruye con el re-render
       _renderTablero();
-    });
+    })
+    .catch(function(){ alert('Error de conexión'); if (btn) btn.disabled = false; });
 }
 function _marcarPortadaEv(adjId) {
   var t = _tarjetaActual();
@@ -2431,7 +2490,10 @@ function _onMsgKeydownEv(ev) {
   // abierto, Enter selecciona al resaltado (eso sí se mantiene).
   _mencionKeydownGenerico(ev, 'ev-msg-sugerencias', 'ev-msg-nuevo');
 }
+var _enviandoMensajeEv = false;
+
 function _enviarMensajeEv() {
+  if (_enviandoMensajeEv) return; // ya hay un envío en curso, ignora clicks de más
   var input = document.getElementById('ev-msg-nuevo');
   var texto = input.value.trim();
   if (!texto) return;
@@ -2457,6 +2519,9 @@ function _enviarMensajeEv() {
   // los dos (antes de este cambio no había limpieza instantánea, así
   // que el texto quedaba solo si fallaba; ahora que se limpia al
   // toque, hay que devolverlo a mano en el error).
+  _enviandoMensajeEv = true;
+  var btnEnviar = document.getElementById('ev-btn-enviar-mensaje');
+  if (btnEnviar) { btnEnviar.disabled = true; btnEnviar.textContent = 'Enviando...'; }
   input.value = '';
   _respondiendoAMensajeEv = null;
   _renderRespuestaPreviewEv();
@@ -2478,6 +2543,11 @@ function _enviarMensajeEv() {
       alert('Error de conexión al enviar mensaje');
       input.value = texto;
       if (respondiendoOriginalEv) { _respondiendoAMensajeEv = respondiendoOriginalEv; _renderRespuestaPreviewEv(); }
+    })
+    .finally(function() {
+      _enviandoMensajeEv = false;
+      var btn = document.getElementById('ev-btn-enviar-mensaje');
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; }
     });
 }
 
