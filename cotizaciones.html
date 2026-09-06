@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.09.06.1 (2 pedidos de Cristian: (1) "en tarjetas de servicio y cotizaciones agregar los ... con los que tiene eventos" — mismo menú "···" que servicio.html/eventos.html: 🔗 Copiar link a este negocio, 🗑️ Borrar negocio (reusa _confirmarBorrarDeal, ya existente — se sacó del botón suelto viejo en la tarjeta hero y se consolidó acá). "Duplicar negocio" NO se agregó — a diferencia de Servicio Técnico/Eventos (puro Firebase), acá significaría crear un deal REAL en HubSpot (_hsCrearDeal), con todo lo que eso puede disparar del lado del CRM — mejor confirmarlo explícitamente antes de construirlo. (2) "en cotizaciones desactivar hubspot, no lo usamos mas" — investigado a fondo antes de tocar nada: las acciones que el frontend realmente usa hoy (actualizarEstado, reasignarVendedor, actualizarColaborador, actualizarTelefono, eliminarDeal) ya son RTDB-primero y NO dependían de que HubSpot respondiera bien — el corte real se hizo en FotoMap.gs (_hsFetch, el único punto por el que pasan las 88 referencias a HubSpot del archivo). Actualizado también el texto de "Borrar negocio" (ya no dice "se archiva en HubSpot", sería engañoso). Confirmado con 3 tests: copiar link arma la URL con el id correcto, borrar desde el menú llama a la función ya existente con el id correcto, y el menú alterna bien.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.05.1 (Responder a un mensaje puntual — mismo feature que servicio.html v2026.09.05.1. Cristian: "es espectacular, podemos hacerlo en cotizaciones, eventos tambien?". Cada mensaje ahora tiene un botón ↩ — al tocarlo aparece un banner "Respondiendo a {autor}: {recorte}" arriba del campo, con ✕ para cancelar. Al enviar, el autor original se agrega como una @mención más (salvo que te respondas a vos mismo), reusando 100% el mecanismo de notificación que ya existía para menciones. El mensaje nuevo guarda un respuesta_a liviano para mostrar la cita, clickeable (hace scroll y resalta el mensaje original). A diferencia de servicio.html, esta pantalla no tenía editar/borrar mensajes, así que el botón ↩ quedó solo, sin compartir fila con otros. Backend: cot_agregarMensaje (FotoMap.gs) ahora acepta y guarda respuesta_a. Confirmado con 3 tests: el envío arma el payload correcto y auto-menciona, el render muestra el botón responder y la cita clickeable, y el backend guarda respuesta_a.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.04.2 (Fix de posición del avatar — Cristian: "se solapa arriba a la derecha con la campana de mensajes, corré a la izq todos los iconos y deja el avatar a la derecha arriba". avatar.js v4 ahora se cuelga DENTRO de .header como último hijo (position:relative, fluye en el flex normal) en vez de position:fixed — cae después de la campanita, empujándola a la izquierda, sin taparla. ?v=4 en el <script src="avatar.js"> para forzar la descarga de la versión nueva. Confirmado con integración real: el avatar queda dentro de .header, es su último hijo, cero errores propios.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.04.1 (UNIFICACIÓN DE AVATAR — Cristian: "quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos". Se sacó el avatar propio (HTML/CSS/JS con ids -cot) y se reemplazó por <script src="avatar.js">, la misma fuente única que ahora usan los 6 módulos del Portal — index.html "ganó" como referencia: menú completo con tema, Saludo WhatsApp, Push, Instalar app y cerrar sesión. Posición: fija arriba a la derecha en los 6 módulos. Detalle importante: _aplicarTemaCot también re-pintaba el Kanban al cambiar de tema (aplicarFiltros()) — avatar.js no puede saber eso, así que ahora dispara un evento genérico 'tlc-tema-cambiado' al cambiar de tema, y _aplicarTemaCot quedó como listener de ese evento (mismo efecto de siempre, sin que avatar.js necesite conocer nada específico de este módulo). Push/Instalar en el menú nuevo siguen llamando a las funciones reales de este archivo sin tocar, vía feature-detection de avatar.js. Confirmado con integración real: avatar.js corriendo DENTRO del HTML completo (servido localmente, sesión real, sin mocks) — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
@@ -177,6 +178,22 @@
         }
         .btn-back { width:32px; height:32px; border-radius:50%; background:#1c2541; border:none; color:#f8fafc; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .det-titulo { font-size:14px; font-weight:700; flex:1; color:#f1f5f9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.3; }
+        /* Menú "···" del detalle de negocio — mismo patrón visual y de
+           comportamiento que ya usa eventos.html (Copiar link/
+           Duplicar/Borrar). Pedido por Cristian: "en tarjetas de
+           servicio y cotizaciones agregar los ... con los que tiene
+           eventos". */
+        .cot-btn-menu-negocio { width:32px; height:32px; border-radius:8px; background:#0f1a30; border:1px solid #1e3050;
+          color:#f1f5f9; font-size:17px; font-weight:800; cursor:pointer; line-height:1; flex-shrink:0; }
+        .cot-btn-menu-negocio:hover { border-color:#3a86ff; }
+        .cot-menu-negocio-dropdown { display:none; position:absolute; top:100%; right:0; margin-top:6px; background:#0f1a30;
+          border:1px solid #1e3050; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.35); min-width:210px; z-index:20; overflow:hidden; }
+        .cot-menu-negocio-dropdown.abierto { display:block; }
+        .cot-menu-negocio-dropdown button { display:block; width:100%; text-align:left; padding:10px 14px; font-size:12.5px; border:none;
+          background:none; color:#f1f5f9; cursor:pointer; font-family:inherit; }
+        .cot-menu-negocio-dropdown button:hover { background:rgba(58,134,255,.12); }
+        .cot-menu-negocio-dropdown button.rojo { color:#ef4444; border-top:1px solid #1e3050; }
+        .cot-menu-negocio-dropdown button.rojo:hover { background:rgba(239,68,68,.12); }
         .det-subtitulo { font-size:11px; font-weight:500; color:#64748b; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
         /* HERO CARD */
@@ -775,6 +792,13 @@
         <div style="flex:1;overflow:hidden;">
             <div class="det-titulo" id="det-titulo">—</div>
             <div class="det-subtitulo" id="det-subtitulo"></div>
+        </div>
+        <div style="position:relative;">
+            <button class="cot-btn-menu-negocio" onclick="_toggleMenuNegocio(event)" title="Más acciones">⋯</button>
+            <div class="cot-menu-negocio-dropdown" id="cot-menu-negocio-dropdown">
+                <button onclick="_copiarLinkNegocio()">🔗 Copiar link a este negocio</button>
+                <button id="cot-menu-borrar-negocio" class="rojo" onclick="_confirmarBorrarNegocioDesdeMenu()">🗑️ Borrar negocio</button>
+            </div>
         </div>
     </div>
     <div class="det-body-wrap">
@@ -2816,6 +2840,8 @@ function _renderDetalle(c) {
     const primerNombreUsuario = (currentUserNombre || '').split(' ')[0].toLowerCase();
     const esDueño = primerNombreUsuario && String(c.vendedor || '').toLowerCase().includes(primerNombreUsuario);
     const puedeGestionar = permisos.verTodo || esDueño;
+    var btnMenuBorrarNeg = document.getElementById('cot-menu-borrar-negocio');
+    if (btnMenuBorrarNeg) btnMenuBorrarNeg.style.display = puedeGestionar ? 'block' : 'none';
 
     document.getElementById('det-titulo').textContent = c.nombreNegocio ? _fixEncoding(c.nombreNegocio) : cliente;
     const subtituloEl = document.getElementById('det-subtitulo');
@@ -2876,12 +2902,6 @@ function _renderDetalle(c) {
                     <option value="GENERAL"${!c.pipeline_id ? ' selected' : ''}>🏢 Pipeline General</option>
                     ${PIPELINES.map(p => `<option value="${p.id}"${c.pipeline_id === p.id ? ' selected' : ''}>🏷️ ${_escCot(p.nombre)}</option>`).join('')}
                 </select>
-                ${puedeGestionar ? `<button id="btn-borrar-deal" onclick="_confirmarBorrarDeal('${id}')"
-                    style="width:100%;max-width:170px;padding:5px 12px;border-radius:20px;background:transparent;
-                           border:1px solid #dc2626;color:#dc2626;font-size:11px;font-weight:700;
-                           cursor:pointer;white-space:nowrap;">
-                    🗑️ Borrar negocio
-                </button>` : ''}
             </div>
         </div>
         ${(carrito.length > 0 || linkPdf) ? `<a href="${linkPdf || ('presupuesto.html?id=' + encodeURIComponent(String(c.idCot || c.id_cotizacion || c.id || '').split('/')[0]))}" target="_blank" class="cot-btn-presupuesto"
@@ -3328,13 +3348,57 @@ window._toggleContactoCotizacion = async function(idCot, indice, marcado) {
 
 // ─── BORRAR NEGOCIO — confirmación + persistencia ──────────────────
 function _confirmarBorrarDeal(idCot) {
+    // Texto actualizado — Cristian: "en cotizaciones desactivar
+    // hubspot, no lo usamos mas". Antes decía "se archiva en HubSpot,
+    // queda recuperable" — con la integración apagada eso ya no pasa
+    // de verdad (el backend sigue intentándolo de mejor esfuerzo por
+    // las dudas, pero no hay nada del otro lado que lo reciba), así
+    // que el mensaje sería engañoso si lo dejaba igual.
     const ok = confirm(
         'Vas a borrar este negocio del portal.\n\n' +
-        'El presupuesto se archiva en HubSpot (queda recuperable, no se ve más en las listas activas) ' +
-        'y desaparece del Kanban acá.\n\nEsta acción no se puede deshacer desde el portal. ¿Confirmás?'
+        'Desaparece del Kanban y de las listas activas.\n\nEsta acción no se puede deshacer. ¿Confirmás?'
     );
     if (!ok) return;
     _ejecutarBorradoDeal(idCot);
+}
+
+// ── Menú "···" del detalle de negocio (Copiar link / Borrar) ──────
+// Mismo patrón visual y de comportamiento que ya usa eventos.html.
+// Pedido por Cristian: "en tarjetas de servicio y cotizaciones
+// agregar los ... con los que tiene eventos". "Duplicar negocio" no
+// se agregó acá — a diferencia de Servicio Técnico/Eventos (puro
+// Firebase), un negocio nuevo acá significa crear un deal REAL en
+// HubSpot (_hsCrearDeal) con todo lo que eso puede disparar del lado
+// del CRM — mejor confirmarlo explícitamente antes de construirlo,
+// no asumir que es lo mismo que en los otros 2 módulos.
+window._toggleMenuNegocio = function(ev) {
+    ev.stopPropagation();
+    document.getElementById('cot-menu-negocio-dropdown').classList.toggle('abierto');
+};
+document.addEventListener('click', function(ev) {
+    var dd = document.getElementById('cot-menu-negocio-dropdown');
+    if (dd && dd.classList.contains('abierto') && !dd.contains(ev.target) && !ev.target.closest('.cot-btn-menu-negocio')) {
+        dd.classList.remove('abierto');
+    }
+});
+
+function _copiarLinkNegocio() {
+    document.getElementById('cot-menu-negocio-dropdown').classList.remove('abierto');
+    if (!cotActual) return;
+    var idActual = cotActual.idCot || cotActual.id_cotizacion || cotActual.id || '';
+    var link = 'https://ir.tlcsrl.com.ar/cotizaciones.html?id=' + encodeURIComponent(idActual);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(link).then(function(){ alert('✅ Link copiado.'); }).catch(function(){ prompt('Copiá este link:', link); });
+    } else {
+        prompt('Copiá este link:', link);
+    }
+}
+
+function _confirmarBorrarNegocioDesdeMenu() {
+    document.getElementById('cot-menu-negocio-dropdown').classList.remove('abierto');
+    if (!cotActual) return;
+    var idActual = cotActual.idCot || cotActual.id_cotizacion || cotActual.id || '';
+    _confirmarBorrarDeal(idActual);
 }
 
 async function _ejecutarBorradoDeal(idCot) {

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.09.06.1 (Menú "···" en el detalle de ticket — Cristian: "en tarjetas de servicio y cotizaciones agregar los ... con los que tiene eventos". Mismo patrón visual/comportamiento que ya usa eventos.html: 🔗 Copiar link a este ticket, 📋 Duplicar ticket, 🗑️ Borrar ticket. "Borrar" reusa _confirmarEliminar — ya existía en el código con backend funcionando (st_eliminarTicket) pero estaba HUÉRFANO, sin ningún botón que lo llamara. "Duplicar" es nuevo (backend st_duplicarTicket en FotoMap.gs) — copia cliente/equipo/contacto/técnico asignado/prioridad, arranca limpio en depósito "recepción" y progreso "no iniciada", sin notas/gastos/fotos/mensajes. Guardado con bandera de re-entrancia compartida (_accionMenuTicketEnCurso) porque el menú se cierra apenas se toca una opción, sin botón visible al que deshabilitar — mismo criterio que eventos.html. Confirmado con 4 tests: copiar link arma la URL con el id correcto, duplicar bloquea doble click y abre el ticket nuevo con el payload correcto, el menú alterna bien, y borrar desde el menú llama a la función ya existente con el id correcto.) -->
 <!-- Portal TLC | servicio.html | v2026.09.05.1 (Responder a un mensaje puntual — Cristian: "en los mensajes internos, me gustaria pararme en un mensaje y poder responder sobre ese mensaje, obviamente el destinatario es el sender". Cada mensaje ahora tiene un botón ↩ (además de editar/borrar cuando corresponde) — al tocarlo aparece un banner "Respondiendo a {autor}: {recorte}" arriba del campo de texto, con una ✕ para cancelar. Al enviar, el autor original se agrega SOLO como una @mención más al array menciones — reusa 100% el mecanismo de notificación que ya existía (email + push + notificación in-app), sin canal aparte, salvo que te estés respondiendo a vos mismo (no se auto-menciona). El mensaje nuevo guarda un respuesta_a liviano (índice + autor + recorte de texto) para mostrar la cita arriba del texto — clickeable, hace scroll y resalta un momento el mensaje original (_irAMensajeOriginal). Si falla el envío, se restaura tanto el texto como el estado "respondiendo a" completo (con el email), para que un reintento no pierda la auto-mención. Nueva acción de backend: ninguna — reusa st_agregarMensaje (FotoMap.gs), que ahora acepta y guarda el campo respuesta_a opcional. Confirmado con 7 tests: el envío arma el payload correcto y auto-menciona al autor original, no se auto-menciona al responderse a sí mismo, un mensaje normal manda respuesta_a null, todo mensaje (incluso los que no se pueden editar) muestra el botón Responder, un mensaje con respuesta_a muestra la cita clickeable, y el backend guarda/omite respuesta_a correctamente.) -->
 <!-- Portal TLC | servicio.html | v2026.09.04.3 (El toggle del TOTAL de Gastos ahora arranca en AR$ por default en vez de USD — Cristian: "el total de gastos en servicio siempre marcar el toggle en AR$ por default al amanecer". Mismo criterio que ya se usaba para el toggle de moneda de cada gasto individual nuevo (_agregarGasto, v2026.08.30.5) — antes esos dos quedaban inconsistentes: los gastos se tipeaban en AR$ por default pero el Total se mostraba en USD hasta tocarlo a mano. Solo cambió el valor inicial de _monedaTotalGastosSt ('USD' → 'ARS'); el toggle y la conversión con el TC oficial siguen funcionando exactamente igual.) -->
 <!-- Portal TLC | servicio.html | v2026.09.04.2 (Fix de posición del avatar — Cristian: "se solapa arriba a la derecha con la campana de mensajes, corré a la izq todos los iconos y deja el avatar a la derecha arriba". avatar.js v4 ahora se cuelga DENTRO de .st-header como último hijo (position:relative, fluye en el flex normal) en vez de position:fixed — cae después de la campanita, empujándola a la izquierda, sin taparla. ?v=4 en el <script src="avatar.js"> para forzar la descarga de la versión nueva. Confirmado con integración real: el avatar queda dentro de .st-header, es su último hijo, cero errores propios.) -->
@@ -188,6 +189,21 @@ body.tema-claro .btn-icon:hover{background:#cbd5e1;border-color:#3a86ff;}
   display:flex;align-items:center;gap:10px;z-index:10;}
 .detalle-body-wrap{display:flex; gap:16px; align-items:flex-start; max-width:1120px; margin:0 auto; padding:0 14px 40px;}
 #det-body{flex:1; min-width:0; max-width:780px;}
+/* Menú "···" del detalle de ticket — mismo patrón visual y de
+   comportamiento que ya usa eventos.html (Copiar link/Duplicar/
+   Borrar). Pedido por Cristian: "en tarjetas de servicio y
+   cotizaciones agregar los ... con los que tiene eventos". */
+.st-btn-menu-ticket { width:32px; height:32px; border-radius:8px; background:var(--panel-darker); border:1px solid var(--border-glow);
+  color:var(--text-main); font-size:17px; font-weight:800; cursor:pointer; line-height:1; flex-shrink:0; }
+.st-btn-menu-ticket:hover { border-color:#3a86ff; }
+.st-menu-ticket-dropdown { display:none; position:absolute; top:100%; right:0; margin-top:6px; background:var(--panel-dark);
+  border:1px solid var(--border-glow); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.35); min-width:210px; z-index:20; overflow:hidden; }
+.st-menu-ticket-dropdown.abierto { display:block; }
+.st-menu-ticket-dropdown button { display:block; width:100%; text-align:left; padding:10px 14px; font-size:12.5px; border:none;
+  background:none; color:var(--text-main); cursor:pointer; font-family:inherit; }
+.st-menu-ticket-dropdown button:hover { background:rgba(58,134,255,.12); }
+.st-menu-ticket-dropdown button.rojo { color:#ef4444; border-top:1px solid var(--border-glow); }
+.st-menu-ticket-dropdown button.rojo:hover { background:rgba(239,68,68,.12); }
 #det-mensajes-panel{width:320px; flex-shrink:0; position:sticky; top:14px;}
 /* Orden de Preparación necesita más ancho en PC — la grilla de
    equipos tiene un ancho mínimo de 860px, más que el contenedor
@@ -756,6 +772,14 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
     <div style="flex:1;">
       <div style="font-size:19px;font-weight:800;line-height:1.25;" id="det-titulo">—</div>
       <div style="font-size:10px;color:var(--text-muted);" id="det-id">—</div>
+    </div>
+    <div style="position:relative;">
+      <button class="st-btn-menu-ticket" onclick="_toggleMenuTicket(event)" title="Más acciones">⋯</button>
+      <div class="st-menu-ticket-dropdown" id="st-menu-ticket-dropdown">
+        <button onclick="_copiarLinkTicket()">🔗 Copiar link a este ticket</button>
+        <button onclick="_duplicarTicketActual()">📋 Duplicar ticket</button>
+        <button class="rojo" onclick="_confirmarBorrarTicketDesdeMenu()">🗑️ Borrar ticket</button>
+      </div>
     </div>
   </div>
   <div class="detalle-body-wrap" id="det-body-wrap">
@@ -4237,6 +4261,60 @@ window._confirmarEliminar = function(id) {
   })
   .catch(function(e){ alert('Error de conexión: ' + e.message); });
 };
+
+// ── Menú "···" del detalle de ticket (Copiar link / Duplicar / Borrar) ──
+// Mismo patrón visual y de comportamiento que ya usa eventos.html.
+// Pedido por Cristian: "en tarjetas de servicio y cotizaciones
+// agregar los ... con los que tiene eventos".
+window._toggleMenuTicket = function(ev) {
+  ev.stopPropagation();
+  document.getElementById('st-menu-ticket-dropdown').classList.toggle('abierto');
+};
+document.addEventListener('click', function(ev) {
+  var dd = document.getElementById('st-menu-ticket-dropdown');
+  if (dd && dd.classList.contains('abierto') && !dd.contains(ev.target) && !ev.target.closest('.st-btn-menu-ticket')) {
+    dd.classList.remove('abierto');
+  }
+});
+
+function _copiarLinkTicket() {
+  document.getElementById('st-menu-ticket-dropdown').classList.remove('abierto');
+  if (!_ticketActual) return;
+  var link = 'https://ir.tlcsrl.com.ar/servicio.html?ticket=' + encodeURIComponent(_ticketActual.id_ticket);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(function(){ alert('✅ Link copiado.'); }).catch(function(){ prompt('Copiá este link:', link); });
+  } else {
+    prompt('Copiá este link:', link);
+  }
+}
+
+var _accionMenuTicketEnCurso = false; // el menú se cierra apenas se toca una opción — sin botón visible al que deshabilitar, evita doble click mientras la acción está en vuelo
+
+function _duplicarTicketActual() {
+  document.getElementById('st-menu-ticket-dropdown').classList.remove('abierto');
+  if (_accionMenuTicketEnCurso) return;
+  if (!_ticketActual) return;
+  if (!confirm('¿Duplicar este ticket? Se copian los datos del cliente/equipo — no las notas, gastos, fotos ni mensajes.')) return;
+  _accionMenuTicketEnCurso = true;
+  var idOrigen = _ticketActual.id_ticket;
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_duplicarTicket', id_ticket:idOrigen, creado_por:(_session && _session.name || '') }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
+      _tickets.push(r.ticket);
+      _aplicarFiltros();
+      _abrirDetalle(r.ticket.id_ticket);
+    })
+    .catch(function(){ alert('Error de conexión al duplicar el ticket'); })
+    .finally(function() { _accionMenuTicketEnCurso = false; });
+}
+
+function _confirmarBorrarTicketDesdeMenu() {
+  document.getElementById('st-menu-ticket-dropdown').classList.remove('abierto');
+  if (!_ticketActual) return;
+  window._confirmarEliminar(_ticketActual.id_ticket);
+}
 
 // ── Nuevo ticket — Marca/Modelo dinámicos desde /precios ───────────
 // En vez de una hoja aparte, se lee directo de Lista_Precios (ya se
