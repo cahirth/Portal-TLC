@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.09.06.5 (3 bugs reales de Cristian: (1) "Notas, al clickearla queda mostrando Agregando... aunque haya terminado, se queda ahi tildado el mockup" — CONFIRMADO: los botones "+ Agregar Nota" y "+ Crear nuevo Checklist" viven AFUERA de los contenedores que se re-renderizan en éxito (#ev-notas-cont / #ev-checklists-cont solo tienen la LISTA de lo ya existente, no el botón de agregar uno nuevo) — el comentario "el botón viejo se destruye con el re-render" de la vuelta anterior era falso para estos 2 casos puntuales, y el botón quedaba trabado en "Agregando.../Creando..." para siempre incluso después de un éxito. Corregido con reset explícito en un .finally(), sin depender de que ningún re-render lo destruya solo. Auditados también _agregarChecklistItem/_eliminarChecklistItemEv/_editarNotaEv/_eliminarNotaEv/_eliminarAdjuntoEv/_borrarChecklistGrupoEv — esos SÍ viven dentro de sus contenedores (o el elemento desaparece de verdad en éxito), no tenían este problema. (2) "los botones con Guard no se deshabilitan cuando son clickeados" — mismo bug que el punto 1, probablemente lo que reportó primero fue justo esto en Notas/Checklist antes de notar el detalle de que quedaba "tildado". (3) "si refresco y vuelvo a abrir la tarjeta no se actualizan los cambios, salgo y vuelvo a entrar en una 2da vez y si actualiza, es muy molesto" — BUG REAL en el mecanismo cache-first de _abrirEvento: al refrescar la página, el evento se pinta al instante desde localStorage (posiblemente viejo) mientras un pedido de fondo trae los datos frescos. Si el usuario abría una tarjeta manualmente (sin deep-link ?tarjeta=) ANTES de que ese pedido de fondo terminara, cuando terminaba un instante después, _aplicarEventoActualEv solo sabía refrescar la tarjeta del deep-link original (nula en este caso) — la tarjeta abierta a mano se quedaba con los datos viejos hasta cerrarla y reabrirla de cero. Ahora también revisa TARJETA_ACTUAL_ID (la tarjeta que esté abierta EN ESE MOMENTO, la haya abierto como sea) y la refresca igual cuando llegan los datos frescos. Confirmado con 5 tests: los 2 botones se resetean correctamente incluso en éxito (antes se quedaban trabados), una tarjeta abierta manualmente SÍ se refresca cuando llega el dato fresco de fondo (sin deep-link), sin ninguna tarjeta abierta no se llama de más a _abrirTarjeta, y el deep-link explícito (?tarjeta=) sigue funcionando exactamente igual que antes.) -->
 <!-- Portal TLC | eventos.html | v2026.09.06.4 (BUG REAL encontrado con tu captura completa de la ventana — el ancho del panel SÍ estaba bien (~1600px, el fix fluido de la vuelta anterior funcionó), pero el texto seguía envolviéndose en 5-8 líneas igual, lo cual no tenía sentido para ese ancho. Causa: al agregar el <div> nuevo que envuelve el textarea + el renglón de autor/fecha (v2026.09.06.1), el textarea quedó con flex:1 en su CSS — pero flex:1 SOLO funciona si el elemento es hijo DIRECTO de un contenedor flex, y ahora el padre directo del textarea es ese div nuevo (que no es flex, es un div común). El flex:1 dejó de tener efecto, y el navegador volvió a su ancho por defecto de <textarea> sin CSS de ancho (~20 caracteres) — angosto sin importar cuánto espacio real hubiera alrededor. Cambiado a width:100%+box-sizing:border-box, que sí funciona sea cual sea el contexto del padre. Sin poder medir el ancho renderizado real desde acá, esta vez la causa quedó clara con la captura de ventana completa que mandaste — confío en que este es el arreglo de fondo.) -->
 <!-- Portal TLC | eventos.html | v2026.09.06.3 (Ancho FLUIDO en vez de breakpoints fijos — Cristian: "drag & drop funciona ahora pero sigue angosto". Los breakpoints fijos de la v2026.09.06.2 (1300px/1600px) no calzaron con el ancho real de la ventana — adivinar puntos de quiebre exactos es frágil. Reemplazado: .ev-overlay-panel ahora usa max-width:min(94vw,1600px) a partir de los 960px, que se adapta de forma continua a CUALQUIER ancho de ventana en vez de saltar solo en los valores exactos que se me ocurrió probar. También se achicó un poco el panel de mensajes (34vw → 28vw de tope) para cederle más espacio al checklist. Sin poder ver el resultado en vivo desde acá, si sigue viéndose angosto después de este cambio, lo más útil que se puede mandar es el ancho real de la ventana del navegador (o una captura que muestre el borde completo de la ventana) para calibrar el CSS con un dato concreto en vez de seguir probando a ciegas.) -->
 <!-- Portal TLC | eventos.html | v2026.09.06.2 (2 arreglos sobre v2026.09.06.1 — Cristian: "la vista esta angosta, y no puede guardar el nuevo orden". (1) ANCHO — con el checklist y el panel de mensajes uno al lado del otro, a partir de los 1040px de ancho máximo de antes la columna de texto (flex:1, se come lo que sobra después de los 320px fijos del panel de mensajes) quedaba angosta y el texto de los ítems se envolvía en muchas líneas. Se agregaron 2 breakpoints más anchos (1300px y 1600px) para pantallas grandes. (2) REORDENAR NO GUARDABA — confirmado con mouse en desktop. Causa real: el Drag & Drop nativo de HTML5 (draggable="true"+dragstart/dragover/drop) es frágil cuando hay un <textarea> DENTRO del elemento arrastrable — el navegador termina priorizando la selección de texto del textarea sobre el gesto de arrastre de la fila, y el dragstart nunca llega a dispararse bien. Reemplazado por completo con Pointer Events (pointerdown/pointermove/pointerup) controlados 100% a mano, sin depender de la API nativa — el gesto arranca SOLO desde el grip (⠿, con pointer capture), nunca compite con el texto, y funciona igual con mouse y con el dedo (age importante para cuando esto llegue a otros módulos usados en el celular). En el camino se encontró y corrigió un bug propio en la lógica de soltar: se limpiaban las clases visuales "encima/debajo" ANTES de leer cuál de las dos era, así que siempre daba "encima" — el ítem terminaba un lugar más arriba de lo que correspondía. Confirmado con 4 tests de DOM real (jsdom con PointerEvent): arrastrar y soltar debajo del último item lo manda al final correctamente, soltar encima de un item lo inserta antes de él, soltar afuera de cualquier fila no hace nada, y soltar en el mismo lugar no dispara ninguna llamada al backend.) -->
@@ -946,8 +947,27 @@ function _aplicarEventoActualEv(id, tarjetaId) {
   _renderTablero();
   _cambiarVistaEv(VISTA_ACTUAL_EV);
   history.replaceState(null, '', 'eventos.html?id=' + encodeURIComponent(id));
-  if (tarjetaId && EVENTO_ACTUAL.tarjetas.some(function(t){ return t.id === tarjetaId; })) {
-    _abrirTarjeta(tarjetaId);
+  // BUG REAL — Cristian: "si refresco y vuelvo a abrir la tarjeta no
+  // se actualizan los cambios, salgo y vuelvo a entrar en una 2da vez
+  // y si actualiza, es muy molesto". Esto solo refrescaba la tarjeta
+  // si "tarjetaId" venía como parámetro (o sea, solo en el caso de
+  // entrar por un deep-link ?id=...&tarjeta=...). Si el usuario
+  // refrescaba la página y DESPUÉS hacía click manualmente en una
+  // tarjeta (el caso normal, sin deep-link), esa apertura leía
+  // EVENTO_ACTUAL en ese momento — que podía ser todavía la versión
+  // vieja de la caché local, si el pedido de fondo (que sí trae los
+  // datos frescos) no había terminado de resolver. Cuando ese pedido
+  // terminaba un instante después, este bloque no tenía forma de
+  // saber que había una tarjeta abierta manualmente — solo revisaba
+  // el "tarjetaId" original del deep-link (nulo en este caso) — así
+  // que la tarjeta abierta se quedaba con los datos viejos hasta que
+  // el usuario la cerraba y la volvía a abrir de cero (ahí sí, ya con
+  // EVENTO_ACTUAL actualizado). Ahora también revisa TARJETA_ACTUAL_ID
+  // (la tarjeta que esté abierta AHORA MISMO, la haya abierto como
+  // sea) — si hay una, se refresca con los datos recién llegados.
+  var tarjetaARefrescar = tarjetaId || TARJETA_ACTUAL_ID;
+  if (tarjetaARefrescar && EVENTO_ACTUAL.tarjetas.some(function(t){ return t.id === tarjetaARefrescar; })) {
+    _abrirTarjeta(tarjetaARefrescar);
   }
 }
 
@@ -1825,12 +1845,19 @@ function _crearChecklistGrupoEv(btn) {
     body: JSON.stringify({ accion:'ev_crearChecklistGrupo', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, titulo:'Nuevo Checklist' }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert(r.error||'Error'); if (btn) { btn.disabled = false; btn.textContent = '+ Crear nuevo Checklist'; } return; }
+      if (!r.ok) { alert(r.error||'Error'); return; }
       t.checklists = r.checklists;
-      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); // el botón viejo se destruye con el re-render
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
       _renderTablero();
     })
-    .catch(function(){ alert('Error de conexión'); if (btn) { btn.disabled = false; btn.textContent = '+ Crear nuevo Checklist'; } });
+    .catch(function(){ alert('Error de conexión'); })
+    .finally(function() {
+      // Mismo bug real que en _agregarNotaEv — "+ Crear nuevo
+      // Checklist" también vive AFUERA de #ev-checklists-cont (ese
+      // contenedor solo tiene los checklists YA creados), así que se
+      // quedaba trabado en "Creando..." para siempre.
+      if (btn) { btn.disabled = false; btn.textContent = '+ Crear nuevo Checklist'; }
+    });
 }
 function _renombrarChecklistGrupoEv(idGrupo, nuevoTitulo) {
   var t = _tarjetaActual();
@@ -1851,7 +1878,7 @@ function _borrarChecklistGrupoEv(idGrupo, btn) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); if (btn) btn.disabled = false; return; }
       t.checklists = r.checklists;
-      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); // el botón viejo se destruye con el re-render
+      document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); // en éxito el grupo entero (con este botón) desaparece del re-render, no hace falta resetearlo
       _renderTablero();
     })
     .catch(function(){ alert('Error de conexión'); if (btn) btn.disabled = false; });
@@ -2113,12 +2140,25 @@ function _agregarNotaEv(btn) {
     body: JSON.stringify({ accion:'ev_agregarNota', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, texto:texto, autor_nombre:_session.name }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert(r.error||'Error'); if (btn) { btn.disabled = false; btn.textContent = '+ Agregar Nota'; } return; }
+      if (!r.ok) { alert(r.error||'Error'); return; }
       t.notas = r.notas;
-      document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t); // el botón viejo se destruye con el re-render
+      document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t);
       input.value = '';
     })
-    .catch(function(){ alert('Error de conexión'); if (btn) { btn.disabled = false; btn.textContent = '+ Agregar Nota'; } });
+    .catch(function(){ alert('Error de conexión'); })
+    .finally(function() {
+      // BUG REAL — Cristian: "Notas, al clickearla queda mostrando
+      // Agregando... aunque haya terminado, se queda ahi tildado el
+      // mockup". El botón "+ Agregar Nota" vive AFUERA de #ev-notas-
+      // cont (ese contenedor solo tiene la LISTA de notas existentes,
+      // no el botón de agregar una nueva) — así que reemplazar el
+      // innerHTML de #ev-notas-cont nunca tocaba este botón en
+      // particular, y se quedaba trabado en "Agregando..." para
+      // siempre, incluso después de un éxito. Ahora se resetea acá
+      // explícitamente, sin depender de que algún re-render lo
+      // destruya solo.
+      if (btn) { btn.disabled = false; btn.textContent = '+ Agregar Nota'; }
+    });
 }
 
 // Editar/borrar notas — solo Administrador (el backend también lo
