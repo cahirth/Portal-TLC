@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.09.05.3 (Verificación pedida por Cristian: "deshabilitar el boton mientras hace la accion, chequealo". Encontrado 1 caso real que no funcionaba del todo: "+ Nueva columna" es un <div>, no un <button> — ponerle disabled=true (como hacía la v2026.09.05.2) no lo deshabilita de verdad, el navegador no lo pinta distinto ni bloquea el click real, solo mi chequeo interno lo notaba. Corregido agregándole opacity+pointer-events a mano para que se vea y se sienta deshabilitado de verdad mientras la acción está en curso. El resto de los botones guardados en la v2026.09.05.2 SÍ son <button> reales — confirmado con un test de DOM real (jsdom) que queda con disabled=true nativo. Confirmado con 2 tests de DOM real: el div "+ Nueva columna" ahora se ve apagado (opacity .5, pointer-events none) y bloquea el doble click durante la acción; un <button> real (probado con "+ Agregar Nota") queda con disabled=true nativo, que el navegador ya pinta gris y bloquea solo.) -->
 <!-- Portal TLC | eventos.html | v2026.09.05.2 (Auditoría de TODOS los botones — Cristian: "en eventos botones guard y acciones mientras guard, hacer auditoria de todos los botones y modificarlos con esa condicion". Revisados los ~43 handlers del archivo. Se agregó el patrón deshabilitar-al-click + mostrar la acción a los que mutan datos y no lo tenían: notas (agregar/editar/eliminar), checklist (crear grupo/agregar item/eliminar item/borrar grupo), adjuntos (eliminar), crear evento/columna/tarjeta, y el botón Enviar del chat interno (que no tenía guard, a diferencia de sus equivalentes en servicio.html/cotizaciones.html — ahora usa la misma bandera _enviandoMensajeEv). Para las acciones del menú ⋮ de evento/tarjeta (duplicar, borrar, quitar logo) — que cierran el menú apenas se tocan, sin dejar un botón visible al cual deshabilitar — se agregó una bandera compartida _accionMenuEnCurso que bloquea un doble disparo mientras la acción está en vuelo. Se dejaron sin tocar, a propósito, los botones de navegación/toggle (volver, cambiar vista, tema, menús desplegables, filtros, campana, reaccionar, mencionar) y las acciones idempotentes o de repetición intencional (agregar/eliminar/editar gasto — cada click debe poder agregar una fila nueva, igual que en servicio.html; toggle de ítem de checklist; marcar todas las notificaciones leídas; toggle de urgente — mismo criterio que ya usan cotizaciones.html/servicio.html para estos casos). Confirmado con 6 tests: _agregarNotaEv/_crearChecklistGrupoEv/_eliminarAdjuntoEv/_abrirModalNuevaColumna bloquean un segundo click mientras el primero sigue en vuelo, _borrarTarjetaActual respeta la bandera compartida _accionMenuEnCurso, y _enviarMensajeEv bloquea el doble click mostrando "Enviando...".) -->
 <!-- Portal TLC | eventos.html | v2026.09.05.1 (Responder a un mensaje puntual — mismo feature que servicio.html v2026.09.05.1 / cotizaciones.html v2026.09.05.1. Cristian: "es espectacular, podemos hacerlo en cotizaciones, eventos tambien?". Cada mensaje ahora tiene un botón ↩ — al tocarlo aparece un banner "Respondiendo a {autor}: {recorte}" arriba del campo, con ✕ para cancelar. Al enviar, el autor original se agrega como una @mención más (salvo que te respondas a vos mismo), reusando el mecanismo de notificación que ya existía. Se encontró y corrigió una regresión propia en el camino: al agregar la limpieza instantánea del campo de texto (para que el "Respondiendo a..." se sienta igual de responsivo que en los otros 2 módulos), un error de red hubiera perdido el mensaje tipeado — antes no pasaba porque este módulo nunca limpiaba el campo hasta que el envío confirmaba OK. Ahora, si falla, se restaura tanto el texto como el estado de "respondiendo a" completo. Backend: ev_agregarMensaje (FotoMap.gs) ahora acepta y guarda respuesta_a. Confirmado con 4 tests: el envío arma el payload correcto, auto-menciona y limpia el input al instante; si falla, restaura texto Y el estado de respuesta (la regresión detectada); el render muestra el botón responder y la cita clickeable; y el backend guarda respuesta_a.) -->
 <!-- Portal TLC | eventos.html | v2026.09.04.2 (Sin cambios de código — trazabilidad: avatar.js v4 corrigió cómo se posiciona en los módulos CON header propio (se cuelga adentro del header en vez de flotar fijo). Este módulo no tiene header propio, así que sigue igual que en v2026.09.04.1 — flotante abajo-derecha, sin nada ahí con qué solaparse. Solo se actualizó ?v=4 en el <script src="avatar.js"> para bajar la versión nueva.) -->
@@ -1343,16 +1344,28 @@ function _abrirModalNuevaColumna(btn) {
   var nombre = prompt('Nombre de la columna:');
   if (!nombre || !nombre.trim()) return;
   var color = COLORES_COLUMNA_EV[(EVENTO_ACTUAL.columnas || []).length % COLORES_COLUMNA_EV.length];
-  if (btn) { if (btn.disabled) return; btn.disabled = true; }
+  // OJO: "+ Nueva columna" es un <div>, no un <button> — poner
+  // .disabled=true en un div no lo deshabilita de verdad (el navegador
+  // no bloquea el click ni lo pinta distinto, es solo una propiedad
+  // JS cualquiera). El chequeo `if (btn.disabled) return` de abajo SÍ
+  // sigue funcionando como bandera manual, pero sin esto no se VE
+  // deshabilitado ni el click real queda bloqueado por el navegador —
+  // hay que simularlo a mano con estilos + pointer-events.
+  if (btn) {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.style.opacity = '.5';
+    btn.style.pointerEvents = 'none';
+  }
   fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_crearColumna', id_evento:EVENTO_ACTUAL.id, nombre:nombre.trim(), color:color, vendedorRol:_session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
-      if (!r.ok) { alert('Error: ' + (r.error||'')); if (btn) btn.disabled = false; return; }
+      if (!r.ok) { alert('Error: ' + (r.error||'')); if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = ''; } return; }
       EVENTO_ACTUAL.columnas = r.columnas;
-      _renderTablero(); // el botón viejo se destruye con el re-render
+      _renderTablero(); // el div viejo se destruye con el re-render
     })
-    .catch(function(){ alert('Error de conexión al crear la columna'); if (btn) btn.disabled = false; });
+    .catch(function(){ alert('Error de conexión al crear la columna'); if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.pointerEvents = ''; } });
 }
 function _menuColumna(ev, idCol) {
   ev.stopPropagation();
