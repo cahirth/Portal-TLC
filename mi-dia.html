@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | mi-dia.html | v2026.08.30.5 (3 pedidos de Cristian: (1) "modulo mi dia, tarda en amanecer, podes chequealos?" — mismo problema y mismo arreglo ya aplicado en cuenta-corriente.html: _cargarTodoMd() pedía Ventas, Servicio Técnico, Eventos y Tareas sueltas una atrás de la otra con await secuencial, sumando sus tiempos — ahora salen las 4 juntas con Promise.all, con el mismo aislamiento de errores de antes (si una falla, las demás igual completan). En un test con 4 llamadas de 50ms cada una, el tiempo total bajó de ~200ms a ~52ms. (2) "el PIN, podes destildarlo y sacarlo de mi dia" — el pin de Ventas/Servicio/Eventos era un <span> fijo sin forma de destildarlo desde acá. Ahora es clickeable y reusa la MISMA acción que ya usa cada módulo de origen para su propio pin (marcarNegocioUrgente para Ventas, st_actualizarCampo con prioridad:media para Servicio Técnico, marcarTarjetaUrgenteEv para Eventos) — sin backend nuevo. Al destildar desaparece de la lista al toque (optimista); si el backend falla, vuelve a aparecer y avisa, en vez de perderse silenciosamente. (3) "en imagen 2 para abris la tarjeta permitir tocar toda la fila para abrirla y no el link Abrir" — antes solo el texto "Abrir →" (un <a>) navegaba; ahora toda la fila es clickeable cuando tiene link, "Abrir →" queda como texto informativo nomás. El checkbox/pin y el botón de borrar cortan la propagación del click para no disparar la navegación al tocarlos — una tarea suelta (sin link) no se vuelve clickeable como fila. Confirmado con 8 tests: las 4 llamadas de carga corren en paralelo con resultado correcto, la fila con link es clickeable en toda su extensión, el pin corta la propagación y no dispara la navegación de la fila, una tarea sin link no queda clickeable, destildar el pin llama a la acción correcta según el origen (los 3 casos), y si el backend falla al destildar, el pin vuelve a aparecer en la lista en vez de perderse.) -->
 <!-- Portal TLC | mi-dia.html | v2026.08.30.4 (Sumado avatar.js (archivo nuevo, mismo patrón que version.js/permisos.js) — Cristian: "mi dia y eventos no tienen avatar, podria haber 1 solo avatar flotante". Confirmado con test de integración real.) -->
 <!-- Portal TLC | mi-dia.html | v2026.08.30.3 (En PC (≥900px), los 2 grupos de filtros (Tiempo + Origen) ahora quedan en UNA sola fila, con un separador vertical sutil entre ambos — antes se veían apilados en 2 líneas separadas incluso en pantallas anchas. Se envolvieron los 2 en un contenedor nuevo (.md-filtros-fila), que solo pasa a display:flex desde el media query de 900px — en mobile sigue apilado como antes (sin cambios ahí). Pedido por Cristian: "alinear los filtros en la PC en una sola fila". Confirmado con test: los 2 grupos comparten el mismo contenedor, el CSS los pone en fila desde 900px, y la lógica de ambos filtros (clase "activo" al tocar cada botón) sigue funcionando igual después de mover el HTML. Batería de regresión completa (10+4 tests de v2026.08.30.1/.2) sigue pasando sin cambios.) -->
 <!-- Portal TLC | mi-dia.html | v2026.08.30.2 (2 cambios de layout pedidos por Cristian: "inmovilizar panel desde la línea naranja, ensanchar la pantalla en PC". (1) Captura de tarea + los 2 filtros (Tiempo/Origen) ahora viven en un panel propio con position:sticky (.md-top-fijo), justo debajo del header — queda fijo mientras la lista de abajo (#md-lista) scrollea sola, así no hay que volver arriba para tocar un filtro con listas largas. Con borde inferior sutil marcando el corte. (2) El ancho máximo (.md-wrap y el panel fijo, alineados entre sí) pasa de 760px fijo a responsive: sigue en 760px en mobile, pero se ensancha a 1200px en pantallas ≥900px (PC). Confirmado con 4 tests: captura+filtros quedan dentro del panel fijo, la lista queda afuera (en el área que sí scrollea), el panel usa position:sticky, y el ancho crece igual en los dos (panel fijo y lista) en pantallas grandes. Batería de regresión completa (10 tests del Paso 3) sigue pasando sin cambios — la reestructuración del HTML no tocó ningún ID ni lógica.) -->
@@ -86,6 +87,14 @@ a { color:var(--accent-blue); text-decoration:none; }
 .md-item { display:flex; align-items:flex-start; gap:10px; padding:11px 12px; background:var(--panel-dark); border:1px solid var(--border-glow); border-radius:10px; margin-bottom:7px; }
 .md-item.md-completada { opacity:.5; }
 .md-item.md-completada .md-item-titulo { text-decoration:line-through; }
+/* Pedido por Cristian: "en imagen 2 para abris la tarjeta permitir
+   tocar toda la fila para abrirla y no el link Abrir" — antes solo el
+   texto "Abrir →" (un <a>) navegaba; ahora toda la fila lo hace, y
+   "Abrir →" queda como texto informativo nomás (el checkbox/pin y el
+   botón de borrar cortan la propagación para no disparar la
+   navegación al tocarlos). */
+.md-item.md-item-clickeable { cursor:pointer; }
+.md-item.md-item-clickeable:hover { border-color:var(--accent-blue); }
 .md-check { width:19px; height:19px; border-radius:6px; border:1.5px solid var(--border-glow); background:transparent; cursor:pointer; flex-shrink:0; margin-top:1px; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--accent-green); }
 .md-check.marcado { background:var(--accent-green); border-color:var(--accent-green); color:#04241c; }
 .md-item-body { flex:1; min-width:0; }
@@ -236,85 +245,105 @@ async function _init() {
 }
 
 async function _cargarTodoMd(miClaveTecnico) {
-  var items = [];
+  // Pedido por Cristian: "modulo mi dia, tarda en amanecer, podes
+  // chequearlos?" — mismo problema y mismo arreglo que ya se hizo en
+  // cuenta-corriente.html: estas 4 llamadas (Ventas, Servicio Técnico,
+  // Eventos, Tareas sueltas) son totalmente independientes entre sí,
+  // pero se pedían una atrás de la otra con await secuencial, sumando
+  // sus tiempos en vez de superponerse. Ahora salen las 4 juntas con
+  // Promise.all — mismo resultado final, mismo aislamiento de errores
+  // (si una falla, las demás igual completan bien), mucho más rápido.
 
-  // ── Ventas — negocios marcados urgente POR MÍ ──
-  try {
-    var respVentas = await fetch(RTDB_URL + '/cotizaciones.json?_=' + Date.now());
-    var dataVentas = await respVentas.json();
-    Object.keys(dataVentas || {}).forEach(function(id) {
-      var c = dataVentas[id];
-      if (c && c.urgente && c.urgente.activo && c.urgente.marcado_por === _session.name) {
-        items.push({
-          tipo: 'ventas', id: id,
-          titulo: c.nombreNegocio || c.razonSocial || id,
-          nota: c.urgente.nota || '',
-          fecha: null, completada: false,
-          link: 'cotizaciones.html?id=' + encodeURIComponent(id),
-          origenLabel: '📦 Ventas',
-        });
-      }
-    });
-  } catch(e) { console.warn('Error cargando pines de Ventas:', e); }
-
-  // ── Servicio Técnico — tickets urgentes ASIGNADOS A MÍ (proxy de
-  // pertenencia, ya que "prioridad" no guarda quién lo marcó) ──
-  try {
-    var respSt = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now());
-    var dataSt = await respSt.json();
-    Object.keys(dataSt || {}).forEach(function(id) {
-      var t = dataSt[id];
-      if (t && t.prioridad === 'urgente' && t.tecnico_asignado === miClaveTecnico) {
-        items.push({
-          tipo: 'servicio', id: t.id_ticket || id,
-          titulo: (t.cliente || '—') + (t.equipo_modelo ? ' — ' + t.equipo_modelo : ''),
-          nota: '', fecha: null, completada: false,
-          link: 'servicio.html?ticket=' + encodeURIComponent(t.id_ticket || id),
-          origenLabel: '🔧 Servicio',
-        });
-      }
-    });
-  } catch(e) { console.warn('Error cargando pines de Servicio Técnico:', e); }
-
-  // ── Eventos — tarjetas marcadas urgente POR MÍ, en cualquier evento ──
-  try {
-    var respEv = await fetch(RTDB_URL + '/eventos.json?_=' + Date.now());
-    var dataEv = await respEv.json();
-    Object.keys(dataEv || {}).forEach(function(idEvento) {
-      var ev = dataEv[idEvento];
-      var tarjetas = (ev && ev.tarjetas) ? Object.values(ev.tarjetas) : [];
-      tarjetas.forEach(function(t) {
-        if (t && t.urgente && t.urgente.activo && t.urgente.marcado_por === _session.name) {
-          items.push({
-            tipo: 'eventos', id: t.id,
-            titulo: t.titulo + (ev.nombre ? ' (' + ev.nombre + ')' : ''),
-            nota: t.urgente.nota || '',
+  async function cargarVentas() {
+    var out = [];
+    try {
+      var respVentas = await fetch(RTDB_URL + '/cotizaciones.json?_=' + Date.now());
+      var dataVentas = await respVentas.json();
+      Object.keys(dataVentas || {}).forEach(function(id) {
+        var c = dataVentas[id];
+        if (c && c.urgente && c.urgente.activo && c.urgente.marcado_por === _session.name) {
+          out.push({
+            tipo: 'ventas', id: id,
+            titulo: c.nombreNegocio || c.razonSocial || id,
+            nota: c.urgente.nota || '',
             fecha: null, completada: false,
-            link: 'eventos.html?id=' + encodeURIComponent(idEvento) + '&tarjeta=' + encodeURIComponent(t.id),
-            origenLabel: '🎪 Eventos',
+            link: 'cotizaciones.html?id=' + encodeURIComponent(id),
+            origenLabel: '📦 Ventas',
           });
         }
       });
-    });
-  } catch(e) { console.warn('Error cargando pines de Eventos:', e); }
+    } catch(e) { console.warn('Error cargando pines de Ventas:', e); }
+    return out;
+  }
 
-  // ── Tareas sueltas (manuales) ──
-  try {
-    var respTareas = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({ accion:'listarTareas', usuario_email:_session.username, solicitante_email:_session.username, solicitante_rol:(_session.rol||'') }) });
-    var rTareas = await respTareas.json();
-    if (rTareas.ok) {
-      (rTareas.tareas || []).forEach(function(t) {
-        items.push({
-          tipo: 'tarea', id: t.id, titulo: t.titulo, nota: t.descripcion || '',
-          fecha: t.fecha || null, completada: !!t.completada,
-          link: null, origenLabel: '📝 Tarea',
+  async function cargarServicio() {
+    var out = [];
+    try {
+      var respSt = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now());
+      var dataSt = await respSt.json();
+      Object.keys(dataSt || {}).forEach(function(id) {
+        var t = dataSt[id];
+        if (t && t.prioridad === 'urgente' && t.tecnico_asignado === miClaveTecnico) {
+          out.push({
+            tipo: 'servicio', id: t.id_ticket || id,
+            titulo: (t.cliente || '—') + (t.equipo_modelo ? ' — ' + t.equipo_modelo : ''),
+            nota: '', fecha: null, completada: false,
+            link: 'servicio.html?ticket=' + encodeURIComponent(t.id_ticket || id),
+            origenLabel: '🔧 Servicio',
+          });
+        }
+      });
+    } catch(e) { console.warn('Error cargando pines de Servicio Técnico:', e); }
+    return out;
+  }
+
+  async function cargarEventos() {
+    var out = [];
+    try {
+      var respEv = await fetch(RTDB_URL + '/eventos.json?_=' + Date.now());
+      var dataEv = await respEv.json();
+      Object.keys(dataEv || {}).forEach(function(idEvento) {
+        var ev = dataEv[idEvento];
+        var tarjetas = (ev && ev.tarjetas) ? Object.values(ev.tarjetas) : [];
+        tarjetas.forEach(function(t) {
+          if (t && t.urgente && t.urgente.activo && t.urgente.marcado_por === _session.name) {
+            out.push({
+              tipo: 'eventos', id: t.id,
+              titulo: t.titulo + (ev.nombre ? ' (' + ev.nombre + ')' : ''),
+              nota: t.urgente.nota || '',
+              fecha: null, completada: false,
+              link: 'eventos.html?id=' + encodeURIComponent(idEvento) + '&tarjeta=' + encodeURIComponent(t.id),
+              origenLabel: '🎪 Eventos',
+              idEvento: idEvento,
+            });
+          }
         });
       });
-    }
-  } catch(e) { console.warn('Error cargando tareas sueltas:', e); }
+    } catch(e) { console.warn('Error cargando pines de Eventos:', e); }
+    return out;
+  }
 
-  _itemsMd = items;
+  async function cargarTareas() {
+    var out = [];
+    try {
+      var respTareas = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ accion:'listarTareas', usuario_email:_session.username, solicitante_email:_session.username, solicitante_rol:(_session.rol||'') }) });
+      var rTareas = await respTareas.json();
+      if (rTareas.ok) {
+        (rTareas.tareas || []).forEach(function(t) {
+          out.push({
+            tipo: 'tarea', id: t.id, titulo: t.titulo, nota: t.descripcion || '',
+            fecha: t.fecha || null, completada: !!t.completada,
+            link: null, origenLabel: '📝 Tarea',
+          });
+        });
+      }
+    } catch(e) { console.warn('Error cargando tareas sueltas:', e); }
+    return out;
+  }
+
+  var resultados = await Promise.all([cargarVentas(), cargarServicio(), cargarEventos(), cargarTareas()]);
+  _itemsMd = [].concat(resultados[0], resultados[1], resultados[2], resultados[3]);
   _renderListaMd();
 }
 
@@ -349,23 +378,64 @@ window._setFiltroOrigenMd = function(v) {
 function _renderItemMd(item) {
   var claseOrigen = 'md-origen-' + item.tipo;
   var esTarea = item.tipo === 'tarea';
+  var esPin = !esTarea;
+  // Pedido por Cristian: "el PIN, podes destildarlo y sacarlo de mi
+  // dia" — antes el pin de Ventas/Servicio/Eventos era un <span> fijo,
+  // sin forma de destildarlo desde acá (había que ir al negocio/
+  // ticket/tarjeta original). Ahora es clickeable y llama a la MISMA
+  // acción que ya usa cada módulo de origen para su propio pin — no
+  // hay backend nuevo, esto solo llama lo que ya existía.
   var checkHtml = esTarea
-    ? '<button class="md-check' + (item.completada ? ' marcado' : '') + '" onclick="_toggleCompletarTareaMd(\'' + item.id + '\',' + (!item.completada) + ')">' + (item.completada ? '✓' : '') + '</button>'
-    : '<span class="md-check marcado" style="cursor:default;" title="Pin activo">📌</span>';
-  return '<div class="md-item' + (item.completada ? ' md-completada' : '') + '">' +
+    ? '<button class="md-check' + (item.completada ? ' marcado' : '') + '" onclick="event.stopPropagation(); _toggleCompletarTareaMd(\'' + item.id + '\',' + (!item.completada) + ')">' + (item.completada ? '✓' : '') + '</button>'
+    : '<button class="md-check marcado" onclick="event.stopPropagation(); _despinnearItemMd(\'' + item.tipo + '\',\'' + item.id + '\',\'' + _esc(item.idEvento||'') + '\')" title="Quitar el pin">📌</button>';
+  return '<div class="md-item' + (item.completada ? ' md-completada' : '') + (item.link ? ' md-item-clickeable' : '') + '"' +
+      (item.link ? ' onclick="location.href=\'' + item.link + '\'"' : '') + '>' +
     checkHtml +
     '<div class="md-item-body">' +
       '<div class="md-item-titulo">' + _esc(item.titulo) + '</div>' +
       '<div class="md-item-meta">' +
         '<span class="md-origen-badge ' + claseOrigen + '">' + item.origenLabel + '</span>' +
         (item.fecha ? '<span class="md-item-fecha">📅 ' + _esc(item.fecha) + '</span>' : '') +
-        (item.link ? '<a class="md-item-link" href="' + item.link + '">Abrir →</a>' : '') +
+        (item.link ? '<span class="md-item-link">Abrir →</span>' : '') +
       '</div>' +
       (item.nota ? '<div class="md-item-nota">' + _esc(item.nota) + '</div>' : '') +
     '</div>' +
-    (esTarea ? '<button class="md-btn-borrar" onclick="_eliminarTareaMd(\'' + item.id + '\')" title="Eliminar">✕</button>' : '') +
+    (esTarea ? '<button class="md-btn-borrar" onclick="event.stopPropagation(); _eliminarTareaMd(\'' + item.id + '\')" title="Eliminar">✕</button>' : '') +
   '</div>';
 }
+
+// Destilda un pin (Ventas/Servicio/Eventos) reusando la MISMA acción
+// que ya usa cada módulo para su propio pin — mismo backend, sin nada
+// nuevo. Al confirmar, lo saca también de la lista acá (ya no está
+// pineado, no le corresponde seguir en Mi Día).
+window._despinnearItemMd = function(tipo, id, idEvento) {
+  var body;
+  if (tipo === 'ventas') {
+    body = { accion:'marcarNegocioUrgente', idCot:id, activo:false, nota:'', vendedor:(_session.name||'') };
+  } else if (tipo === 'servicio') {
+    body = { accion:'st_actualizarCampo', id_ticket:id, campo:'prioridad', valor:'media' };
+  } else if (tipo === 'eventos') {
+    body = { accion:'marcarTarjetaUrgenteEv', id_evento:idEvento, id_tarjeta:id, activo:false, nota:'', vendedor:(_session.name||'') };
+  } else {
+    return;
+  }
+  var itemAnterior = _itemsMd.find(function(i) { return i.tipo === tipo && i.id === id; });
+  _itemsMd = _itemsMd.filter(function(i) { return !(i.tipo === tipo && i.id === id); }); // optimista — desaparece de la lista al toque
+  _renderListaMd();
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(body) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok && itemAnterior) {
+        alert('No se pudo quitar el pin: ' + (r.error||''));
+        _itemsMd.push(itemAnterior); // lo devuelve si falló, para no perder el pin en pantalla sin haberlo sacado de verdad
+        _renderListaMd();
+      }
+    })
+    .catch(function() {
+      if (itemAnterior) { _itemsMd.push(itemAnterior); _renderListaMd(); }
+      alert('Error de conexión al quitar el pin');
+    });
+};
 
 function _renderListaMd() {
   var filtrados = _itemsMd.filter(function(i) { return _pasaFiltroTiempoMd(i) && _pasaFiltroOrigenMd(i); });
