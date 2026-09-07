@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.09.06.2 (BUG REAL — Cristian: "podes ver los links en el servicio? los clickeo y no hacen nada". Confirmado con la consola del navegador: "Uncaught ReferenceError: _copiarLinkTicket is not defined". Causa: _copiarLinkTicket/_duplicarTicketActual/_confirmarBorrarTicketDesdeMenu (agregadas en v2026.09.06.1, el menú "···") estaban declaradas como simples "function X(){}" en vez de "window.X = function(){}" como SÍ estaba _toggleMenuTicket (que funcionaba bien, justo al lado). Confirmado con una carga real del archivo completo (servidor local + jsdom, sin mocks, sin syntax-check aislado que no reproduce esto) que esa diferencia de forma es justo lo que las dejaba sin colgar del global — el onclick="" inline busca el identificador en window, y si no está ahí, tira ReferenceError apenas se toca el botón sin ningún otro síntoma visible (el menú se ve, se abre, pero tocar una opción no hace nada). Revisado también cotizaciones.html, que usa el mismo patrón "···" — ahí SÍ funciona bien con "function X(){}" simple (confirmado con la misma prueba real), así que el problema era específico de algo en servicio.html, no un patrón universal — no hizo falta tocar cotizaciones.html. Cambiadas las 3 funciones a la forma explícita "window.X = function(){}". Confirmado con 4 tests: las 3 funciones ahora SÍ existen en window (antes daban "undefined") en una carga real del archivo, y los 3 tests de comportamiento (copiar link, duplicar con bloqueo de doble click, borrar) siguen dando exactamente el mismo resultado que antes — solo cambió la forma de declaración, no la lógica.) -->
 <!-- Portal TLC | servicio.html | v2026.09.06.1 (Menú "···" en el detalle de ticket — Cristian: "en tarjetas de servicio y cotizaciones agregar los ... con los que tiene eventos". Mismo patrón visual/comportamiento que ya usa eventos.html: 🔗 Copiar link a este ticket, 📋 Duplicar ticket, 🗑️ Borrar ticket. "Borrar" reusa _confirmarEliminar — ya existía en el código con backend funcionando (st_eliminarTicket) pero estaba HUÉRFANO, sin ningún botón que lo llamara. "Duplicar" es nuevo (backend st_duplicarTicket en FotoMap.gs) — copia cliente/equipo/contacto/técnico asignado/prioridad, arranca limpio en depósito "recepción" y progreso "no iniciada", sin notas/gastos/fotos/mensajes. Guardado con bandera de re-entrancia compartida (_accionMenuTicketEnCurso) porque el menú se cierra apenas se toca una opción, sin botón visible al que deshabilitar — mismo criterio que eventos.html. Confirmado con 4 tests: copiar link arma la URL con el id correcto, duplicar bloquea doble click y abre el ticket nuevo con el payload correcto, el menú alterna bien, y borrar desde el menú llama a la función ya existente con el id correcto.) -->
 <!-- Portal TLC | servicio.html | v2026.09.05.1 (Responder a un mensaje puntual — Cristian: "en los mensajes internos, me gustaria pararme en un mensaje y poder responder sobre ese mensaje, obviamente el destinatario es el sender". Cada mensaje ahora tiene un botón ↩ (además de editar/borrar cuando corresponde) — al tocarlo aparece un banner "Respondiendo a {autor}: {recorte}" arriba del campo de texto, con una ✕ para cancelar. Al enviar, el autor original se agrega SOLO como una @mención más al array menciones — reusa 100% el mecanismo de notificación que ya existía (email + push + notificación in-app), sin canal aparte, salvo que te estés respondiendo a vos mismo (no se auto-menciona). El mensaje nuevo guarda un respuesta_a liviano (índice + autor + recorte de texto) para mostrar la cita arriba del texto — clickeable, hace scroll y resalta un momento el mensaje original (_irAMensajeOriginal). Si falla el envío, se restaura tanto el texto como el estado "respondiendo a" completo (con el email), para que un reintento no pierda la auto-mención. Nueva acción de backend: ninguna — reusa st_agregarMensaje (FotoMap.gs), que ahora acepta y guarda el campo respuesta_a opcional. Confirmado con 7 tests: el envío arma el payload correcto y auto-menciona al autor original, no se auto-menciona al responderse a sí mismo, un mensaje normal manda respuesta_a null, todo mensaje (incluso los que no se pueden editar) muestra el botón Responder, un mensaje con respuesta_a muestra la cita clickeable, y el backend guarda/omite respuesta_a correctamente.) -->
 <!-- Portal TLC | servicio.html | v2026.09.04.3 (El toggle del TOTAL de Gastos ahora arranca en AR$ por default en vez de USD — Cristian: "el total de gastos en servicio siempre marcar el toggle en AR$ por default al amanecer". Mismo criterio que ya se usaba para el toggle de moneda de cada gasto individual nuevo (_agregarGasto, v2026.08.30.5) — antes esos dos quedaban inconsistentes: los gastos se tipeaban en AR$ por default pero el Total se mostraba en USD hasta tocarlo a mano. Solo cambió el valor inicial de _monedaTotalGastosSt ('USD' → 'ARS'); el toggle y la conversión con el TC oficial siguen funcionando exactamente igual.) -->
@@ -4277,7 +4278,20 @@ document.addEventListener('click', function(ev) {
   }
 });
 
-function _copiarLinkTicket() {
+// BUG REAL encontrado por Cristian ("los clickeo y no hacen nada") —
+// confirmado con la consola: "Uncaught ReferenceError: _copiarLinkTicket
+// is not defined". Las 3 funciones de abajo estaban declaradas como
+// simples "function X(){}" en vez de "window.X = function(){}" (como
+// SÍ está _toggleMenuTicket, arriba, que funciona bien) — confirmado
+// con una carga real del archivo completo (servidor local + jsdom, sin
+// mocks) que esa diferencia de forma es justo lo que hace que no
+// queden colgadas del global: "typeof window._copiarLinkTicket" daba
+// "undefined" mientras que "typeof window._toggleMenuTicket" daba
+// "function". El onclick="" inline en HTML busca el identificador en
+// el scope global — si no cuelga ahí, tira ReferenceError apenas se
+// toca el botón, sin ningún otro síntoma visible. Cambiadas las 3 a
+// la misma forma explícita que ya funcionaba.
+window._copiarLinkTicket = function() {
   document.getElementById('st-menu-ticket-dropdown').classList.remove('abierto');
   if (!_ticketActual) return;
   var link = 'https://ir.tlcsrl.com.ar/servicio.html?ticket=' + encodeURIComponent(_ticketActual.id_ticket);
@@ -4286,11 +4300,11 @@ function _copiarLinkTicket() {
   } else {
     prompt('Copiá este link:', link);
   }
-}
+};
 
 var _accionMenuTicketEnCurso = false; // el menú se cierra apenas se toca una opción — sin botón visible al que deshabilitar, evita doble click mientras la acción está en vuelo
 
-function _duplicarTicketActual() {
+window._duplicarTicketActual = function() {
   document.getElementById('st-menu-ticket-dropdown').classList.remove('abierto');
   if (_accionMenuTicketEnCurso) return;
   if (!_ticketActual) return;
@@ -4308,13 +4322,13 @@ function _duplicarTicketActual() {
     })
     .catch(function(){ alert('Error de conexión al duplicar el ticket'); })
     .finally(function() { _accionMenuTicketEnCurso = false; });
-}
+};
 
-function _confirmarBorrarTicketDesdeMenu() {
+window._confirmarBorrarTicketDesdeMenu = function() {
   document.getElementById('st-menu-ticket-dropdown').classList.remove('abierto');
   if (!_ticketActual) return;
   window._confirmarEliminar(_ticketActual.id_ticket);
-}
+};
 
 // ── Nuevo ticket — Marca/Modelo dinámicos desde /precios ───────────
 // En vez de una hoja aparte, se lee directo de Lista_Precios (ya se
