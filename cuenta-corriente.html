@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.09.08.1 (Pedido por Cristian tras encontrar los gastos huérfanos de Fernando del Campo: "si se puede asignar gastos viejos o los saneamos así como quedaron?" — ahora se puede reasignar el beneficiario de un gasto directo desde la edición inline, sin depender de un comando de consola cada vez. En la fila de edición aparece un selector "Reasignar a otro beneficiario" (solo visible para usuarios Internos, mismo criterio que "asignar a otro beneficiario" al cargar un gasto nuevo) — funciona para los 3 orígenes (Servicio Técnico, Eventos, Generales). Para Servicio/Evento no hizo falta backend nuevo (ya reciben el array completo del origen y lo reescriben tal cual); para Generales se extendió editarGastoGeneral (FotoMap.gs) para aceptar a_favor_de, exigiendo que el solicitante sea Interno. Si el gasto no tenía creado_por (como los huérfanos viejos), también se completa con el nuevo beneficiario. El toast avisa explícitamente "Gasto reasignado a X" cuando corresponde, para que no sea confuso que el ítem desaparezca de la vista actual (ya no le pertenece a quien lo estabas mirando). Confirmado con 3 tests: reasignar en un gasto de Servicio Técnico funciona y completa creado_por si faltaba, reasignar en un gasto General manda el payload correcto con el permiso, y sin el selector (usuario no Interno) la edición normal sigue igual sin tocar el beneficiario.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.05.1 (BUG REAL — Cristian (dictado): "el modulo de cuentas corrientes que solo trae los gastos a nombre de Cristian... un gasto de un millon y pico de una tarjeta de service de Fernando del Campo, lo selecciono y no trae nada, cero pesos". Causa encontrada: _esPendienteParaBeneficiario comparaba nombres con === exacto — cualquier diferencia entre cómo quedó tipeado "a_favor_de" en el gasto (mayúscula distinta, un espacio de más, una tilde faltante) y el nombre que resuelve el selector de Colaborador AHORA rompe el match en silencio, sin ningún error visible — el gasto simplemente no aparece, como si no existiera. No era un bug exclusivo de un usuario — cualquiera con una mínima inconsistencia de cómo quedó escrito su nombre en algún gasto viejo se veía afectado igual; a Cristian probablemente no le pasaba porque su propio nombre se tipeó siempre de la misma forma consistente al ser quien más usa el sistema. Arreglado con una comparación normalizada (recorta espacios, ignora mayúsculas/minúsculas y tildes) en vez de === exacto — mismo arreglo aplicado también en listarGastosGeneralesPendientes (FotoMap.gs), que tenía el mismo patrón frágil para los gastos "Generales". Confirmado con 6 tests: reproduce el bug real exacto (diferencia de mayúscula entre "Fernando Del Campo" guardado y "Fernando del Campo" resuelto ahora) y confirma que con el fix sí matchea; también tolera espacios de más y tildes faltantes/de más; nombres genuinamente distintos siguen sin matchear (no se volvió permisivo de más); un gasto ya PAGADO sigue sin contar como pendiente; y el mismo fix en el backend de Gastos Generales no mezcla gastos de personas distintas.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.04.7 (2 cosas — Cristian con captura: "no aparece COAS que estaba liquidada y la tengo que enviar a no liquidada": el "Deshacer" de la vez pasada borraba el registro de la liquidación IGUAL aunque no encontrara el gasto real (bug real en FotoMap.gs, corregido — ver changelog ahí). Y: "Deshacer liquidación y liquidar gastos solamente tiene que estar permitido para administradores. No, otro no puede, debería estar deshabilitado" — antes ambas acciones (botón "Liquidar Selección" y botón "Deshacer liquidación") se gateaban con el permiso "Internos" (que habilita VARIAS cosas — ver cuenta corriente ajena, asignar gastos a otro beneficiario). Ahora se agregó CURRENT.esAdmin (de account.rol === "Administrador", leído de la sesión) como chequeo SEPARADO y específico para estas 2 acciones puntuales — "Internos" sigue rigiendo todo lo demás (ver/asignar) sin cambios. Gateado en 3 capas: el botón queda disabled/oculto para no-admin, el handler de click revalida antes de llamar al backend, y el backend (crearLiquidacion/revertirLiquidacion) rechaza si solicitante_es_admin !== true — igual que antes, la validación real vive en el servidor.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.04.6 (BUG DE FONDO encontrado por Cristian probando el candado de la vez pasada — confirmó una "Compensación con saldo a favor" de $238.598 y preguntó: "explicame como pude pagarlo sin plata?". La respuesta real: esa comparación (seleccionado vs. saldo PENDIENTE de reintegro) es circular — "saldo pendiente" es plata que la empresa LE DEBE al colaborador, no plata disponible para compensar contra algo. Confirmado con Cristian: "no, no existe" ningún concepto real de deuda del colaborador hacia la empresa contra el cual cruzar. Se sacó la opción "Compensación con saldo a favor" del todo (select, CSS box, toda la lógica en updatePaymentMethodUI y en el handler de confirm) — solo quedan Transferencia y Efectivo, los dos medios que sí representan un pago real. Además, agregado un botón "↺ Deshacer liquidación" en el modal de detalle (solo visible para Internos) para poder revertir la liquidación de $238.598 que ya se había confirmado por error — llama a la acción nueva revertirLiquidacion en FotoMap.gs, que devuelve el/los gasto(s) a PENDIENTE (sacándoles liquidacion_id), devuelve el saldo inicial histórico si correspondía, y borra el registro de la liquidación. Confirmado con 2 tests: manda el payload correcto y cierra/recarga bien, y cancelar el confirm() del navegador no llega a tocar el backend.) -->
@@ -140,11 +141,23 @@ function row(i){
 // array que ya lee servicio.html/eventos.html, o el gasto general por
 // su id), no hay una copia separada aca.
 function editRow(i){
-  return `<div class="row row-edit"><div class="new-grid" style="grid-template-columns:auto 1fr auto auto auto auto;align-items:center;">
+  // Reasignar el beneficiario desde acá mismo — pedido por Cristian:
+  // "si se puede asignar gastos viejos o los saneamos así como
+  // quedaron" — en vez de depender de un comando de consola cada vez
+  // que aparece un gasto sin dueño (como pasó con los de Fernando del
+  // Campo), se puede reasignar directo desde la edición. Solo
+  // Internos ven este selector — mismo criterio que "asignar a otro
+  // beneficiario" al cargar un gasto nuevo.
+  const opts = USERS.map(u=>`<option value="${esc(u.nombre)}" ${u.nombre===userName()?"selected":""}>${esc(u.nombre)}</option>`).join("");
+  const selectorBenef = CURRENT.permisos.Internos
+    ? `<select id="ei-benef-${i.id}" title="Reasignar a otro beneficiario">${opts}</select>`
+    : '';
+  return `<div class="row row-edit"><div class="new-grid" style="grid-template-columns:auto 1fr auto auto ${CURRENT.permisos.Internos?'auto':''} auto auto;align-items:center;">
     <input type="date" id="ei-fecha-${i.id}" value="${esc(i.fecha)}">
     <input id="ei-concepto-${i.id}" value="${esc(i.concepto)}" placeholder="Concepto / descripcion">
     <select id="ei-moneda-${i.id}"><option ${i.moneda==="ARS"?"selected":""}>ARS</option><option ${i.moneda==="USD"?"selected":""}>USD</option></select>
     <input id="ei-monto-${i.id}" type="text" inputmode="decimal" value="${_formatMontoARS(i.monto)}" onfocus="this.select()" onblur="this.value=_formatMontoARS(_parseMontoARS(this.value))">
+    ${selectorBenef}
     <button class="add" onclick="guardarEdicionItem('${i.id}')">\u2713 Guardar</button>
     <button class="add" style="background:transparent;color:var(--muted);border:1px solid var(--border)" onclick="cancelarEdicionItem()">\u2715</button>
   </div></div>`;
@@ -165,6 +178,8 @@ window.guardarEdicionItem = async function(id) {
   const concepto = $("ei-concepto-"+id).value.trim();
   const moneda = $("ei-moneda-"+id).value;
   const monto = _parseMontoARS($("ei-monto-"+id).value);
+  const elBenef = $("ei-benef-"+id);
+  const nuevoBeneficiario = elBenef ? elBenef.value : null; // solo existe si CURRENT.permisos.Internos
   if (!concepto || !monto) { toast("Completa concepto y monto"); return; }
 
   const btn = document.querySelector(`[onclick="guardarEdicionItem('${id}')"]`);
@@ -179,9 +194,11 @@ window.guardarEdicionItem = async function(id) {
   try {
     let rr;
     if (info.origen_tipo === 'general') {
-      const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
-        accion:'editarGastoGeneral', id: info.id_gasto, fecha, descripcion: concepto, moneda, importe: importeAGuardar,
-      }) });
+      const payloadGeneral = { accion:'editarGastoGeneral', id: info.id_gasto, fecha, descripcion: concepto, moneda, importe: importeAGuardar };
+      // Reasignar beneficiario — pedido por Cristian: "si se puede
+      // asignar gastos viejos o los saneamos así como quedaron".
+      if (nuevoBeneficiario) { payloadGeneral.a_favor_de = nuevoBeneficiario; payloadGeneral.solicitante_es_interno = CURRENT.permisos.Internos; }
+      const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadGeneral) });
       rr = await r.json();
     } else {
       const tarjetaId = info.origen_tipo === 'servicio' ? info.id_ticket : info.id_tarjeta;
@@ -189,6 +206,10 @@ window.guardarEdicionItem = async function(id) {
       const item = gastosCompletos[info.gasto_index];
       if (!item) { toast('No se encontro el gasto en el origen - proba recargar.'); return; }
       Object.assign(item, { fecha, descripcion: concepto, moneda, importe: importeAGuardar });
+      // Servicio/Evento reciben el array COMPLETO y lo reescriben tal
+      // cual — no hace falta una acción de backend aparte para
+      // reasignar, alcanza con tocar el campo antes de mandarlo.
+      if (nuevoBeneficiario) { item.a_favor_de = nuevoBeneficiario; if (!item.creado_por) item.creado_por = nuevoBeneficiario; }
       const accion = info.origen_tipo === 'servicio' ? 'st_actualizarGastos' : 'ev_actualizarGastos';
       const payload = info.origen_tipo === 'servicio'
         ? { accion, id_ticket: info.id_ticket, gastos: gastosCompletos }
@@ -197,7 +218,7 @@ window.guardarEdicionItem = async function(id) {
       rr = await r.json();
     }
     if (!rr.ok) { toast('Error al guardar: ' + (rr.error||'')); return; }
-    toast('Gasto actualizado');
+    toast(nuevoBeneficiario && nuevoBeneficiario !== userName() ? 'Gasto reasignado a ' + nuevoBeneficiario : 'Gasto actualizado');
     _editandoItemId = null;
     await cargarTodo(); // recarga fresca - refleja lo que quedo guardado en la tarjeta de origen
   } catch(e) {
