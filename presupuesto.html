@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto.html | v2026.08.29.2 (BUG REAL — Cristian, con captura: "porque en presupuesto editor calcula un descuento de 11$ si no tiene ningun descuento aplicado". Confirmado con el dato crudo de Firebase (precioLista === precioContado EXACTOS en los 2 ítems, sin ningún descuentoValor cargado) que no había ningún descuento real de por medio. Causa real: la fila "Descuentos (Contado)" salía de restar subtotalBruto (recién sumado acá arriba, con precisión completa: precioLista sin redondear) contra netoTotal (el total GUARDADO en p.totales, redondeado a 2 decimales en USD desde que se guardó la primera vez) — dos números de distinta precisión, sin ningún filtro de "¿esto es plata de verdad o solo el resto de redondear?". El residuo de redondear 478.82736... a 478.82 (guardado), multiplicado por el TC oficial (1535), daba justo esos ~$11 fantasma — ni siquiera un error de cálculo real, un artefacto de precisión puro. Mismo criterio que ya usa presupuesto-editor.html para su propio "ruido de redondeo" (ver el fix de v2026.08.14.1 en ese archivo): si la diferencia es menor al 0,05% del bruto, no es un descuento real — se descarta, y el residuo se absorbe también en el Total para que las filas de abajo sigan sumando entre sí sin quedar desalineadas por unos pesos. Confirmado con 2 tests: el caso real (precios idénticos, sin descuento) ya no muestra la fila "Descuentos" y "Subtotal con descuentos"/"Total" muestran el bruto completo sin el residuo; un descuento genuino (10%, bien por encima del umbral) sigue mostrándose exactamente igual que antes, sin ningún cambio de comportamiento.) -->
 <!-- Portal TLC | presupuesto.html | v2026.08.29.1 (Los botones "Guardar PDF" y "Enviar por WhatsApp" (arriba a la derecha) ahora NO aparecen cuando quien mira el presupuesto es el CLIENTE — antes este archivo no distinguía entre vendedor y cliente en absoluto, ambos veían exactamente lo mismo. Nueva función esModoCliente() (mismo criterio ?modo=cliente que ya usa ficha-equipo.html), y el link que se manda por WhatsApp (urlParaCompartir) ahora incluye ese parámetro — así el cliente SIEMPRE lo recibe así, sin importar desde qué negocio/vendedor haya salido. "Volver" y "Ver Orden de Servicio" quedaron sin tocar (no fueron nombrados en el pedido). Pedido por Cristian con captura: "al enviar el presupuesto, aparecen arriba a la derecha 2 botones, Guardar PDF y Enviar Whatsapp, el presupuesto que recibe el cliente no debe contener esos botones, si el sender, o sea el vendedor, pero no el receptor". Confirmado con test de punta a punta: el vendedor (sin modo=cliente) ve los 2 botones normal; el cliente (con modo=cliente) no ve ninguno de los 2; y el link real que arma "Enviar por WhatsApp" incluye &modo=cliente.) -->
 <!-- Portal TLC | presupuesto.html | v2026.08.16.2 (Ancho angosto en impresión — Cristian con captura: "un poco angosto no?" (mucho aire a los costados en la hoja A4). Causa: max-width:780px, heredado de la regla de pantalla (pensada para lectura cómoda en un monitor), se seguía aplicando también al imprimir. Agregado max-width:none específicamente en @media print — .page ahora usa todo el ancho real disponible dentro del margen de @page, en vez de ese techo pensado para pantalla. Confirmado que el mecanismo de centrado/zoom de v2026.08.16.1 sigue intacto (mismo test, sigue en verde).) -->
 <!-- Portal TLC | presupuesto.html | v2026.08.16.1 (BUG REAL DE CENTRADO — Cristian pidió "que en hoja A4 salga centrado y sin saltos de página". Encontradas 2 causas: (1) la regla @media print pisaba ".page{margin:0 auto}" (el "auto" es lo que centra en pantalla) con "margin:0" — sin el auto, .page (max-width:780px) quedaba pegado al borde izquierdo del área imprimible. Restaurado a "margin:0 auto". (2) El mecanismo de "una sola hoja" (v2026.08.10.1) usaba transform:scale() con un ancho en porcentaje mayor a 100% para compensar — pero cuando el ancho de un elemento con margin:auto supera el 100% de su contenedor, CSS resuelve los márgenes automáticos a 0 (caso "over-constrained" de la spec), rompiendo el centrado apenas hacía falta achicar. Reemplazado transform:scale()+width-compensado por zoom — reacomoda el layout de verdad (no es solo un efecto visual), así el margin:0 auto restaurado en (1) lo sigue centrando sin ningún truco de ancho aparte. Confirmado con test: 3 escenarios (entra sin achicar, necesita achicarse ~0.667, caso extremo que toca el piso 0.55) — el zoom se aplica/no se aplica correctamente según haga falta, respeta el piso mínimo, y se resetea después de imprimir. Sobre "sin saltos de página": revisado que no queda ningún page-break FORZADO en el archivo (solo page-break-inside:avoid, defensivo) — el mecanismo de una sola hoja ya se encarga de esto, ahora además centrado.) -->
@@ -454,7 +455,32 @@
       subtotalBrutoUSD += (i.precioLista || i.precioNeto || 0) * (i.cantidad || 1);
     });
     var subtotalBruto = (p.monedaTotales === 'ARS' && p.tcOficial) ? subtotalBrutoUSD * p.tcOficial : subtotalBrutoUSD;
-    var montoDescuento = Math.max(0, subtotalBruto - netoTotal);
+    // BUG REAL — Cristian: "porque en presupuesto editor calcula un
+    // descuento de 11$ si no tiene ningun descuento aplicado". Causa:
+    // "Descuentos" salía de restar subtotalBruto (recién calculado acá
+    // arriba, con precisión completa) contra netoTotal (el total
+    // GUARDADO en p.totales, redondeado a 2 decimales en USD desde
+    // que se guardó por primera vez) — dos números de distinta
+    // precisión, sin ningún filtro de "¿esto es plata de verdad o
+    // solo el resto de redondear?". Con precioLista === precioContado
+    // EXACTOS en los 2 ítems de este caso (sin ningún descuento real
+    // cargado), el residuo de redondear el USD guardado a 2 decimales
+    // (478.82 en vez de 478.82736...), multiplicado por el TC oficial
+    // (1535), daba justo esos ~$11 fantasma. Mismo criterio que ya
+    // usa presupuesto-editor.html para su propio "ruido de redondeo"
+    // (ver el fix de v2026.08.14.1 en ese archivo): si la diferencia
+    // es menor al 0,05% del bruto, no es un descuento real — se
+    // descarta, y el residuo (delta) se absorbe también en el Total
+    // para que las filas de abajo sigan sumando entre sí sin quedar
+    // desalineadas por unos pesos.
+    var montoDescuentoBruto = Math.max(0, subtotalBruto - netoTotal);
+    var esRuidoDeRedondeo = subtotalBruto > 0 && (montoDescuentoBruto / subtotalBruto) < 0.0005;
+    var montoDescuento = esRuidoDeRedondeo ? 0 : montoDescuentoBruto;
+    if (esRuidoDeRedondeo) {
+      var deltaRuido = subtotalBruto - netoTotal;
+      netoTotal += deltaRuido;
+      totalCIva += deltaRuido;
+    }
     var labelDescuento = (p.formaPago === 'contado') ? 'Descuentos (Contado)' : 'Descuentos';
 
     // Validez de la oferta — dinámica si viene del editor nuevo
