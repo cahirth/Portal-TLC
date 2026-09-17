@@ -94,7 +94,29 @@ self.addEventListener('notificationclick', function(event) {
 //      borrar nada a mano. Reportado por Cristian: "esta version esta
 //      sirviendo, decime como hago para que se actualice" (después de
 //      confirmar que el archivo en el servidor sí estaba al día).
-const CACHE_NAME = 'portal-tlc-v19';
+// v20: BUG REAL — Cristian: "revisas que no puedo subir adjuntos",
+//      consola mostrando "Failed to convert value to 'Response'" al
+//      navegar a eventos.html. Encontrados 2 lugares donde la cadena
+//      de respaldo (si falla la red, buscar en caché) podía resolver
+//      a undefined en vez de una Response real — y pasarle undefined
+//      a event.respondWith() es EXACTAMENTE lo que tira ese error, con
+//      la página quedando colgada a medio cargar. (1) La rama network-
+//      first para HTML (navegación a páginas como eventos.html?id=...)
+//      — si la red fallaba Y ninguna de las 2 búsquedas en caché
+//      encontraba nada (típico con una URL con query string que nunca
+//      se había cacheado antes), toda la cadena resolvía a undefined.
+//      (2) La rama de assets externos — para cualquier fetch que NO
+//      fuera navegación (ej. una fuente), el "if" de respaldo no tenía
+//      "else", así que caía en un return implícito vacío (undefined)
+//      apenas fallaba sin tener nada en caché. Las 2 ahora tienen una
+//      Response de emergencia garantizada al final de la cadena, para
+//      que SIEMPRE llegue algo real. Confirmado con 2 tests que
+//      reproducen el escenario exacto (ambas búsquedas en caché
+//      fallando) — la cadena vieja efectivamente resolvía a undefined
+//      en los dos casos, la nueva siempre devuelve una Response real.
+//      CACHE_NAME bumpeado — fuerza la limpieza de la caché vieja en
+//      todos los dispositivos.
+const CACHE_NAME = 'portal-tlc-v20';
 
 const HTML_LOCAL = [
     './',
@@ -203,7 +225,29 @@ self.addEventListener('fetch', event => {
                     }
                     return response;
                 })
-                .catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))
+                // BUG REAL — Cristian: "revisas que no puedo subir
+                // adjuntos", con consola mostrando "Failed to convert
+                // value to 'Response'" justo al navegar a eventos.html.
+                // Si la red fallaba (ej. estaba justo subiendo un
+                // adjunto pesado y consumiendo toda la conexión) Y
+                // NINGUNA de las 2 búsquedas en caché encontraba nada
+                // (típico en una URL con query string tipo ?id=... que
+                // nunca se había cacheado antes), esta cadena entera
+                // resolvía a undefined — y pasarle undefined a
+                // event.respondWith() es EXACTAMENTE lo que tira ese
+                // error en el navegador, dejando la página colgada a
+                // medio cargar. Ahora hay una respuesta de emergencia
+                // garantizada al final, para que SIEMPRE llegue algo
+                // real, nunca undefined.
+                .catch(() => caches.match(event.request)
+                    .then(cached => cached || caches.match('./index.html'))
+                    .then(cached => cached || new Response(
+                        '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center;">' +
+                        '<h2>Sin conexión</h2><p>No se pudo cargar esta página y tampoco hay una copia guardada localmente.</p>' +
+                        '<p>Revisá tu conexión a internet e intentá de nuevo.</p></body></html>',
+                        { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+                    ))
+                )
         );
         return;
     }
@@ -219,9 +263,19 @@ self.addEventListener('fetch', event => {
                 return response;
             });
         }).catch(() => {
+            // Mismo bug real que arriba — para un asset que no es
+            // navegación (ej. una fuente, un ícono) y que tampoco
+            // estaba en caché, esto devolvía undefined en silencio
+            // (el "if" sin "else" caía directo a un return implícito
+            // vacío). Ahora siempre hay una Response real, aunque sea
+            // de error, para no romper la promesa de respondWith().
             if (event.request.mode === 'navigate') {
-                return caches.match('./index.html');
+                return caches.match('./index.html').then(cached => cached || new Response(
+                    'Sin conexión y sin copia local disponible.',
+                    { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
+                ));
             }
+            return new Response('', { status: 504, statusText: 'Recurso no disponible sin conexión' });
         })
     );
 });
