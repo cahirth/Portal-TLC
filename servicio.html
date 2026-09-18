@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.09.18.3 (TC HISTÓRICO REAL por gasto — Cristian preguntó: "el tc es el de la fecha de la carga, y queda guardado historico si hace 10 dias era 1530 y hoy 1535, el input de 10 dias queda con 1530 y el de hoy 1535, es asi?" — la respuesta era NO, había un único TC vigente aplicado a todos por igual. Ahora sí: cada gasto NUEVO guarda su propio tc_al_cargar al crearse (el TC vigente en ese momento), y ese valor queda fijo para siempre — se usa tanto para la etiqueta como para convertir ARS↔USD de ese renglón puntual, incluso al editarlo después (antes, editar el importe de un gasto viejo lo convertía con el TC de HOY, no con el suyo — corregido también). _aMonedaGastoSt ahora acepta un TC opcional (el histórico del gasto), con el TC vigente como respaldo para gastos que todavía no tienen uno propio guardado. El Total agregado de abajo NO se tocó — sigue usando el TC vigente de hoy para la conversión (cambiar eso es una decisión aparte, con implicancias en otros módulos, no se asumió). Confirmado con 3 tests: un gasto nuevo se crea con el TC de hoy; dos gastos con TC distinto (1530 vs 1535) muestran cada uno el suyo; editar el importe de un gasto viejo usa SU TC histórico para convertir a USD, no el de hoy.) -->
 <!-- Portal TLC | servicio.html | v2026.09.18.2 (Pedido por Cristian, con captura: "en cada gasto de tarjeta, sea servicio, evento, sea cualquier tipo de moneda USD o AR$, por favor agregar al lado el tipo de cambio (no editable) en cada renglon" — antes el TC oficial solo se veía una vez, en el total agregado al final de la lista de gastos. Ahora también aparece junto al campo Importe de CADA gasto individual, tanto en la fila editable como en la de solo lectura (gastos ya liquidados o ticket finalizado) — mismo texto informativo (no un input, no editable) que ya usa el total, reusando la clase .gastos-tc-label existente. No es un TC propio de cada gasto — es el mismo TC vigente aplicado a todos por igual (no se guarda un TC histórico por gasto), mostrado repetido en cada renglón para no tener que bajar la vista al total mientras se cargan varios gastos seguidos. Confirmado con 3 tests: la fila editable muestra el TC, la fila de solo lectura (gasto liquidado) también lo muestra, y un gasto cargado en USD (no solo los en ARS) también lo muestra.) -->
 <!-- Portal TLC | servicio.html | v2026.09.18.1 (BUG REAL — Cristian: "en servicio no andan las notas, click guardar nota y borra lo escrito en el campo y no guarda". Investigado a fondo (incluido un error de consola con un 404 real en el POST al backend, que resultó ser transitorio y no la causa de fondo — se confirmó carácter por carácter que la URL del deployment activo coincide exacto con la del frontend). La causa real, aclarada por Cristian después: "si lo guardaba, mi problema era que no lo veia, porque cuando clickeas guardar nota scrollea abajo de todo y la nota nueva esta arriba, y en el celu no se ve" — la nota SÍ se guardaba bien (se agrega arriba de la lista con unshift), pero el re-render del detalle completo (o el teclado del celular cerrándose al perder foco el textarea) dejaba la pantalla scrolleada más abajo, lejos de donde apareció la nota — parecía que no había pasado nada, sobre todo en el celular. Arreglado: después de agregar la nota, la vista vuelve sola a la sección "Notas de seguimiento" (scrollIntoView suave) para que la nota recién guardada quede a la vista sin que el usuario tenga que buscarla. Confirmado con test que simula el flujo completo — tras guardar, se pide volver a la sección de notas.) -->
 <!-- Portal TLC | servicio.html | v2026.09.06.2 (BUG REAL — Cristian: "podes ver los links en el servicio? los clickeo y no hacen nada". Confirmado con la consola del navegador: "Uncaught ReferenceError: _copiarLinkTicket is not defined". Causa: _copiarLinkTicket/_duplicarTicketActual/_confirmarBorrarTicketDesdeMenu (agregadas en v2026.09.06.1, el menú "···") estaban declaradas como simples "function X(){}" en vez de "window.X = function(){}" como SÍ estaba _toggleMenuTicket (que funcionaba bien, justo al lado). Confirmado con una carga real del archivo completo (servidor local + jsdom, sin mocks, sin syntax-check aislado que no reproduce esto) que esa diferencia de forma es justo lo que las dejaba sin colgar del global — el onclick="" inline busca el identificador en window, y si no está ahí, tira ReferenceError apenas se toca el botón sin ningún otro síntoma visible (el menú se ve, se abre, pero tocar una opción no hace nada). Revisado también cotizaciones.html, que usa el mismo patrón "···" — ahí SÍ funciona bien con "function X(){}" simple (confirmado con la misma prueba real), así que el problema era específico de algo en servicio.html, no un patrón universal — no hizo falta tocar cotizaciones.html. Cambiadas las 3 funciones a la forma explícita "window.X = function(){}". Confirmado con 4 tests: las 3 funciones ahora SÍ existen en window (antes daban "undefined") en una carga real del archivo, y los 3 tests de comportamiento (copiar link, duplicar con bloqueo de doble click, borrar) siguen dando exactamente el mismo resultado que antes — solo cambió la forma de declaración, no la lógica.) -->
@@ -3894,8 +3895,17 @@ async function _cargarTCSt() {
 }
 _cargarTCSt();
 
-function _aMonedaGastoSt(montoUSD, moneda) {
-  if (moneda === 'ARS' && TC_OFICIAL_ST) return montoUSD * TC_OFICIAL_ST;
+function _aMonedaGastoSt(montoUSD, moneda, tcOverride) {
+  // tcOverride — el TC histórico guardado en el gasto (g.tc_al_cargar),
+  // si lo tiene. Pedido por Cristian: "el tc es el de la fecha de la
+  // carga, y queda guardado historico si hace 10 dias era 1530 y hoy
+  // 1535, el input de 10 dias queda con 1530 y el de hoy 1535". Sin
+  // tcOverride, se sigue usando el TC vigente de hoy — mismo
+  // comportamiento de siempre (usado para el Total agregado, que no
+  // se tocó, y como respaldo para gastos que todavía no tienen TC
+  // histórico guardado).
+  var tc = tcOverride || TC_OFICIAL_ST;
+  if (moneda === 'ARS' && tc) return montoUSD * tc;
   return montoUSD;
 }
 
@@ -3951,16 +3961,18 @@ function _renderGastos(t) {
     // y fecha y hora, fijate en imagen 3 como lo hicimos en notas".
     var metaAutorHtml = g.creado_por ? '<div class="nota-meta">' + _esc(g.creado_por) + (g.creado_en ? ' · ' + _formatFechaISO(g.creado_en) : '') + badgePagadoHtml + '</div>' : (badgePagadoHtml ? '<div class="nota-meta">' + badgePagadoHtml + '</div>' : '');
     if (soloLecturaEsteGasto) {
-      var importeSoloLectura = _aMonedaGastoSt(parseFloat(g.importe)||0, moneda);
+      var tcDeEsteGasto = g.tc_al_cargar || TC_OFICIAL_ST;
+      var importeSoloLectura = _aMonedaGastoSt(parseFloat(g.importe)||0, moneda, g.tc_al_cargar);
       return '<div class="gastos-card">' +
         metaAutorHtml +
         '<div class="gastos-top"><b style="font-size:13px;">' + _esc(g.descripcion || '—') + '</b></div>' +
         '<div style="font-size:11px;color:var(--text-muted);">' + _esc(g.fecha || '—') + ' · ' + (moneda === 'ARS' ? 'AR$ ' : 'USD ') + importeSoloLectura.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) +
-          (TC_OFICIAL_ST ? ' <span class="gastos-tc-label" title="Tipo de cambio usado en la conversión de este gasto">· TC $' + TC_OFICIAL_ST.toLocaleString('es-AR') + '</span>' : '') +
+          (tcDeEsteGasto ? ' <span class="gastos-tc-label" title="Tipo de cambio usado en la conversión de este gasto">· TC $' + tcDeEsteGasto.toLocaleString('es-AR') + '</span>' : '') +
         '</div>' +
       '</div>';
     }
-    var importeMostrado = moneda === 'ARS' ? _aMonedaGastoSt(parseFloat(g.importe)||0, 'ARS') : (g.importe||'');
+    var importeMostrado = moneda === 'ARS' ? _aMonedaGastoSt(parseFloat(g.importe)||0, 'ARS', g.tc_al_cargar) : (g.importe||'');
+    var tcParaLabel = g.tc_al_cargar || TC_OFICIAL_ST;
     return '<div class="gastos-card">' +
       metaAutorHtml +
       '<div class="gastos-top">' +
@@ -3969,7 +3981,7 @@ function _renderGastos(t) {
       '</div>' +
       '<div class="gastos-grid">' +
         '<div class="gastos-campo"><label>Fecha</label><input type="date" class="gastos-input" value="' + _esc(g.fecha||'') + '" onchange="_editarGasto(\'' + t.id_ticket + '\',' + i + ',\'fecha\',this.value)"></div>' +
-        '<div class="gastos-campo"><label>Importe' + (moneda === 'ARS' && !TC_OFICIAL_ST ? ' <span style="color:#f8961e;">(cargando TC...)</span>' : '') + '</label>' +
+        '<div class="gastos-campo"><label>Importe' + (moneda === 'ARS' && !tcParaLabel ? ' <span style="color:#f8961e;">(cargando TC...)</span>' : '') + '</label>' +
           '<div class="gastos-importe-wrap">' +
             '<div class="gastos-moneda-switch" onclick="_toggleMonedaGasto(\'' + t.id_ticket + '\',' + i + ')" title="Cambiar moneda">' +
               '<span class="' + (moneda !== 'ARS' ? 'activo' : '') + '">USD</span>' +
@@ -3977,15 +3989,7 @@ function _renderGastos(t) {
             '</div>' +
             '<input type="text" inputmode="decimal" class="gastos-input" value="' + _formatMontoARS(importeMostrado) + '" placeholder="0,00" onfocus="this.select()" onblur="this.value=_formatMontoARS(_parseMontoARS(this.value)); _editarGasto(\'' + t.id_ticket + '\',' + i + ',\'importe\',this.value)">' +
           '</div>' +
-          // Pedido por Cristian: "en cada gasto de tarjeta... agregar
-          // al lado el tipo de cambio (no editable) en cada renglon" —
-          // antes el TC solo se veía una vez, en el total agregado de
-          // abajo. No es un valor propio de CADA gasto (es un único TC
-          // vigente que se aplica a todos por igual, no se guarda un
-          // TC histórico por gasto) — es el mismo número que ya
-          // aparece en el total, mostrado también acá para no tener
-          // que buscarlo más abajo mientras se cargan varios gastos.
-          (TC_OFICIAL_ST ? '<span class="gastos-tc-label" style="display:block;margin-top:3px;" title="Tipo de cambio vigente usado para convertir este importe">TC: $' + TC_OFICIAL_ST.toLocaleString('es-AR') + '</span>' : '') +
+          (tcParaLabel ? '<span class="gastos-tc-label" style="display:block;margin-top:3px;" title="' + (g.tc_al_cargar ? 'Tipo de cambio del día en que se cargó este gasto (queda fijo)' : 'Tipo de cambio vigente hoy — este gasto todavía no tiene uno propio guardado') + '">TC: $' + tcParaLabel.toLocaleString('es-AR') + '</span>' : '') +
         '</div>' +
       '</div>' +
     '</div>';
@@ -4022,7 +4026,7 @@ window._toggleMonedaGasto = function(id, idx) {
   // ya se le liquidó a la persona. Paso 1 del módulo nuevo "Cuenta
   // Corriente y Rendición de Gastos".
   if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
-  if (g.moneda !== 'ARS' && !TC_OFICIAL_ST) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
+  if (g.moneda !== 'ARS' && !(g.tc_al_cargar || TC_OFICIAL_ST)) { alert('El tipo de cambio oficial todavía no cargó — esperá unos segundos e intentá de nuevo.'); return; }
   g.moneda = (g.moneda === 'ARS') ? 'USD' : 'ARS';
   var cont = document.getElementById('det-gastos-card');
   if (cont) cont.innerHTML = _renderGastos(t);
@@ -4041,7 +4045,7 @@ window._agregarGasto = function(id) {
   // gastos viejos (de antes de este cambio) no tienen estos campos —
   // se tratan como PENDIENTE/a favor de quien figure en creado_por al
   // leerlos (ver _renderGastos), sin necesidad de migrar nada.
-  t.gastos.push({ fecha: hoy, descripcion: '', importe: '', moneda: 'ARS', creado_por: autor, creado_en: new Date().toISOString(), a_favor_de: autor, estado: 'PENDIENTE' });
+  t.gastos.push({ fecha: hoy, descripcion: '', importe: '', moneda: 'ARS', creado_por: autor, creado_en: new Date().toISOString(), a_favor_de: autor, estado: 'PENDIENTE', tc_al_cargar: TC_OFICIAL_ST || null });
   if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual = t;
   _renderDetalle(t);
   _guardarGastos(id, t.gastos);
@@ -4059,8 +4063,14 @@ window._editarGasto = function(id, idx, campo, valor) {
     // g.importe SIEMPRE se guarda en USD internamente — si el toggle
     // de esta fila está en AR$, lo que tipeó el operador es un monto
     // en pesos, hay que convertirlo antes de guardar (mismo criterio
-    // que presupuesto-editor.html/eventos.html).
-    g.importe = (g.moneda === 'ARS' && TC_OFICIAL_ST) ? (num / TC_OFICIAL_ST) : num;
+    // que presupuesto-editor.html/eventos.html). Usa el TC HISTÓRICO
+    // de este gasto (g.tc_al_cargar) si ya lo tiene — así el
+    // ida-y-vuelta (se muestra en ARS con el TC de esa fecha, se
+    // edita, se vuelve a guardar en USD) no cambia solo porque hoy el
+    // TC es otro. Si todavía no tiene uno propio (gasto viejo, antes
+    // de este cambio), cae al TC vigente de hoy como siempre.
+    var tcParaGuardar = g.tc_al_cargar || TC_OFICIAL_ST;
+    g.importe = (g.moneda === 'ARS' && tcParaGuardar) ? (num / tcParaGuardar) : num;
   } else {
     g[campo] = valor;
   }
