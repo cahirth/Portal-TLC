@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.09.20.1 (FOTOS LENTAS — Cristian: "las fotos del catalogo tardan en mostrarse, esta toda medio lenta la app, se pone dificil". Causa real: las fotos de Google Drive (banner de ofertas, _fotoUrlSimple) se pedían sin NINGÚN parámetro de tamaño — Drive/lh3.googleusercontent.com sirve el archivo ORIGINAL completo (a menudo varios MB, resolución de cámara de celular) aunque se muestre en una miniatura de 44-48px, y el navegador tenía que descargar y recién ahí achicar cada imagen entera. Agregado "=w400" a los links de Drive — le pide al propio servidor de Google que redimensione y sirva una versión ya chica y liviana, sin bajar nunca el archivo grande. No pisa un tamaño que ya venga puesto a mano en la URL. Mismo fix aplicado en ficha-equipo.html (fotoUrl, misma lógica). PENDIENTE — selector-dispositivos.html (el catálogo principal, con probablemente más fotos cargando a la vez que en ningún otro lado) usa la MISMA lógica según su propio comentario ("Misma lógica que selector-dispositivos.html" en ficha-equipo.html) pero no se tiene ese archivo en esta sesión — pedido a Cristian para aplicar el mismo arreglo ahí, que es donde más impacto debería tener. Confirmado con 2 tests: agrega =w400 a links de Drive nuevos, y no pisa un tamaño ya especificado.) -->
 <!-- Portal TLC | index.html | v2026.09.04.2 (Fix de posición del avatar — Cristian: "esta solapado los dos botones abajo a la derecha" / "se solapa arriba a la derecha con la campana de mensajes, corré a la izq todos los iconos y deja el avatar a la derecha arriba". avatar.js v4 ahora se cuelga DENTRO de .app-header como último hijo (position:relative, fluye en el flex normal) en vez de position:fixed — cae después de la campanita, empujándola a la izquierda, sin taparla ni escaparse del marco de teléfono simulado. ?v=4 en el <script src="avatar.js"> para forzar la descarga de la versión nueva. Confirmado con integración real: el avatar queda dentro de .app-header, es su último hijo, cero errores propios.) -->
 <!-- Portal TLC | index.html | v2026.09.04.1 (UNIFICACIÓN DE AVATAR — Cristian: "quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos". index.html GANÓ como referencia de diseño (menú completo: tema, Saludo WhatsApp, Push, Instalar app, cerrar sesión) — se extrajo esa lógica a avatar.js (archivo compartido que ya usaban eventos.html/cuenta-corriente.html en su versión simple) y ahora los 6 módulos del Portal usan la MISMA fuente. Se sacó el avatar propio de este archivo (HTML/CSS/JS con ids -idx, ~180 líneas) y se reemplazó por <script src="avatar.js">, agregado justo después de version.js. _aplicarTemaIdx queda (la sigue usando el arranque y la sincronización entre pestañas), solo se le sacaron las partes que tocaban los botones del avatar viejo. updateUserDisplay() se recortó para solo actualizar el saludo del subtítulo — el avatar en sí lo arma avatar.js solo. Confirmado con integración real: avatar.js corriendo DENTRO del HTML completo (servido localmente, sesión real, sin mocks) — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
 <!-- Portal TLC | index.html | v2026.08.30.3 (Nuevo ítem "Cuenta Corriente" dentro del submenú de Administración, junto a Eventos/Reportes/Regulatoria/Comercio Exterior — navega a cuenta-corriente.html (archivo nuevo, Paso 3 del módulo "Cuenta Corriente y Rendición de Gastos") vía abrirUrlConPermiso, reusando el mismo permiso "Administracion" (userPermisos.admin) que ya chequea la pantalla en sí. Pedido por Cristian: "pone el acceso dentro de Administracion". Confirmado con 3 tests: el ítem vive físicamente dentro del submenú de Administración, queda habilitado/bloqueado según el mismo permiso real, y bloqueado no navega (avisa con toast).) -->
@@ -1546,10 +1547,21 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
     function _fotoUrlSimple(foto, fotoMap) {
         if (!foto) return '';
         const s = String(foto).trim();
-        if (s.includes('lh3.googleusercontent.com')) return s;
+        // Pedido por Cristian: "las fotos del catalogo tardan en
+        // mostrarse, esta toda medio lenta la app". Causa real: las
+        // fotos de Google Drive se pedían SIN ningún parámetro de
+        // tamaño — Drive/Google Photos sirve el archivo ORIGINAL
+        // completo (a menudo varios MB, resolución de cámara de
+        // celular) aunque se muestre en una miniatura de 44-48px.
+        // Agregar "=w400" le pide al propio servidor de Google que
+        // redimensione y sirva una versión mucho más chica y liviana
+        // — el navegador nunca descarga el archivo grande para
+        // empezar. 400px cubre con margen una miniatura chica incluso
+        // en pantallas de alta densidad (2x-3x).
+        if (s.includes('lh3.googleusercontent.com')) return s.includes('=w') || s.includes('=s') ? s : s + '=w400';
 
         const mDrive = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-        if (mDrive) return `https://lh3.googleusercontent.com/d/${mDrive[1]}`;
+        if (mDrive) return `https://lh3.googleusercontent.com/d/${mDrive[1]}=w400`;
 
         const mFotos = s.match(/^Fotos\/(.+)$/i);
         if (mFotos && fotoMap) {

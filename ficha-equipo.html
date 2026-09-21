@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.09.20.1 (FOTOS LENTAS — Cristian: "las fotos del catalogo tardan en mostrarse, esta toda medio lenta la app, se pone dificil". Mismo fix que index.html: fotoUrl() pedía las fotos de Google Drive sin ningún parámetro de tamaño, sirviendo el archivo original completo (varios MB) aunque se mostrara en una miniatura chica. Agregado "=w400" a los links de Drive — Google redimensiona y sirve una versión ya liviana, sin que el navegador baje nunca el archivo grande. No pisa un tamaño ya especificado en la URL. Confirmado con test.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.30.3 (BUG REAL — el badge "Tu comisión" mostraba el valor crudo del JSON con un "%" pegado al final, ej. "0,07%" en vez de "7%" — reportado por Cristian con captura de ELI EZER ERK-9100 ("en selector, tu comision lo volves a dividir x 100... en el adjunto es 0,07% y debe ser 7%", después de un rato de investigación se confirmó que el badge real vivía acá, no en selector-dispositivos.html). Causa: la celda COMISIONES en la hoja Lista_Precios tiene formato porcentaje ("7.00%" a la vista), y por eso Sheets entrega el valor crudo como la FRACCIÓN interna 0.07, no como "7" — _mostrarBadgeComisionSiCorresponde() usaba ese 0.07 tal cual, sin multiplicar por 100, y se lo pasaba directo a toLocaleString + "%". Mismo criterio de conversión que ya usa fmtPct() en selector-dispositivos.html (si el valor es ≤1 se multiplica por 100). Confirmado con 4 tests: el caso real reportado (0.07 → "7%"), una comisión ya cargada como número entero (7 → "7%", sigue andando igual que antes), una comisión chica de verdad (0.5 → "50%", mismo criterio consistente), y que sin sesión de vendedor el badge sigue sin mostrarse (vista de cliente).) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.30.2 (BUG REAL — el botón "Ver stock" nunca se ocultaba en modo cliente (?modo=cliente), a diferencia de teléfono/WhatsApp/PDF (herramientas del vendedor, ya ocultas desde v2026.08.29.3). El stock interno de TLC no es algo que quien recibe el link de la ficha deba ver. Pedido por Cristian: "Cuando envío la ficha técnica el cliente no debe tener acceso al botón ver stock". Un chequeo de _modoReceptor agregado a la condición que arma el botón. Confirmado con test: en modo cliente el botón no aparece; para el vendedor (sin ese parámetro) sigue viéndose normal.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.30.1 (BUG REAL — la clave de "Ficha enviada" (v2026.08.29.2) era SOLO por equipo, sin el destinatario: una vez mandada la ficha de un equipo a un cliente, quedaba bloqueada para SIEMPRE, ni siquiera dejaba mandársela a un cliente DISTINTO. Reportado por Cristian: "Un equipo, quiero enviar otro, y ya me pone el ficha enviada y no me deja mandar más... entiendo que podría ser el mismo, que no me deje enviar al mismo cliente, pero se traba" — confirmando el diagnóstico exacto. Ahora la clave incluye el teléfono (_claveFichaEnviada(equipo, telefono)) — cada combinación equipo+cliente se trackea por separado. Se re-chequea en cada tecla del teléfono (oninput), y como el campo queda oculto junto con "Ficha enviada", se agregó el link "¿Enviar a otro cliente?" dentro del mensaje para poder volver a mostrarlo y tipear un número nuevo (_habilitarNuevoDestinatario, _ocultarEstadoFichaEnviada). Confirmado con 5 tests: arranca limpio, marcar para un cliente muestra el estado, escribir un teléfono DISTINTO ya no bloquea (el bug reportado), volver a escribir el teléfono ya enviado muestra el estado de nuevo, y el link de "otro cliente" limpia y habilita todo.) -->
@@ -598,12 +599,17 @@ async function _cargarFotoMap() {
 // planilla no siempre es una URL directa: puede ser un link de Drive
 // (se convierte a lh3), o una ruta relativa tipo "Fotos/xxx.png" que
 // hay que resolver contra el fotoMap cargado del Apps Script.
+// Pedido por Cristian: "las fotos del catalogo tardan en mostrarse,
+// esta toda medio lenta la app" — mismo fix que index.html: pedirle a
+// Drive el archivo original completo (varios MB) para mostrarlo en
+// una miniatura chica era la causa real. "=w400" le pide a Google que
+// redimensione y sirva una versión liviana directamente.
 function fotoUrl(foto) {
     if (!foto) return '';
     var s = foto.toString().trim();
-    if (s.indexOf('lh3.googleusercontent.com') !== -1) return s;
+    if (s.indexOf('lh3.googleusercontent.com') !== -1) return (s.indexOf('=w') !== -1 || s.indexOf('=s') !== -1) ? s : s + '=w400';
     var mDrive = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-    if (mDrive) return 'https://lh3.googleusercontent.com/d/' + mDrive[1];
+    if (mDrive) return 'https://lh3.googleusercontent.com/d/' + mDrive[1] + '=w400';
     var mFotos = s.match(/^Fotos\/(.+)$/i);
     if (mFotos) {
         var nombre = mFotos[1].toLowerCase();
