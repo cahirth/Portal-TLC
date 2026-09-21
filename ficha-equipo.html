@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.09.20.2 (BUG REAL — Cristian, tras el fix de tamaño de fotos: "en ficha equipo tarda una eternidad" (con captura: el recuadro de la foto quedaba girando sin resolverse nunca, mientras el resto de la ficha — precio, comisión, modalidades de pago — ya había cargado bien). Causa real, 2 partes: (1) la foto del equipo se resolvía SIEMPRE detrás de una promesa que esperaba a _cargarFotoMap() (fetch a Apps Script) terminar — INCLUSO cuando la foto de ESE equipo puntual es un link directo de Drive que fotoUrl() ya resuelve sin necesitar el fotoMap para nada. Ahora _resolverFotoDiferida intenta mostrar la foto YA MISMO, sin esperar nada; solo si el link es del formato "Fotos/xxx.png" (que sí necesita el fotoMap para encontrar la URL real) espera al fotoMap — la gran mayoría de equipos con foto en link directo ya no se ven afectados en absoluto. (2) _cargarFotoMap() no tenía NINGÚN límite de tiempo — si Apps Script está lento o colgado (mismo problema de fondo que se viene arrastrando hoy con historico.json / el posible límite de 200 versiones del proyecto, pendiente para la noche), el fetch podía quedar esperando indefinidamente sin resolver nunca. Ahora se corta solo a los 8 segundos y cae al placeholder en vez de girar para siempre. Confirmado con 4 tests: un link directo de Drive se muestra al toque sin esperar fotoMap; un link "Fotos/..." espera correctamente y se resuelve bien una vez que el fotoMap está listo; sin ninguna foto, oculta el recuadro sin esperar nada; y con Apps Script simulando estar colgado (nunca responde), _cargarFotoMap se corta a los ~8s en vez de esperar para siempre.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.09.20.1 (FOTOS LENTAS — Cristian: "las fotos del catalogo tardan en mostrarse, esta toda medio lenta la app, se pone dificil". Mismo fix que index.html: fotoUrl() pedía las fotos de Google Drive sin ningún parámetro de tamaño, sirviendo el archivo original completo (varios MB) aunque se mostrara en una miniatura chica. Agregado "=w400" a los links de Drive — Google redimensiona y sirve una versión ya liviana, sin que el navegador baje nunca el archivo grande. No pisa un tamaño ya especificado en la URL. Confirmado con test.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.30.3 (BUG REAL — el badge "Tu comisión" mostraba el valor crudo del JSON con un "%" pegado al final, ej. "0,07%" en vez de "7%" — reportado por Cristian con captura de ELI EZER ERK-9100 ("en selector, tu comision lo volves a dividir x 100... en el adjunto es 0,07% y debe ser 7%", después de un rato de investigación se confirmó que el badge real vivía acá, no en selector-dispositivos.html). Causa: la celda COMISIONES en la hoja Lista_Precios tiene formato porcentaje ("7.00%" a la vista), y por eso Sheets entrega el valor crudo como la FRACCIÓN interna 0.07, no como "7" — _mostrarBadgeComisionSiCorresponde() usaba ese 0.07 tal cual, sin multiplicar por 100, y se lo pasaba directo a toLocaleString + "%". Mismo criterio de conversión que ya usa fmtPct() en selector-dispositivos.html (si el valor es ≤1 se multiplica por 100). Confirmado con 4 tests: el caso real reportado (0.07 → "7%"), una comisión ya cargada como número entero (7 → "7%", sigue andando igual que antes), una comisión chica de verdad (0.5 → "50%", mismo criterio consistente), y que sin sesión de vendedor el badge sigue sin mostrarse (vista de cliente).) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.08.30.2 (BUG REAL — el botón "Ver stock" nunca se ocultaba en modo cliente (?modo=cliente), a diferencia de teléfono/WhatsApp/PDF (herramientas del vendedor, ya ocultas desde v2026.08.29.3). El stock interno de TLC no es algo que quien recibe el link de la ficha deba ver. Pedido por Cristian: "Cuando envío la ficha técnica el cliente no debe tener acceso al botón ver stock". Un chequeo de _modoReceptor agregado a la condición que arma el botón. Confirmado con test: en modo cliente el botón no aparece; para el vendedor (sin ese parámetro) sigue viéndose normal.) -->
@@ -571,28 +572,59 @@ async function _mostrarBadgeComisionSiCorresponde(equipo) {
 // o después de que el resto de la ficha ya se haya pintado). Si para
 // entonces la foto ya se había ocultado por "sin foto", no vuelve a
 // tocarla — solo actúa si sigue en el estado "cargando" inicial.
+// Devuelve true si logró resolver y mostrar la foto (o si determinó
+// que no hay foto y ocultó el recuadro), false si el link es del tipo
+// "Fotos/xxx.png" y todavía no hay fotoMap cargado para resolverlo —
+// en ese caso el llamador reintenta cuando el fotoMap esté listo.
 function _resolverFotoDiferida(fotoRaw) {
     var wrap = document.querySelector('.foto-wrap');
     var foto = document.getElementById('fi-foto');
-    if (!wrap || !foto) return;
+    if (!wrap || !foto) return true;
     var fotoResuelta = fotoUrl(fotoRaw);
     if (fotoResuelta) {
         foto.src = fotoResuelta;
         foto.style.display = 'block';
         wrap.classList.remove('foto-cargando');
-    } else {
-        wrap.style.display = 'none';
+        return true;
     }
+    // fotoUrl devuelve '' tanto si genuinamente no hay foto (fotoRaw
+    // vacío) como si es un link "Fotos/..." que necesita el fotoMap
+    // — solo en este último caso vale la pena esperar y reintentar.
+    var esFormatoQueNecesitaFotoMap = /^Fotos\//i.test((fotoRaw || '').toString().trim());
+    if (esFormatoQueNecesitaFotoMap) return false;
+    wrap.style.display = 'none';
+    return true;
 }
 
 async function _cargarFotoMap() {
+    // BUG REAL — Cristian: "en ficha equipo tarda una eternidad" (con
+    // captura: el recuadro de la foto quedaba girando sin resolverse
+    // nunca, mientras el resto de la ficha — precio, comisión,
+    // modalidades de pago, todo lo que sale de Firebase directo — ya
+    // había cargado bien). Esta función depende de Apps Script
+    // (FOTO_MAP_URL = GAS_URL), y NO tenía ningún límite de tiempo —
+    // si el backend está lento o colgado (mismo tema de fondo que
+    // veníamos peleando hoy con historico.json / el posible límite de
+    // 200 versiones del proyecto), este fetch podía quedar esperando
+    // indefinidamente, sin que la foto se resolviera NUNCA — ni
+    // siquiera con un error, simplemente giraba para siempre. Ahora
+    // se corta solo a los 8 segundos si Apps Script no contestó, y la
+    // foto cae al placeholder en vez de quedar girando eternamente —
+    // resto de la ficha no se ve afectado, ya que fotoMap siempre
+    // corrió sin bloquear nada más (ver comentario en _cargarFicha).
     try {
-        var res = await fetch(FOTO_MAP_URL, { redirect: 'follow' });
+        var controller = new AbortController();
+        var timeoutId = setTimeout(function() { controller.abort(); }, 8000);
+        var res = await fetch(FOTO_MAP_URL, { redirect: 'follow', signal: controller.signal });
+        clearTimeout(timeoutId);
         var text = await res.text();
         var data = JSON.parse(text);
         if (data.error) { console.warn('FotoMap Apps Script error:', data.error); return; }
         fotoMap = data;
-    } catch(e) { console.warn('No se pudo cargar fotoMap:', e.message); }
+    } catch(e) {
+        if (e.name === 'AbortError') console.warn('FotoMap: Apps Script no contestó en 8s, se sigue sin la foto de Fotos/... (mesas, accesorios sin link directo de Drive quedan con el ícono genérico)');
+        else console.warn('No se pudo cargar fotoMap:', e.message);
+    }
 }
 
 // Misma lógica que selector-dispositivos.html — el campo "Foto" de la
@@ -1094,10 +1126,23 @@ async function _cargarFicha() {
         document.getElementById('fi-nombre').textContent = d['Nombre de Dispositivo'] || '';
         document.getElementById('fi-descripcion').textContent = d.Descripcion || '';
 
-        // La foto recién se resuelve cuando el fotoMap termine de cargar
-        // (puede que ya haya terminado, puede que tarde un instante más)
-        // — el resto de la ficha no espera por esto.
-        promesaFotoMap.then(function() { _resolverFotoDiferida(d.Foto); });
+        // BUG REAL — Cristian: "en ficha equipo tarda una eternidad"
+        // (con captura: la foto quedaba girando, todo lo demás ya
+        // había cargado). La causa: esto esperaba SIEMPRE a que
+        // terminara el fotoMap de Apps Script (lento, y hoy además
+        // con problemas de fondo) antes de intentar mostrar la foto
+        // — incluso cuando la foto de ESTE equipo puntual es un link
+        // DIRECTO de Drive que no necesita fotoMap para nada (fotoUrl
+        // ya lo resuelve sin consultar fotoMap). Ahora se intenta
+        // mostrar YA MISMO, sin esperar nada — si resuelve (la
+        // mayoría de los casos, links directos), aparece al toque. Si
+        // no resuelve todavía (formato "Fotos/xxx.png", que sí
+        // necesita el fotoMap para encontrar la URL real), ahí sí
+        // espera a que termine — pero ya no bloquea a los equipos que
+        // no lo necesitaban para nada.
+        if (!_resolverFotoDiferida(d.Foto)) {
+            promesaFotoMap.then(function() { _resolverFotoDiferida(d.Foto); });
+        }
 
         var btnRow = document.getElementById('fi-btn-row');
         var botones = '';
