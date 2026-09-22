@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.09.21.1 (PRIMER PASO DE MIGRACIÓN FUERA DE APPS SCRIPT — Cristian: "arrancamos con modulo empresas, que guarde al toque". Las 7 acciones de este módulo (listarEmpresas, guardarEmpresa, borrarEmpresa, guardarContacto, borrarContacto, reasignarEmpresaNegocio, guardarEmpresaContactoQR) se eligieron primero porque son Firebase puro — ninguna toca historico.json en GitHub (la fuente de casi todos los problemas del 20/09/2026) ni ningún otro sistema externo, riesgo bajo para probar el patrón de migración completo. Agregada la constante EMPRESAS_URL (con un placeholder claro + aviso en consola si no se reemplaza) — las 13 llamadas fetch(GAS_URL) del archivo (todas usan una de estas 7 acciones, confirmado que no hay ninguna otra acción en este archivo) ahora apuntan a EMPRESAS_URL en vez de GAS_URL. Ver /cloud-function-empresas/ para el código de la Cloud Function (index.js, equivalente línea por línea a las funciones de FotoMap.gs, verificado con 6 tests) y DESPLIEGUE.md con los pasos para desplegarla. Una vez desplegada, reemplazar el placeholder de EMPRESAS_URL por la URL real — nada más de este archivo necesita tocarse.) -->
 <!-- Portal TLC | empresas.html | v2026.09.04.2 (Fix de posición del avatar — Cristian: "se solapa arriba a la derecha con la campana de mensajes, corré a la izq todos los iconos y deja el avatar a la derecha arriba". avatar.js v4 ahora se cuelga DENTRO de .header como último hijo (position:relative, fluye en el flex normal) en vez de position:fixed. ?v=4 en el <script src="avatar.js"> para forzar la descarga de la versión nueva. Confirmado con integración real: el avatar queda dentro de .header, es su último hijo, cero errores propios.) -->
 <!-- Portal TLC | empresas.html | v2026.09.04.1 (UNIFICACIÓN DE AVATAR — Cristian: "quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos". Se sacó el avatar propio (era la versión más chica de las 4 — solo iniciales fijas + toggle de tema, sin nombre/email/rol/menú real) y se reemplazó por <script src="avatar.js">, la misma fuente única que ahora usan los 6 módulos del Portal — index.html "ganó" como referencia: menú completo con tema, Saludo WhatsApp, Push, Instalar app y cerrar sesión (empresas.html no tenía ninguna de esas 3 últimas antes). _aplicarTema queda (la sigue usando el arranque), solo se le sacaron las partes que tocaban los botones del menú viejo. Push/Instalar NO aparecen todavía acá — este módulo no tiene la infraestructura de Firebase Cloud Messaging que sí tienen index/servicio/cotizaciones (avatar.js los oculta solos vía feature-detection); agregarla es un paso aparte, acordado con Cristian. Confirmado con integración real: avatar.js corriendo DENTRO del HTML completo (servido localmente, sesión real, sin mocks) — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
 <!-- Portal TLC | empresas.html | v2026.08.19.7 (Todos los botones que mutan datos ahora se deshabilitan al primer click para evitar acciones repetidas (doble-click / doble-tap) — extiende a los que todavía no lo tenían el mismo patrón que ya usaban _crearNuevaEmpresa/_guardarCambiosEmpresa/_guardarContacto/_confirmarImportacion/_confirmarNuevoNegocio: se deshabilita al entrar, se reactiva en cualquier salida por error (fetch fallido, respuesta ok:false), y en el camino feliz queda deshabilitado hasta que la UI se re-renderiza o navega (no hace falta reactivarlo a mano). Cubre: _borrarEmpresaActual (🗑 Borrar empresa), _borrarContacto (✕ por contacto, ahora recibe el botón como 2do parámetro), _usarEmpresaParaNegocio (✅ por contacto, ídem), _guardarContactoQREmpresas (💾 Guardar del modal QR — se reactiva también al abrir un escaneo nuevo, por si quedó deshabilitado de un guardado previo en la misma sesión), y _iaEnviarPregunta (➤ enviar + el input de texto — esta consulta puede tardar 10-20s, así que sin el guard se podían mandar preguntas duplicadas tocando varias veces o con Enter). NO se tocaron los botones de navegación/toggle (⟵ volver, tema claro/oscuro, avatar, Cancelar, abrir/cerrar modales, mic, "Mostrar más") — deshabilitarlos permanentemente rompería su uso normal sin prevenir ninguna acción duplicada real. Pedido por Cristian: "todos los botones una vez clickeados deben deshabilitarse, para no hacer acciones repetidas". Confirmado con 5 tests aislados: cada función bloquea un 2do click mientras la 1ra sigue pendiente (no dispara un 2do fetch/consulta), y se reactiva correctamente tras un error de red o de respuesta.) -->
@@ -385,6 +386,19 @@ console.log("%c TLC Empresas (archivo) v" + _VERSION_ARCHIVO_EMPRESAS + " ", "ba
 // con cotizaciones/tickets reales — próxima etapa.
 // ══════════════════════════════════════════════════════════════════
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+// Primer paso de la migración fuera de Apps Script — Cristian:
+// "arrancamos con modulo empresas, que guarde al toque". Las 7
+// acciones de este módulo (listar/guardar/borrar empresas,
+// guardar/borrar contactos, reasignar negocio, guardado por QR) ya
+// no van a Apps Script — van a la Cloud Function nueva, más rápida y
+// sin el límite de 200 versiones que venía trabando todo. Cambiá
+// SOLO este valor por la URL real una vez desplegada (ver
+// DESPLIEGUE.md) — todo el resto del archivo ya está armado para
+// usarla, no hace falta tocar nada más.
+const EMPRESAS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/empresas'; // Cloud Function desplegada 2026.09.22 — reemplaza a GAS_URL para este módulo
+if (EMPRESAS_URL.startsWith('PENDIENTE_')) {
+  console.error('⚠️ EMPRESAS_URL todavía no está configurada — ver DESPLIEGUE.md. Las acciones de este módulo van a fallar hasta que se pegue la URL real de la Cloud Function.');
+}
 
 // Sesión compartida con el resto del Portal (login OTP), solo lectura —
 // empresas.html no tiene pantalla de login propia, se apoya en la sesión
@@ -431,7 +445,7 @@ async function _cargarEmpresas() {
   var cont = document.getElementById('lista-empresas');
   if (cont && !EMPRESAS.length) cont.innerHTML = '<div class="empty-lista" style="text-align:center;"><div class="spinner" style="margin:0 auto 10px;"></div>Cargando empresas y contactos...</div>';
   try {
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var resp = await fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarEmpresas' }) });
     var r = await resp.json();
     if (miSeq !== _cargaEmpresasSeq) { _cargando = false; return; } // ya hay un pedido más nuevo en curso — esta respuesta quedó vieja, se descarta
@@ -477,7 +491,7 @@ async function _cargarEmpresasCacheFirst() {
     _renderListaEmpresas();
   }
 
-  var pedido = fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  var pedido = fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'listarEmpresas' }) })
     .then(function(resp) { return resp.json(); })
     .then(function(r) {
@@ -842,7 +856,7 @@ window._crearNuevaEmpresa = function() {
   var textoOrigCrearEmp = btnCrearEmp ? btnCrearEmp.textContent : '';
   if (btnCrearEmp) { btnCrearEmp.disabled = true; btnCrearEmp.textContent = 'Guardando...'; }
 
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:razon, cuit:cuit, telefono:telefono,
       domicilioFiscal:domicilioFiscal, domicilioComercial:domicilioComercial, domicilioEnvio:domicilioEnvio, comentariosGenerales:comentariosGenerales }) })
     .then(function(r){ return r.json(); })
@@ -922,7 +936,7 @@ window._usarEmpresaParaNegocio = async function(contactoId, btn) {
   if (!_volverANegocioId || !_empresaActualId) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
   try {
-    const resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    const resp = await fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'reasignarEmpresaNegocio', idCot: _volverANegocioId, empresaId: _empresaActualId, contactoId: contactoId || '' }) });
     const r = await resp.json();
     if (!r.ok) { alert('No se pudo cambiar la empresa del negocio: ' + (r.error||'')); if (btn) btn.disabled = false; return; }
@@ -955,7 +969,7 @@ window._guardarCambiosEmpresa = function() {
   var btn = document.getElementById('btn-guardar-cambios-empresa');
   var textoOriginal = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'guardarEmpresa', id:e.id, razonSocial:razon, cuit:cuit, telefono:telefono,
       domicilioFiscal:domicilioFiscal, domicilioComercial:domicilioComercial, domicilioEnvio:domicilioEnvio, comentariosGenerales:comentariosGenerales }) })
     .then(function(r){ return r.json(); })
@@ -976,7 +990,7 @@ window._borrarEmpresaActual = function() {
   var btn = document.getElementById('btn-borrar-empresa-actual');
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
   var sesionBorrar = _leerSesionCompartida();
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'borrarEmpresa', id:e.id, vendedorRol: (sesionBorrar && sesionBorrar.rol) || '' }) })
     .then(function(r){ return r.json(); })
     .then(async function(r) {
@@ -1134,7 +1148,7 @@ window._guardarContactoQREmpresas = function() {
   var btn = document.querySelector('#emp-qr-datos-modal .qr-btn-guardar');
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
   var nombreCompleto = ((datos.nombre||'') + ' ' + (datos.apellido||'')).trim() || 'Sin nombre';
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+  fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
     accion:'guardarEmpresaContactoQR', id: datos.id||'', nombre: datos.nombre||'', apellido: datos.apellido||'',
     dni: datos.dni||'', email: datos.email||'', telefono: datos.telefono||'', vip: !!datos.vip, categoria: datos.categoria||''
   }) }).then(function(r){ return r.json(); }).then(function(r) {
@@ -1179,7 +1193,7 @@ window._guardarContacto = function() {
   var textoOrigContacto = btnContacto ? btnContacto.textContent : '';
   if (btnContacto) { btnContacto.disabled = true; btnContacto.textContent = 'Guardando...'; }
 
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify(payload) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -1204,7 +1218,7 @@ window._borrarContacto = function(contactoId, btn) {
   if (!e) return;
   if (!confirm('¿Borrar este contacto?')) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'borrarContacto', id:contactoId }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -1412,7 +1426,7 @@ async function _confirmarNuevoNegocio() {
       contactosAdicionales: adicionales.map(function(ct) { return { id: ct.id || '', nombre: ct.nombre || '', email: ct.email || '', telefono: ct.telefono || '' }; }),
     };
     console.log('[Nuevo Negocio] Payload enviado:', payload);
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var resp = await fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify(payload)
     });
     var textoCrudo = await resp.text();
@@ -1594,12 +1608,12 @@ window._confirmarImportacion = async function() {
   for (var i = 0; i < p.nuevas.length; i++) {
     var g = p.nuevas[i];
     try {
-      var r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      var r = await fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ accion:'guardarEmpresa', razonSocial:g.razonSocial, cuit:g.cuit, telefono:g.telefono, domicilio:g.domicilio }) }).then(function(x){return x.json();});
       if (r.ok) {
         for (var j = 0; j < g.contactos.length; j++) {
           var c = g.contactos[j];
-          await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+          await fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'guardarContacto', empresaId:r.id, nombre:c.nombre, cargo:c.cargo, email:c.email, telefono:c.telefono }) });
         }
       }
@@ -1614,7 +1628,7 @@ window._confirmarImportacion = async function() {
     for (var m = 0; m < ge.contactosNuevos.length; m++) {
       var cn = ge.contactosNuevos[m];
       try {
-        await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        await fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
           body: JSON.stringify({ accion:'guardarContacto', empresaId:ge.empresaExistenteId, nombre:cn.nombre, cargo:cn.cargo, email:cn.email, telefono:cn.telefono }) });
       } catch(e) { console.warn('Error agregando contacto a', ge.razonSocial, e); }
     }
