@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.09.22.1 (BUG REAL — Cristian, tras confirmar que el guardado en sí ya andaba bien: "funciona pero tengo que refrescar la pagina con F5 para ver los cambios, es muy molesto". Causa: _cargarEmpresasCacheFirst() guarda una copia de la lista en localStorage (emp_cache_lista) para que la próxima carga de la página aparezca al instante — pero ninguna de las funciones que modifican datos (_guardarCambiosEmpresa, _borrarEmpresaActual, _guardarContacto, _borrarContacto) actualizaba esa copia guardada, solo el array en memoria de la sesión actual. Dentro de la misma sesión todo se veía bien, pero la próxima carga de la página (otra pestaña, cerrar y volver a abrir, F5) mostraba la caché vieja de ANTES del cambio, hasta que el pedido de fondo la corregía un rato después o el usuario forzaba F5. Agregado un helper único (_sincronizarCacheEmpresas) llamado después de cada uno de esos 4 cambios exitosos, para que la próxima carga ya arranque con los datos correctos sin depender de F5. El flujo de QR (_guardarContactoQREmpresas) queda sin tocar por ahora — no actualiza el estado local en absoluto, es un caso aparte, y no es donde se reportó el problema. Confirmado con test: tras editar un campo en memoria y llamar al helper, la copia en localStorage refleja el cambio correctamente.) -->
 <!-- Portal TLC | empresas.html | v2026.09.21.1 (PRIMER PASO DE MIGRACIÓN FUERA DE APPS SCRIPT — Cristian: "arrancamos con modulo empresas, que guarde al toque". Las 7 acciones de este módulo (listarEmpresas, guardarEmpresa, borrarEmpresa, guardarContacto, borrarContacto, reasignarEmpresaNegocio, guardarEmpresaContactoQR) se eligieron primero porque son Firebase puro — ninguna toca historico.json en GitHub (la fuente de casi todos los problemas del 20/09/2026) ni ningún otro sistema externo, riesgo bajo para probar el patrón de migración completo. Agregada la constante EMPRESAS_URL (con un placeholder claro + aviso en consola si no se reemplaza) — las 13 llamadas fetch(GAS_URL) del archivo (todas usan una de estas 7 acciones, confirmado que no hay ninguna otra acción en este archivo) ahora apuntan a EMPRESAS_URL en vez de GAS_URL. Ver /cloud-function-empresas/ para el código de la Cloud Function (index.js, equivalente línea por línea a las funciones de FotoMap.gs, verificado con 6 tests) y DESPLIEGUE.md con los pasos para desplegarla. Una vez desplegada, reemplazar el placeholder de EMPRESAS_URL por la URL real — nada más de este archivo necesita tocarse.) -->
 <!-- Portal TLC | empresas.html | v2026.09.04.2 (Fix de posición del avatar — Cristian: "se solapa arriba a la derecha con la campana de mensajes, corré a la izq todos los iconos y deja el avatar a la derecha arriba". avatar.js v4 ahora se cuelga DENTRO de .header como último hijo (position:relative, fluye en el flex normal) en vez de position:fixed. ?v=4 en el <script src="avatar.js"> para forzar la descarga de la versión nueva. Confirmado con integración real: el avatar queda dentro de .header, es su último hijo, cero errores propios.) -->
 <!-- Portal TLC | empresas.html | v2026.09.04.1 (UNIFICACIÓN DE AVATAR — Cristian: "quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos". Se sacó el avatar propio (era la versión más chica de las 4 — solo iniciales fijas + toggle de tema, sin nombre/email/rol/menú real) y se reemplazó por <script src="avatar.js">, la misma fuente única que ahora usan los 6 módulos del Portal — index.html "ganó" como referencia: menú completo con tema, Saludo WhatsApp, Push, Instalar app y cerrar sesión (empresas.html no tenía ninguna de esas 3 últimas antes). _aplicarTema queda (la sigue usando el arranque), solo se le sacaron las partes que tocaban los botones del menú viejo. Push/Instalar NO aparecen todavía acá — este módulo no tiene la infraestructura de Firebase Cloud Messaging que sí tienen index/servicio/cotizaciones (avatar.js los oculta solos vía feature-detection); agregarla es un paso aparte, acordado con Cristian. Confirmado con integración real: avatar.js corriendo DENTRO del HTML completo (servido localmente, sesión real, sin mocks) — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
@@ -956,6 +957,27 @@ function _cerrarDetalle() {
   _renderListaEmpresas();
 }
 
+// BUG REAL — Cristian: "funciona pero tengo que refrescar la pagina
+// con F5 para ver los cambios, es muy molesto". El guardado en sí
+// SIEMPRE anduvo bien (confirmado con el curl y con los tests) — lo
+// que fallaba era la caché local: _cargarEmpresasCacheFirst() guarda
+// una copia de la lista en localStorage para que la PRÓXIMA vez que
+// se abre empresas.html aparezca al instante, sin esperar a la red.
+// Pero ninguna de las funciones que MODIFICAN datos (guardar/borrar
+// empresa, guardar/borrar contacto) actualizaba esa copia guardada —
+// solo el array en memoria de la sesión actual. Resultado: dentro de
+// la misma sesión todo se veía bien, pero apenas se volvía a cargar
+// la página (otra pestaña, cerrar y volver a abrir, F5), aparecía la
+// caché vieja de ANTES del cambio — hasta que el pedido de fondo
+// terminaba de corregirlo un rato después, o hasta que el usuario
+// forzaba un F5 que de paso limpiaba el problema. Este helper único
+// se llama después de CUALQUIER cambio exitoso, para que la próxima
+// carga de la página ya arranque con los datos correctos, sin
+// depender de F5 ni de esperar al pedido de fondo.
+function _sincronizarCacheEmpresas() {
+  try { localStorage.setItem('emp_cache_lista', JSON.stringify(EMPRESAS)); } catch(eLs) {}
+}
+
 window._guardarCambiosEmpresa = function() {
   var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
   if (!e) return;
@@ -978,6 +1000,7 @@ window._guardarCambiosEmpresa = function() {
       e.razonSocial = razon; e.cuit = cuit; e.telefono = telefono;
       e.domicilioFiscal = domicilioFiscal; e.domicilioComercial = domicilioComercial; e.domicilioEnvio = domicilioEnvio; e.comentariosGenerales = comentariosGenerales;
       document.getElementById('hdr-titulo').textContent = razon;
+      _sincronizarCacheEmpresas();
     })
     .catch(function(){ alert('Error de conexión al guardar.'); })
     .finally(function() { if (btn) { btn.disabled = false; btn.textContent = textoOriginal; } });
@@ -996,6 +1019,7 @@ window._borrarEmpresaActual = function() {
     .then(async function(r) {
       if (!r.ok) { alert('Error al borrar: ' + (r.error||'desconocido')); if (btn) btn.disabled = false; return; }
       EMPRESAS = EMPRESAS.filter(function(x){ return x.id !== _empresaActualId; });
+      _sincronizarCacheEmpresas();
       _cerrarDetalle(); // sale de la ficha; al volver a entrar el botón se recrea habilitado
     })
     .catch(function(){ alert('Error de conexión al borrar.'); if (btn) btn.disabled = false; });
@@ -1208,6 +1232,7 @@ window._guardarContacto = function() {
       ['fc-nombre','fc-cargo','fc-email','fc-telefono','fc-dni'].forEach(function(id){ document.getElementById(id).value = ''; });
       document.getElementById('form-contacto').style.display = 'none';
       _renderContactos(e);
+      _sincronizarCacheEmpresas();
     })
     .catch(function(){ alert('Error de conexión al guardar el contacto.'); })
     .finally(function() { if (btnContacto) { btnContacto.disabled = false; btnContacto.textContent = textoOrigContacto; } });
@@ -1224,6 +1249,7 @@ window._borrarContacto = function(contactoId, btn) {
     .then(function(r) {
       if (!r.ok) { alert('Error al borrar el contacto: ' + (r.error||'desconocido')); if (btn) btn.disabled = false; return; }
       e.contactos = e.contactos.filter(function(c){ return c.id !== contactoId; });
+      _sincronizarCacheEmpresas();
       _renderContactos(e); // el botón viejo se destruye junto con la tarjeta al re-renderizar
     })
     .catch(function(){ alert('Error de conexión al borrar el contacto.'); if (btn) btn.disabled = false; });
