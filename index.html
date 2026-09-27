@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.09.23.1 (MUERTE A APPS SCRIPT — módulo Fotos migrado a Cloud Functions. _cargarOfertasFotoMap() y cargarFotoMapIdx() (2 lecturas separadas de fotoMap, para el banner de ofertas y para cotizaciones) ahora usan la misma FOTOS_URL nueva en vez de sus 2 URLs de Apps Script distintas. De paso se corrigió una inconsistencia real: cargarFotoMapIdx() apuntaba a un ID de deployment DISTINTO al resto de todo el Portal (AKfycbxD37... en vez de AKfycbww2...) — probable resabio de un deployment viejo, ahora consolidado en la misma fuente única.) -->
 <!-- Portal TLC | index.html | v2026.09.20.1 (FOTOS LENTAS — Cristian: "las fotos del catalogo tardan en mostrarse, esta toda medio lenta la app, se pone dificil". Causa real: las fotos de Google Drive (banner de ofertas, _fotoUrlSimple) se pedían sin NINGÚN parámetro de tamaño — Drive/lh3.googleusercontent.com sirve el archivo ORIGINAL completo (a menudo varios MB, resolución de cámara de celular) aunque se muestre en una miniatura de 44-48px, y el navegador tenía que descargar y recién ahí achicar cada imagen entera. Agregado "=w400" a los links de Drive — le pide al propio servidor de Google que redimensione y sirva una versión ya chica y liviana, sin bajar nunca el archivo grande. No pisa un tamaño que ya venga puesto a mano en la URL. Mismo fix aplicado en ficha-equipo.html (fotoUrl, misma lógica). PENDIENTE — selector-dispositivos.html (el catálogo principal, con probablemente más fotos cargando a la vez que en ningún otro lado) usa la MISMA lógica según su propio comentario ("Misma lógica que selector-dispositivos.html" en ficha-equipo.html) pero no se tiene ese archivo en esta sesión — pedido a Cristian para aplicar el mismo arreglo ahí, que es donde más impacto debería tener. Confirmado con 2 tests: agrega =w400 a links de Drive nuevos, y no pisa un tamaño ya especificado.) -->
 <!-- Portal TLC | index.html | v2026.09.04.2 (Fix de posición del avatar — Cristian: "esta solapado los dos botones abajo a la derecha" / "se solapa arriba a la derecha con la campana de mensajes, corré a la izq todos los iconos y deja el avatar a la derecha arriba". avatar.js v4 ahora se cuelga DENTRO de .app-header como último hijo (position:relative, fluye en el flex normal) en vez de position:fixed — cae después de la campanita, empujándola a la izquierda, sin taparla ni escaparse del marco de teléfono simulado. ?v=4 en el <script src="avatar.js"> para forzar la descarga de la versión nueva. Confirmado con integración real: el avatar queda dentro de .app-header, es su último hijo, cero errores propios.) -->
 <!-- Portal TLC | index.html | v2026.09.04.1 (UNIFICACIÓN DE AVATAR — Cristian: "quiero unificar los avatares que estan en todos los modulos, lo quiero solo en index, modo oscuro y claro que cambie en todos los modulos". index.html GANÓ como referencia de diseño (menú completo: tema, Saludo WhatsApp, Push, Instalar app, cerrar sesión) — se extrajo esa lógica a avatar.js (archivo compartido que ya usaban eventos.html/cuenta-corriente.html en su versión simple) y ahora los 6 módulos del Portal usan la MISMA fuente. Se sacó el avatar propio de este archivo (HTML/CSS/JS con ids -idx, ~180 líneas) y se reemplazó por <script src="avatar.js">, agregado justo después de version.js. _aplicarTemaIdx queda (la sigue usando el arranque y la sincronización entre pestañas), solo se le sacaron las partes que tocaban los botones del avatar viejo. updateUserDisplay() se recortó para solo actualizar el saludo del subtítulo — el avatar en sí lo arma avatar.js solo. Confirmado con integración real: avatar.js corriendo DENTRO del HTML completo (servido localmente, sesión real, sin mocks) — el avatar se inyecta con las iniciales correctas y el menú completo, cero errores propios.) -->
@@ -1522,13 +1523,17 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
     // ════════════════════════════════════════════════════════════════
     const FIREBASE_DB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
 
-    const FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+    // MUERTE A APPS SCRIPT — módulo Fotos migrado a Cloud Functions.
+    // Reemplaza a FOTO_MAP_URL/doGet() de Apps Script, que recorría
+    // toda la carpeta de Drive en cada pedido — ahora lee un mapa ya
+    // armado desde Firebase, instantáneo. Ver /cloud-function-fotos/.
+    const FOTOS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/fotos'; // Cloud Function desplegada 2026.09.27
     let _ofertasFotoMap = null; // se carga una sola vez, lazy
 
     async function _cargarOfertasFotoMap() {
         if (_ofertasFotoMap) return _ofertasFotoMap;
         try {
-            const res  = await fetch(FOTO_MAP_URL, { redirect: 'follow' });
+            const res  = await fetch(FOTOS_URL, { redirect: 'follow' });
             const data = await res.json();
             _ofertasFotoMap = (data && !data.error) ? data : {};
         } catch (e) {
@@ -2519,13 +2524,17 @@ body.tema-claro .qr-modal-card { background:#ffffff; }
 
     // ─── COTIZACIONES ─────────────────────────────────────────────────────────────
     const SHEET_ID_COT = '1WNEOD8qtHJfyM0wVgQqCEKOkDNg4Z6mJU1KrCIfh2nU';
-    const FOTO_MAP_URL_IDX = 'https://script.google.com/macros/s/AKfycbxD37pl_gc0wADzn0d2NgQ1on6wx1LZGQoP861rdrQXZqJxqx1OEaRYvK06GHQBlaYw/exec';
+    // OJO — esto apuntaba a un ID DE DEPLOYMENT DISTINTO al resto de
+    // todo el Portal (AKfycbxD37... en vez de AKfycbww2...) — probable
+    // resabio de un deployment viejo. Como de todas formas hacía lo
+    // mismo (leer el fotoMap), ahora usa la MISMA Cloud Function nueva
+    // que el resto — de paso se saca de encima esa inconsistencia.
     let fotoMapIdx = {};
 
     async function cargarFotoMapIdx() {
         if (Object.keys(fotoMapIdx).length > 0) return; // ya cargado
         try {
-            const res = await fetch(FOTO_MAP_URL_IDX, { redirect: 'follow' });
+            const res = await fetch(FOTOS_URL, { redirect: 'follow' });
             fotoMapIdx = await res.json();
         } catch(e) { console.warn('fotoMapIdx error:', e.message); }
     }
