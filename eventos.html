@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.09.27.1 (MINI-MIGRACIÓN URGENTE — Cristian, con el congreso del 1-2 de octubre encima: "estoy sufriendo el modulo eventos... guardar checklist, listar tarjetas, guardar notas, es un suplicio". Migradas 12 acciones puntuales (no todo Eventos, que es grande — eso se migra completo más adelante, ver PLAN-MIGRACION.md): ev_listarEventos, ev_crearChecklistGrupo, ev_editarChecklistGrupo, ev_borrarChecklistGrupo, ev_agregarChecklistItem, ev_toggleChecklistItem, ev_reordenarChecklistItems, ev_eliminarChecklistItem, ev_editarChecklistItem, ev_agregarNota (x2, ambos usos), ev_editarNota, ev_eliminarNota — las 13 llamadas correspondientes ahora apuntan a EVENTOS_CHECKLIST_URL (Cloud Function nueva, ver /cloud-function-eventos-checklist/) en vez de GAS_URL. Las otras 30 acciones de este archivo (crear/editar/mover tarjetas, fotos, mensajes, gastos, columnas, etc.) quedan sin tocar en GAS_URL. Incluye el efecto secundario real que tenían en Apps Script — notificar push+mail a quien te mencionan en un ítem de checklist, o al responsable cuando se completa una subtarea — replicado en la Cloud Function con firebase-admin's messaging() y un fetch directo a Brevo.) -->
 <!-- Portal TLC | eventos.html | v2026.09.18.2 (Mismo cambio y mismo criterio que servicio.html — TC HISTÓRICO REAL por gasto, no un único TC vigente aplicado a todos. Cada gasto nuevo guarda su propio tc_al_cargar al crearse, usado para la etiqueta y para convertir ARS↔USD de ese renglón (incluso al editarlo después). El Total agregado sigue usando el TC vigente de hoy, sin tocar. Confirmado con los mismos 3 tests que servicio.html.) -->
 <!-- Portal TLC | eventos.html | v2026.09.18.1 (Mismo pedido y mismo criterio que servicio.html — Cristian: "en cada gasto de tarjeta, sea servicio, evento, sea cualquier tipo de moneda USD o AR$, por favor agregar al lado el tipo de cambio (no editable) en cada renglon". Antes el TC oficial solo se veía una vez, en el total agregado. Ahora también aparece junto al campo Importe de cada gasto individual, en la fila editable y en la de solo lectura (gasto liquidado), reusando .ev-gastos-tc-label existente. Confirmado con 3 tests, mismos casos que servicio.html: fila editable, fila de solo lectura, y un gasto en USD (no solo los en ARS).) -->
 <!-- Portal TLC | eventos.html | v2026.09.06.6 (BUG REAL — Cristian: "cada vez que tildo o hago un cambio en eventos no se reflejan los cambios, debo refrescar la pantalla, podes ver eso?". Causa encontrada: el pedido de fondo que refresca el evento (parte del mecanismo cache-first — pinta al instante desde localStorage, sincroniza de verdad en segundo plano) podía tardar unos segundos en volver. Si en ese tiempo el usuario tildaba un checklist, agregaba una nota, etc. (cada acción se reflejaba bien al toque en su momento), y RECIÉN AHÍ terminaba ese pedido de fondo, la respuesta VIEJA (pedida antes de esos cambios) pisaba EVENTO_ACTUAL entero — el cambio recién hecho desaparecía visualmente de la nada, aunque en Firebase ya estaba bien guardado, hasta un F5 de verdad (que dispara un pedido fresco, ahí sí después de todos los cambios). Arreglado sin tocar los ~14 puntos de mutación local dispersos por el archivo (tildar checklist, notas, gastos, mensajes, adjuntos, etc.) — se guarda una "foto" (JSON.stringify) de EVENTO_ACTUAL justo antes de salir a pedir los datos frescos; si al volver la foto ya no coincide con el estado actual, significa que algo cambió mientras tanto, y se descarta esa respuesta vieja en vez de aplicarla (igual se actualiza la caché local con el estado ACTUAL, que es más nuevo que lo que trajo el pedido). Confirmado con 2 tests: sin cambios locales de por medio, la respuesta del servidor se aplica normalmente; con un cambio local hecho MIENTRAS el pedido de fondo seguía en vuelo, ese cambio NO se pisa y no se vuelve a repintar con datos viejos. Nota honesta: este fix cubre el escenario más probable (la ventana de carrera justo después de abrir el evento) — si el problema persistiera más allá de eso (ej. 5+ minutos después de abierto, sin relación con la carga inicial), habría que investigar más con un caso concreto.) -->
@@ -620,6 +621,15 @@ const _VERSION_ARCHIVO_EVENTOS = '2026.08.30.9';
 console.log("%c TLC Eventos v" + _VERSION_ARCHIVO_EVENTOS + " ", "background:#8b5cf6;color:white;font-weight:bold;border-radius:4px;padding:2px 8px;");
 
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+// MUERTE A APPS SCRIPT — Cristian, con el congreso del 1-2 de octubre
+// encima: "estoy sufriendo el modulo eventos... guardar checklist,
+// listar tarjetas, guardar notas, es un suplicio". Mini-migración
+// urgente de solo estas 12 acciones puntuales (no todo Eventos — eso
+// se migra completo más adelante, con más calma, ver
+// PLAN-MIGRACION.md). El resto de las acciones de este archivo (crear/
+// editar/mover tarjetas, fotos, mensajes, etc.) queda sin tocar en
+// GAS_URL por ahora.
+var EVENTOS_CHECKLIST_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/eventosChecklist'; // Cloud Function desplegada 2026.09.27
 var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY = 'tlc_tema';
 var _session = null;
@@ -770,7 +780,7 @@ var _errorCargaEventos = false; // distingue "falló el pedido" de "no hay event
 async function _cargarEventos() {
   _errorCargaEventos = false;
   try {
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_listarEventos' }) });
+    var resp = await fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_listarEventos' }) });
     var r = await resp.json();
     if (r.ok && Array.isArray(r.eventos)) {
       EVENTOS = r.eventos;
@@ -1371,7 +1381,7 @@ window._toggleUrgenteDesdeTarjetaEv = function(idTarjeta, activar) {
       if (TARJETA_ACTUAL_ID === idTarjeta) _renderOverlayTarjeta();
 
       var textoNota = activar ? ('📌 Marcado como urgente' + (nota ? ': ' + nota : '')) : '📌 Desmarcado como urgente';
-      fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ accion:'ev_agregarNota', id_evento:EVENTO_ACTUAL.id, id_tarjeta:idTarjeta, texto:textoNota, autor_nombre:(_session && _session.name || '') }) })
         .then(function(r2){ return r2.json(); })
         .then(function(r2) {
@@ -1870,7 +1880,7 @@ function _crearChecklistGrupoEv(btn) {
   var t = _tarjetaActual();
   if (!t) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Creando...'; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_crearChecklistGrupo', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, titulo:'Nuevo Checklist' }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -1891,7 +1901,7 @@ function _crearChecklistGrupoEv(btn) {
 function _renombrarChecklistGrupoEv(idGrupo, nuevoTitulo) {
   var t = _tarjetaActual();
   if (!t || !nuevoTitulo || !nuevoTitulo.trim()) return;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_editarChecklistGrupo', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, titulo:nuevoTitulo.trim() }) })
     .then(function(r){ return r.json(); })
     .then(function(r) { if (r.ok) t.checklists = r.checklists; });
@@ -1901,7 +1911,7 @@ function _borrarChecklistGrupoEv(idGrupo, btn) {
   if (!t) return;
   if (!confirm('¿Borrar este checklist completo con todos sus ítems?')) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_borrarChecklistGrupo', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2045,7 +2055,7 @@ function _soltarArrastreItem(ev) {
   document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
   _autoResizeTodosItemsChecklistEv();
 
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
     accion:'ev_reordenarChecklistItems', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:estado.idGrupo,
     orden: items.map(function(i){ return i.id; }),
   }) })
@@ -2076,7 +2086,7 @@ function _terminarArrastreItem() {
 
 function _toggleChecklistItem(idGrupo, idItem) {
   var t = _tarjetaActual();
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_toggleChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, id_item:idItem, autor_email:_session.username, autor_nombre:_session.name }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2089,7 +2099,7 @@ function _toggleChecklistItem(idGrupo, idItem) {
 function _eliminarChecklistItemEv(idGrupo, idItem, btn) {
   var t = _tarjetaActual();
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_eliminarChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, id_item:idItem }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2104,7 +2114,7 @@ function _editarChecklistItemEv(idGrupo, idItem, nuevoTexto) {
   var t = _tarjetaActual();
   nuevoTexto = (nuevoTexto || '').trim();
   if (!nuevoTexto) { document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); return; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_editarChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, id_item:idItem, texto:nuevoTexto }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2130,7 +2140,7 @@ function _agregarChecklistItem(idGrupo, btn) {
   var menciones = _extraerMencionesDeTexto(texto);
   var t = _tarjetaActual();
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Agregando...'; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_agregarChecklistItem', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, texto:texto, menciones:menciones, autor_email:_session.username, autor_nombre:_session.name }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2165,7 +2175,7 @@ function _agregarNotaEv(btn) {
   if (!texto) return;
   var t = _tarjetaActual();
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Agregando...'; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_agregarNota', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, texto:texto, autor_nombre:_session.name }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2201,7 +2211,7 @@ function _editarNotaEv(idNota, btn) {
   var nuevoTexto = prompt('Editar nota:', nota.texto);
   if (nuevoTexto === null || !nuevoTexto.trim() || nuevoTexto.trim() === nota.texto) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Guardando...'; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_editarNota', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_nota:idNota, texto:nuevoTexto.trim(), vendedorRol:_session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2215,7 +2225,7 @@ function _eliminarNotaEv(idNota, btn) {
   if (!confirm('¿Borrar esta nota? No se puede deshacer.')) return;
   var t = _tarjetaActual();
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Borrando...'; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_eliminarNota', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_nota:idNota, vendedorRol:_session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
