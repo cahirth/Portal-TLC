@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — módulo Notificaciones migrado a Cloud Functions (transversal, usado en cotizaciones/eventos/index/servicio/selector-dispositivos). Las 5 acciones (guardarTokenPush, listarNotificaciones, marcarNotificacionLeida, reaccionarNotificacion, marcarTodasNotificacionesLeidas) ahora apuntan a NOTIFICACIONES_URL (Cloud Function nueva, ver /cloud-function-notificaciones/) en vez de a Apps Script — el resto de este archivo sigue sin tocar. ) -->
 <!-- Portal TLC | servicio.html | v2026.09.18.3 (TC HISTÓRICO REAL por gasto — Cristian preguntó: "el tc es el de la fecha de la carga, y queda guardado historico si hace 10 dias era 1530 y hoy 1535, el input de 10 dias queda con 1530 y el de hoy 1535, es asi?" — la respuesta era NO, había un único TC vigente aplicado a todos por igual. Ahora sí: cada gasto NUEVO guarda su propio tc_al_cargar al crearse (el TC vigente en ese momento), y ese valor queda fijo para siempre — se usa tanto para la etiqueta como para convertir ARS↔USD de ese renglón puntual, incluso al editarlo después (antes, editar el importe de un gasto viejo lo convertía con el TC de HOY, no con el suyo — corregido también). _aMonedaGastoSt ahora acepta un TC opcional (el histórico del gasto), con el TC vigente como respaldo para gastos que todavía no tienen uno propio guardado. El Total agregado de abajo NO se tocó — sigue usando el TC vigente de hoy para la conversión (cambiar eso es una decisión aparte, con implicancias en otros módulos, no se asumió). Confirmado con 3 tests: un gasto nuevo se crea con el TC de hoy; dos gastos con TC distinto (1530 vs 1535) muestran cada uno el suyo; editar el importe de un gasto viejo usa SU TC histórico para convertir a USD, no el de hoy.) -->
 <!-- Portal TLC | servicio.html | v2026.09.18.2 (Pedido por Cristian, con captura: "en cada gasto de tarjeta, sea servicio, evento, sea cualquier tipo de moneda USD o AR$, por favor agregar al lado el tipo de cambio (no editable) en cada renglon" — antes el TC oficial solo se veía una vez, en el total agregado al final de la lista de gastos. Ahora también aparece junto al campo Importe de CADA gasto individual, tanto en la fila editable como en la de solo lectura (gastos ya liquidados o ticket finalizado) — mismo texto informativo (no un input, no editable) que ya usa el total, reusando la clase .gastos-tc-label existente. No es un TC propio de cada gasto — es el mismo TC vigente aplicado a todos por igual (no se guarda un TC histórico por gasto), mostrado repetido en cada renglón para no tener que bajar la vista al total mientras se cargan varios gastos seguidos. Confirmado con 3 tests: la fila editable muestra el TC, la fila de solo lectura (gasto liquidado) también lo muestra, y un gasto cargado en USD (no solo los en ARS) también lo muestra.) -->
 <!-- Portal TLC | servicio.html | v2026.09.18.1 (BUG REAL — Cristian: "en servicio no andan las notas, click guardar nota y borra lo escrito en el campo y no guarda". Investigado a fondo (incluido un error de consola con un 404 real en el POST al backend, que resultó ser transitorio y no la causa de fondo — se confirmó carácter por carácter que la URL del deployment activo coincide exacto con la del frontend). La causa real, aclarada por Cristian después: "si lo guardaba, mi problema era que no lo veia, porque cuando clickeas guardar nota scrollea abajo de todo y la nota nueva esta arriba, y en el celu no se ve" — la nota SÍ se guardaba bien (se agrega arriba de la lista con unshift), pero el re-render del detalle completo (o el teclado del celular cerrándose al perder foco el textarea) dejaba la pantalla scrolleada más abajo, lejos de donde apareció la nota — parecía que no había pasado nada, sobre todo en el celular. Arreglado: después de agregar la nota, la vista vuelve sola a la sección "Notas de seguimiento" (scrollIntoView suave) para que la nota recién guardada quede a la vista sin que el usuario tenga que buscarla. Confirmado con test que simula el flujo completo — tras guardar, se pide volver a la sección de notas.) -->
@@ -864,6 +865,10 @@ console.log('%c Portal TLC | servicio.html | v' + PORTAL_TLC_VERSION + ' ', 'bac
 
 // ── Config ────────────────────────────────────────────────────────
 var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+// MUERTE A APPS SCRIPT — módulo Notificaciones migrado (transversal).
+// Solo estas 5 acciones puntuales van acá — el resto de este archivo
+// sigue en GAS_URL sin tocar.
+var NOTIFICACIONES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/notificaciones'; // Cloud Function desplegada 2026.09.27
 var RTDB_URL    = 'https://portal-tlc-default-rtdb.firebaseio.com';
 var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY    = 'tlc_tema';
@@ -3311,7 +3316,7 @@ async function _cargarNotificaciones(silencioso) {
   var email = (_session && _session.username) || '';
   if (!email) return;
   try {
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var resp = await fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarNotificaciones', email:email }) });
     var r = await resp.json();
     if (!r.ok) return;
@@ -3420,13 +3425,13 @@ window._reaccionarNotif = function(ev, idNoti, tipo, origen, ticketId, mensajeIn
     else payloadMsg.id_ticket = ticketId;
     fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
       .then(function(){
-        return fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        return fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
           body: JSON.stringify({ accion:'marcarNotificacionLeida', email:email, id:idNoti }) });
       })
       .then(function(){ _cargarNotificaciones(true); });
     return;
   }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'reaccionarNotificacion', email:email, id:idNoti, reaccion:tipo }) })
     .then(function(){ _cargarNotificaciones(true); });
 };
@@ -3466,7 +3471,7 @@ window._clickNotificacion = function(ev, idNoti, ticketId, origen, tarjetaId) {
   }
   var email = (_session && _session.username) || '';
   if (email) {
-    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'marcarNotificacionLeida', email:email, id:idNoti }) })
       .then(function(){ _cargarNotificaciones(true); });
   }
@@ -3495,7 +3500,7 @@ window._marcarTodasLeidasClick = function(ev) {
   if (ev) ev.stopPropagation();
   var email = (_session && _session.username) || '';
   if (!email) return;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'marcarTodasNotificacionesLeidas', email:email }) })
     .then(function(){ _cargarNotificaciones(); });
 };
@@ -3564,7 +3569,7 @@ window._activarNotificacionesPush = async function() {
 
     var email = (_session && _session.username) || '';
     if (!email) return;
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var resp = await fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'guardarTokenPush', email:email, token:token }) });
     var r = await resp.json();
     if (!r.ok) _stMostrarError('No se pudo guardar el token: ' + (r.error||'desconocido'));

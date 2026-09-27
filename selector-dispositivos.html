@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | selector-dispositivos.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — módulo Notificaciones migrado a Cloud Functions (transversal, usado en cotizaciones/eventos/index/servicio/selector-dispositivos). Las 5 acciones (guardarTokenPush, listarNotificaciones, marcarNotificacionLeida, reaccionarNotificacion, marcarTodasNotificacionesLeidas) ahora apuntan a NOTIFICACIONES_URL (Cloud Function nueva, ver /cloud-function-notificaciones/) en vez de a Apps Script — el resto de este archivo sigue sin tocar. Solo guardarTokenPush usa esto en este archivo.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.09.23.1 (MUERTE A APPS SCRIPT — mismo criterio que ficha-equipo.html: cargarFotoMap() ahora usa FOTOS_URL (Cloud Function nueva) en vez de FOTO_MAP_URL. OJO — en este archivo FOTO_MAP_URL en realidad se usa como alias genérico de TODO Apps Script (login, HubSpot, push, registro en Sheets), no solo fotos — el nombre es engañoso. Por eso NO se tocó esa constante ni sus otras 6 llamadas, solo la de cargarFotoMap() pasa a la nueva URL. El resto de las acciones de este archivo se migrarán en sus propios módulos más adelante.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.09.20.2 (BUG REAL — Cristian, tras el fix de tamaño de fotos: "otra vez no lee las fotos" (con captura: TODAS las tarjetas del catálogo con el cuadro gris "pendiente", ninguna se resolvía). Causa: cargarFotoMap() (fetch a Apps Script) no tenía NINGÚN límite de tiempo — si el backend está lento o colgado (mismo problema de fondo que se viene arrastrando hoy: el límite de 200 versiones del proyecto), _fotoMapPromise quedaba esperando indefinidamente. Como _resolverFotosPendientesConFotoMap() encadena TODO su trabajo detrás de esa misma promesa, ninguna foto en formato "Fotos/xxx.png" se resolvía nunca — quedaban en gris para siempre. Mismo fix ya aplicado hoy en ficha-equipo.html: ahora se corta solo a los 8 segundos si Apps Script no contestó, la promesa se resuelve igual (vacía) y el resto de la app sigue funcionando — esas fotos puntuales quedan sin resolver esta vez, en vez de trabar el mecanismo entero para siempre. Confirmado con test: con Apps Script simulando estar colgado, cargarFotoMap se corta a los ~8s en vez de esperar para siempre.) -->
 <!-- Portal TLC | selector-dispositivos.html | v2026.09.20.1 (FOTOS LENTAS — Cristian: "las fotos del catalogo tardan en mostrarse, esta toda medio lenta la app, se pone dificil". Este es el catálogo principal del Portal — fotoUrl() se usa acá en 8 lugares distintos, la mayor concentración de fotos de todo el sistema. Causa real: las fotos de Google Drive se pedían sin NINGÚN parámetro de tamaño — Drive/lh3.googleusercontent.com sirve el archivo ORIGINAL completo (a menudo varios MB, resolución de cámara de celular) aunque se muestre en una miniatura chica, y con VARIAS fotos cargando juntas en un listado esto es justo lo que hace sentir la app lenta. Agregado "=w400" a los links de Drive — Google redimensiona y sirve una versión ya liviana, sin que el navegador baje nunca el archivo grande. No pisa un tamaño ya especificado en la URL. La estrategia de lazy-loading del listado principal (isAboveFold: las primeras tarjetas visibles cargan eager/prioridad alta, el resto lazy/prioridad baja) ya estaba bien hecha de antes — no se tocó, este fix la complementa. Mismo criterio ya aplicado en index.html y ficha-equipo.html. Confirmado con test.) -->
@@ -1637,6 +1638,10 @@ const FOTO_MAP_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59S
 // El resto de las acciones de este archivo sigue en FOTO_MAP_URL/Apps
 // Script; se migrarán en sus propios módulos más adelante.
 const FOTOS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/fotos'; // Cloud Function desplegada 2026.09.27
+// MUERTE A APPS SCRIPT — módulo Notificaciones migrado (transversal).
+// Solo guardarTokenPush usa esto en este archivo — el resto sigue en
+// FOTO_MAP_URL sin tocar.
+const NOTIFICACIONES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/notificaciones'; // Cloud Function desplegada 2026.09.27
 let fotoMap = {};
 
 // Modalidades — el descKey es el GATILLO: si está vacío, no se muestra el botón
@@ -1930,7 +1935,7 @@ window._activarNotificacionesPush = async function() {
     var cuenta = _leerSesion();
     var email = cuenta ? cuenta.username : '';
     if (!email) return;
-    var resp = await fetch(FOTO_MAP_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var resp = await fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'guardarTokenPush', email:email, token:token }) });
     var r = await resp.json();
     if (!r.ok) alert('No se pudo guardar el token: ' + (r.error||'desconocido'));
