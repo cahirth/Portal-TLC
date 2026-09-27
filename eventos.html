@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.09.27.2 (BUG REAL — Cristian, con capturas: agregó "hola prueba" a un checklist (se vio bien en el momento), volvió al tablero, volvió a entrar a la tarjeta — "hola prueba no esta, si refresco o entro varias veces aparece". Causa: _abrirTarjeta usa una caché en localStorage (ev_cache_tarjeta_<id>) para abrir la tarjeta al instante la próxima vez sin esperar al servidor — pero esa caché solo se actualizaba cuando se ABRÍA la tarjeta (con datos frescos), nunca cuando se agregaba/editaba/borraba un ítem de checklist o una nota MIENTRAS la tarjeta ya estaba abierta. El cambio se veía bien en el momento (el array en memoria sí se actualizaba), pero al salir y reentrar, _abrirTarjeta mostraba la caché VIEJA de antes del cambio hasta que el refresco de fondo la alcanzaba. Agregado un helper único (_sincronizarCacheTarjetaEv) llamado después de las 10 funciones que modifican checklist/notas (crear/renombrar/borrar grupo, agregar/tildar/eliminar/editar ítem, reordenar, agregar/editar/borrar nota) — la próxima carga ya arranca con los datos correctos, sin depender de F5 ni de esperar al refresco de fondo. Mismo patrón que ya se usó en empresas.html para este mismo tipo de bug.) -->
 <!-- Portal TLC | eventos.html | v2026.09.27.1 (MINI-MIGRACIÓN URGENTE — Cristian, con el congreso del 1-2 de octubre encima: "estoy sufriendo el modulo eventos... guardar checklist, listar tarjetas, guardar notas, es un suplicio". Migradas 12 acciones puntuales (no todo Eventos, que es grande — eso se migra completo más adelante, ver PLAN-MIGRACION.md): ev_listarEventos, ev_crearChecklistGrupo, ev_editarChecklistGrupo, ev_borrarChecklistGrupo, ev_agregarChecklistItem, ev_toggleChecklistItem, ev_reordenarChecklistItems, ev_eliminarChecklistItem, ev_editarChecklistItem, ev_agregarNota (x2, ambos usos), ev_editarNota, ev_eliminarNota — las 13 llamadas correspondientes ahora apuntan a EVENTOS_CHECKLIST_URL (Cloud Function nueva, ver /cloud-function-eventos-checklist/) en vez de GAS_URL. Las otras 30 acciones de este archivo (crear/editar/mover tarjetas, fotos, mensajes, gastos, columnas, etc.) quedan sin tocar en GAS_URL. Incluye el efecto secundario real que tenían en Apps Script — notificar push+mail a quien te mencionan en un ítem de checklist, o al responsable cuando se completa una subtarea — replicado en la Cloud Function con firebase-admin's messaging() y un fetch directo a Brevo.) -->
 <!-- Portal TLC | eventos.html | v2026.09.18.2 (Mismo cambio y mismo criterio que servicio.html — TC HISTÓRICO REAL por gasto, no un único TC vigente aplicado a todos. Cada gasto nuevo guarda su propio tc_al_cargar al crearse, usado para la etiqueta y para convertir ARS↔USD de ese renglón (incluso al editarlo después). El Total agregado sigue usando el TC vigente de hoy, sin tocar. Confirmado con los mismos 3 tests que servicio.html.) -->
 <!-- Portal TLC | eventos.html | v2026.09.18.1 (Mismo pedido y mismo criterio que servicio.html — Cristian: "en cada gasto de tarjeta, sea servicio, evento, sea cualquier tipo de moneda USD o AR$, por favor agregar al lado el tipo de cambio (no editable) en cada renglon". Antes el TC oficial solo se veía una vez, en el total agregado. Ahora también aparece junto al campo Importe de cada gasto individual, en la fila editable y en la de solo lectura (gasto liquidado), reusando .ev-gastos-tc-label existente. Confirmado con 3 tests, mismos casos que servicio.html: fila editable, fila de solo lectura, y un gasto en USD (no solo los en ARS).) -->
@@ -1876,6 +1877,35 @@ function _autoResizeTodosItemsChecklistEv() {
   document.querySelectorAll('.ev-check-item-texto-fija').forEach(_autoResizeTextareaEv);
 }
 
+// BUG REAL — Cristian, con capturas: agregó "hola prueba" a un
+// checklist (aparece bien en el momento), volvió al tablero, volvió a
+// entrar a la tarjeta — "hola prueba no esta, si refresco o entro
+// varias veces aparece". Causa: _abrirTarjeta usa una caché en
+// localStorage (ev_cache_tarjeta_<id>) para abrir la tarjeta al
+// instante la próxima vez, sin esperar al servidor — pero esa caché
+// SOLO se actualizaba cuando se ABRÍA la tarjeta (con datos frescos
+// del servidor), nunca cuando se agregaba/editaba/borraba algo
+// MIENTRAS la tarjeta ya estaba abierta. Resultado: el cambio se veía
+// bien en el momento (el array en memoria sí se actualizaba), pero al
+// salir y volver a entrar, _abrirTarjeta mostraba la caché VIEJA de
+// antes del cambio — hasta que el refresco de fondo (que sí trae
+// datos frescos) alcanzaba a corregirlo un rato después, o hasta
+// entrar varias veces. Este helper único se llama después de
+// cualquier cambio exitoso al checklist o las notas, para que la
+// caché nunca quede desactualizada — no pisa "mensajes" (que estas
+// funciones no tocan), solo actualiza checklists/notas sobre lo que
+// ya hubiera guardado.
+function _sincronizarCacheTarjetaEv(t) {
+  try {
+    var clave = 'ev_cache_tarjeta_' + t.id;
+    var actual = {};
+    try { actual = JSON.parse(localStorage.getItem(clave) || '{}') || {}; } catch(eParse) { actual = {}; }
+    actual.checklists = t.checklists;
+    actual.notas = t.notas;
+    localStorage.setItem(clave, JSON.stringify(actual));
+  } catch(eLs) {}
+}
+
 function _crearChecklistGrupoEv(btn) {
   var t = _tarjetaActual();
   if (!t) return;
@@ -1886,6 +1916,7 @@ function _crearChecklistGrupoEv(btn) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); return; }
       t.checklists = r.checklists;
+      _sincronizarCacheTarjetaEv(t);
       document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
       _renderTablero();
     })
@@ -1904,7 +1935,7 @@ function _renombrarChecklistGrupoEv(idGrupo, nuevoTitulo) {
   fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_editarChecklistGrupo', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, id_grupo:idGrupo, titulo:nuevoTitulo.trim() }) })
     .then(function(r){ return r.json(); })
-    .then(function(r) { if (r.ok) t.checklists = r.checklists; });
+    .then(function(r) { if (r.ok) { t.checklists = r.checklists; _sincronizarCacheTarjetaEv(t); } });
 }
 function _borrarChecklistGrupoEv(idGrupo, btn) {
   var t = _tarjetaActual();
@@ -1917,6 +1948,7 @@ function _borrarChecklistGrupoEv(idGrupo, btn) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); if (btn) btn.disabled = false; return; }
       t.checklists = r.checklists;
+      _sincronizarCacheTarjetaEv(t);
       document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); // en éxito el grupo entero (con este botón) desaparece del re-render, no hace falta resetearlo
       _renderTablero();
     })
@@ -2066,6 +2098,9 @@ function _soltarArrastreItem(ev) {
         t.checklists = r.checklists || t.checklists; // si el backend devolvió el estado real, usarlo
         document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t);
         _autoResizeTodosItemsChecklistEv();
+      } else {
+        t.checklists = r.checklists;
+        _sincronizarCacheTarjetaEv(t);
       }
     })
     .catch(function(){ alert('Error de conexión al guardar el nuevo orden — puede que quede desactualizado hasta recargar.'); });
@@ -2092,6 +2127,7 @@ function _toggleChecklistItem(idGrupo, idItem) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); return; }
       t.checklists = r.checklists;
+      _sincronizarCacheTarjetaEv(t);
       document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv();
       _renderTablero();
     });
@@ -2105,6 +2141,7 @@ function _eliminarChecklistItemEv(idGrupo, idItem, btn) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); if (btn) btn.disabled = false; return; }
       t.checklists = r.checklists;
+      _sincronizarCacheTarjetaEv(t);
       document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); // el botón viejo se destruye con el re-render
       _renderTablero();
     })
@@ -2120,6 +2157,7 @@ function _editarChecklistItemEv(idGrupo, idItem, nuevoTexto) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); return; }
       t.checklists = r.checklists;
+      _sincronizarCacheTarjetaEv(t);
     });
 }
 var _mencionChecklistSeleccionada = [];
@@ -2146,6 +2184,7 @@ function _agregarChecklistItem(idGrupo, btn) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); if (btn) { btn.disabled = false; btn.textContent = '+ Agregar'; } return; }
       t.checklists = r.checklists;
+      _sincronizarCacheTarjetaEv(t);
       document.getElementById('ev-checklists-cont').innerHTML = _renderChecklistsGrupos(t); _autoResizeTodosItemsChecklistEv(); // el botón viejo se destruye con el re-render
       input.value = '';
       _renderTablero();
@@ -2181,6 +2220,7 @@ function _agregarNotaEv(btn) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); return; }
       t.notas = r.notas;
+      _sincronizarCacheTarjetaEv(t);
       document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t);
       input.value = '';
     })
@@ -2217,6 +2257,7 @@ function _editarNotaEv(idNota, btn) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); if (btn) { btn.disabled = false; btn.textContent = '✎ Editar'; } return; }
       t.notas = r.notas;
+      _sincronizarCacheTarjetaEv(t);
       document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t);
     })
     .catch(function(){ alert('Error de conexión'); if (btn) { btn.disabled = false; btn.textContent = '✎ Editar'; } });
@@ -2231,6 +2272,7 @@ function _eliminarNotaEv(idNota, btn) {
     .then(function(r) {
       if (!r.ok) { alert(r.error||'Error'); if (btn) { btn.disabled = false; btn.textContent = '🗑 Borrar'; } return; }
       t.notas = r.notas;
+      _sincronizarCacheTarjetaEv(t);
       document.getElementById('ev-notas-cont').innerHTML = _renderNotasGenerales(t);
     })
     .catch(function(){ alert('Error de conexión'); if (btn) { btn.disabled = false; btn.textContent = '🗑 Borrar'; } });
