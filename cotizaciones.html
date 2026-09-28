@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.09.28.2 (MUERTE A APPS SCRIPT — módulo Pipelines migrado a Cloud Functions. Las 3 acciones (listarPipelines, guardarPipeline, eliminarPipeline) ahora apuntan a PIPELINES_URL en vez de a Apps Script — el resto de este archivo sigue sin tocar. eliminarPipeline cambia de comportamiento a propósito: en vez de escribir en historico.json/GitHub para desvincular las cotizaciones que tenían el pipeline borrado, ahora lo hace directo sobre el espejo de Firebase (cotizaciones/{id}) — mismo criterio ya anotado en PLAN-MIGRACION.md, sacar historico.json del camino de las acciones comunes. Contrapartida consciente: esta acción puntual ya no deja un commit de auditoría en GitHub como antes.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — módulo Notificaciones migrado a Cloud Functions (transversal, usado en cotizaciones/eventos/index/servicio/selector-dispositivos). Las 5 acciones (guardarTokenPush, listarNotificaciones, marcarNotificacionLeida, reaccionarNotificacion, marcarTodasNotificacionesLeidas) ahora apuntan a NOTIFICACIONES_URL (Cloud Function nueva, ver /cloud-function-notificaciones/) en vez de a Apps Script — el resto de este archivo sigue sin tocar. ) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.06.1 (2 pedidos de Cristian: (1) "en tarjetas de servicio y cotizaciones agregar los ... con los que tiene eventos" — mismo menú "···" que servicio.html/eventos.html: 🔗 Copiar link a este negocio, 🗑️ Borrar negocio (reusa _confirmarBorrarDeal, ya existente — se sacó del botón suelto viejo en la tarjeta hero y se consolidó acá). "Duplicar negocio" NO se agregó — a diferencia de Servicio Técnico/Eventos (puro Firebase), acá significaría crear un deal REAL en HubSpot (_hsCrearDeal), con todo lo que eso puede disparar del lado del CRM — mejor confirmarlo explícitamente antes de construirlo. (2) "en cotizaciones desactivar hubspot, no lo usamos mas" — investigado a fondo antes de tocar nada: las acciones que el frontend realmente usa hoy (actualizarEstado, reasignarVendedor, actualizarColaborador, actualizarTelefono, eliminarDeal) ya son RTDB-primero y NO dependían de que HubSpot respondiera bien — el corte real se hizo en FotoMap.gs (_hsFetch, el único punto por el que pasan las 88 referencias a HubSpot del archivo). Actualizado también el texto de "Borrar negocio" (ya no dice "se archiva en HubSpot", sería engañoso). Confirmado con 3 tests: copiar link arma la URL con el id correcto, borrar desde el menú llama a la función ya existente con el id correcto, y el menú alterna bien.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.05.1 (Responder a un mensaje puntual — mismo feature que servicio.html v2026.09.05.1. Cristian: "es espectacular, podemos hacerlo en cotizaciones, eventos tambien?". Cada mensaje ahora tiene un botón ↩ — al tocarlo aparece un banner "Respondiendo a {autor}: {recorte}" arriba del campo, con ✕ para cancelar. Al enviar, el autor original se agrega como una @mención más (salvo que te respondas a vos mismo), reusando 100% el mecanismo de notificación que ya existía para menciones. El mensaje nuevo guarda un respuesta_a liviano para mostrar la cita, clickeable (hace scroll y resalta el mensaje original). A diferencia de servicio.html, esta pantalla no tenía editar/borrar mensajes, así que el botón ↩ quedó solo, sin compartir fila con otros. Backend: cot_agregarMensaje (FotoMap.gs) ahora acepta y guarda respuesta_a. Confirmado con 3 tests: el envío arma el payload correcto y auto-menciona, el render muestra el botón responder y la cita clickeable, y el backend guarda respuesta_a.) -->
@@ -925,7 +926,7 @@ function _guardarPipelinesEnCache() {
 
 async function _cargarPipelines(_esReintento) {
     try {
-        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        const resp = await fetch(PIPELINES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'listarPipelines' }) });
         const r = await resp.json();
         if (!r.ok) throw new Error(r.error || 'listarPipelines devolvió ok:false');
@@ -973,7 +974,7 @@ window._onCambiarPipeline = async function(valor) {
         const nombre = prompt('Nombre de la nueva campaña/pipeline (ej: "Facoextrema 2026"):');
         if (!nombre || !nombre.trim()) { document.getElementById('select-pipeline').value = pipelineActual; return; }
         try {
-            const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            const resp = await fetch(PIPELINES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
                 body: JSON.stringify({ accion:'guardarPipeline', nombre: nombre.trim() }) });
             const r = await resp.json();
             if (!r.ok) { alert('No se pudo crear el pipeline: ' + (r.error||'error desconocido')); document.getElementById('select-pipeline').value = pipelineActual; return; }
@@ -1006,7 +1007,7 @@ window._abrirConfigPipeline = async function() {
     if (opcion.trim().toLowerCase() === 'borrar') {
         if (!confirm('¿Eliminar el pipeline "' + p.nombre + '"? Las tarjetas asociadas vuelven automáticamente a "Pipeline General". No se puede deshacer.')) return;
         try {
-            const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            const resp = await fetch(PIPELINES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
                 body: JSON.stringify({ accion:'eliminarPipeline', id: p.id }) });
             const r = await resp.json();
             if (!r.ok) { alert('No se pudo eliminar: ' + (r.error||'error desconocido')); return; }
@@ -1020,7 +1021,7 @@ window._abrirConfigPipeline = async function() {
     }
     if (!opcion.trim()) return;
     try {
-        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        const resp = await fetch(PIPELINES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'guardarPipeline', id: p.id, nombre: opcion.trim() }) });
         const r = await resp.json();
         if (!r.ok) { alert('No se pudo renombrar: ' + (r.error||'error desconocido')); return; }
@@ -1085,6 +1086,10 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl
 // estas 5 acciones puntuales van acá — el resto de este archivo sigue
 // en APPS_SCRIPT_URL sin tocar.
 const NOTIFICACIONES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/notificaciones'; // Cloud Function desplegada 2026.09.27
+// MUERTE A APPS SCRIPT — módulo Pipelines migrado. Solo estas 3
+// acciones puntuales van acá — el resto de este archivo sigue en
+// APPS_SCRIPT_URL sin tocar.
+const PIPELINES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/pipelines'; // Cloud Function desplegada 2026.09.28
 
 let _preciosCache = null; // cache lazy de precios.json
 
