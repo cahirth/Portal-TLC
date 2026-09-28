@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.09.28.3 (CARGA INICIAL — Cristian: "ni bien arranca el modulo, llego a ver cargando tickets, eso pensé que iba a ser mas rapido". Medido con F12 → Network: servicio_tecnico.json tarda 1,41 s en total, de los cuales 1,18 s son de DESCARGA (el servidor responde en 0,24 s) — la página completa transfiere 11,7 MB. Causa principal (NO resuelta acá): cada ticket trae adentro sus fotos en base64 (hasta 9 por ticket) y la lista las descarga todas aunque solo el detalle las usa. Este cambio es solo la mejora chica: _cargarTickets ahora lanza los 3 pedidos (tickets, columnas, asignados por etapa) a la vez en vez de en fila — el total pasa a ser el del más lento, no la suma. Confirmado con simulación de tiempos (~600 ms vs ~900 ms en fila) y con el caso de error de red. El arreglo de fondo (sacar las fotos del nodo que lee la lista) queda anotado en PLAN-MIGRACION.md; lo leen 4 páginas: servicio.html, orden-servicio.html, remito-ingreso.html y, por la firma, orden-preparacion.html.) -->
 <!-- Portal TLC | servicio.html | v2026.09.28.2 (MUERTE A APPS SCRIPT — módulo Servicio Técnico migrado a Cloud Functions, el más grande hasta ahora: 19 acciones propias (crear/duplicar/borrar ticket, campos, depósito, notas, gastos, fotos, mensajes, equipos de orden, etiquetas de cajas, versiones de presupuesto, asignados por etapa) + marcarNegocioUrgente/marcarTarjetaUrgenteEv (compartidas con Mi Día/Cotizaciones/Eventos) ahora apuntan a SERVICIO_URL. De paso, listarEmpresas (suelta, nunca se había redirigido) ahora va a EMPRESAS_URL. TODAS las acciones que modifican un array compartido (mensajes, fotos, equipos) usan transacción atómica de Firebase — misma lección aplicada en Eventos. Único caso real con Sheets (st_actualizarDeposito, al llegar una orden de preparación a "para_instalar", resolvía el email del vendedor por nombre desde la hoja Vendedores) resuelto leyendo el nodo "permisos" ya sincronizado en Firebase (Cristian: "la solapa vendedores tiene su boton de script que lo sube a firebase") — no se tocó Sheets para nada. Confirmado con 15 tests, incluida la condición de carrera (2 mensajes simultáneos, ninguno se pierde).) -->
 <!-- Portal TLC | servicio.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — módulo Notificaciones migrado a Cloud Functions (transversal, usado en cotizaciones/eventos/index/servicio/selector-dispositivos). Las 5 acciones (guardarTokenPush, listarNotificaciones, marcarNotificacionLeida, reaccionarNotificacion, marcarTodasNotificacionesLeidas) ahora apuntan a NOTIFICACIONES_URL (Cloud Function nueva, ver /cloud-function-notificaciones/) en vez de a Apps Script — el resto de este archivo sigue sin tocar. ) -->
 <!-- Portal TLC | servicio.html | v2026.09.18.3 (TC HISTÓRICO REAL por gasto — Cristian preguntó: "el tc es el de la fecha de la carga, y queda guardado historico si hace 10 dias era 1530 y hoy 1535, el input de 10 dias queda con 1530 y el de hoy 1535, es asi?" — la respuesta era NO, había un único TC vigente aplicado a todos por igual. Ahora sí: cada gasto NUEVO guarda su propio tc_al_cargar al crearse (el TC vigente en ese momento), y ese valor queda fijo para siempre — se usa tanto para la etiqueta como para convertir ARS↔USD de ese renglón puntual, incluso al editarlo después (antes, editar el importe de un gasto viejo lo convertía con el TC de HOY, no con el suyo — corregido también). _aMonedaGastoSt ahora acepta un TC opcional (el histórico del gasto), con el TC vigente como respaldo para gastos que todavía no tienen uno propio guardado. El Total agregado de abajo NO se tocó — sigue usando el TC vigente de hoy para la conversión (cambiar eso es una decisión aparte, con implicancias en otros módulos, no se asumió). Confirmado con 3 tests: un gasto nuevo se crea con el TC de hoy; dos gastos con TC distinto (1530 vs 1535) muestran cada uno el suyo; editar el importe de un gasto viejo usa SU TC histórico para convertir a USD, no el de hoy.) -->
@@ -1208,10 +1209,19 @@ async function _cargarTickets() {
   if (kanban) kanban.style.display = 'none';
   if (lista)  lista.style.display  = 'none';
   try {
-    await _cargarColumnas();
-    await _cargarAsignadosPorEtapa();
-    var res  = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now(), { cache:'no-store' });
-    var data = await res.json();
+    // Los 3 pedidos son independientes entre sí (columnas y asignados
+    // ya capturan sus propios errores y solo setean sus propias
+    // globales) — antes iban en fila, uno esperando al otro, y el
+    // pedido grande (todos los tickets) arrancaba recién después de
+    // los dos chicos. Ahora arrancan juntos y se espera al más lento.
+    // Cristian: "ni bien arranca el modulo, llego a ver cargando
+    // tickets, eso pensé que iba a ser mas rapido".
+    var resultados = await Promise.all([
+      fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now(), { cache:'no-store' }).then(function(r){ return r.json(); }),
+      _cargarColumnas(),
+      _cargarAsignadosPorEtapa(),
+    ]);
+    var data = resultados[0];
     _tickets = data ? Object.values(data) : [];
     // Ordenar: más reciente arriba
     _tickets.sort(function(a,b){
