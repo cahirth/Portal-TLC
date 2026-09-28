@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | mi-dia.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — las 3 acciones que usa este archivo para despinnear pines (marcarNegocioUrgente, st_actualizarCampo, marcarTarjetaUrgenteEv, ver _despinnearItemMd) ahora van a SERVICIO_URL — las 3 convergían en un solo fetch dinámico, un solo cambio.) -->
 <!-- Portal TLC | mi-dia.html | v2026.09.22.1 (SEGUNDO MÓDULO MIGRADO FUERA DE APPS SCRIPT — Cristian: "por que otro modulo seguimos? que sea facil de implementar y me dé rápido resultados?". Elegido "Tareas" (crearTarea, listarTareas, completarTarea, eliminarTarea): igual de simple que Empresas, todas Firebase puro sobre un único nodo por tarea (tareas/{id}), sin tocar historico.json ni GitHub. Las otras 3 acciones que usa este archivo (marcarNegocioUrgente, marcarTarjetaUrgenteEv, st_actualizarCampo) quedan sin tocar en GAS_URL a propósito — las usan también cotizaciones.html/eventos.html/servicio.html directamente, migrarlas implica tocar los 4 archivos a la vez. Agregada la constante TAREAS_URL (con el mismo placeholder claro + aviso en consola que ya se usó en empresas.html) — las 4 llamadas correspondientes ahora apuntan ahí en vez de a GAS_URL. Ver /cloud-function-tareas/ para el código (index.js, equivalente línea por línea a FotoMap.gs, verificado con 9 tests) y DESPLIEGUE.md. Ya con los 2 aprendizajes de la migración de Empresas aplicados desde el vamos: databaseURL explícito en admin.initializeApp(), y el body leído de req.rawBody (no de req.body, que queda vacío con Content-Type: text/plain).) -->
 <!-- Portal TLC | mi-dia.html | v2026.08.30.5 (3 pedidos de Cristian: (1) "modulo mi dia, tarda en amanecer, podes chequealos?" — mismo problema y mismo arreglo ya aplicado en cuenta-corriente.html: _cargarTodoMd() pedía Ventas, Servicio Técnico, Eventos y Tareas sueltas una atrás de la otra con await secuencial, sumando sus tiempos — ahora salen las 4 juntas con Promise.all, con el mismo aislamiento de errores de antes (si una falla, las demás igual completan). En un test con 4 llamadas de 50ms cada una, el tiempo total bajó de ~200ms a ~52ms. (2) "el PIN, podes destildarlo y sacarlo de mi dia" — el pin de Ventas/Servicio/Eventos era un <span> fijo sin forma de destildarlo desde acá. Ahora es clickeable y reusa la MISMA acción que ya usa cada módulo de origen para su propio pin (marcarNegocioUrgente para Ventas, st_actualizarCampo con prioridad:media para Servicio Técnico, marcarTarjetaUrgenteEv para Eventos) — sin backend nuevo. Al destildar desaparece de la lista al toque (optimista); si el backend falla, vuelve a aparecer y avisa, en vez de perderse silenciosamente. (3) "en imagen 2 para abris la tarjeta permitir tocar toda la fila para abrirla y no el link Abrir" — antes solo el texto "Abrir →" (un <a>) navegaba; ahora toda la fila es clickeable cuando tiene link, "Abrir →" queda como texto informativo nomás. El checkbox/pin y el botón de borrar cortan la propagación del click para no disparar la navegación al tocarlos — una tarea suelta (sin link) no se vuelve clickeable como fila. Confirmado con 8 tests: las 4 llamadas de carga corren en paralelo con resultado correcto, la fila con link es clickeable en toda su extensión, el pin corta la propagación y no dispara la navegación de la fila, una tarea sin link no queda clickeable, destildar el pin llama a la acción correcta según el origen (los 3 casos), y si el backend falla al destildar, el pin vuelve a aparecer en la lista en vez de perderse.) -->
 <!-- Portal TLC | mi-dia.html | v2026.08.30.4 (Sumado avatar.js (archivo nuevo, mismo patrón que version.js/permisos.js) — Cristian: "mi dia y eventos no tienen avatar, podria haber 1 solo avatar flotante". Confirmado con test de integración real.) -->
@@ -180,6 +181,11 @@ var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLv
 // también otros archivos (cotizaciones.html, eventos.html,
 // servicio.html), migrarlas implica tocar los 4 a la vez.
 var TAREAS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/tareas'; // Cloud Function desplegada 2026.09.22 — reemplaza a GAS_URL solo para las 4 acciones de Tareas
+// MUERTE A APPS SCRIPT — módulo Servicio Técnico migrado, que incluye
+// las 3 acciones que usa este archivo para despinnear pines
+// (marcarNegocioUrgente, st_actualizarCampo, marcarTarjetaUrgenteEv)
+// — las 3 convergen en un solo fetch dinámico, ver _despinnearItemMd.
+var SERVICIO_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio'; // Cloud Function desplegada 2026.09.28
 var RTDB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
 var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY = 'tlc_tema';
@@ -431,7 +437,7 @@ window._despinnearItemMd = function(tipo, id, idEvento) {
   var itemAnterior = _itemsMd.find(function(i) { return i.tipo === tipo && i.id === id; });
   _itemsMd = _itemsMd.filter(function(i) { return !(i.tipo === tipo && i.id === id); }); // optimista — desaparece de la lista al toque
   _renderListaMd();
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(body) })
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(body) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok && itemAnterior) {

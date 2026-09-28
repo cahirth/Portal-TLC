@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.09.28.3 (MUERTE A APPS SCRIPT — solo marcarNegocioUrgente de este archivo (comparte esa acción con Mi Día y Servicio Técnico) ahora va a SERVICIO_URL — el resto de Cotizaciones sigue sin tocar, es la fase más grande y más atada a historico.json/GitHub, queda para más adelante en el plan.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.28.2 (MUERTE A APPS SCRIPT — módulo Pipelines migrado a Cloud Functions. Las 3 acciones (listarPipelines, guardarPipeline, eliminarPipeline) ahora apuntan a PIPELINES_URL en vez de a Apps Script — el resto de este archivo sigue sin tocar. eliminarPipeline cambia de comportamiento a propósito: en vez de escribir en historico.json/GitHub para desvincular las cotizaciones que tenían el pipeline borrado, ahora lo hace directo sobre el espejo de Firebase (cotizaciones/{id}) — mismo criterio ya anotado en PLAN-MIGRACION.md, sacar historico.json del camino de las acciones comunes. Contrapartida consciente: esta acción puntual ya no deja un commit de auditoría en GitHub como antes.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — módulo Notificaciones migrado a Cloud Functions (transversal, usado en cotizaciones/eventos/index/servicio/selector-dispositivos). Las 5 acciones (guardarTokenPush, listarNotificaciones, marcarNotificacionLeida, reaccionarNotificacion, marcarTodasNotificacionesLeidas) ahora apuntan a NOTIFICACIONES_URL (Cloud Function nueva, ver /cloud-function-notificaciones/) en vez de a Apps Script — el resto de este archivo sigue sin tocar. ) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.06.1 (2 pedidos de Cristian: (1) "en tarjetas de servicio y cotizaciones agregar los ... con los que tiene eventos" — mismo menú "···" que servicio.html/eventos.html: 🔗 Copiar link a este negocio, 🗑️ Borrar negocio (reusa _confirmarBorrarDeal, ya existente — se sacó del botón suelto viejo en la tarjeta hero y se consolidó acá). "Duplicar negocio" NO se agregó — a diferencia de Servicio Técnico/Eventos (puro Firebase), acá significaría crear un deal REAL en HubSpot (_hsCrearDeal), con todo lo que eso puede disparar del lado del CRM — mejor confirmarlo explícitamente antes de construirlo. (2) "en cotizaciones desactivar hubspot, no lo usamos mas" — investigado a fondo antes de tocar nada: las acciones que el frontend realmente usa hoy (actualizarEstado, reasignarVendedor, actualizarColaborador, actualizarTelefono, eliminarDeal) ya son RTDB-primero y NO dependían de que HubSpot respondiera bien — el corte real se hizo en FotoMap.gs (_hsFetch, el único punto por el que pasan las 88 referencias a HubSpot del archivo). Actualizado también el texto de "Borrar negocio" (ya no dice "se archiva en HubSpot", sería engañoso). Confirmado con 3 tests: copiar link arma la URL con el id correcto, borrar desde el menú llama a la función ya existente con el id correcto, y el menú alterna bien.) -->
@@ -1090,6 +1091,12 @@ const NOTIFICACIONES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/no
 // acciones puntuales van acá — el resto de este archivo sigue en
 // APPS_SCRIPT_URL sin tocar.
 const PIPELINES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/pipelines'; // Cloud Function desplegada 2026.09.28
+// MUERTE A APPS SCRIPT — solo marcarNegocioUrgente de este archivo va
+// a la Cloud Function de Servicio Técnico (comparte esa acción con
+// Mi Día y Servicio) — el resto de Cotizaciones sigue en
+// APPS_SCRIPT_URL sin tocar, es la fase más grande y más atada a
+// GitHub, queda para más adelante.
+const SERVICIO_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio'; // Cloud Function desplegada 2026.09.28
 
 let _preciosCache = null; // cache lazy de precios.json
 
@@ -3883,7 +3890,7 @@ async function _toggleUrgenteDesdeTarjeta(id, activar) {
         nota = notaIngresada;
     }
     try {
-        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        const resp = await fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'marcarNegocioUrgente', idCot:id, activo:activar, nota:nota,
                 vendedor:(currentUserNombre||'') }) });
         const r = await resp.json();

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.09.28.2 (MUERTE A APPS SCRIPT — módulo Servicio Técnico migrado a Cloud Functions, el más grande hasta ahora: 19 acciones propias (crear/duplicar/borrar ticket, campos, depósito, notas, gastos, fotos, mensajes, equipos de orden, etiquetas de cajas, versiones de presupuesto, asignados por etapa) + marcarNegocioUrgente/marcarTarjetaUrgenteEv (compartidas con Mi Día/Cotizaciones/Eventos) ahora apuntan a SERVICIO_URL. De paso, listarEmpresas (suelta, nunca se había redirigido) ahora va a EMPRESAS_URL. TODAS las acciones que modifican un array compartido (mensajes, fotos, equipos) usan transacción atómica de Firebase — misma lección aplicada en Eventos. Único caso real con Sheets (st_actualizarDeposito, al llegar una orden de preparación a "para_instalar", resolvía el email del vendedor por nombre desde la hoja Vendedores) resuelto leyendo el nodo "permisos" ya sincronizado en Firebase (Cristian: "la solapa vendedores tiene su boton de script que lo sube a firebase") — no se tocó Sheets para nada. Confirmado con 15 tests, incluida la condición de carrera (2 mensajes simultáneos, ninguno se pierde).) -->
 <!-- Portal TLC | servicio.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — módulo Notificaciones migrado a Cloud Functions (transversal, usado en cotizaciones/eventos/index/servicio/selector-dispositivos). Las 5 acciones (guardarTokenPush, listarNotificaciones, marcarNotificacionLeida, reaccionarNotificacion, marcarTodasNotificacionesLeidas) ahora apuntan a NOTIFICACIONES_URL (Cloud Function nueva, ver /cloud-function-notificaciones/) en vez de a Apps Script — el resto de este archivo sigue sin tocar. ) -->
 <!-- Portal TLC | servicio.html | v2026.09.18.3 (TC HISTÓRICO REAL por gasto — Cristian preguntó: "el tc es el de la fecha de la carga, y queda guardado historico si hace 10 dias era 1530 y hoy 1535, el input de 10 dias queda con 1530 y el de hoy 1535, es asi?" — la respuesta era NO, había un único TC vigente aplicado a todos por igual. Ahora sí: cada gasto NUEVO guarda su propio tc_al_cargar al crearse (el TC vigente en ese momento), y ese valor queda fijo para siempre — se usa tanto para la etiqueta como para convertir ARS↔USD de ese renglón puntual, incluso al editarlo después (antes, editar el importe de un gasto viejo lo convertía con el TC de HOY, no con el suyo — corregido también). _aMonedaGastoSt ahora acepta un TC opcional (el histórico del gasto), con el TC vigente como respaldo para gastos que todavía no tienen uno propio guardado. El Total agregado de abajo NO se tocó — sigue usando el TC vigente de hoy para la conversión (cambiar eso es una decisión aparte, con implicancias en otros módulos, no se asumió). Confirmado con 3 tests: un gasto nuevo se crea con el TC de hoy; dos gastos con TC distinto (1530 vs 1535) muestran cada uno el suyo; editar el importe de un gasto viejo usa SU TC histórico para convertir a USD, no el de hoy.) -->
 <!-- Portal TLC | servicio.html | v2026.09.18.2 (Pedido por Cristian, con captura: "en cada gasto de tarjeta, sea servicio, evento, sea cualquier tipo de moneda USD o AR$, por favor agregar al lado el tipo de cambio (no editable) en cada renglon" — antes el TC oficial solo se veía una vez, en el total agregado al final de la lista de gastos. Ahora también aparece junto al campo Importe de CADA gasto individual, tanto en la fila editable como en la de solo lectura (gastos ya liquidados o ticket finalizado) — mismo texto informativo (no un input, no editable) que ya usa el total, reusando la clase .gastos-tc-label existente. No es un TC propio de cada gasto — es el mismo TC vigente aplicado a todos por igual (no se guarda un TC histórico por gasto), mostrado repetido en cada renglón para no tener que bajar la vista al total mientras se cargan varios gastos seguidos. Confirmado con 3 tests: la fila editable muestra el TC, la fila de solo lectura (gasto liquidado) también lo muestra, y un gasto cargado en USD (no solo los en ARS) también lo muestra.) -->
@@ -869,6 +870,15 @@ var GAS_URL     = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaK
 // Solo estas 5 acciones puntuales van acá — el resto de este archivo
 // sigue en GAS_URL sin tocar.
 var NOTIFICACIONES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/notificaciones'; // Cloud Function desplegada 2026.09.27
+// MUERTE A APPS SCRIPT — módulo Servicio Técnico migrado. Las 19
+// acciones propias de este archivo (más marcarNegocioUrgente/
+// marcarTarjetaUrgenteEv si en algún momento se usan acá) van a
+// SERVICIO_URL — el resto (login, precios, etc.) sigue en GAS_URL.
+var SERVICIO_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio'; // Cloud Function desplegada 2026.09.28
+// Pieza suelta — este archivo también usa listarEmpresas (ya migrada
+// hace rato a su propia Cloud Function), pero nunca se había
+// redirigido acá. Se aprovecha esta sesión para corregirlo de paso.
+var EMPRESAS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/empresas'; // Cloud Function desplegada 2026.09.22
 var RTDB_URL    = 'https://portal-tlc-default-rtdb.firebaseio.com';
 var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY    = 'tlc_tema';
@@ -1558,7 +1568,7 @@ window._toggleAsignadoEtapa = function(etapa, codigo, activo) {
   var btn = document.getElementById('asignar-btn-' + etapa);
   if (btn) btn.textContent = '👤 ' + (lista.length ? lista.length + ' asignado' + (lista.length > 1 ? 's' : '') : 'Asignar');
 
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'guardarAsignadosEtapa', etapa: etapa, codigos: lista }) })
     .then(function(r){ return r.json(); })
     .then(function(r){ if (!r.ok) console.warn('Error guardando asignados de etapa:', r.error); })
@@ -1622,7 +1632,7 @@ function _ejecutarMovimientoEtapa(t, nuevaCol, asignado, depositoAnterior, cerra
   var body = { accion:'st_actualizarDeposito', id_ticket:t.id_ticket, deposito:nuevaCol };
   if (asignado) body.tecnico_asignado = asignado;
 
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) })
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) })
     .then(function(r){ return r.json(); })
     .then(function(r){
       if (!r.ok) {
@@ -2257,7 +2267,7 @@ window._confirmarImprimirEtiquetas = function() {
   if (btnImprimir) { btnImprimir.disabled = true; btnImprimir.textContent = '⏳ Generando...'; }
 
   var idTicket = est.idTicket;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_guardarEtiquetasCajas', id_ticket:idTicket, cajas:cajas, transporte:transporte }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2458,7 +2468,7 @@ window._avanzarPasoPrep = function(idTicket, nuevaEtapa) {
 window._separarEquipoOrden = function(idTicket, indice, cantidad, btn) {
   if (!confirm('¿Separar esta fila en ' + cantidad + ' filas independientes, una por cada N° de Serie?\n\nEl N° de Serie que tenga cargado ahora se borra — hay que volver a cargarlo por separado en cada fila nueva.')) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_separarEquipoOrden', id_ticket:idTicket, indice:indice }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2475,7 +2485,7 @@ window._separarEquipoOrden = function(idTicket, indice, cantidad, btn) {
 window._actualizarFilaOrden = function(idTicket, indice, campo, valor) {
   var payload = { accion:'st_actualizarEquipoOrden', id_ticket:idTicket, indice:indice };
   payload[campo] = valor;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) })
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert('No se pudo guardar: ' + (r.error||'')); return; }
@@ -2813,7 +2823,7 @@ window._reaccionarMensajeTicket = function(ev, idTicket, indice, tipo) {
   var email = (_session && _session.username) || '';
   var nombre = (_session && _session.name) || '';
   if (!email) return;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_reaccionarMensaje', id_ticket:idTicket, indice:indice, autor_email:email, autor_nombre:nombre, reaccion:tipo }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2854,7 +2864,7 @@ window._guardarMensajeEditado = function(idTicket, idx, btn) {
   if (!textoNuevo) { alert('El mensaje no puede quedar vacío — si querés eliminarlo, usá ✕ Borrar.'); return; }
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Guardando...'; }
   var email = (_session && _session.username) || '';
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_editarMensaje', id_ticket:idTicket, indice:idx, texto:textoNuevo, autor_email:email }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2875,7 +2885,7 @@ window._borrarMensaje = function(idTicket, idx, btn) {
   if (!confirm('¿Borrar este mensaje? No se puede deshacer.')) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
   var email = (_session && _session.username) || '';
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_borrarMensaje', id_ticket:idTicket, indice:idx, autor_email:email }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -3152,7 +3162,7 @@ window._enviarMensajeTicket = function(idTicket) {
   var boxSugerencias = document.getElementById('mencion-sugerencias');
   if (boxSugerencias) boxSugerencias.style.display = 'none';
 
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_agregarMensaje', id_ticket:idTicket, texto:texto,
       autor_nombre:autorNombre, autor_email:autorEmail, menciones:menciones, respuesta_a:respuestaAEnviar }) })
   .then(function(r){ return r.json(); })
@@ -3705,7 +3715,7 @@ window._borrarVersionPresupuestoTicket = async function(ticketId, nroVersion, bt
   if (!confirm('¿Borrar la versión v' + nroVersion + ' del historial? No se puede deshacer.')) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
   try {
-    const resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    const resp = await fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'eliminarVersionPresupuestoTicket', ticketId: ticketId, version: nroVersion }) });
     const r = await resp.json();
     if (!r.ok) { alert('No se pudo borrar la versión: ' + (r.error || r.message || 'error desconocido')); if (btn) btn.disabled = false; return; }
@@ -3814,7 +3824,7 @@ window._guardarCampoTecnico = function(id, campo, valor) {
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
   if (t) t[campo] = valor;
   if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual[campo] = valor;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_actualizarCampo', id_ticket:id, campo:campo, valor:valor }) })
   .then(function(r){ return r.json(); })
   .then(function(r){ if(!r.ok) console.warn('Error guardando campo:', r.error); })
@@ -4100,7 +4110,7 @@ window._eliminarGasto = function(id, idx) {
 };
 
 function _guardarGastos(id, gastos) {
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_actualizarGastos', id_ticket:id, gastos:gastos }) })
   .then(function(r){ return r.json(); })
   .then(function(r){ if(!r.ok) console.warn('Error guardando gastos:', r.error); })
@@ -4180,7 +4190,7 @@ window._guardarCampoSiCambio = function(id, campo, valor, valorAnterior) {
   } else {
     body = { accion:'st_actualizarCampo', id_ticket:id, campo:campo, valor:valor };
   }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) })
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) })
     .then(function(r){ return r.json(); })
     .then(function(r){ if(!r.ok) console.warn('Error guardando campo:', r.error); })
     .catch(function(e){ console.warn(e); });
@@ -4212,7 +4222,7 @@ window._guardarNota = function(id) {
     if (seccionNotas) seccionNotas.scrollIntoView({ behavior:'smooth', block:'start' });
   }
 
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({ accion:'st_agregarNota', id_ticket:id, texto:texto, autor:autor }) })
   .then(function(r){ return r.json(); })
   .then(function(r){
@@ -4232,7 +4242,7 @@ window._guardarNota = function(id) {
 // en vez de una acción por-índice en el backend — más simple y
 // consistente con lo que ya existe para gastos.
 function _guardarNotas(id, notas) {
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_actualizarNotas', id_ticket:id, notas:notas }) })
   .then(function(r){ return r.json(); })
   .then(function(r){ if(!r.ok) console.warn('Error guardando notas:', r.error); })
@@ -4289,7 +4299,7 @@ window._borrarNota = function(idTicket, idx, btn) {
 
 window._confirmarEliminar = function(id) {
   if (!confirm('¿Eliminar este ticket permanentemente? Esta acción no se puede deshacer.')) return;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({ accion:'st_eliminarTicket', id_ticket:id }) })
   .then(function(r){ return r.json(); })
   .then(function(r){
@@ -4350,7 +4360,7 @@ window._duplicarTicketActual = function() {
   if (!confirm('¿Duplicar este ticket? Se copian los datos del cliente/equipo — no las notas, gastos, fotos ni mensajes.')) return;
   _accionMenuTicketEnCurso = true;
   var idOrigen = _ticketActual.id_ticket;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_duplicarTicket', id_ticket:idOrigen, creado_por:(_session && _session.name || '') }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -4579,7 +4589,7 @@ function _precargarNuevoTicketDesdeURL() {
   // el link en empresas.html (la copia en memoria de ahí puede quedar
   // vieja). Pisa lo pintado en el paso 1 en cuanto llega la respuesta.
   if (empresaId) {
-    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarEmpresas' }) })
       .then(function(r){ return r.json(); })
       .then(function(r){
@@ -4707,7 +4717,7 @@ window._onDetFotoSeleccionada = function(event) {
   var idTicket = _fotoTicketIdPendiente;
   var campo = _fotoTicketCampoPendiente || 'fotos';
   _comprimirImagen(file, function(dataUrl) {
-    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'st_agregarFoto', id_ticket:idTicket, foto:dataUrl, campo:campo }) })
     .then(function(r){ return r.json(); })
     .then(function(r){
@@ -4736,7 +4746,7 @@ window._eliminarFotoTicket = function(idTicket, idx, campo, btn) {
   }
   if (!confirm('¿Eliminar esta foto?')) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'st_eliminarFoto', id_ticket:idTicket, indice:idx, campo:campo }) })
   .then(function(r){ return r.json(); })
   .then(function(r){
@@ -4891,7 +4901,7 @@ window._crearTicket = function() {
   var btn = document.querySelector('#modal-nuevo .btn-primary');
   btn.disabled = true; btn.textContent = 'Creando...';
 
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload) })
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload) })
   .then(function(r){ return r.json(); })
   .then(function(r){
     if (r.ok) {

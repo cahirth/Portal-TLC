@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.09.28.2 (MUERTE A APPS SCRIPT — solo marcarTarjetaUrgenteEv de este archivo (comparte esa acción con Mi Día y Servicio Técnico) ahora va a SERVICIO_URL — el resto de Eventos (30+ acciones sin migrar todavía) sigue sin tocar.) -->
 <!-- Portal TLC | eventos.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — módulo Notificaciones migrado a Cloud Functions (transversal, usado en cotizaciones/eventos/index/servicio/selector-dispositivos). Las 5 acciones (guardarTokenPush, listarNotificaciones, marcarNotificacionLeida, reaccionarNotificacion, marcarTodasNotificacionesLeidas) ahora apuntan a NOTIFICACIONES_URL (Cloud Function nueva, ver /cloud-function-notificaciones/) en vez de a Apps Script — el resto de este archivo sigue sin tocar. De paso arregla un bug real: el botón de "marcar todas como leídas" de este archivo mandaba la acción "marcarTodasLeidas" (sin "Notificaciones" en el medio), un nombre que Apps Script nunca tuvo registrado — ese botón nunca funcionó de verdad. La Cloud Function nueva acepta los 2 nombres.) -->
 <!-- Portal TLC | eventos.html | v2026.09.27.2 (BUG REAL — Cristian, con capturas: agregó "hola prueba" a un checklist (se vio bien en el momento), volvió al tablero, volvió a entrar a la tarjeta — "hola prueba no esta, si refresco o entro varias veces aparece". Causa: _abrirTarjeta usa una caché en localStorage (ev_cache_tarjeta_<id>) para abrir la tarjeta al instante la próxima vez sin esperar al servidor — pero esa caché solo se actualizaba cuando se ABRÍA la tarjeta (con datos frescos), nunca cuando se agregaba/editaba/borraba un ítem de checklist o una nota MIENTRAS la tarjeta ya estaba abierta. El cambio se veía bien en el momento (el array en memoria sí se actualizaba), pero al salir y reentrar, _abrirTarjeta mostraba la caché VIEJA de antes del cambio hasta que el refresco de fondo la alcanzaba. Agregado un helper único (_sincronizarCacheTarjetaEv) llamado después de las 10 funciones que modifican checklist/notas (crear/renombrar/borrar grupo, agregar/tildar/eliminar/editar ítem, reordenar, agregar/editar/borrar nota) — la próxima carga ya arranca con los datos correctos, sin depender de F5 ni de esperar al refresco de fondo. Mismo patrón que ya se usó en empresas.html para este mismo tipo de bug.) -->
 <!-- Portal TLC | eventos.html | v2026.09.27.1 (MINI-MIGRACIÓN URGENTE — Cristian, con el congreso del 1-2 de octubre encima: "estoy sufriendo el modulo eventos... guardar checklist, listar tarjetas, guardar notas, es un suplicio". Migradas 12 acciones puntuales (no todo Eventos, que es grande — eso se migra completo más adelante, ver PLAN-MIGRACION.md): ev_listarEventos, ev_crearChecklistGrupo, ev_editarChecklistGrupo, ev_borrarChecklistGrupo, ev_agregarChecklistItem, ev_toggleChecklistItem, ev_reordenarChecklistItems, ev_eliminarChecklistItem, ev_editarChecklistItem, ev_agregarNota (x2, ambos usos), ev_editarNota, ev_eliminarNota — las 13 llamadas correspondientes ahora apuntan a EVENTOS_CHECKLIST_URL (Cloud Function nueva, ver /cloud-function-eventos-checklist/) en vez de GAS_URL. Las otras 30 acciones de este archivo (crear/editar/mover tarjetas, fotos, mensajes, gastos, columnas, etc.) quedan sin tocar en GAS_URL. Incluye el efecto secundario real que tenían en Apps Script — notificar push+mail a quien te mencionan en un ítem de checklist, o al responsable cuando se completa una subtarea — replicado en la Cloud Function con firebase-admin's messaging() y un fetch directo a Brevo.) -->
@@ -636,6 +637,11 @@ var EVENTOS_CHECKLIST_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/e
 // Solo estas 5 acciones puntuales van acá — el resto de este archivo
 // sigue en GAS_URL sin tocar.
 var NOTIFICACIONES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/notificaciones'; // Cloud Function desplegada 2026.09.27
+// MUERTE A APPS SCRIPT — solo marcarTarjetaUrgenteEv de este archivo
+// va a la Cloud Function de Servicio Técnico (comparte esa acción con
+// Mi Día y Servicio) — el resto de Eventos sigue en GAS_URL sin
+// tocar.
+var SERVICIO_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio'; // Cloud Function desplegada 2026.09.28
 var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY = 'tlc_tema';
 var _session = null;
@@ -1377,7 +1383,7 @@ window._toggleUrgenteDesdeTarjetaEv = function(idTarjeta, activar) {
     if (notaIngresada === null) return; // canceló — chequeo ANTES de cualquier fallback a '', igual que en cotizaciones.html
     nota = notaIngresada;
   }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'marcarTarjetaUrgenteEv', id_evento:EVENTO_ACTUAL.id, id_tarjeta:idTarjeta, activo:activar, nota:nota, vendedor:(_session && _session.name || '') }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
