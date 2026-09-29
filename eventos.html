@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.09.29.2 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". Mismo bug real corregido que en servicio.html (la lista de menciones quedaba vacía para siempre tras un solo fallo).) -->
+<!-- Portal TLC | eventos.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — Cristian: "avanza con eventos". El resto del módulo (21 acciones: crear/borrar/duplicar/obtener evento, logo, columnas, tarjetas, gastos, portada, mensajes, reacciones, adjuntos) ahora va a EVENTOS_CHECKLIST_URL, la misma Cloud Function ya desplegada para checklist/notas/listado — se extendió esa función en vez de crear una nueva. Las 30+ acciones que siguen en GAS_URL (listarInternos, y las de Sheets/HubSpot) quedan sin tocar. Confirmadas Firebase-puro tras revisar FotoMap.gs, con transacción atómica en lo que toca un array o contador compartido (columnas, mensajes, cantidadTarjetas del resumen) — mismo criterio que Servicio Técnico. Confirmado con 26 tests, incluidas 2 condiciones de carrera (crear 2 tarjetas a la vez, agregar 2 mensajes a la vez).) -->
 <!-- Portal TLC | eventos.html | v2026.09.28.2 (MUERTE A APPS SCRIPT — solo marcarTarjetaUrgenteEv de este archivo (comparte esa acción con Mi Día y Servicio Técnico) ahora va a SERVICIO_URL — el resto de Eventos (30+ acciones sin migrar todavía) sigue sin tocar.) -->
 <!-- Portal TLC | eventos.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — módulo Notificaciones migrado a Cloud Functions (transversal, usado en cotizaciones/eventos/index/servicio/selector-dispositivos). Las 5 acciones (guardarTokenPush, listarNotificaciones, marcarNotificacionLeida, reaccionarNotificacion, marcarTodasNotificacionesLeidas) ahora apuntan a NOTIFICACIONES_URL (Cloud Function nueva, ver /cloud-function-notificaciones/) en vez de a Apps Script — el resto de este archivo sigue sin tocar. De paso arregla un bug real: el botón de "marcar todas como leídas" de este archivo mandaba la acción "marcarTodasLeidas" (sin "Notificaciones" en el medio), un nombre que Apps Script nunca tuvo registrado — ese botón nunca funcionó de verdad. La Cloud Function nueva acepta los 2 nombres.) -->
 <!-- Portal TLC | eventos.html | v2026.09.27.2 (BUG REAL — Cristian, con capturas: agregó "hola prueba" a un checklist (se vio bien en el momento), volvió al tablero, volvió a entrar a la tarjeta — "hola prueba no esta, si refresco o entro varias veces aparece". Causa: _abrirTarjeta usa una caché en localStorage (ev_cache_tarjeta_<id>) para abrir la tarjeta al instante la próxima vez sin esperar al servidor — pero esa caché solo se actualizaba cuando se ABRÍA la tarjeta (con datos frescos), nunca cuando se agregaba/editaba/borraba un ítem de checklist o una nota MIENTRAS la tarjeta ya estaba abierta. El cambio se veía bien en el momento (el array en memoria sí se actualizaba), pero al salir y reentrar, _abrirTarjeta mostraba la caché VIEJA de antes del cambio hasta que el refresco de fondo la alcanzaba. Agregado un helper único (_sincronizarCacheTarjetaEv) llamado después de las 10 funciones que modifican checklist/notas (crear/renombrar/borrar grupo, agregar/tildar/eliminar/editar ítem, reordenar, agregar/editar/borrar nota) — la próxima carga ya arranca con los datos correctos, sin depender de F5 ni de esperar al refresco de fondo. Mismo patrón que ya se usó en empresas.html para este mismo tipo de bug.) -->
@@ -642,6 +644,9 @@ var NOTIFICACIONES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/noti
 // Mi Día y Servicio) — el resto de Eventos sigue en GAS_URL sin
 // tocar.
 var SERVICIO_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio'; // Cloud Function desplegada 2026.09.28
+// MUERTE A APPS SCRIPT — la lista de @menciones (listarInternos) va acá.
+var INTERNOS_URL = 'PENDIENTE_PEGAR_URL_DE_CLOUD_FUNCTION_ACA'; // ← reemplazar tras el despliegue
+if (INTERNOS_URL.startsWith('PENDIENTE_')) console.error('⚠️ INTERNOS_URL todavía no está configurada — ver DESPLIEGUE.md.');
 var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY = 'tlc_tema';
 var _session = null;
@@ -810,7 +815,7 @@ function _abrirModalNuevoEvento(btn) {
   var nombre = prompt('Nombre del evento o congreso (ej. "Faco Extrema 2026"):');
   if (!nombre || !nombre.trim()) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Creando...'; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_crearEvento', nombre: nombre.trim(), vendedorRol: _session.rol }) })
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_crearEvento', nombre: nombre.trim(), vendedorRol: _session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert('Error al crear: ' + (r.error||'desconocido')); if (btn) { btn.disabled = false; btn.textContent = '+ Crear evento'; } return; }
@@ -851,7 +856,7 @@ function _duplicarEventoActual() {
   if (!EVENTO_ACTUAL) return;
   if (!confirm('¿Duplicar el evento "' + EVENTO_ACTUAL.nombre + '" con todas sus tarjetas y checklists (sin tildar)? Las notas, adjuntos y mensajes NO se copian.')) return;
   _accionMenuEnCurso = true;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_duplicarEvento', id: EVENTO_ACTUAL.id, vendedorRol: _session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -883,7 +888,7 @@ function _subirLogoEventoJs(ev) {
   var reader = new FileReader();
   reader.onload = function() {
     var base64 = reader.result.split(',')[1];
-    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+    fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
       accion:'ev_subirLogoEvento', id: EVENTO_ACTUAL.id, nombre: file.name, tipoMime: file.type, base64: base64, vendedorRol: _session.rol,
     }) })
       .then(function(r){ return r.json(); })
@@ -906,7 +911,7 @@ function _quitarLogoEventoJs() {
   if (_accionMenuEnCurso) return;
   if (!EVENTO_ACTUAL || !confirm('¿Quitar el logo de este evento?')) return;
   _accionMenuEnCurso = true;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
     accion:'ev_quitarLogoEvento', id: EVENTO_ACTUAL.id, vendedorRol: _session.rol,
   }) })
     .then(function(r){ return r.json(); })
@@ -935,7 +940,7 @@ function _borrarEventoActual() {
   if (!EVENTO_ACTUAL) return;
   if (!confirm('¿Borrar el evento "' + EVENTO_ACTUAL.nombre + '" con TODAS sus tarjetas, checklists y adjuntos? No se puede deshacer.')) return;
   _accionMenuEnCurso = true;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_borrarEvento', id: EVENTO_ACTUAL.id, vendedorRol: _session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -1047,7 +1052,7 @@ async function _abrirEvento(id, tarjetaId) {
   // en vez de aplicarla — lo que hay en memoria en ese momento ya es
   // más nuevo que lo que llegó.
   var fotoAntesDelPedido = JSON.stringify(EVENTO_ACTUAL);
-  var pedido = fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_obtenerEvento', id: id }) })
+  var pedido = fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_obtenerEvento', id: id }) })
     .then(function(resp) { return resp.json(); })
     .then(function(r) {
       if (!r.ok) throw new Error(r.error || 'Error desconocido');
@@ -1422,7 +1427,7 @@ function _dropEnCol(ev, idCol) {
   tarjeta.columna_id = idCol;
   tarjeta.orden = Date.now();
   _renderTablero();
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_moverTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:_dragTarjetaId, columna_id:idCol, orden:tarjeta.orden }) });
   _dragTarjetaId = null;
 }
@@ -1448,7 +1453,7 @@ function _abrirModalNuevaColumna(btn) {
     btn.style.opacity = '.5';
     btn.style.pointerEvents = 'none';
   }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_crearColumna', id_evento:EVENTO_ACTUAL.id, nombre:nombre.trim(), color:color, vendedorRol:_session.rol }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -1466,7 +1471,7 @@ function _menuColumna(ev, idCol) {
   if (accion === null) return;
   if (accion.trim().toLowerCase() === 'borrar') {
     if (!confirm('¿Borrar la columna "' + col.nombre + '"? Tiene que estar vacía.')) return;
-    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'ev_borrarColumna', id_evento:EVENTO_ACTUAL.id, id_columna:idCol, vendedorRol:_session.rol }) })
       .then(function(r){ return r.json(); })
       .then(function(r) {
@@ -1477,7 +1482,7 @@ function _menuColumna(ev, idCol) {
     return;
   }
   if (!accion.trim() || accion.trim() === col.nombre) return;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_editarColumna', id_evento:EVENTO_ACTUAL.id, id_columna:idCol, nombre:accion.trim() }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -1493,7 +1498,7 @@ async function _abrirModalNuevaTarjeta(idCol, btn) {
   if (!titulo || !titulo.trim()) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Creando...'; }
   try {
-    var btnRes = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var btnRes = await fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'ev_crearTarjeta', id_evento:EVENTO_ACTUAL.id, titulo:titulo.trim(), columna_id:idCol }) });
     var r = await btnRes.json();
     if (!r.ok) { alert('Error: ' + (r.error||'')); if (btn) { btn.disabled = false; btn.textContent = '+ Nueva tarjeta'; } return; }
@@ -1559,7 +1564,7 @@ async function _duplicarTarjetaActual() {
   if (!confirm('¿Duplicar esta tarjeta? Se copian título, descripción, categoría y checklists (sin tildar) — no las notas, adjuntos ni mensajes.')) return;
   _accionMenuEnCurso = true;
   try {
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var resp = await fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'ev_duplicarTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id }) });
     var r = await resp.json();
     if (!r.ok) { alert('Error: ' + (r.error||'')); return; }
@@ -1583,7 +1588,7 @@ function _borrarTarjetaActual() {
   if (!TARJETA_ACTUAL_ID) return;
   if (!confirm('¿Borrar esta tarjeta? No se puede deshacer.')) return;
   _accionMenuEnCurso = true;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_borrarTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:TARJETA_ACTUAL_ID }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -1688,7 +1693,7 @@ async function _abrirTarjeta(idTarjeta) {
   // errores de verdad. Reportado por Cristian: "la primera vez que
   // abro una ficha del tablero aparece Sin Texto".
   function _pedirDetalleTarjetaEv(reintentando, repintarAlTerminar) {
-    return fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    return fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'ev_obtenerTarjetaEv', id_evento:EVENTO_ACTUAL.id, id_tarjeta:idTarjeta }) })
       .then(function(resp) { return resp.json(); })
       .then(function(r) {
@@ -1758,10 +1763,13 @@ function _tarjetaActual() { return (EVENTO_ACTUAL && Array.isArray(EVENTO_ACTUAL
 
 async function _cargarInternosEv() {
   try {
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'listarInternos' }) });
+    var resp = await fetch(INTERNOS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'listarInternos' }) });
     var r = await resp.json();
-    _internosCacheEv = (r.ok && Array.isArray(r.internos)) ? r.internos : [];
-  } catch(e) { _internosCacheEv = []; }
+    // BUG REAL — mismo que en servicio.html: si esto fallaba UNA vez,
+    // quedaba en [] (verdadero en JS) y nunca más se reintentaba en
+    // toda la sesión. Ahora queda en null para reintentar solo.
+    _internosCacheEv = (r.ok && Array.isArray(r.internos)) ? r.internos : null;
+  } catch(e) { _internosCacheEv = null; }
 }
 
 // Actualiza SOLO el <select> de "Responsable Principal" — reemplaza
@@ -1859,7 +1867,7 @@ function _guardarCampoTarjeta(campo, valor) {
   var t = _tarjetaActual();
   if (!t) return;
   t[campo] = valor;
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify(Object.assign({ accion:'ev_editarTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id }, (function(){ var o={}; o[campo]=valor; return o; })())) });
   _renderTablero();
 }
@@ -1869,7 +1877,7 @@ function _guardarResponsable(email) {
   var persona = (_internosCacheEv || []).find(function(p){ return p.email === email; });
   t.responsable_email = email;
   t.responsable_nombre = persona ? persona.nombre : '';
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_editarTarjeta', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, responsable_email:t.responsable_email, responsable_nombre:t.responsable_nombre }) });
   _renderTablero();
 }
@@ -2512,7 +2520,7 @@ window._eliminarGastoEv = function(idx) {
 };
 
 function _guardarGastosEv(t) {
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_actualizarGastos', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, gastos:t.gastos }) })
   .then(function(r){ return r.json(); })
   .then(function(r){ if(!r.ok) console.warn('Error guardando gastos:', r.error); })
@@ -2594,7 +2602,7 @@ function _subirAdjuntoEv(ev) {
 
   var enviar = function(base64DataUrl, nombreFinal, tipoMimeFinal) {
     var base64 = base64DataUrl.split(',')[1];
-    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+    fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
       accion:'subirAdjunto', modulo:'eventos', idRegistro: EVENTO_ACTUAL.id + '/tarjetas/' + t.id,
       nombre:nombreFinal, tipoMime:tipoMimeFinal, base64:base64, subidoPorNombre:_session.name,
     }) })
@@ -2623,7 +2631,7 @@ function _eliminarAdjuntoEv(adjId, btn) {
   var t = _tarjetaActual();
   if (!confirm('¿Eliminar este archivo?')) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
     accion:'eliminarAdjunto', modulo:'eventos', idRegistro: EVENTO_ACTUAL.id + '/tarjetas/' + t.id, adjId:adjId,
   }) })
     .then(function(r){ return r.json(); })
@@ -2637,7 +2645,7 @@ function _eliminarAdjuntoEv(adjId, btn) {
 }
 function _marcarPortadaEv(adjId) {
   var t = _tarjetaActual();
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
     accion:'ev_marcarPortada', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, adjId: adjId || '',
   }) })
     .then(function(r){ return r.json(); })
@@ -2786,7 +2794,7 @@ function _construirHtmlListaMensajesEv(t) {
 window._reaccionarMensajeEv = function(ev, indice, tipo) {
   if (ev) ev.stopPropagation();
   var t = _tarjetaActual();
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_reaccionarMensaje', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, indice:indice, autor_email:_session.username, autor_nombre:_session.name, reaccion:tipo }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
@@ -2840,7 +2848,7 @@ function _enviarMensajeEv() {
   _respondiendoAMensajeEv = null;
   _renderRespuestaPreviewEv();
 
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'ev_agregarMensaje', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, texto:texto, menciones:menciones, autor_nombre:_session.name, autor_email:_session.username, respuesta_a:respuestaAEnviar }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
