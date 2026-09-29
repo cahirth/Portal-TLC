@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.09.29.4 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". De paso se corrigió un bug real: si el pedido a listarInternos fallaba UNA vez, la lista de menciones quedaba vacía para siempre en esa sesión (un array vacío es "verdadero" en JS, así que nunca reintentaba) — explica el "a veces aparece, a veces no" — ahora reintenta solo la próxima vez que alguien escribe "@".) -->
 <!-- Portal TLC | servicio.html | v2026.09.28.3 (CARGA INICIAL — Cristian: "ni bien arranca el modulo, llego a ver cargando tickets, eso pensé que iba a ser mas rapido". Medido con F12 → Network: servicio_tecnico.json tarda 1,41 s en total, de los cuales 1,18 s son de DESCARGA (el servidor responde en 0,24 s) — la página completa transfiere 11,7 MB. Causa principal (NO resuelta acá): cada ticket trae adentro sus fotos en base64 (hasta 9 por ticket) y la lista las descarga todas aunque solo el detalle las usa. Este cambio es solo la mejora chica: _cargarTickets ahora lanza los 3 pedidos (tickets, columnas, asignados por etapa) a la vez en vez de en fila — el total pasa a ser el del más lento, no la suma. Confirmado con simulación de tiempos (~600 ms vs ~900 ms en fila) y con el caso de error de red. El arreglo de fondo (sacar las fotos del nodo que lee la lista) queda anotado en PLAN-MIGRACION.md; lo leen 4 páginas: servicio.html, orden-servicio.html, remito-ingreso.html y, por la firma, orden-preparacion.html.) -->
 <!-- Portal TLC | servicio.html | v2026.09.28.2 (MUERTE A APPS SCRIPT — módulo Servicio Técnico migrado a Cloud Functions, el más grande hasta ahora: 19 acciones propias (crear/duplicar/borrar ticket, campos, depósito, notas, gastos, fotos, mensajes, equipos de orden, etiquetas de cajas, versiones de presupuesto, asignados por etapa) + marcarNegocioUrgente/marcarTarjetaUrgenteEv (compartidas con Mi Día/Cotizaciones/Eventos) ahora apuntan a SERVICIO_URL. De paso, listarEmpresas (suelta, nunca se había redirigido) ahora va a EMPRESAS_URL. TODAS las acciones que modifican un array compartido (mensajes, fotos, equipos) usan transacción atómica de Firebase — misma lección aplicada en Eventos. Único caso real con Sheets (st_actualizarDeposito, al llegar una orden de preparación a "para_instalar", resolvía el email del vendedor por nombre desde la hoja Vendedores) resuelto leyendo el nodo "permisos" ya sincronizado en Firebase (Cristian: "la solapa vendedores tiene su boton de script que lo sube a firebase") — no se tocó Sheets para nada. Confirmado con 15 tests, incluida la condición de carrera (2 mensajes simultáneos, ninguno se pierde).) -->
 <!-- Portal TLC | servicio.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — módulo Notificaciones migrado a Cloud Functions (transversal, usado en cotizaciones/eventos/index/servicio/selector-dispositivos). Las 5 acciones (guardarTokenPush, listarNotificaciones, marcarNotificacionLeida, reaccionarNotificacion, marcarTodasNotificacionesLeidas) ahora apuntan a NOTIFICACIONES_URL (Cloud Function nueva, ver /cloud-function-notificaciones/) en vez de a Apps Script — el resto de este archivo sigue sin tocar. ) -->
@@ -880,6 +881,12 @@ var SERVICIO_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio';
 // hace rato a su propia Cloud Function), pero nunca se había
 // redirigido acá. Se aprovecha esta sesión para corregirlo de paso.
 var EMPRESAS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/empresas'; // Cloud Function desplegada 2026.09.22
+// MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento
+// y todo lo que pasa por AppScript es realmente impredecible". La
+// lista de @menciones (listarInternos) resuelta de raíz: no necesita
+// Sheets en el momento, "Internos" ya está sincronizado en Firebase
+// (permisos, el mismo botón de la hoja Vendedores).
+var INTERNOS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/internos'; // Cloud Function desplegada 2026.09.29
 var RTDB_URL    = 'https://portal-tlc-default-rtdb.firebaseio.com';
 var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY    = 'tlc_tema';
@@ -2576,14 +2583,23 @@ var _internosCache = null; // se carga una sola vez por sesión
 async function _cargarInternosMenciones() {
   if (_internosCache) return _internosCache;
   try {
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var resp = await fetch(INTERNOS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarInternos' }) });
     var r = await resp.json();
-    _internosCache = (r.ok && Array.isArray(r.internos)) ? r.internos : [];
+    // BUG REAL — Cristian: "a veces aparece, a veces no". Causa: si
+    // este pedido fallaba UNA sola vez, _internosCache quedaba en []
+    // (un array vacío — que en JS es "verdadero", así que el chequeo
+    // de arriba "if (_internosCache) return" lo tomaba como YA
+    // cargado) y nunca más se reintentaba en toda la sesión. Ahora,
+    // si falla o viene vacío por error, _internosCache queda en null
+    // — la PRÓXIMA vez que alguien escriba "@" se reintenta solo, en
+    // vez de quedar roto hasta recargar la página.
+    if (r.ok && Array.isArray(r.internos)) _internosCache = r.internos;
+    else _internosCache = null;
   } catch(e) {
-    _internosCache = [];
+    _internosCache = null;
   }
-  return _internosCache;
+  return _internosCache || [];
 }
 
 // Resalta las @menciones conocidas dentro de un texto ya escapado

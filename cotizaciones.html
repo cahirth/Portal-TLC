@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.09.29.2 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". Mismo bug real corregido que en servicio.html.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — st_crearOrdenPreparacion (el puente Ventas → Servicio para crear la Orden de Preparación de Equipos) ahora va a SERVICIO_URL en vez de APPS_SCRIPT_URL. Había quedado afuera de la migración de Servicio Técnico porque la usa este archivo, no servicio.html — encontrada al revisar el plan. Confirmada Firebase-puro (crea el ticket en servicio_tecnico/{id}, mismo nodo que el resto del módulo), agregada a la Cloud Function servicio ya desplegada, sin necesitar una función nueva. Probada con test: arma bien los equipos desde el carrito, toma el domicilio de la empresa, marca el negocio de origen.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.28.3 (MUERTE A APPS SCRIPT — solo marcarNegocioUrgente de este archivo (comparte esa acción con Mi Día y Servicio Técnico) ahora va a SERVICIO_URL — el resto de Cotizaciones sigue sin tocar, es la fase más grande y más atada a historico.json/GitHub, queda para más adelante en el plan.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.28.2 (MUERTE A APPS SCRIPT — módulo Pipelines migrado a Cloud Functions. Las 3 acciones (listarPipelines, guardarPipeline, eliminarPipeline) ahora apuntan a PIPELINES_URL en vez de a Apps Script — el resto de este archivo sigue sin tocar. eliminarPipeline cambia de comportamiento a propósito: en vez de escribir en historico.json/GitHub para desvincular las cotizaciones que tenían el pipeline borrado, ahora lo hace directo sobre el espejo de Firebase (cotizaciones/{id}) — mismo criterio ya anotado en PLAN-MIGRACION.md, sacar historico.json del camino de las acciones comunes. Contrapartida consciente: esta acción puntual ya no deja un commit de auditoría en GitHub como antes.) -->
@@ -1098,6 +1099,8 @@ const PIPELINES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/pipelin
 // APPS_SCRIPT_URL sin tocar, es la fase más grande y más atada a
 // GitHub, queda para más adelante.
 const SERVICIO_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio'; // Cloud Function desplegada 2026.09.28
+// MUERTE A APPS SCRIPT — la lista de @menciones (listarInternos) va acá.
+const INTERNOS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/internos'; // Cloud Function desplegada 2026.09.29
 
 let _preciosCache = null; // cache lazy de precios.json
 
@@ -1218,12 +1221,17 @@ var _pollingMensajesCotId = null;
 async function _cargarInternosMencionesCot() {
     if (_internosCacheCot) return _internosCacheCot;
     try {
-        var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        var resp = await fetch(INTERNOS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'listarInternos' }) });
         var r = await resp.json();
-        _internosCacheCot = (r.ok && Array.isArray(r.internos)) ? r.internos : [];
-    } catch(e) { _internosCacheCot = []; }
-    return _internosCacheCot;
+        // BUG REAL — mismo que en servicio.html/eventos.html: si esto
+        // fallaba una vez, quedaba en [] (verdadero en JS) y el
+        // "if (_internosCacheCot) return" de arriba nunca más
+        // reintentaba en toda la sesión.
+        if (r.ok && Array.isArray(r.internos)) _internosCacheCot = r.internos;
+        else _internosCacheCot = null;
+    } catch(e) { _internosCacheCot = null; }
+    return _internosCacheCot || [];
 }
 
 function _escCot(s) {
