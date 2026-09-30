@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.09.30.1 (Cristian: "no quiero que se cambie solo de dueño... a menos que tenga rol de administrador... y que pregunte ¿realmente lo quiere cambiar?". El selector de Vendedor del detalle ahora aparece solo para Administrador (antes también para el dueño) y pide confirmación antes de reasignar; si se cancela vuelve al valor anterior. _mutarVendedorCotizacion también rechaza si no es admin. Complementa el arreglo en presupuesto-editor.html, que al editar pisaba el dueño con el usuario logueado.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.29.3 (BUG REAL — Cristian: "si un item tiene descuento, en usd, cuando edito ese presupuesto lo abre y el descuento lo aplica en %, esta mal". Causa real encontrada acá (no en presupuesto-editor.html): al armar el borrador para reabrir un negocio existente, el objeto de cada ítem nunca copiaba descuentoTipo — solo el valor numérico (descuento), nunca si era % o USD. presupuesto-editor.html, al no encontrar el campo, caía siempre al default '%' — el descuento en USD se perdía silenciosamente y se reinterpretaba como si fuera un porcentaje. Ahora se copia descuentoTipo también.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.29.2 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". Mismo bug real corregido que en servicio.html.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — st_crearOrdenPreparacion (el puente Ventas → Servicio para crear la Orden de Preparación de Equipos) ahora va a SERVICIO_URL en vez de APPS_SCRIPT_URL. Había quedado afuera de la migración de Servicio Técnico porque la usa este archivo, no servicio.html — encontrada al revisar el plan. Confirmada Firebase-puro (crea el ticket en servicio_tecnico/{id}, mismo nodo que el resto del módulo), agregada a la Cloud Function servicio ya desplegada, sin necesitar una función nueva. Probada con test: arma bien los equipos desde el carrito, toma el domicilio de la empresa, marca el negocio de origen.) -->
@@ -2958,8 +2959,8 @@ function _renderDetalle(c) {
         </div>
         <div class="det-card">
             <div class="det-card-label">Vendedor</div>
-            ${puedeGestionar ? `
-            <select class="det-vendedor-select" data-id="${id}" onchange="_mutarVendedorCotizacion('${id}', this.value)"
+            ${permisos.verTodo ? `
+            <select class="det-vendedor-select" data-id="${id}" onchange="_confirmarCambioVendedor('${id}', this)"
                 style="width:100%;font-size:12px;font-weight:600;color:#0f172a;background:white;border:1px solid #cbd5e1;
                        border-radius:6px;padding:5px 6px;font-family:inherit;">
                 ${listaVendedores.map(v => `<option value="${v.nombre}" ${v.nombre === c.vendedor ? 'selected' : ''}>${v.nombre}</option>`).join('')}
@@ -3582,8 +3583,25 @@ function _cambiarEstadoDesdeDetalle(id, nuevoEstado, elSelect) {
 }
 
 // ─── REASIGNAR VENDEDOR ──────────────────────────────────────────
+// Cambiar el dueño de un negocio es exclusivo del Administrador y pide
+// confirmación: si el negocio pasa a otro vendedor, el anterior (si no
+// es admin) deja de verlo. Si se cancela, el selector vuelve al valor real.
+function _confirmarCambioVendedor(id, sel) {
+    const c = [historicoCompleto, todasLasCot].map(arr => (arr || []).find(x =>
+        String(x.idCot || x.id_cotizacion || x.id || '') === String(id))).find(Boolean) || cotActual;
+    const actual = (c && c.vendedor) || '';
+    const nuevo  = sel.value;
+    if (!permisos.verTodo) { sel.value = actual; return; }
+    if (!nuevo || nuevo === actual) return;
+    const ok = confirm('¿Cambiar el dueño del negocio?\n\n' + (actual || '(sin vendedor)') + '  →  ' + nuevo +
+        '\n\n' + (actual || 'El vendedor actual') + ' dejará de ver este negocio si no es administrador.');
+    if (!ok) { sel.value = actual; return; }
+    _mutarVendedorCotizacion(id, nuevo);
+}
+
 function _mutarVendedorCotizacion(id, nuevoVendedor) {
     if (!nuevoVendedor) return;
+    if (!permisos.verTodo) { console.warn('Reasignar vendedor: solo Administrador'); return; }
     // Paso A: actualizar en memoria a 0ms
     [historicoCompleto, todasLasCot].forEach(arr => {
         const c = arr.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id));

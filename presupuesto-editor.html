@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.09.30.1 (Cristian: "no quiero que se cambie solo de dueño... porque se editó, porque se miró". Al guardar, si el negocio ya existe se conserva el vendedor que tiene en RTDB (cotizaciones/{id}/vendedor) en vez de poner al usuario logueado. Solo un negocio nuevo toma como dueño a quien lo crea. Si no se puede leer el dueño actual, no guarda.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.09.29.3 (Cristian: "por default siempre pone clínica del cliente... que por default aparezca que lo retiran en TLC". El default de "Lugar de entrega" cambió de "Clínica del Cliente" a "Nuestra oficina" — tanto para un presupuesto nuevo (se movió el <option> de oficina primero) como al reabrir un negocio viejo que no tenga este dato guardado (el fallback de la línea de restauración pasó de 'cliente' a 'oficina'). Un negocio que ya tenga guardado explícitamente "cliente" sigue mostrando "cliente" al reabrirlo — esto solo cambia el default, no toca datos ya guardados.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.09.29.2 (2 bugs reales — Cristian: "si un item tiene descuento, en usd, cuando edito ese presupuesto lo abre y el descuento lo aplica en %... switchear el descuento en % o USD, calcularlo". (1) La causa real de que se aplicara siempre en % estaba en cotizaciones.html (ver esa versión), no acá — este archivo ya respetaba bien it.descuentoTipo, solo nunca le llegaba. (2) _toggleDescuentoTipoItem ya no resetea el descuento a 0 al cambiar entre % y USD — calcula el EQUIVALENTE con la misma fórmula que usa _calcTotalesItem (bruto = precio × cantidad), así el vendedor ve el mismo descuento real, solo expresado distinto. Confirmado con 3 tests: 10% sobre 2000 de bruto da 200 USD, la vuelta a % da los mismos 10% originales (ida y vuelta sin pérdida), y con bruto 0 no rompe.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — Cristian: "vayamos de a poco, función por función... encaremos el punto 4.1". guardarPresupuestoEditor migró a su propia Cloud Function nueva (cotizaciones) — la primera acción de Cotizaciones migrada aparte del resto del módulo, porque ya era 100% Firebase desde el arreglo de velocidad del 29/09 (ya no dependía de historico.json/GitHub para nada). Se le agregó protección contra condición de carrera con transacción atómica sobre el negocio (2 guardados simultáneos al mismo negocio ya no se pisan). De paso, listarEmpresas (2 llamadas, migrada hace rato pero nunca redirigida en este archivo) ahora va a EMPRESAS_URL. Confirmado con 7 tests: negocio nuevo, edición (conserva notas), soloRegistrarNegocio, modalidadPago/pipeline_id a nivel principal, presupuesto vinculado a un ticket de Servicio, ticket inexistente, y la condición de carrera.) -->
@@ -1600,6 +1601,24 @@ async function _generarPresupuesto() {
 
   var sesion = _leerSesionCompartida();
   var vendedor = (sesion && sesion.name) || '';
+  // DUEÑO DEL NEGOCIO — editar un presupuesto NO cambia el dueño. Si el
+  // negocio ya existe, se conserva el vendedor que tiene en RTDB; el
+  // usuario logueado solo queda como dueño cuando el negocio es nuevo.
+  // Cambiar el dueño es exclusivo del Administrador, desde el selector
+  // "Vendedor" del detalle en cotizaciones.html (con confirmación).
+  if (NEGOCIO_ID) {
+    try {
+      var rDueno = await fetch(FIREBASE_DB_URL_PE + '/cotizaciones/' + encodeURIComponent(NEGOCIO_ID) + '/vendedor.json?_=' + Date.now(), { cache: 'no-store' });
+      if (!rDueno.ok) throw new Error('RTDB HTTP ' + rDueno.status);
+      var duenoActual = await rDueno.json();
+      if (duenoActual) vendedor = duenoActual;
+    } catch (eDueno) {
+      console.error('[Generar presupuesto] No se pudo leer el dueño actual del negocio:', eDueno);
+      alert('No se pudo verificar el vendedor actual del negocio. Revisá la conexión e intentá de nuevo.');
+      if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
+      return;
+    }
+  }
 
   var payload = {
     accion: 'guardarPresupuestoEditor',
