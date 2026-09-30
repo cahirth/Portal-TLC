@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | comisiones.html | v2026.09.29.2 (MUERTE A APPS SCRIPT — Cristian: "vamos función por función" — ahora sí. guardarComisionManual (cargar/borrar el override manual de una comisión) también migró a INTERNOS_URL, la misma Cloud Function. Este archivo queda 100% migrado, sus 3 acciones fuera de Apps Script. Confirmado con 3 tests nuevos: carga el override, lo borra mandando vacío, y rechaza un negocio inexistente o un valor no numérico.) -->
 <!-- Portal TLC | comisiones.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — Cristian: "vayamos de a poco... función por función". calcularComisiones ahora va a INTERNOS_URL (misma Cloud Function ya desplegada para listarInternos, extendida con esta acción — no necesitaba ninguna decisión nueva sobre Sheets: usa permisos y precios, ya sincronizados a Firebase por los botones que Cristian ya usa, más cotizaciones nativo). guardarComisionManual queda sin tocar en Apps Script a propósito, para la próxima función. Confirmado con 4 tests: interno cobra 1% fijo, externo cobra por % de equipo (un equipo sin % cargado no rompe nada), comision_override pisa el cálculo automático, y el filtro de fechas funciona.) -->
 <!-- Portal TLC | comisiones.html | v2026.08.26.4 (Corrección de nombre de columna — la v2026.08.26.3 (recién anterior) usaba "Ver Comisiones" por error; Cristian confirmó con captura del Excel real que la columna se llama simplemente "Comisiones". Corregido acá y en index.html v2026.08.19.3, para que ambos lados lean la MISMA columna real.) -->
 <!-- Portal TLC | comisiones.html | v2026.08.26.3 (Corrección de nombre de columna — el permiso de acceso pedía 'Comisiones', pero index.html (que grisea el botón del menú) ya usaba 'Ver Comisiones' de antes. Alineado a 'Ver Comisiones' en los dos lados, para que sea la MISMA columna la que controla el botón gris del menú y el acceso real a la pantalla. Confirmado con test actualizado.) -->
@@ -115,12 +116,8 @@
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
-// MUERTE A APPS SCRIPT — solo calcularComisiones va acá. La otra
-// acción de este archivo (guardarComisionManual) queda sin tocar por
-// ahora, a propósito — vamos función por función. Misma Cloud
-// Function que ya usan servicio/eventos/cotizaciones/cuenta-corriente
-// para listarInternos — se le agregó esta acción nueva, la URL no
-// cambia, así que no hace falta ningún placeholder acá.
+// MUERTE A APPS SCRIPT — las 3 acciones de este archivo
+// (calcularComisiones, guardarComisionManual x2) ya migraron acá.
 const INTERNOS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/internos';
 const SESSION_KEY = 'tlc_session_v1';
 
@@ -224,7 +221,7 @@ window._toggleVendedor = function(vi) {
 window._guardarComisionFila = async function(idCot, idInput) {
     const valor = document.getElementById(idInput).value;
     try {
-        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        const resp = await fetch(INTERNOS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'guardarComisionManual', idCot: idCot, comisionManual: valor }) });
         const r = await resp.json();
         if (!r.ok) { alert('No se pudo guardar: ' + (r.error||'')); return; }
@@ -234,7 +231,7 @@ window._guardarComisionFila = async function(idCot, idInput) {
 
 window._limpiarComisionFila = async function(idCot, idInput, valorCalculado) {
     try {
-        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        const resp = await fetch(INTERNOS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'guardarComisionManual', idCot: idCot, comisionManual: '' }) });
         const r = await resp.json();
         if (!r.ok) { alert('No se pudo restaurar: ' + (r.error||'')); return; }
