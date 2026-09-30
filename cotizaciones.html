@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.09.29.3 (BUG REAL — Cristian: "si un item tiene descuento, en usd, cuando edito ese presupuesto lo abre y el descuento lo aplica en %, esta mal". Causa real encontrada acá (no en presupuesto-editor.html): al armar el borrador para reabrir un negocio existente, el objeto de cada ítem nunca copiaba descuentoTipo — solo el valor numérico (descuento), nunca si era % o USD. presupuesto-editor.html, al no encontrar el campo, caía siempre al default '%' — el descuento en USD se perdía silenciosamente y se reinterpretaba como si fuera un porcentaje. Ahora se copia descuentoTipo también.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.29.2 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". Mismo bug real corregido que en servicio.html.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — st_crearOrdenPreparacion (el puente Ventas → Servicio para crear la Orden de Preparación de Equipos) ahora va a SERVICIO_URL en vez de APPS_SCRIPT_URL. Había quedado afuera de la migración de Servicio Técnico porque la usa este archivo, no servicio.html — encontrada al revisar el plan. Confirmada Firebase-puro (crea el ticket en servicio_tecnico/{id}, mismo nodo que el resto del módulo), agregada a la Cloud Function servicio ya desplegada, sin necesitar una función nueva. Probada con test: arma bien los equipos desde el carrito, toma el domicilio de la empresa, marca el negocio de origen.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.28.3 (MUERTE A APPS SCRIPT — solo marcarNegocioUrgente de este archivo (comparte esa acción con Mi Día y Servicio Técnico) ahora va a SERVICIO_URL — el resto de Cotizaciones sigue sin tocar, es la fase más grande y más atada a historico.json/GitHub, queda para más adelante en el plan.) -->
@@ -4422,6 +4423,14 @@ function _irAPresupuestoEditor(idCot) {
             precioContado: precioContado,
             cantidad: parseInt(it.cantidad) || 1,
             descuento: parseFloat(it.descuentoValor) || 0,
+            // BUG REAL — Cristian: "si un item tiene descuento en usd,
+            // cuando edito ese presupuesto lo abre y el descuento lo
+            // aplica en %". Causa: este objeto nunca copiaba
+            // descuentoTipo — presupuesto-editor.html, al no
+            // encontrarlo, caía siempre al default '%' (ver su propio
+            // "it.descuentoTipo || '%'"), sin importar que el negocio
+            // guardado tuviera el descuento en USD.
+            descuentoTipo: it.descuentoTipo || '%',
             descuentoContadoOriginal: descuentoContadoOriginal,
             iva: (it.ivaPct !== undefined && it.ivaPct !== null) ? parseFloat(it.ivaPct) : 10.5,
             moneda: it.moneda || 'USD',

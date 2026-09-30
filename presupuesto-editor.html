@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.09.29.3 (Cristian: "por default siempre pone clínica del cliente... que por default aparezca que lo retiran en TLC". El default de "Lugar de entrega" cambió de "Clínica del Cliente" a "Nuestra oficina" — tanto para un presupuesto nuevo (se movió el <option> de oficina primero) como al reabrir un negocio viejo que no tenga este dato guardado (el fallback de la línea de restauración pasó de 'cliente' a 'oficina'). Un negocio que ya tenga guardado explícitamente "cliente" sigue mostrando "cliente" al reabrirlo — esto solo cambia el default, no toca datos ya guardados.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.09.29.2 (2 bugs reales — Cristian: "si un item tiene descuento, en usd, cuando edito ese presupuesto lo abre y el descuento lo aplica en %... switchear el descuento en % o USD, calcularlo". (1) La causa real de que se aplicara siempre en % estaba en cotizaciones.html (ver esa versión), no acá — este archivo ya respetaba bien it.descuentoTipo, solo nunca le llegaba. (2) _toggleDescuentoTipoItem ya no resetea el descuento a 0 al cambiar entre % y USD — calcula el EQUIVALENTE con la misma fórmula que usa _calcTotalesItem (bruto = precio × cantidad), así el vendedor ve el mismo descuento real, solo expresado distinto. Confirmado con 3 tests: 10% sobre 2000 de bruto da 200 USD, la vuelta a % da los mismos 10% originales (ida y vuelta sin pérdida), y con bruto 0 no rompe.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — Cristian: "vayamos de a poco, función por función... encaremos el punto 4.1". guardarPresupuestoEditor migró a su propia Cloud Function nueva (cotizaciones) — la primera acción de Cotizaciones migrada aparte del resto del módulo, porque ya era 100% Firebase desde el arreglo de velocidad del 29/09 (ya no dependía de historico.json/GitHub para nada). Se le agregó protección contra condición de carrera con transacción atómica sobre el negocio (2 guardados simultáneos al mismo negocio ya no se pisan). De paso, listarEmpresas (2 llamadas, migrada hace rato pero nunca redirigida en este archivo) ahora va a EMPRESAS_URL. Confirmado con 7 tests: negocio nuevo, edición (conserva notas), soloRegistrarNegocio, modalidadPago/pipeline_id a nivel principal, presupuesto vinculado a un ticket de Servicio, ticket inexistente, y la condición de carrera.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.27.1 (2 bugs reales encontrados al reabrir un negocio para editar — Cristian: "cuando edito un presupuesto debe traer exactamente las variables del presupuestos, todos los descuentos y adelanto, forma de pago, tal cual están en el presupuesto a editar, ahora no lo trae". (1) El ANTICIPO/ADELANTO de TLC6/TLC12 volvía siempre al default genérico (35%/50%) en vez del real guardado — _restaurarDraftYItemPendiente ahora aplica draft.modalidadPago.anticipoPct/anticipoTipo a PARAMS_PAGO antes de que se pinte la tarjeta de Modalidades de Pago (ver cotizaciones.html y FotoMap.gs v194, que ahora mandan/guardan ese dato). (2) BUG encontrado de rebote haciendo el test: _onCambiarFormaPago() para CUALQUIER modalidad que no fuera Contado (TLC6/TLC12/Leasing) siempre reseteaba el descuento de cada ítem a 0%, sin importar si era carga inicial — se perdía el descuento real guardado. Ahora respeta el valor real en la carga inicial (mismo criterio que ya existía para Contado), y solo resetea a 0 cuando el usuario cambia de modalidad a mano en medio de la sesión. Confirmado con 5 tests: el anticipo restaurado es el real (no el genérico), la forma de pago es la correcta, el descuento del ítem es el real, la tarjeta en pantalla lo refleja, y el reset a 0 sigue funcionando al cambiar de modalidad a mano.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.14.2 (Soporte para una LISTA de ítems pendientes (sessionStorage nuevo: tlc_items_pendientes_presupuesto), además del ítem suelto de siempre (tlc_item_pendiente_presupuesto, sin tocar — sigue funcionando exactamente igual). Usado por el botón nuevo "Agregar Cotización" de ficha-equipo.html (ver esa v2026.08.15.5), que manda el equipo Padre + cada módulo/accesorio tildado como varias líneas separadas, en vez de un solo ítem. _restaurarDraftYItemPendiente refactorizada: se extrajo _procesarUnItemPendiente() (agrega una línea, o suma cantidad si ya existe una igual) para poder reusarla tanto con el ítem suelto como con cada elemento de la lista nueva — mismo cálculo de descuento automático y misma detección de duplicados en los dos casos, un solo lugar para arreglar si hiciera falta. Parte del pedido de Cristian de eliminar la pantalla intermedia de selector-dispositivos.html y trasladar "Agregar cotización" a la ficha técnica. Confirmado con 2 tests: una lista de 2 ítems (equipo + accesorio) se carga como 2 líneas separadas con sus precios y descuentos correctos; el flujo viejo del ítem suelto sigue cargando 1 sola línea exactamente igual que antes.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.14.1 (BUG REAL encontrado — el campo "Descuento" de cada ítem se auto-completaba con la fórmula (Precio LISTA − Precio CONTADO CNO) / Precio LISTA, sin importar qué tan chica fuera la diferencia. Si en la planilla Lista_Precios el Precio Contado de un equipo quedaba cargado con apenas $1-2 de diferencia contra el Precio Lista (redondeo de centavos al tipear, no un descuento real), la fórmula igual generaba un "descuento" de fracciones de % — en un ítem de ~$30.000, una diferencia de $2 daba 0,01% de descuento = exactos $3 de "Descuentos (Contado)" en el Total, sin que nadie hubiera tocado nada. Reportado por Cristian: "no puse descuento, quiero que sea 0, y no $3". Arreglado en DOS lugares: (1) el auto-cálculo ahora trata cualquier diferencia menor a 0.05% como ruido de redondeo y la deja en 0%, para presupuestos nuevos; (2) clamp defensivo agregado también en _calcularItem(), que corrige presupuestos VIEJOS ya guardados en Firebase con este descuento fantasma sin necesidad de regenerarlos — al volver a abrirlos, el 0,01% guardado se recalcula como 0% real. Confirmado con test numérico reproduciendo el caso exacto (ítem $30.000, Precio Contado con $2 de diferencia → $3 de descuento fantasma → $0 con el fix).) -->
@@ -316,8 +319,8 @@
         <div class="det-campo full">
           <label>Lugar de entrega</label>
           <select id="cc-lugar-entrega">
-            <option value="cliente">Clínica del Cliente</option>
             <option value="oficina">Nuestra oficina — Del Carmen 716 PB CABA (envío y seguro a cargo del comprador)</option>
+            <option value="cliente">Clínica del Cliente</option>
           </select>
         </div>
         <div class="det-campo full">
@@ -385,6 +388,17 @@ console.log("%c TLC Presupuesto Editor v" + APP_VERSION + " ", "background:#3a86
 //      revisarlo para que lea condicionesComerciales en el nuevo formato.
 // ══════════════════════════════════════════════════════════════════
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+// MUERTE A APPS SCRIPT — Cristian: "vayamos de a poco... función por
+// función... encaremos el punto 4.1". guardarPresupuestoEditor migró
+// a su propia Cloud Function nueva (cotizaciones) — la primera acción
+// de Cotizaciones migrada, aparte del resto del módulo, porque ya era
+// 100% Firebase desde el arreglo de velocidad (no dependía de
+// historico.json para nada).
+const COTIZACIONES_URL = 'PENDIENTE_PEGAR_URL_DE_CLOUD_FUNCTION_ACA'; // ← reemplazar tras el despliegue
+if (COTIZACIONES_URL.startsWith('PENDIENTE_')) console.error('⚠️ COTIZACIONES_URL todavía no está configurada — ver DESPLIEGUE.md.');
+// De paso, listarEmpresas (ya migrada hace rato) tampoco se había
+// redirigido nunca acá — se aprovecha esta sesión para corregirlo.
+const EMPRESAS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/empresas';
 
 // Sesión compartida con el resto del Portal (login OTP), solo lectura —
 // mismo patrón que empresas.html, para saber quién es el vendedor al guardar.
@@ -697,7 +711,7 @@ function _volver() {
 async function _cargarEmpresasCache() {
   if (EMPRESAS_CACHE) return EMPRESAS_CACHE;
   try {
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var resp = await fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarEmpresas' }) });
     var r = await resp.json();
     EMPRESAS_CACHE = r.ok ? (r.empresas || []) : [];
@@ -760,7 +774,7 @@ function _cambiarCliente() {
 async function _refrescarDatosEmpresa() {
   if (!CLIENTE_SEL || !CLIENTE_SEL.id) return;
   try {
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var resp = await fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarEmpresas' }) });
     var r = await resp.json();
     if (!r.ok || !Array.isArray(r.empresas)) return;
@@ -973,12 +987,29 @@ window._toggleMonedaItem = function(id) {
 window._toggleDescuentoTipoItem = function(id) {
   var it = ITEMS.find(function(x){ return x.id === id; });
   if (!it) return;
-  it.descuentoTipo = ((it.descuentoTipo || '%') === 'USD') ? '%' : 'USD';
-  // Al cambiar de tipo, el número que había tipeado en el otro tipo ya
-  // no tiene sentido (35 en % no es lo mismo que 35 en USD) — se
-  // resetea a 0 para no dejar un descuento fantasma aplicado sin que
-  // el vendedor se dé cuenta.
-  it.descuento = 0;
+  var tipoViejo = it.descuentoTipo || '%';
+  var tipoNuevo = (tipoViejo === 'USD') ? '%' : 'USD';
+  var bruto = (it.precio || 0) * (it.cantidad || 1);
+  // Cristian: "switchear el descuento en % o USD, calcularlo" — antes
+  // esto reseteaba el descuento a 0 al cambiar de tipo (35 en % no es
+  // lo mismo que 35 en USD, así que dejar el mismo número era peor
+  // que borrarlo). Ahora, en vez de resetear, se calcula el
+  // EQUIVALENTE en el nuevo tipo, con la misma fórmula que ya usa
+  // _calcTotalesItem (bruto = precio × cantidad) — el vendedor ve el
+  // mismo descuento real, solo expresado distinto.
+  var descuentoViejo = Math.max(0, it.descuento || 0);
+  var descuentoNuevo = 0;
+  if (bruto > 0) {
+    if (tipoNuevo === 'USD') {
+      // % -> USD: mismo % de descuento, expresado en dólares.
+      descuentoNuevo = Math.round(bruto * (descuentoViejo / 100) * 100) / 100;
+    } else {
+      // USD -> %: mismo monto de descuento, expresado como % del bruto.
+      descuentoNuevo = Math.min(100, Math.round((descuentoViejo / bruto) * 10000) / 100);
+    }
+  }
+  it.descuentoTipo = tipoNuevo;
+  it.descuento = descuentoNuevo;
   it.descuentoEditadoManual = true;
   _render();
 };
@@ -1603,7 +1634,7 @@ async function _generarPresupuesto() {
   };
 
   try {
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+    var resp = await fetch(COTIZACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
     var textoCrudo = await resp.text();
     var r;
     try { r = JSON.parse(textoCrudo); }
@@ -1710,7 +1741,7 @@ if (_draftCondiciones) {
   document.getElementById('cc-validez-fecha').value = _draftCondiciones.validezFecha || '';
   document.getElementById('cc-tiempo-entrega').value = _draftCondiciones.tiempoEntrega || 'inmediato';
   document.getElementById('cc-tiempo-entrega-custom').value = _draftCondiciones.tiempoEntregaCustom || '';
-  document.getElementById('cc-lugar-entrega').value = _draftCondiciones.lugarEntrega || 'cliente';
+  document.getElementById('cc-lugar-entrega').value = _draftCondiciones.lugarEntrega || 'oficina';
   document.getElementById('cc-notas').value = _draftCondiciones.notas || '';
   _toggleValidezPersonalizada();
   _toggleTiempoEntregaPersonalizado();
