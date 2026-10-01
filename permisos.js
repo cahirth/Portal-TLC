@@ -1,3 +1,4 @@
+// Portal TLC | permisos.js | v2026.09.30.8 — Comisiones: se acepta la columna "Comisiones" o "Ver Comisiones" de la hoja Vendedores (antes solo "Comisiones").
 // Portal TLC | permisos.js | v2026.08.30.1 | Validación de acceso a módulos secundarios
 // v2026.08.30.1: BUG DE FONDO REAL resuelto de raíz — hasta ahora,
 //      cada llamada (con el caché de sessionStorage vencido) pedía
@@ -94,6 +95,22 @@ async function _leerFilaPermisosJs(email) {
   }
 }
 
+// Alias de columnas de la hoja Vendedores: la columna de Comisiones se
+// llama "Ver Comisiones" en la planilla (así la lee cotizaciones.html),
+// pero el inicio y comisiones.html la pedían como "Comisiones". Con el
+// nombre equivocado, el inicio la daba por NO habilitada para todos, y
+// comisiones.html (fail-open) dejaba entrar a cualquiera por link
+// directo. Se acepta cualquiera de los dos nombres.
+const _ALIAS_COLUMNAS_PERMISOS_JS = { 'Comisiones': ['Ver Comisiones'] };
+function _claveColumnaConAliasJs(fila, columnaSheet) {
+  const candidatas = [columnaSheet].concat(_ALIAS_COLUMNAS_PERMISOS_JS[columnaSheet] || []);
+  for (let i = 0; i < candidatas.length; i++) {
+    const k = _rtdbHeaderSeguroJs(candidatas[i]);
+    if (fila && (k in fila)) return k;
+  }
+  return _rtdbHeaderSeguroJs(columnaSheet);
+}
+
 async function validarAccesoModulo(columnaSheet) {
   try {
     // 1) Sesión — si no hay sesión válida, ni vale la pena consultar
@@ -141,7 +158,7 @@ async function validarAccesoModulo(columnaSheet) {
       return false;
     }
 
-    const claveColumna = _rtdbHeaderSeguroJs(columnaSheet);
+    const claveColumna = _claveColumnaConAliasJs(fila, columnaSheet);
     if (!(claveColumna in fila)) {
       // La columna todavía no existe / no se sincronizó — fail-open
       // (no bloqueamos por una columna que ni siquiera está cargada).
@@ -199,7 +216,7 @@ async function consultarPermisoModulo(columnaSheet) {
     const fila = await _leerFilaPermisosJs(email);
     if (!fila) return false; // usuario no encontrado — sin acceso
 
-    const claveColumna = _rtdbHeaderSeguroJs(columnaSheet);
+    const claveColumna = _claveColumnaConAliasJs(fila, columnaSheet);
     if (!(claveColumna in fila)) {
       console.warn('[permisos.js] Columna "' + columnaSheet + '" no encontrada en /permisos — se permite mostrar igual.');
       return true;
