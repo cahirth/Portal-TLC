@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | comisiones.html | v2026.09.30.12 (Cristian: "ahora sí abre, lo único que es lento en cargar". (1) El cálculo (Cloud Function internos → calcularComisiones) se pide en paralelo con la validación del permiso, en vez de uno después del otro; no se muestra nada hasta confirmar el acceso. (2) Se pinta al instante el último resultado guardado en este navegador para ese mismo usuario y rango de fechas, y se actualiza solo atrás ("Actualizando..."). (3) Guardar o restaurar una comisión ya no vacía la pantalla ni cierra los vendedores desplegados. Si se cambia el rango mientras carga, gana el pedido más nuevo.) -->
 <!-- Portal TLC | comisiones.html | v2026.09.29.2 (MUERTE A APPS SCRIPT — Cristian: "vamos función por función" — ahora sí. guardarComisionManual (cargar/borrar el override manual de una comisión) también migró a INTERNOS_URL, la misma Cloud Function. Este archivo queda 100% migrado, sus 3 acciones fuera de Apps Script. Confirmado con 3 tests nuevos: carga el override, lo borra mandando vacío, y rechaza un negocio inexistente o un valor no numérico.) -->
 <!-- Portal TLC | comisiones.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — Cristian: "vayamos de a poco... función por función". calcularComisiones ahora va a INTERNOS_URL (misma Cloud Function ya desplegada para listarInternos, extendida con esta acción — no necesitaba ninguna decisión nueva sobre Sheets: usa permisos y precios, ya sincronizados a Firebase por los botones que Cristian ya usa, más cotizaciones nativo). guardarComisionManual queda sin tocar en Apps Script a propósito, para la próxima función. Confirmado con 4 tests: interno cobra 1% fijo, externo cobra por % de equipo (un equipo sin % cargado no rompe nada), comision_override pisa el cálculo automático, y el filtro de fechas funciona.) -->
 <!-- Portal TLC | comisiones.html | v2026.08.26.4 (Corrección de nombre de columna — la v2026.08.26.3 (recién anterior) usaba "Ver Comisiones" por error; Cristian confirmó con captura del Excel real que la columna se llama simplemente "Comisiones". Corregido acá y en index.html v2026.08.19.3, para que ambos lados lean la MISMA columna real.) -->
@@ -149,27 +150,75 @@ window._limpiarFiltroFechas = function() {
     _cargarComisiones();
 };
 
-async function _cargarComisiones() {
+// ── APERTURA AL INSTANTE ───────────────────────────────────────────
+// Cristian: "ahora sí abre, lo único que es lento en cargar". El cálculo
+// lo hace la Cloud Function (recorre todos los negocios Ganados), y
+// antes además esperaba primero la validación de permiso, en fila.
+// Ahora: (1) el pedido del cálculo sale EN PARALELO con la validación
+// del permiso (no se muestra nada hasta confirmar el acceso), (2) se
+// pinta al instante el último resultado guardado en este navegador
+// para ese mismo rango de fechas y se actualiza atrás, y (3) después de
+// guardar/restaurar una comisión ya no se vacía la pantalla.
+function _comPedir(desde, hasta) {
+    return fetch(INTERNOS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ accion:'calcularComisiones', desde, hasta }) }).then(function(resp) { return resp.json(); });
+}
+function _comClaveCache(desde, hasta) {
+    return 'com_cache_v1_' + String((currentUser && currentUser.username) || '').toLowerCase() + '_' + (desde || '') + '_' + (hasta || '');
+}
+function _comEstado(html) {
+    const cont = document.getElementById('lista-vendedores'); if (!cont || !cont.parentNode) return;
+    let el = document.getElementById('com-estado-carga');
+    if (!el) {
+        el = document.createElement('div'); el.id = 'com-estado-carga';
+        el.style.cssText = 'font-size:11px;opacity:.6;text-align:right;margin:0 0 6px;min-height:14px;';
+        cont.parentNode.insertBefore(el, cont);
+    }
+    el.innerHTML = html || '';
+}
+let _comCargaSeq = 0;
+
+async function _cargarComisiones(opciones) {
+    opciones = opciones || {};
     const cont = document.getElementById('lista-vendedores');
-    cont.innerHTML = '<div class="empty"><div class="spinner"></div>Cargando comisiones...</div>';
     const desde = document.getElementById('filtro-desde').value || '';
     const hasta = document.getElementById('filtro-hasta').value || '';
+    const miCarga = ++_comCargaSeq;
+    const clave = _comClaveCache(desde, hasta);
+
+    let pintadoDesdeCache = false;
+    if (!opciones.mantenerVista) {
+        try {
+            const cache = JSON.parse(localStorage.getItem(clave) || 'null');
+            if (cache && Array.isArray(cache.vendedores)) {
+                _ultimoResultado = cache.vendedores;
+                _renderVendedores(cache.vendedores);
+                pintadoDesdeCache = true;
+            }
+        } catch(eC) {}
+        if (!pintadoDesdeCache) cont.innerHTML = '<div class="empty"><div class="spinner"></div>Cargando comisiones...</div>';
+    }
+    _comEstado('⏳ Actualizando...');
+
     try {
-        const resp = await fetch(INTERNOS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-            body: JSON.stringify({ accion:'calcularComisiones', desde, hasta }) });
-        const r = await resp.json();
-        if (!r.ok) { cont.innerHTML = '<div class="empty">⚠ ' + _esc(r.error || 'Error al calcular comisiones') + '</div>'; return; }
+        const r = await (opciones.pedido ? opciones.pedido : _comPedir(desde, hasta));
+        if (miCarga !== _comCargaSeq) return; // se pidió otro rango mientras tanto: gana el más nuevo
+        _comEstado('');
+        if (!r.ok) { if (!pintadoDesdeCache && !opciones.mantenerVista) cont.innerHTML = '<div class="empty">⚠ ' + _esc(r.error || 'Error al calcular comisiones') + '</div>'; return; }
         let vendedores = r.vendedores || [];
-        // Sin permiso de verTodo, solo se ve la propia fila — mismo
-        // criterio que el resto del Portal para vendedores externos.
         if (!permisos.verTodo && currentUserNombre) {
             const propioNombre = currentUserNombre.toLowerCase().trim();
             vendedores = vendedores.filter(function(v) { return String(v.vendedor||'').toLowerCase().trim() === propioNombre; });
         }
         _ultimoResultado = vendedores;
+        const abiertos = Array.prototype.map.call(document.querySelectorAll('.vendedor-negocios.abierto'), function(el) { return el.id; });
         _renderVendedores(vendedores);
+        abiertos.forEach(function(id) { const el = document.getElementById(id); if (el) el.classList.add('abierto'); });
+        try { localStorage.setItem(clave, JSON.stringify({ ts: Date.now(), vendedores: vendedores })); } catch(eLs) {}
     } catch(e) {
-        cont.innerHTML = '<div class="empty">⚠ Error de conexión al cargar las comisiones.</div>';
+        if (miCarga !== _comCargaSeq) return;
+        _comEstado((pintadoDesdeCache || opciones.mantenerVista) ? '⚠ No se pudo actualizar — se muestra lo último guardado' : '');
+        if (!pintadoDesdeCache && !opciones.mantenerVista) cont.innerHTML = '<div class="empty">⚠ Error de conexión al cargar las comisiones.</div>';
     }
 }
 
@@ -225,7 +274,7 @@ window._guardarComisionFila = async function(idCot, idInput) {
             body: JSON.stringify({ accion:'guardarComisionManual', idCot: idCot, comisionManual: valor }) });
         const r = await resp.json();
         if (!r.ok) { alert('No se pudo guardar: ' + (r.error||'')); return; }
-        _cargarComisiones();
+        _cargarComisiones({ mantenerVista: true });
     } catch(e) { alert('Error de conexión al guardar la comisión.'); }
 };
 
@@ -235,7 +284,7 @@ window._limpiarComisionFila = async function(idCot, idInput, valorCalculado) {
             body: JSON.stringify({ accion:'guardarComisionManual', idCot: idCot, comisionManual: '' }) });
         const r = await resp.json();
         if (!r.ok) { alert('No se pudo restaurar: ' + (r.error||'')); return; }
-        _cargarComisiones();
+        _cargarComisiones({ mantenerVista: true });
     } catch(e) { alert('Error de conexión al restaurar la comisión.'); }
 };
 
@@ -250,6 +299,11 @@ async function _iniciar() {
         currentUserNombre = account.name || account.username || '';
         permisos = ROLES[account.rol] || ROLES['Vend_Externo'];
 
+        // El cálculo sale YA, en paralelo con la validación del permiso;
+        // el resultado no se muestra hasta confirmar el acceso.
+        const pedidoAnticipado = _comPedir(document.getElementById('filtro-desde').value || '', document.getElementById('filtro-hasta').value || '');
+        pedidoAnticipado.catch(function() {});
+
         if (typeof validarAccesoModulo === 'function') {
             // Columna dedicada "Comisiones" en la hoja Vendedores
             // (TRUE/FALSE por usuario) — mismo nombre que usa
@@ -263,7 +317,7 @@ async function _iniciar() {
             if (!acceso) return;
         }
 
-        await _cargarComisiones();
+        await _cargarComisiones({ pedido: pedidoAnticipado });
     } catch(e) {
         document.getElementById('lista-vendedores').innerHTML = '<div class="empty">⚠ Error al iniciar la sesión.</div>';
     }
