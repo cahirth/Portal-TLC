@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.09.30.4 (Cristian: "a veces tardan un poco en cargar todos los gastos de todas las tarjetas". Causa: cada apertura baja servicio_tecnico.json y eventos.json completos (con fotos) + 3 consultas a Apps Script, y repite todo después de cada acción. Arreglo inmediato (el de fondo queda en el plan: fotos de Servicio a otro nodo + Cuenta Corriente a Cloud Function): se abre al instante con la última lista guardada en este navegador (por usuario que mira y colaborador elegido) y se actualiza sola atrás con "Actualizando...". Después de liquidar/editar/agregar ya no se vacía la pantalla. Agregar, editar, liquidar y deshacer quedan bloqueados (con aviso) hasta que llegan los datos frescos, porque escriben usando la lista completa de gastos de cada tarjeta y no deben usar una copia vieja. Si se cambia de colaborador mientras carga, gana siempre la carga más nueva.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". Este archivo no cacheaba la lista (la pide fresca cada vez), así que no tenía el bug de caché de los otros 3 — solo cambia a qué URL apunta.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.08.2 (2 bugs reales de Cristian: (1) "cuando despliego gastos de la tarjeta, edito un gastos y de cierra el desplegado, tengo que volver a desplegar" — toggleGroup solo alternaba una clase CSS en el DOM vivo, sin guardar en ningún lado qué grupos estaban abiertos; como renderGroups() reconstruye todo el innerHTML de #groups desde cero, cualquier grupo abierto perdía la marca apenas algo disparaba un re-render (como editarItemClick, que llama a renderGroups() para mostrar el formulario de edición). Ahora se trackea en un Set (openGroups) que sobrevive a cualquier re-render. (2) "guardar... No se encontro el gasto en el origen" — BUG REAL encontrado con el JSON crudo de Firebase que pasó Cristian: esta tarjeta de Eventos (y cualquier otra de antes de que se empezara a guardar el campo "id" en cada tarjeta) NO TIENE t.id en absoluto. El id del ítem se armaba con t.id DIRECTO sin respaldo ("evento:...:" + t.id + ":" + idx) — si faltaba, quedaba literalmente como "evento:EV-XXX:undefined:0". La caché de edición (_origenGastosCompletos) SÍ usaba el respaldo correcto (t.id || la clave real de Firebase) para su propia clave — esa desalineación entre los dos (uno con "undefined" literal, el otro con la clave real) es lo que hacía que nunca lo encontrara al guardar, en CUALQUIER gasto de esa tarjeta, siempre. Confirmado con una reproducción completa usando los datos reales exactos (incluida la tarjeta real sin campo id) — el código viejo efectivamente generaba el id con "undefined" literal y fallaba exactamente como se reportó; con el fix (mismo respaldo aplicado en los dos lugares), el gasto se encuentra correctamente.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.08.1 (Pedido por Cristian tras encontrar los gastos huérfanos de Fernando del Campo: "si se puede asignar gastos viejos o los saneamos así como quedaron?" — ahora se puede reasignar el beneficiario de un gasto directo desde la edición inline, sin depender de un comando de consola cada vez. En la fila de edición aparece un selector "Reasignar a otro beneficiario" (solo visible para usuarios Internos, mismo criterio que "asignar a otro beneficiario" al cargar un gasto nuevo) — funciona para los 3 orígenes (Servicio Técnico, Eventos, Generales). Para Servicio/Evento no hizo falta backend nuevo (ya reciben el array completo del origen y lo reescriben tal cual); para Generales se extendió editarGastoGeneral (FotoMap.gs) para aceptar a_favor_de, exigiendo que el solicitante sea Interno. Si el gasto no tenía creado_por (como los huérfanos viejos), también se completa con el nuevo beneficiario. El toast avisa explícitamente "Gasto reasignado a X" cuando corresponde, para que no sea confuso que el ítem desaparezca de la vista actual (ya no le pertenece a quien lo estabas mirando). Confirmado con 3 tests: reasignar en un gasto de Servicio Técnico funciona y completa creado_por si faltaba, reasignar en un gasto General manda el payload correcto con el permiso, y sin el selector (usuario no Interno) la edición normal sigue igual sin tocar el beneficiario.) -->
@@ -178,6 +179,7 @@ window.cancelarEdicionItem = function() {
 };
 
 window.guardarEdicionItem = async function(id) {
+  if (!_ccPuedeEscribir()) return;
   const fecha = $("ei-fecha-"+id).value;
   const concepto = $("ei-concepto-"+id).value.trim();
   const moneda = $("ei-moneda-"+id).value;
@@ -269,6 +271,7 @@ window._parseMontoARS = function(s) {
 };
 
 window.addExpense = async function(id) {
+  if (!_ccPuedeEscribir()) return;
   const c = $("c-"+id).value.trim(), a = _parseMontoARS($("a-"+id).value);
   if (!c || !a) { toast("Completá concepto y monto"); return; }
   const ben = CURRENT.permisos.Internos ? $("b-"+id).value : CURRENT.nombre;
@@ -323,6 +326,7 @@ function openPaymentDetail(id){let p=state.liquidaciones.find(x=>x.id===id);if(!
 }
 
 window.deshacerLiquidacion = async function() {
+  if (!_ccPuedeEscribir()) return;
   if (!CURRENT.esAdmin) { toast("Solo Administradores pueden deshacer liquidaciones"); return; }
   const id = _detailLiquidacionId;
   if (!id) return;
@@ -376,6 +380,7 @@ $("payMethod").onchange=updatePaymentMethodUI;
 // en su origen real y calcula los montos con el TC oficial — acá solo
 // se arma el pedido.
 $("confirm").onclick = async function() {
+  if (!_ccPuedeEscribir()) return;
   if (!CURRENT.esAdmin) { toast("Solo Administradores pueden liquidar gastos"); return; }
   if (!$("payDate").value) { toast("Seleccioná la fecha"); return; }
   const btn = $("confirm");
@@ -492,11 +497,59 @@ async function _cargarUsuarios() {
   return lista;
 }
 
-async function cargarTodo() {
-  $("groups").innerHTML = '<div class="card" style="padding:18px;text-align:center;color:var(--muted);font-size:12px">Cargando...</div>';
+// ── APERTURA AL INSTANTE (cache-first) ─────────────────────────────
+// Cristian: "a veces tardan un poco en cargar todos los gastos". Para
+// armar la lista hay que bajar servicio_tecnico.json y eventos.json
+// COMPLETOS (con fotos) + 3 consultas a Apps Script. Mientras eso no se
+// resuelva de fondo: se pinta al instante la última lista guardada en
+// este navegador y se actualiza sola atrás. Después de una acción
+// (liquidar, editar, agregar) ya no se vacía la pantalla: se ve lo de
+// siempre con "Actualizando..." hasta que llega lo fresco.
+// IMPORTANTE: las acciones que escriben usan _origenGastosCompletos (la
+// lista COMPLETA de gastos de cada tarjeta, para no pisar los de otros),
+// así que quedan bloqueadas hasta que llegan los datos frescos.
+let _ccDatosFrescos = false;
+let _ccCargaSeq = 0;
+let _ccBeneficiarioPintado = null;
+function _ccClaveCache(benef) { return 'cc_cache_v1_' + ((CURRENT && CURRENT.email) || '') + '_' + (benef || ''); }
+function _ccMostrarEstado(html) {
+  const g = $("groups"); if (!g || !g.parentNode) return;
+  let el = document.getElementById('cc-estado-carga');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'cc-estado-carga';
+    el.style.cssText = 'font-size:11px;color:var(--muted);text-align:right;margin:0 0 6px;min-height:14px;';
+    g.parentNode.insertBefore(el, g);
+  }
+  el.innerHTML = html || '';
+}
+function _ccPuedeEscribir() {
+  if (_ccDatosFrescos) return true;
+  toast('Actualizando los datos, esperá un segundo y volvé a intentar');
+  return false;
+}
 
+async function cargarTodo() {
   const beneficiarioEmail = state.usuario_seleccionado;
   const beneficiarioNombre = userName();
+  const miCarga = ++_ccCargaSeq;
+  _ccDatosFrescos = false;
+
+  if (_ccBeneficiarioPintado !== beneficiarioEmail) {
+    let cache = null;
+    try { cache = JSON.parse(localStorage.getItem(_ccClaveCache(beneficiarioEmail)) || 'null'); } catch(eC) { cache = null; }
+    if (cache && Array.isArray(cache.grupos)) {
+      state.grupos_gastos = cache.grupos;
+      state.saldo_inicial = cache.saldo_inicial || { monto_ars:0, monto_usd:0, fecha_corte:'', estado:'PAGADO' };
+      state.liquidaciones = cache.liquidaciones || [];
+      _origenInfo = cache.origenInfo || {};
+      _origenGastosCompletos = {}; // nunca desde caché: solo se usa para escribir, y eso espera a lo fresco
+      render();
+      _ccBeneficiarioPintado = beneficiarioEmail;
+    } else {
+      $("groups").innerHTML = '<div class="card" style="padding:18px;text-align:center;color:var(--muted);font-size:12px">Cargando...</div>';
+    }
+  }
+  _ccMostrarEstado('⏳ Actualizando...');
 
   // Pedido por Cristian: "podemos hacer que gastos pendientes no tarde
   // tanto en cargar... se toma su tiempo y es molesto". Las 5 llamadas
@@ -645,6 +698,8 @@ async function cargarTodo() {
     grupos.push({ tarjeta_id: 'GENERAL', tipo_origen: 'GENERAL', titulo_origen: 'Gastos generales / directos', items: [] });
   }
 
+  if (miCarga !== _ccCargaSeq) return; // mientras tanto se pidió otra carga (p. ej. se cambió de colaborador): gana la más nueva
+
   _origenInfo = _origenInfoLocal;
   _origenGastosCompletos = _origenGastosCompletosLocal;
   state.grupos_gastos = grupos;
@@ -652,6 +707,14 @@ async function cargarTodo() {
   state.liquidaciones = liquidaciones;
 
   render();
+  _ccDatosFrescos = true;
+  _ccBeneficiarioPintado = beneficiarioEmail;
+  _ccMostrarEstado('');
+  try {
+    localStorage.setItem(_ccClaveCache(beneficiarioEmail), JSON.stringify({
+      ts: Date.now(), grupos: grupos, saldo_inicial: saldoInicial, liquidaciones: liquidaciones, origenInfo: _origenInfoLocal,
+    }));
+  } catch(eLs) { /* localStorage lleno: se sigue sin caché */ }
 }
 
 async function _initCC() {

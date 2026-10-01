@@ -1,3 +1,4 @@
+// Portal TLC | adjuntos.js | v2026.09.30.2 — Cristian: "necesito que un adjunto subido aparezca en la lista". Tras subir, el "✅ Subido" se borraba al instante (el re-render de la lista pisaba el estado) y si Firebase tardaba un instante el archivo no aparecía. Ahora: botón bloqueado mientras sube (evita subir dos veces), recarga con hasta 3 reintentos hasta que el archivo aparece, y el mensaje final queda visible.
 // Portal TLC | adjuntos.js | Módulo reutilizable de archivos adjuntos
 // ══════════════════════════════════════════════════════════════════
 // Se usa igual en servicio.html (modulo:'servicio') y cotizaciones.html
@@ -94,19 +95,47 @@ function adjuntosRenderSeccion(containerId, apiUrl, modulo, id, adjuntosData, su
     '<div id="' + containerId + '-status" style="font-size:10px;margin-top:6px;"></div>';
 }
 
+// Tras subir/borrar: recarga la lista y, si el cambio todavía no se ve
+// (Firebase puede tardar un instante), reintenta unas veces. Al final
+// vuelve a mostrar el mensaje de estado (el re-render lo borraba: antes
+// el "✅ Subido" desaparecía al instante y no quedaba ninguna señal).
+async function _adjuntosRecargarHastaVer(modulo, id, containerId, cantidadEsperada, sube) {
+  if (typeof adjuntosRecargar !== 'function') return true;
+  for (let intento = 0; intento < 4; intento++) {
+    if (intento > 0) await new Promise(function(r) { setTimeout(r, 1200); });
+    await adjuntosRecargar(modulo, id, containerId);
+    const n = document.querySelectorAll('#' + containerId + '-lista .adj-item').length;
+    if (sube ? n >= cantidadEsperada : n <= cantidadEsperada) return true;
+  }
+  return false;
+}
+
+function _adjuntosEstado(containerId, html) {
+  const el = document.getElementById(containerId + '-status');
+  if (el) el.innerHTML = html;
+}
+
+function _adjuntosBotonBloqueado(containerId, bloqueado) {
+  const cont = document.getElementById(containerId);
+  if (!cont) return;
+  const btn = cont.querySelector('button[onclick*="-input"]');
+  if (btn) { btn.disabled = bloqueado; btn.style.opacity = bloqueado ? '.5' : '1'; btn.style.cursor = bloqueado ? 'not-allowed' : 'pointer'; }
+}
+
 async function adjuntosSubir(apiUrl, modulo, id, inputEl, containerId, subidoPor) {
   const file = inputEl.files[0];
   if (!file) return;
-  const statusEl = document.getElementById(containerId + '-status');
 
   const error = _adjuntosValidarArchivo(file);
   if (error) {
-    if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">⚠️ ' + _adjuntosEsc(error) + '</span>';
+    _adjuntosEstado(containerId, '<span style="color:#f87171;">⚠️ ' + _adjuntosEsc(error) + '</span>');
     inputEl.value = '';
     return;
   }
 
-  if (statusEl) statusEl.innerHTML = '<span style="color:#3a86ff;">⏳ Subiendo...</span>';
+  const cantidadAntes = document.querySelectorAll('#' + containerId + '-lista .adj-item').length;
+  _adjuntosBotonBloqueado(containerId, true);
+  _adjuntosEstado(containerId, '<span style="color:#3a86ff;">⏳ Subiendo ' + _adjuntosEsc(file.name) + '...</span>');
   try {
     const base64 = await _adjuntosLeerBase64(file);
     const resp = await fetch(apiUrl, {
@@ -121,23 +150,27 @@ async function adjuntosSubir(apiUrl, modulo, id, inputEl, containerId, subidoPor
     let r;
     try { r = JSON.parse(textoCrudo); }
     catch(eParse) {
-      if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">⚠️ Respuesta inválida del servidor.</span>';
+      _adjuntosEstado(containerId, '<span style="color:#f87171;">⚠️ Respuesta inválida del servidor.</span>');
       console.error('[adjuntos.js] respuesta cruda:', textoCrudo);
-      inputEl.value = '';
       return;
     }
     if (!r.ok) {
-      if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">⚠️ ' + _adjuntosEsc(r.error || r.message || 'No se pudo subir') + '</span>';
-      inputEl.value = '';
+      _adjuntosEstado(containerId, '<span style="color:#f87171;">⚠️ ' + _adjuntosEsc(r.error || r.message || 'No se pudo subir') + '</span>');
       return;
     }
-    if (statusEl) statusEl.innerHTML = '<span style="color:#06d6a0;">✅ Subido</span>';
-    inputEl.value = '';
-    if (typeof adjuntosRecargar === 'function') await adjuntosRecargar(modulo, id, containerId);
+    _adjuntosEstado(containerId, '<span style="color:#3a86ff;">⏳ Subido, actualizando la lista...</span>');
+    const seVe = await _adjuntosRecargarHastaVer(modulo, id, containerId, cantidadAntes + 1, true);
+    if (seVe) _adjuntosEstado(containerId, '<span style="color:#06d6a0;">✅ ' + _adjuntosEsc(file.name) + ' subido</span>');
+    else {
+      console.warn('[adjuntos.js] Se subió pero no aparece en la lista. Respuesta del servidor:', r);
+      _adjuntosEstado(containerId, '<span style="color:#f59e0b;">⚠️ Se subió, pero todavía no aparece en la lista. Cerrá y volvé a abrir en unos segundos.</span>');
+    }
   } catch(e) {
     console.error('[adjuntos.js] Error subiendo:', e);
-    if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">⚠️ Error de conexión.</span>';
+    _adjuntosEstado(containerId, '<span style="color:#f87171;">⚠️ Error de conexión.</span>');
+  } finally {
     inputEl.value = '';
+    _adjuntosBotonBloqueado(containerId, false);
   }
 }
 
@@ -150,7 +183,8 @@ async function adjuntosBorrar(apiUrl, modulo, id, adjId, containerId) {
     });
     const r = await resp.json();
     if (!r.ok) { alert('No se pudo borrar el adjunto: ' + (r.error || r.message || 'error desconocido')); return; }
-    if (typeof adjuntosRecargar === 'function') await adjuntosRecargar(modulo, id, containerId);
+    const cantidadAntes = document.querySelectorAll('#' + containerId + '-lista .adj-item').length;
+    await _adjuntosRecargarHastaVer(modulo, id, containerId, Math.max(0, cantidadAntes - 1), false);
   } catch(e) {
     alert('Error de conexión al borrar el adjunto.');
   }

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.09.30.2 (Cristian: "quiero que cuando abras la tarjeta... se abra de inmediato y que los mensajes aparezcan de inmediato" + "necesito que un adjunto subido aparezca en la lista". MENSAJES: dejaron de esperar a Apps Script (cot_listarMensajes, 1-3 s + polling cada 8 s también por Apps Script). Ahora se pintan al instante con lo que ya vino del negocio desde Firebase y se refrescan leyendo directo cotizaciones/{id}/mensajes (mismo criterio que Servicio Técnico); los internos para @menciones cargan en paralelo en vez de en fila. El polling detecta también reacciones nuevas (antes solo si cambiaba la cantidad). Apps Script queda solo como respaldo si Firebase no responde o si no se confirma que los mensajes viven en ese nodo. ADJUNTOS: adjuntosRecargar ya no se corta si el negocio no está en la lista filtrada en memoria; antes en ese caso el archivo subido nunca aparecía hasta recargar la página.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.30.1 (Cristian: "no quiero que se cambie solo de dueño... a menos que tenga rol de administrador... y que pregunte ¿realmente lo quiere cambiar?". El selector de Vendedor del detalle ahora aparece solo para Administrador (antes también para el dueño) y pide confirmación antes de reasignar; si se cancela vuelve al valor anterior. _mutarVendedorCotizacion también rechaza si no es admin. Complementa el arreglo en presupuesto-editor.html, que al editar pisaba el dueño con el usuario logueado.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.29.3 (BUG REAL — Cristian: "si un item tiene descuento, en usd, cuando edito ese presupuesto lo abre y el descuento lo aplica en %, esta mal". Causa real encontrada acá (no en presupuesto-editor.html): al armar el borrador para reabrir un negocio existente, el objeto de cada ítem nunca copiaba descuentoTipo — solo el valor numérico (descuento), nunca si era % o USD. presupuesto-editor.html, al no encontrar el campo, caía siempre al default '%' — el descuento en USD se perdía silenciosamente y se reinterpretaba como si fuera un porcentaje. Ahora se copia descuentoTipo también.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.29.2 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". Mismo bug real corregido que en servicio.html.) -->
@@ -1510,35 +1511,94 @@ async function _renderPanelMensajesCot(id) {
                 'style="margin-top:8px;width:100%;padding:8px;border-radius:8px;background:#3a86ff;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;">Enviar</button>' +
         '</div>';
 
-    try {
-        var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-            body: JSON.stringify({ accion:'cot_listarMensajes', id_cotizacion:id }) });
-        var r = await resp.json();
-        _mensajesCotActual = (r.ok && Array.isArray(r.mensajes)) ? r.mensajes : [];
-    } catch(e) {}
+    // MENSAJES AL INSTANTE — antes esperaba a Apps Script (1-3 s) y
+    // después a los internos, en fila. Ahora: (1) se pintan al toque los
+    // mensajes que ya vinieron con el negocio desde Firebase, (2) se
+    // piden frescos directo a Firebase (cotizaciones/{id}/mensajes, igual
+    // que Servicio Técnico), y (3) los internos cargan en paralelo.
+    var cMem = _buscarCotEnMemoria(id);
+    var enMemoria = cMem ? _normalizarMensajesCot(cMem.mensajes) : null;
+    if (enMemoria) _mensajesCotActual = enMemoria;
+    if (enMemoria || _mensajesCotEnRtdbConfirmado()) _repintarListaMensajesCot();
 
     var yaEstabaCache = !!_internosCacheCot;
-    await _cargarInternosMencionesCot();
-    var lista = document.getElementById('mensajes-lista-cot');
-    if (lista) lista.innerHTML = _construirHtmlListaMensajesCot();
+    var promInternos = _cargarInternosMencionesCot();
+
+    var frescos = await _leerMensajesCot(id);
+    if (_idCotActual !== id) return; // se cerró o se abrió otro negocio mientras esperaba
+    if (frescos) { _mensajesCotActual = frescos; if (cMem) cMem.mensajes = frescos; }
+    _repintarListaMensajesCot();
+
+    promInternos.then(function() { if (!yaEstabaCache && _idCotActual === id) _repintarListaMensajesCot(); });
 
     _iniciarPollingMensajesCot(id);
 }
 
+function _repintarListaMensajesCot() {
+    var lista = document.getElementById('mensajes-lista-cot');
+    if (lista) lista.innerHTML = _construirHtmlListaMensajesCot();
+}
+
+function _buscarCotEnMemoria(id) {
+    var buscar = function(arr) { return (arr || []).find(function(x) { return x && String(x.idCot || x.id_cotizacion || x.id || '') === String(id); }); };
+    return buscar(todasLasCot) || buscar(historicoCompleto) || null;
+}
+
+// Devuelve el array de mensajes tal cual lo guarda Firebase, o null si no
+// sirve para usarlo directo (vacío o con huecos: las reacciones y las
+// respuestas usan el índice del array, así que NO se compacta).
+function _normalizarMensajesCot(d) {
+    if (!d) return null;
+    var arr = Array.isArray(d) ? d : (typeof d === 'object'
+        ? Object.keys(d).filter(function(k){ return /^\d+$/.test(k); }).sort(function(a,b){ return a-b; }).reduce(function(acc,k){ acc[+k] = d[k]; return acc; }, [])
+        : null);
+    if (!arr || !arr.length) return null;
+    for (var i = 0; i < arr.length; i++) if (!arr[i]) return null;
+    return arr;
+}
+
+// Si al menos un negocio cargado desde Firebase trae "mensajes", queda
+// confirmado que viven en cotizaciones/{id}/mensajes: ahí un negocio sin
+// ese campo simplemente no tiene mensajes y NO hace falta consultar
+// Apps Script. Si nunca aparece, se usa Apps Script como respaldo.
+var _mensajesCotRtdbConfirmadoCache = null;
+function _mensajesCotEnRtdbConfirmado() {
+    if (_mensajesCotRtdbConfirmadoCache === true) return true;
+    var ok = (todasLasCot || []).some(function(x){ return x && x.mensajes; }) || (historicoCompleto || []).some(function(x){ return x && x.mensajes; });
+    if (ok) _mensajesCotRtdbConfirmadoCache = true;
+    return ok;
+}
+
+async function _leerMensajesCot(id) {
+    try {
+        var res = await fetch('https://portal-tlc-default-rtdb.firebaseio.com/cotizaciones/' + encodeURIComponent(id) + '/mensajes.json?_=' + Date.now(), { cache:'no-store' });
+        if (res.ok) {
+            var d = await res.json();
+            var lista = _normalizarMensajesCot(d);
+            if (lista) { _mensajesCotRtdbConfirmadoCache = true; return lista; }
+            if (!d && _mensajesCotEnRtdbConfirmado()) return [];
+        }
+    } catch(eRtdb) { console.warn('[Mensajes] Firebase falló, uso Apps Script de respaldo:', eRtdb); }
+    // Respaldo: el camino anterior, por Apps Script
+    try {
+        var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({ accion:'cot_listarMensajes', id_cotizacion:id }) });
+        var r = await resp.json();
+        return (r.ok && Array.isArray(r.mensajes)) ? r.mensajes : [];
+    } catch(e) { return null; }
+}
+
 function _iniciarPollingMensajesCot(id) {
     _detenerPollingMensajesCot();
+    _idCotActual = id;
     _pollingMensajesCotId = setInterval(async function() {
         if (_idCotActual !== id) return;
-        try {
-            var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
-                body: JSON.stringify({ accion:'cot_listarMensajes', id_cotizacion:id }) });
-            var r = await resp.json();
-            var nuevos = (r.ok && Array.isArray(r.mensajes)) ? r.mensajes : [];
-            if (nuevos.length === _mensajesCotActual.length) return;
-            _mensajesCotActual = nuevos;
-            var lista = document.getElementById('mensajes-lista-cot');
-            if (lista) lista.innerHTML = _construirHtmlListaMensajesCot();
-        } catch(e) {}
+        var nuevos = await _leerMensajesCot(id);
+        if (!nuevos || _idCotActual !== id) return;
+        if (JSON.stringify(nuevos) === JSON.stringify(_mensajesCotActual)) return; // también detecta reacciones nuevas
+        _mensajesCotActual = nuevos;
+        var cMem = _buscarCotEnMemoria(id); if (cMem) cMem.mensajes = nuevos;
+        _repintarListaMensajesCot();
     }, 8000);
 }
 
@@ -3278,11 +3338,10 @@ function _renderDetalle(c) {
 // todo el detalle — se llama después de subir/borrar un archivo.
 async function adjuntosRecargar(modulo, id, containerId) {
     try {
-        const c = todasLasCot.find(x => String(x.idCot || x.id_cotizacion || x.id || '') === String(id));
-        if (!c) return;
-        const res = await fetch('https://portal-tlc-default-rtdb.firebaseio.com/cotizaciones/' + encodeURIComponent(id) + '/adjuntos.json?_=' + Date.now());
+        const c = _buscarCotEnMemoria(id); // puede no estar (filtros): igual se recarga y se pinta
+        const res = await fetch('https://portal-tlc-default-rtdb.firebaseio.com/cotizaciones/' + encodeURIComponent(id) + '/adjuntos.json?_=' + Date.now(), { cache:'no-store' });
         const adjuntosFrescos = res.ok ? await res.json() : null;
-        c.adjuntos = adjuntosFrescos;
+        if (c) c.adjuntos = adjuntosFrescos;
         adjuntosRenderSeccion(containerId, APPS_SCRIPT_URL, 'ventas', id, adjuntosFrescos, currentUserNombre || '');
     } catch(e) { console.warn('adjuntosRecargar (ventas):', e); }
 }

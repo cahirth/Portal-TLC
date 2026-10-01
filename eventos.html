@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.09.30.2 (Cristian: "quiero que cuando abras la tarjeta, en cualquier módulo, se abra de inmediato y que los mensajes aparezcan de inmediato". 3 cambios en la tarjeta: (1) si no estaba en caché, el modal ahora se abre al instante con "Abriendo..." en vez de quedar sin respuesta hasta que contesta el servidor; si se cierra mientras carga, ya no se vuelve a abrir solo. (2) BUG REAL: con caché, el refresco de fondo traía los mensajes nuevos pero nunca los mostraba (a propósito no repintaba nada para no pisar ediciones); ahora repinta SOLO la lista de mensajes. (3) Mientras la tarjeta está abierta y la pestaña visible, los mensajes se consultan cada 10 s (antes no había ningún refresco: los mensajes de otros solo aparecían al cerrar y reabrir).) -->
 <!-- Portal TLC | eventos.html | v2026.09.29.2 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". Mismo bug real corregido que en servicio.html (la lista de menciones quedaba vacía para siempre tras un solo fallo).) -->
 <!-- Portal TLC | eventos.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — Cristian: "avanza con eventos". El resto del módulo (21 acciones: crear/borrar/duplicar/obtener evento, logo, columnas, tarjetas, gastos, portada, mensajes, reacciones, adjuntos) ahora va a EVENTOS_CHECKLIST_URL, la misma Cloud Function ya desplegada para checklist/notas/listado — se extendió esa función en vez de crear una nueva. Las 30+ acciones que siguen en GAS_URL (listarInternos, y las de Sheets/HubSpot) quedan sin tocar. Confirmadas Firebase-puro tras revisar FotoMap.gs, con transacción atómica en lo que toca un array o contador compartido (columnas, mensajes, cantidadTarjetas del resumen) — mismo criterio que Servicio Técnico. Confirmado con 26 tests, incluidas 2 condiciones de carrera (crear 2 tarjetas a la vez, agregar 2 mensajes a la vez).) -->
 <!-- Portal TLC | eventos.html | v2026.09.28.2 (MUERTE A APPS SCRIPT — solo marcarTarjetaUrgenteEv de este archivo (comparte esa acción con Mi Día y Servicio Técnico) ahora va a SERVICIO_URL — el resto de Eventos (30+ acciones sin migrar todavía) sigue sin tocar.) -->
@@ -1715,6 +1716,7 @@ async function _abrirTarjeta(idTarjeta) {
         // abra esta tarjeta — pero sin tocar el modal que el vendedor
         // ya está mirando (y quizás editando) en este momento.
         if (repintarAlTerminar && TARJETA_ACTUAL_ID === idTarjeta) _renderOverlayTarjeta();
+        else if (TARJETA_ACTUAL_ID === idTarjeta) _repintarListaMensajesEv(t); // con caché: los mensajes nuevos sí se muestran (notas/checklists no se tocan para no pisar lo que se está editando)
       })
       .catch(function(e) {
         if (!reintentando) {
@@ -1732,7 +1734,11 @@ async function _abrirTarjeta(idTarjeta) {
     // falta UN render (con lo liviano que ya había) para no dejar el
     // modal vacío — mejor mostrar algo que nada, aunque le falte el
     // texto de los ítems.
-    try { await pedido; } catch(e) { _renderOverlayTarjeta(); }
+    var bodyCargandoEv = document.getElementById('ev-overlay-body');
+    if (bodyCargandoEv) bodyCargandoEv.innerHTML = '<div style="padding:28px 12px;text-align:center;color:var(--text-muted);font-size:13px;width:100%;">⏳ Abriendo <b>' + _esc(t.titulo || 'tarjeta') + '</b>...</div>';
+    document.getElementById('ev-overlay-tarjeta').classList.add('open'); // se abre YA, sin esperar al servidor
+    try { await pedido; } catch(e) { if (TARJETA_ACTUAL_ID === idTarjeta) _renderOverlayTarjeta(); }
+    if (TARJETA_ACTUAL_ID !== idTarjeta) return; // la cerró (o abrió otra) mientras cargaba: no reabrir
   } else {
     // Con caché ya mostrado, la actualización de fondo solo refresca
     // el DATO (arriba) — nunca vuelve a tocar el modal actual, ni
@@ -1753,10 +1759,51 @@ async function _abrirTarjeta(idTarjeta) {
   // puntual, pero pasaba con absolutamente todos).
   document.getElementById('ev-overlay-tarjeta').classList.add('open');
   _autoResizeTodosItemsChecklistEv();
+  _iniciarPollingMensajesEv(idTarjeta);
 }
 function _cerrarOverlayTarjeta() {
   document.getElementById('ev-overlay-tarjeta').classList.remove('open');
   TARJETA_ACTUAL_ID = null;
+  _detenerPollingMensajesEv();
+}
+
+// ── MENSAJES AL DÍA con la tarjeta abierta ─────────────────────────
+// Antes: los mensajes nuevos de otros solo aparecían al cerrar y volver
+// a abrir la tarjeta (y si estaba en caché, ni siquiera ahí: el refresco
+// de fondo nunca repintaba). Ahora se consultan cada 10 s mientras la
+// tarjeta está abierta y la pestaña visible, y solo se repinta la lista
+// de mensajes (nunca notas/checklists ni el cuadro de texto).
+var _pollingMensajesEvId = null;
+function _repintarListaMensajesEv(t) {
+  var el = document.getElementById('ev-msg-lista');
+  if (el && t) el.innerHTML = _construirHtmlListaMensajesEv(t);
+}
+function _detenerPollingMensajesEv() {
+  if (_pollingMensajesEvId) { clearInterval(_pollingMensajesEvId); _pollingMensajesEvId = null; }
+}
+function _iniciarPollingMensajesEv(idTarjeta) {
+  _detenerPollingMensajesEv();
+  _pollingMensajesEvId = setInterval(function() {
+    if (TARJETA_ACTUAL_ID !== idTarjeta) { _detenerPollingMensajesEv(); return; }
+    if (document.hidden || !EVENTO_ACTUAL) return;
+    fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ accion:'ev_obtenerTarjetaEv', id_evento:EVENTO_ACTUAL.id, id_tarjeta:idTarjeta }) })
+      .then(function(resp) { return resp.json(); })
+      .then(function(r) {
+        if (!r || !r.ok || !r.tarjeta || TARJETA_ACTUAL_ID !== idTarjeta) return;
+        var t = _tarjetaActual(); if (!t) return;
+        var nuevos = r.tarjeta.mensajes || [];
+        if (JSON.stringify(nuevos) === JSON.stringify(t.mensajes || [])) return;
+        t.mensajes = nuevos;
+        _repintarListaMensajesEv(t);
+        try {
+          var clave = 'ev_cache_tarjeta_' + t.id;
+          var c = JSON.parse(localStorage.getItem(clave) || '{}') || {};
+          c.mensajes = nuevos; localStorage.setItem(clave, JSON.stringify(c));
+        } catch(eLs) {}
+      })
+      .catch(function() {});
+  }, 10000);
 }
 function _tarjetaActual() { return (EVENTO_ACTUAL && Array.isArray(EVENTO_ACTUAL.tarjetas)) ? EVENTO_ACTUAL.tarjetas.find(function(t){ return t.id === TARJETA_ACTUAL_ID; }) : null; }
 

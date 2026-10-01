@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | mi-dia.html | v2026.09.30.5 (Cristian: "revisar el módulo Tareas — dependencia de Apps Script y lentitud en la carga". Apps Script: este módulo ya no lo usaba; quedaba declarada la URL (GAS_URL) sin uso y se eliminó. Lentitud: cada apertura baja cotizaciones.json, servicio_tecnico.json (con fotos) y eventos.json completos + la Cloud Function de tareas. Arreglo inmediato: se abre al instante con la última lista guardada en este navegador y se actualiza sola atrás ("Actualizando..."). Si se completa/crea/borra/despinnea algo mientras llegan los datos frescos, esa carga se descarta y se pide otra, para no volver a mostrar el estado de antes de la acción. La caché se mantiene al día también con las acciones optimistas. El arreglo de fondo es el mismo que Servicio y Cuenta Corriente: fotos de Servicio a otro nodo.) -->
 <!-- Portal TLC | mi-dia.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — las 3 acciones que usa este archivo para despinnear pines (marcarNegocioUrgente, st_actualizarCampo, marcarTarjetaUrgenteEv, ver _despinnearItemMd) ahora van a SERVICIO_URL — las 3 convergían en un solo fetch dinámico, un solo cambio.) -->
 <!-- Portal TLC | mi-dia.html | v2026.09.22.1 (SEGUNDO MÓDULO MIGRADO FUERA DE APPS SCRIPT — Cristian: "por que otro modulo seguimos? que sea facil de implementar y me dé rápido resultados?". Elegido "Tareas" (crearTarea, listarTareas, completarTarea, eliminarTarea): igual de simple que Empresas, todas Firebase puro sobre un único nodo por tarea (tareas/{id}), sin tocar historico.json ni GitHub. Las otras 3 acciones que usa este archivo (marcarNegocioUrgente, marcarTarjetaUrgenteEv, st_actualizarCampo) quedan sin tocar en GAS_URL a propósito — las usan también cotizaciones.html/eventos.html/servicio.html directamente, migrarlas implica tocar los 4 archivos a la vez. Agregada la constante TAREAS_URL (con el mismo placeholder claro + aviso en consola que ya se usó en empresas.html) — las 4 llamadas correspondientes ahora apuntan ahí en vez de a GAS_URL. Ver /cloud-function-tareas/ para el código (index.js, equivalente línea por línea a FotoMap.gs, verificado con 9 tests) y DESPLIEGUE.md. Ya con los 2 aprendizajes de la migración de Empresas aplicados desde el vamos: databaseURL explícito en admin.initializeApp(), y el body leído de req.rawBody (no de req.body, que queda vacío con Content-Type: text/plain).) -->
 <!-- Portal TLC | mi-dia.html | v2026.08.30.5 (3 pedidos de Cristian: (1) "modulo mi dia, tarda en amanecer, podes chequealos?" — mismo problema y mismo arreglo ya aplicado en cuenta-corriente.html: _cargarTodoMd() pedía Ventas, Servicio Técnico, Eventos y Tareas sueltas una atrás de la otra con await secuencial, sumando sus tiempos — ahora salen las 4 juntas con Promise.all, con el mismo aislamiento de errores de antes (si una falla, las demás igual completan). En un test con 4 llamadas de 50ms cada una, el tiempo total bajó de ~200ms a ~52ms. (2) "el PIN, podes destildarlo y sacarlo de mi dia" — el pin de Ventas/Servicio/Eventos era un <span> fijo sin forma de destildarlo desde acá. Ahora es clickeable y reusa la MISMA acción que ya usa cada módulo de origen para su propio pin (marcarNegocioUrgente para Ventas, st_actualizarCampo con prioridad:media para Servicio Técnico, marcarTarjetaUrgenteEv para Eventos) — sin backend nuevo. Al destildar desaparece de la lista al toque (optimista); si el backend falla, vuelve a aparecer y avisa, en vez de perderse silenciosamente. (3) "en imagen 2 para abris la tarjeta permitir tocar toda la fila para abrirla y no el link Abrir" — antes solo el texto "Abrir →" (un <a>) navegaba; ahora toda la fila es clickeable cuando tiene link, "Abrir →" queda como texto informativo nomás. El checkbox/pin y el botón de borrar cortan la propagación del click para no disparar la navegación al tocarlos — una tarea suelta (sin link) no se vuelve clickeable como fila. Confirmado con 8 tests: las 4 llamadas de carga corren en paralelo con resultado correcto, la fila con link es clickeable en toda su extensión, el pin corta la propagación y no dispara la navegación de la fila, una tarea sin link no queda clickeable, destildar el pin llama a la acción correcta según el origen (los 3 casos), y si el backend falla al destildar, el pin vuelve a aparecer en la lista en vez de perderse.) -->
@@ -172,7 +173,7 @@ a { color:var(--accent-blue); text-decoration:none; }
 
 <script>
 'use strict';
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+// (GAS_URL eliminada 2026.09.30 — este módulo ya no llama a Apps Script)
 // Segundo módulo migrado fuera de Apps Script (después de Empresas) —
 // solo las 4 acciones de Tareas (crearTarea, listarTareas,
 // completarTarea, eliminarTarea) van acá. Las otras 3 acciones que
@@ -259,7 +260,44 @@ async function _init() {
   await _cargarTodoMd(miClaveTecnico);
 }
 
+// ── APERTURA AL INSTANTE (cache-first) ─────────────────────────────
+// Cristian: "lentitud en la carga" de Tareas. Para armar la lista se
+// bajan cotizaciones.json, servicio_tecnico.json (con fotos, ~11 MB) y
+// eventos.json COMPLETOS + la Cloud Function de tareas. Hasta resolver
+// lo de fondo (fotos de Servicio a otro nodo): se pinta al instante la
+// última lista guardada en este navegador y se actualiza sola atrás.
+// Las acciones (completar, crear, borrar, despinnear) son por id y
+// optimistas, así que se pueden usar sobre la lista guardada; si se hizo
+// alguna mientras llegaba lo fresco, se vuelve a cargar una vez más para
+// no pisarla con datos de antes de la acción.
+var _mdDatosFrescos = false;
+var _mdAccionesSeq = 0;
+var _mdClaveCache = '';
+function _mdMostrarEstado(html) {
+  var lista = document.getElementById('md-lista'); if (!lista || !lista.parentNode) return;
+  var el = document.getElementById('md-estado-carga');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'md-estado-carga';
+    el.style.cssText = 'font-size:11px;opacity:.6;text-align:right;margin:0 0 6px;min-height:14px;';
+    lista.parentNode.insertBefore(el, lista);
+  }
+  el.innerHTML = html || '';
+}
+function _mdGuardarCache() {
+  if (!_mdDatosFrescos || !_mdClaveCache) return;
+  try { localStorage.setItem(_mdClaveCache, JSON.stringify({ ts: Date.now(), items: _itemsMd })); } catch(eLs) {}
+}
+
 async function _cargarTodoMd(miClaveTecnico) {
+  _mdClaveCache = 'md_cache_v1_' + ((_session && _session.username) || '').toLowerCase() + '_' + (miClaveTecnico || '');
+  if (!_mdDatosFrescos && (!_itemsMd || !_itemsMd.length)) {
+    try {
+      var cacheMd = JSON.parse(localStorage.getItem(_mdClaveCache) || 'null');
+      if (cacheMd && Array.isArray(cacheMd.items)) { _itemsMd = cacheMd.items; _renderListaMd(); }
+    } catch(eC) {}
+  }
+  _mdMostrarEstado('⏳ Actualizando...');
+  var accionesAlEmpezar = _mdAccionesSeq;
   // Pedido por Cristian: "modulo mi dia, tarda en amanecer, podes
   // chequearlos?" — mismo problema y mismo arreglo que ya se hizo en
   // cuenta-corriente.html: estas 4 llamadas (Ventas, Servicio Técnico,
@@ -358,8 +396,15 @@ async function _cargarTodoMd(miClaveTecnico) {
   }
 
   var resultados = await Promise.all([cargarVentas(), cargarServicio(), cargarEventos(), cargarTareas()]);
+  if (_mdAccionesSeq !== accionesAlEmpezar) {
+    // Se completó/creó/borró algo mientras cargaba: estos datos pueden
+    // ser de ANTES de esa acción. Se descartan y se pide otra vez.
+    return _cargarTodoMd(miClaveTecnico);
+  }
   _itemsMd = [].concat(resultados[0], resultados[1], resultados[2], resultados[3]);
+  _mdDatosFrescos = true;
   _renderListaMd();
+  _mdMostrarEstado('');
 }
 
 function _pasaFiltroTiempoMd(item) {
@@ -424,6 +469,7 @@ function _renderItemMd(item) {
 // nuevo. Al confirmar, lo saca también de la lista acá (ya no está
 // pineado, no le corresponde seguir en Mi Día).
 window._despinnearItemMd = function(tipo, id, idEvento) {
+  _mdAccionesSeq++;
   var body;
   if (tipo === 'ventas') {
     body = { accion:'marcarNegocioUrgente', idCot:id, activo:false, nota:'', vendedor:(_session.name||'') };
@@ -453,6 +499,7 @@ window._despinnearItemMd = function(tipo, id, idEvento) {
 };
 
 function _renderListaMd() {
+  _mdGuardarCache();
   var filtrados = _itemsMd.filter(function(i) { return _pasaFiltroTiempoMd(i) && _pasaFiltroOrigenMd(i); });
   var cont = document.getElementById('md-lista');
   if (!filtrados.length) {
@@ -474,6 +521,7 @@ function _renderListaMd() {
 }
 
 window._crearTareaMd = function() {
+  _mdAccionesSeq++;
   var input = document.getElementById('md-input-nueva-tarea');
   var titulo = input.value.trim();
   if (!titulo) return;
@@ -490,6 +538,7 @@ window._crearTareaMd = function() {
 };
 
 window._toggleCompletarTareaMd = function(id, completar) {
+  _mdAccionesSeq++;
   var item = _itemsMd.find(function(i) { return i.tipo === 'tarea' && i.id === id; });
   if (item) { item.completada = completar; _renderListaMd(); }
   fetch(TAREAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
@@ -499,6 +548,7 @@ window._toggleCompletarTareaMd = function(id, completar) {
 };
 
 window._eliminarTareaMd = function(id) {
+  _mdAccionesSeq++;
   if (!confirm('¿Eliminar esta tarea?')) return;
   fetch(TAREAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
     body: JSON.stringify({ accion:'eliminarTarea', id_tarea:id }) })
