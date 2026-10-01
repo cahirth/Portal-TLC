@@ -1,4 +1,4 @@
-// Portal TLC | permisos.js | v2026.09.30.8 — Comisiones: se acepta la columna "Comisiones" o "Ver Comisiones" de la hoja Vendedores (antes solo "Comisiones").
+// Portal TLC | permisos.js | v2026.09.30.9 — BUG REAL (Cristian: "está habilitada pero me dice no tenés permiso para este módulo"): el resultado de cada permiso se guardaba 10 min en sessionStorage, incluido el "NO". Si se entraba antes de sincronizar el permiso nuevo, quedaba bloqueado 10 min aunque ya estuviera habilitado. Ahora solo se reutiliza un "SÍ"; un "NO" se vuelve a consultar siempre. (v2026.09.30.8: se acepta la columna "Comisiones" o "Ver Comisiones".)
 // Portal TLC | permisos.js | v2026.08.30.1 | Validación de acceso a módulos secundarios
 // v2026.08.30.1: BUG DE FONDO REAL resuelto de raíz — hasta ahora,
 //      cada llamada (con el caché de sessionStorage vencido) pedía
@@ -136,12 +136,10 @@ async function validarAccesoModulo(columnaSheet) {
       const cacheRaw = sessionStorage.getItem(claveCache);
       if (cacheRaw) {
         const cache = JSON.parse(cacheRaw);
-        if (cache && typeof cache.permitido === 'boolean' && (Date.now() - cache.ts) < TTL_PERMISOS_MS) {
-          if (!cache.permitido) {
-            alert('🔒 No tienes permiso para acceder a este módulo');
-            window.location.href = 'index.html';
-            return false;
-          }
+        // Solo se confía en un "SÍ" guardado. Un "NO" guardado se vuelve a
+        // consultar siempre: si el permiso se acaba de habilitar en la
+        // planilla y sincronizar, no hay que esperar 10 minutos.
+        if (cache && cache.permitido === true && (Date.now() - cache.ts) < TTL_PERMISOS_MS) {
           return true;
         }
       }
@@ -207,8 +205,8 @@ async function consultarPermisoModulo(columnaSheet) {
       const cacheRaw = sessionStorage.getItem(claveCache);
       if (cacheRaw) {
         const cache = JSON.parse(cacheRaw);
-        if (cache && typeof cache.permitido === 'boolean' && (Date.now() - cache.ts) < TTL_PERMISOS_MS) {
-          return cache.permitido;
+        if (cache && cache.permitido === true && (Date.now() - cache.ts) < TTL_PERMISOS_MS) {
+          return true; // un "NO" guardado no se usa: se vuelve a consultar (ver validarAccesoModulo)
         }
       }
     } catch(eCacheGet) {}
