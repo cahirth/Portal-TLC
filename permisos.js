@@ -1,4 +1,4 @@
-// Portal TLC | permisos.js | v2026.09.30.9 — BUG REAL (Cristian: "está habilitada pero me dice no tenés permiso para este módulo"): el resultado de cada permiso se guardaba 10 min en sessionStorage, incluido el "NO". Si se entraba antes de sincronizar el permiso nuevo, quedaba bloqueado 10 min aunque ya estuviera habilitado. Ahora solo se reutiliza un "SÍ"; un "NO" se vuelve a consultar siempre. (v2026.09.30.8: se acepta la columna "Comisiones" o "Ver Comisiones".)
+// Portal TLC | permisos.js | v2026.09.30.11 — BUG REAL de fondo en Comisiones: en Firebase quedó "Comisiones": 0 (una columna numérica con el mismo nombre pisa a la de tildes al sincronizar) y "Ver_Comisiones": true. Ahora una columna solo cuenta como permiso si su valor es un tilde (true/false); si no, se usa el alias "Ver Comisiones". || v2026.09.30.9 — BUG REAL (Cristian: "está habilitada pero me dice no tenés permiso para este módulo"): el resultado de cada permiso se guardaba 10 min en sessionStorage, incluido el "NO". Si se entraba antes de sincronizar el permiso nuevo, quedaba bloqueado 10 min aunque ya estuviera habilitado. Ahora solo se reutiliza un "SÍ"; un "NO" se vuelve a consultar siempre. (v2026.09.30.8: se acepta la columna "Comisiones" o "Ver Comisiones".)
 // Portal TLC | permisos.js | v2026.08.30.1 | Validación de acceso a módulos secundarios
 // v2026.08.30.1: BUG DE FONDO REAL resuelto de raíz — hasta ahora,
 //      cada llamada (con el caché de sessionStorage vencido) pedía
@@ -102,13 +102,25 @@ async function _leerFilaPermisosJs(email) {
 // comisiones.html (fail-open) dejaba entrar a cualquiera por link
 // directo. Se acepta cualquiera de los dos nombres.
 const _ALIAS_COLUMNAS_PERMISOS_JS = { 'Comisiones': ['Ver Comisiones'] };
+// Un permiso es un tilde (true/false). En la hoja Vendedores hay MÁS de
+// una columna llamada "Comisiones": la de tildes y otra numérica (un
+// porcentaje); al sincronizar, la numérica pisa a la de tildes y en
+// Firebase queda "Comisiones": 0. Por eso solo se toma una columna como
+// permiso si su valor es un tilde; si no, se usa el alias ("Ver
+// Comisiones", que sí es un tilde).
+function _esTildePermisoJs(v) {
+  return typeof v === 'boolean' || v === 'TRUE' || v === 'FALSE' || v === 'true' || v === 'false';
+}
 function _claveColumnaConAliasJs(fila, columnaSheet) {
   const candidatas = [columnaSheet].concat(_ALIAS_COLUMNAS_PERMISOS_JS[columnaSheet] || []);
+  let primeraPresente = null;
   for (let i = 0; i < candidatas.length; i++) {
     const k = _rtdbHeaderSeguroJs(candidatas[i]);
-    if (fila && (k in fila)) return k;
+    if (!fila || !(k in fila)) continue;
+    if (primeraPresente === null) primeraPresente = k;
+    if (_esTildePermisoJs(fila[k])) return k;
   }
-  return _rtdbHeaderSeguroJs(columnaSheet);
+  return primeraPresente !== null ? primeraPresente : _rtdbHeaderSeguroJs(columnaSheet);
 }
 
 async function validarAccesoModulo(columnaSheet) {

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.09.30.11 (Causa de fondo de Comisiones, confirmada con el dato real de Firebase de Cristian: "Comisiones": 0 y "Ver_Comisiones": true. En la hoja Vendedores hay más de una columna llamada "Comisiones" (una numérica) y al sincronizar la numérica pisa a la de tildes. El inicio y permisos.js ahora toman "Comisiones" como permiso solo si es un tilde (true/false); si es un número, usan "Ver Comisiones".) -->
 <!-- Portal TLC | index.html | v2026.09.30.10 (Corrección de la v2026.09.30.8 — Cristian: Comisiones aparecía habilitada en el inicio pero comisiones.html decía "No tienes permiso". Causa: el inicio aceptaba "Comisiones" O "Ver Comisiones", y en /permisos de Firebase quedó una clave vieja "Ver_Comisiones" en TRUE mientras "Comisiones" (la columna real de la planilla) está en FALSE; permisos.js usa "Comisiones" y rechazaba. Ahora el inicio usa el mismo criterio que permisos.js: manda "Comisiones" y solo si no existe mira "Ver Comisiones". Así el botón y el acceso siempre coinciden.) -->
 <!-- Portal TLC | index.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
 <!-- Portal TLC | index.html | v2026.09.30.3 (Cristian: "puede sacar... la URL del centro de abajo de la pantalla... y el código para escanear contactos". Eliminado completo el escaneo QR de FacoExtrema, dado de baja el 28/09: el botón flotante "Escanear QR" del centro abajo, su modal, el aviso, todo su JavaScript (incluida la URL de Apps Script propia, GAS_URL_QR, y las acciones buscarContactoParaQR/guardarEmpresaContactoQR), su CSS y la librería html5-qrcode, que ya no carga en el inicio. Nada más de la página dependía de ese bloque.) -->
@@ -1376,7 +1377,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
                     eventos:       bool('Eventos'),
                     regulatoria:   bool('Regulatoria'),
                     reportes:      bool('Reportes'),
-                    verComisiones: (_headerSeguroIdx('Comisiones') in fila) ? bool('Comisiones') : bool('Ver Comisiones'), // mismo criterio que permisos.js: manda "Comisiones"; "Ver Comisiones" solo si la otra no existe
+                    verComisiones: (typeof fila[_headerSeguroIdx('Comisiones')] === 'boolean' || ['TRUE','FALSE','true','false'].includes(fila[_headerSeguroIdx('Comisiones')])) ? bool('Comisiones') : bool('Ver Comisiones'), // mismo criterio que permisos.js: "Comisiones" solo si es un tilde; si es un número (columna homónima de %), se usa "Ver Comisiones"
                 };
             } else {
                 // Email no encontrado → acceso mínimo
