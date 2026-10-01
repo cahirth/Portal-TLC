@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.09.30.6 (Cristian: "en módulo empresas también sacá el símbolo del QR". Eliminado completo el escaneo QR de FacoExtrema, dado de baja el 28/09: el botón flotante "Escanear QR" del centro abajo (alta directa de empresa), el botón "📷 Escanear QR" del formulario de Nuevo Contacto, el modal de datos escaneados, el escáner de cámara compartido, sus funciones (incluida la llamada guardarEmpresaContactoQR), su CSS y la librería html5-qrcode. Nada más de la página dependía de ese código. La UI de ARCA queda sin tocar.) -->
 <!-- Portal TLC | empresas.html | v2026.09.29.1 (BUG REAL — Cristian: "no se puede crear un negocio nuevo desde empresas" → "No se pudo crear el negocio: Acción desconocida: crearNegocioVacio". Causa: al migrar Empresas a Cloud Functions se redirigieron TODAS las llamadas fetch de este archivo a EMPRESAS_URL dando por hecho que las 13 eran de las 7 acciones de Empresas; la revisión de entonces buscaba "accion:'" sin espacio y no vio "accion: 'crearNegocioVacio'". crearNegocioVacio pertenece a Cotizaciones (escribe en historico.json/GitHub) y sigue en Apps Script, así que la Cloud Function respondía "acción desconocida". Ahora esa llamada vuelve a GAS_URL. Se auditaron las 84 llamadas ruteadas a Cloud Functions en todo el Portal contra la lista real de acciones de cada función: es la única que estaba mal.) -->
 <!-- Portal TLC | empresas.html | v2026.09.22.1 (BUG REAL — Cristian, tras confirmar que el guardado en sí ya andaba bien: "funciona pero tengo que refrescar la pagina con F5 para ver los cambios, es muy molesto". Causa: _cargarEmpresasCacheFirst() guarda una copia de la lista en localStorage (emp_cache_lista) para que la próxima carga de la página aparezca al instante — pero ninguna de las funciones que modifican datos (_guardarCambiosEmpresa, _borrarEmpresaActual, _guardarContacto, _borrarContacto) actualizaba esa copia guardada, solo el array en memoria de la sesión actual. Dentro de la misma sesión todo se veía bien, pero la próxima carga de la página (otra pestaña, cerrar y volver a abrir, F5) mostraba la caché vieja de ANTES del cambio, hasta que el pedido de fondo la corregía un rato después o el usuario forzaba F5. Agregado un helper único (_sincronizarCacheEmpresas) llamado después de cada uno de esos 4 cambios exitosos, para que la próxima carga ya arranque con los datos correctos sin depender de F5. El flujo de QR (_guardarContactoQREmpresas) queda sin tocar por ahora — no actualiza el estado local en absoluto, es un caso aparte, y no es donde se reportó el problema. Confirmado con test: tras editar un campo en memoria y llamar al helper, la copia en localStorage refleja el cambio correctamente.) -->
 <!-- Portal TLC | empresas.html | v2026.09.21.1 (PRIMER PASO DE MIGRACIÓN FUERA DE APPS SCRIPT — Cristian: "arrancamos con modulo empresas, que guarde al toque". Las 7 acciones de este módulo (listarEmpresas, guardarEmpresa, borrarEmpresa, guardarContacto, borrarContacto, reasignarEmpresaNegocio, guardarEmpresaContactoQR) se eligieron primero porque son Firebase puro — ninguna toca historico.json en GitHub (la fuente de casi todos los problemas del 20/09/2026) ni ningún otro sistema externo, riesgo bajo para probar el patrón de migración completo. Agregada la constante EMPRESAS_URL (con un placeholder claro + aviso en consola si no se reemplaza) — las 13 llamadas fetch(GAS_URL) del archivo (todas usan una de estas 7 acciones, confirmado que no hay ninguna otra acción en este archivo) ahora apuntan a EMPRESAS_URL en vez de GAS_URL. Ver /cloud-function-empresas/ para el código de la Cloud Function (index.js, equivalente línea por línea a las funciones de FotoMap.gs, verificado con 6 tests) y DESPLIEGUE.md con los pasos para desplegarla. Una vez desplegada, reemplazar el placeholder de EMPRESAS_URL por la URL real — nada más de este archivo necesita tocarse.) -->
@@ -328,7 +329,6 @@
         <div class="form-contacto" id="form-contacto" style="display:none;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
             <div style="font-size:12px;font-weight:700;color:var(--accent-blue);" id="fc-titulo">+ Agregar contacto</div>
-            <button onclick="_escanearQRContacto()" style="background:#8b5cf6;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">📷 Escanear QR</button>
           </div>
           <div class="det-grid">
             <div class="det-campo">
@@ -1085,122 +1085,6 @@ window._editarContacto = function(contactoId) {
   document.getElementById('form-contacto').scrollIntoView({ behavior:'smooth', block:'center' });
 };
 
-// ── FAB "Escanear QR" (bottom-center) — Alta DIRECTA de Empresa desde
-//    la lista, sin pasar por "Nuevo Contacto" de una empresa puntual
-//    (eso ya lo cubre _escanearQRContacto, "Flujo A"). Mismo backend
-//    que ficha-equipo.html (guardarEmpresaContactoQR) — crea/actualiza
-//    la Empresa+Contacto en Firebase directo, sin necesidad de tener
-//    ninguna empresa abierta antes. Pedido por Cristian: "agrega al
-//    modulo empresas el QR de facoextrema abajo centrado en la
-//    pantalla, para guardar una empresa en ese modulo directamente".
-//
-// EXTENDIDO — antes guardaba directo, sin mostrar nada. Ahora abre un
-// modal de revisión (mismo estilo EXACTO que el paso 2 del modal de
-// QR de index.html), con todos los campos editables por si el QR leyó
-// algo mal, y un botón "Guardar" explícito abajo — nada se guarda
-// hasta que el vendedor confirma. Si el DNI o el email escaneado ya
-// coincide con un contacto EXISTENTE en EMPRESAS que tenga teléfono
-// cargado, se precarga ESE teléfono (más confiable que lo que
-// devuelva el QR, que a veces no trae el campo o viene incompleto).
-// Pedido por Cristian: "abrir el modal que se escanea igual a index,
-// si es un contacto existente y tiene telefono cargado en empresas,
-// mostrarlo en el modal, todos campos editables, boton abajo del
-// modal Guardar".
-var _datosQrEmpActuales = null;
-
-function _buscarTelefonoContactoExistente(datos) {
-    var dniQr = String(datos.dni || '').trim();
-    var emailQr = String(datos.email || '').trim().toLowerCase();
-    if (!dniQr && !emailQr) return '';
-    for (var i = 0; i < EMPRESAS.length; i++) {
-        var contactos = EMPRESAS[i].contactos || [];
-        for (var j = 0; j < contactos.length; j++) {
-            var c = contactos[j];
-            var matchDni = dniQr && String(c.dni || '').trim() === dniQr;
-            var matchEmail = emailQr && String(c.email || '').trim().toLowerCase() === emailQr;
-            if ((matchDni || matchEmail) && c.telefono) return c.telefono;
-        }
-    }
-    return '';
-}
-
-window._abrirScannerQREmpresasDirecto = function() {
-  _abrirScannerQR(function(datos) {
-    var telefonoExistente = _buscarTelefonoContactoExistente(datos);
-    var yaTeniaTelefono = !datos.telefono && !!telefonoExistente;
-    if (yaTeniaTelefono) datos.telefono = telefonoExistente;
-    _datosQrEmpActuales = datos;
-    _renderDatosQrEmpresas(yaTeniaTelefono);
-    var btnQr = document.querySelector('#emp-qr-datos-modal .qr-btn-guardar');
-    if (btnQr) btnQr.disabled = false; // por si quedó deshabilitado de un guardado anterior en la misma sesión
-    document.getElementById('emp-qr-datos-modal').classList.add('abierto');
-  });
-};
-
-window._cerrarModalQREmpresas = function() {
-  document.getElementById('emp-qr-datos-modal').classList.remove('abierto');
-  _datosQrEmpActuales = null;
-};
-
-// Todos los campos editables — mismo criterio que index.html: por si
-// el QR leyó algo mal, cada input actualiza _datosQrEmpActuales al
-// tipear, así "Guardar" siempre usa el valor final, editado o no.
-function _renderDatosQrEmpresas(telefonoPrecargadoDeEmpresas) {
-  var d = _datosQrEmpActuales;
-  var campo = function(etiqueta, clave, tipo) {
-    return '<div class="qr-dato-fila">' +
-      '<span class="qr-lbl">' + etiqueta + '</span>' +
-      '<input type="' + (tipo || 'text') + '" class="qr-dato-input" value="' + _escQr(d[clave] || '') + '" ' +
-        'oninput="_datosQrEmpActuales[\'' + clave + '\']=this.value">' +
-    '</div>';
-  };
-  document.getElementById('emp-qr-datos-render').innerHTML =
-    campo('Nombre', 'nombre') +
-    campo('Apellido', 'apellido') +
-    campo('Email', 'email', 'email') +
-    campo('Teléfono', 'telefono', 'tel') +
-    campo('DNI', 'dni') +
-    campo('Categoría', 'categoria') +
-    (telefonoPrecargadoDeEmpresas ? '<div class="qr-dato-nota">📞 Teléfono precargado desde un contacto ya guardado</div>' : '') +
-    (d.vip ? '<div style="text-align:right;margin-top:6px;"><span class="qr-badge-vip">VIP</span></div>' : '');
-}
-
-function _escQr(s) { var div = document.createElement('div'); div.textContent = String(s == null ? '' : s); return div.innerHTML; }
-
-window._guardarContactoQREmpresas = function() {
-  var datos = _datosQrEmpActuales;
-  if (!datos) return;
-  var btn = document.querySelector('#emp-qr-datos-modal .qr-btn-guardar');
-  if (btn) { if (btn.disabled) return; btn.disabled = true; }
-  var nombreCompleto = ((datos.nombre||'') + ' ' + (datos.apellido||'')).trim() || 'Sin nombre';
-  fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
-    accion:'guardarEmpresaContactoQR', id: datos.id||'', nombre: datos.nombre||'', apellido: datos.apellido||'',
-    dni: datos.dni||'', email: datos.email||'', telefono: datos.telefono||'', vip: !!datos.vip, categoria: datos.categoria||''
-  }) }).then(function(r){ return r.json(); }).then(function(r) {
-    if (!r || !r.ok) { alert('No se pudo guardar la empresa. Probá de nuevo.'); if (btn) btn.disabled = false; return; }
-    _cerrarModalQREmpresas(); // el modal se cierra; al reabrirlo el botón vuelve a estar habilitado
-    alert('✅ "' + nombreCompleto + '" guardado como empresa/contacto.');
-    // Refrescar la lista para que aparezca al toque, sin tener que
-    // salir y volver a entrar al módulo — _cargarEmpresas() ya
-    // repinta sola al terminar (mismo criterio que "después de
-    // crear una empresa nueva", más arriba en este archivo).
-    _cargarEmpresas();
-  }).catch(function() {
-    alert('Error de conexión al guardar. Probá de nuevo.');
-    if (btn) btn.disabled = false;
-  });
-};
-
-
-window._escanearQRContacto = function() {
-  _abrirScannerQR(function(datos) {
-    var nombreCompleto = ((datos.nombre||'') + ' ' + (datos.apellido||'')).trim();
-    if (nombreCompleto) document.getElementById('fc-nombre').value = nombreCompleto;
-    if (datos.email) document.getElementById('fc-email').value = datos.email;
-    if (datos.telefono) document.getElementById('fc-telefono').value = datos.telefono;
-    if (datos.dni) document.getElementById('fc-dni').value = datos.dni;
-  });
-};
 
 window._guardarContacto = function() {
   var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
@@ -1803,78 +1687,7 @@ var _volverANegocioId = null;
   @keyframes iaPulso { 0%,100%{opacity:1;} 50%{opacity:.5;} }
 </style>
 
-<style>
-  /* ── FAB de Escanear QR FacoExtrema — bottom-center ──────────────
-     Mismo estilo visual EXACTO que el FAB de QR de index.html
-     (fondo degradado azul→violeta, borde oscuro, ícono fa-qrcode) —
-     pedido por Cristian: "ponele la misma imagen que el index al qr
-     de empresas". A diferencia del "Flujo A" que ya existía (botón
-     "📷 Escanear QR" adentro del formulario de Nuevo Contacto, que
-     requiere primero entrar a una empresa puntual y abrir ese
-     formulario), este FAB está SIEMPRE visible en la lista y guarda
-     la Empresa+Contacto DIRECTO, sin pasos intermedios — mismo
-     backend (guardarEmpresaContactoQR) que ya usa ficha-equipo.html. */
-  .fab-qr-empresas { position:fixed; bottom:38px; left:50%; transform:translateX(-50%); width:60px; height:60px;
-      border-radius:50%; background:linear-gradient(135deg,#3a86ff,#7209b7); border:4px solid #030712;
-      display:flex; align-items:center; justify-content:center; font-size:24px; color:#fff; cursor:pointer; z-index:900;
-      box-shadow:0 6px 20px rgba(58,134,255,.45); transition:transform .15s; }
-  .fab-qr-empresas:active { transform:translateX(-50%) scale(.92); }
-  .fab-qr-empresas-label { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); font-size:9px;
-      color:#64748b; z-index:900; font-weight:700; text-transform:uppercase; letter-spacing:.4px; pointer-events:none; }
-  @media (min-width:600px) { .fab-qr-empresas, .fab-qr-empresas-label { bottom:24px; } }
-
-  /* ── Modal "datos leídos" del QR — mismo estilo EXACTO que el paso
-     2 del modal de QR de index.html (#qr-fac-paso-datos), adaptado a
-     las variables de color de este archivo (--panel-darker en vez de
-     --bg-dark, que acá no existe). Reusa el scanner de cámara que ya
-     existe (_abrirScannerQR) para el paso de escaneo en sí — este
-     modal es solo el paso de REVISAR/EDITAR antes de guardar. Pedido
-     por Cristian: "abrir el modal que se escanea igual a index...
-     todos campos editables, boton abajo del modal Guardar". */
-  .qr-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); display:none; align-items:center;
-      justify-content:center; z-index:9500; padding:16px; }
-  .qr-modal-overlay.abierto { display:flex; }
-  .qr-modal-card { background:var(--panel-dark); width:100%; max-width:440px; border-radius:20px; padding:24px 20px 26px;
-      max-height:88vh; overflow-y:auto; animation:qrAparecer .22s ease; }
-  @keyframes qrAparecer { from{transform:scale(.94);opacity:0;} to{transform:scale(1);opacity:1;} }
-  .qr-modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
-  .qr-modal-header h2 { font-size:19px; margin:0; display:flex; align-items:center; gap:8px; color:var(--text-main); }
-  .qr-modal-close { width:36px; height:36px; border-radius:50%; background:var(--panel-darker); border:none;
-      color:var(--text-muted); font-size:19px; cursor:pointer; flex-shrink:0; }
-  .qr-datos-leidos { background:var(--panel-darker); border:1px solid var(--border-glow); border-radius:12px; padding:16px 18px; margin-bottom:18px; }
-  .qr-dato-fila { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 0;
-      border-bottom:1px solid var(--border-glow); font-size:15.5px; color:var(--text-main); }
-  .qr-dato-fila:last-child { border-bottom:none; }
-  .qr-dato-fila .qr-lbl { color:var(--text-muted); font-size:13.5px; flex-shrink:0; }
-  .qr-dato-input { flex:1; min-width:0; text-align:right; font-weight:700; font-size:15px; color:var(--text-main);
-      background:transparent; border:none; border-bottom:1px dashed var(--border-glow); padding:2px 0; font-family:inherit; }
-  .qr-dato-input:focus { outline:none; border-bottom-color:var(--accent-blue); }
-  .qr-badge-vip { background:var(--accent-orange); color:#0a1424; font-size:10.5px; font-weight:800; padding:3px 9px;
-      border-radius:20px; text-transform:uppercase; }
-  .qr-dato-nota { font-size:11.5px; color:var(--accent-green); margin-top:-8px; margin-bottom:14px; }
-  .qr-botonera { display:flex; gap:10px; }
-  .qr-botonera button { flex:1; padding:15px; border-radius:12px; border:1px solid var(--border-glow); background:var(--panel-darker);
-      color:var(--text-main); font-size:15px; font-weight:700; cursor:pointer; }
-  .qr-btn-guardar { border-color:var(--accent-green) !important; color:var(--accent-green) !important; }
-</style>
 <button id="ia-btn-flotante" onclick="_iaTogglePanel()" title="Asistente IA">💬</button>
-
-<button type="button" class="fab-qr-empresas" id="emp-btn-escanear-qr" onclick="_abrirScannerQREmpresasDirecto()" title="Escanear QR y guardar empresa"><i class="fa-solid fa-qrcode"></i></button>
-<div class="fab-qr-empresas-label">Escanear QR</div>
-
-<div class="qr-modal-overlay" id="emp-qr-datos-modal">
-  <div class="qr-modal-card">
-    <div class="qr-modal-header">
-      <h2>📷 Datos escaneados</h2>
-      <button class="qr-modal-close" onclick="_cerrarModalQREmpresas()">✕</button>
-    </div>
-    <div class="qr-datos-leidos" id="emp-qr-datos-render"></div>
-    <div class="qr-botonera">
-      <button onclick="_cerrarModalQREmpresas()">Cancelar</button>
-      <button class="qr-btn-guardar" onclick="_guardarContactoQREmpresas()">💾 Guardar</button>
-    </div>
-  </div>
-</div>
 
 <div id="ia-panel">
   <div id="ia-panel-header">
@@ -2118,56 +1931,6 @@ function _iaToggleMic() {
 }
 </script>
 
-<!-- ════════════════════════════════════════════════════════════
-     ESCÁNER QR — modal de cámara compartido (html5-qrcode).
-     Mismo bloque que ficha-equipo.html. ════════════════════════ -->
-<div id="qr-scanner-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;align-items:center;justify-content:center;flex-direction:column;padding:20px;">
-  <div style="background:#fff;border-radius:16px;padding:16px;max-width:360px;width:100%;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <span style="font-weight:800;font-size:14px;color:#0f172a;">📷 Escanear QR</span>
-      <button onclick="_cerrarScannerQR()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#0f172a;">✕</button>
-    </div>
-    <div id="qr-reader" style="width:100%;"></div>
-    <div id="qr-scanner-status" style="font-size:11px;color:#64748b;margin-top:8px;text-align:center;">Apuntá la cámara al QR de la credencial...</div>
-  </div>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script>
-var _qrScannerInstance = null;
-var _qrScannerCallback = null;
-
-function _abrirScannerQR(callback) {
-  _qrScannerCallback = callback;
-  document.getElementById('qr-scanner-overlay').style.display = 'flex';
-  var status = document.getElementById('qr-scanner-status');
-  status.textContent = 'Apuntá la cámara al QR de la credencial...';
-  _qrScannerInstance = new Html5Qrcode('qr-reader');
-  _qrScannerInstance.start(
-    { facingMode: 'environment' },
-    { fps: 10, qrbox: { width: 240, height: 240 } },
-    function(decodedText) {
-      _cerrarScannerQR();
-      try {
-        var datos = JSON.parse(decodedText);
-        if (_qrScannerCallback) _qrScannerCallback(datos);
-      } catch(e) {
-        alert('El QR escaneado no tiene el formato esperado (no es la credencial de un visitante).');
-      }
-    },
-    function() { /* dispara seguido mientras no encuentra nada — se ignora a propósito */ }
-  ).catch(function(err) {
-    status.textContent = '⚠️ No se pudo acceder a la cámara: ' + err;
-  });
-}
-
-function _cerrarScannerQR() {
-  document.getElementById('qr-scanner-overlay').style.display = 'none';
-  if (_qrScannerInstance) {
-    _qrScannerInstance.stop().then(function(){ _qrScannerInstance.clear(); }).catch(function(){});
-    _qrScannerInstance = null;
-  }
-}
-</script>
 
 </body>
 </html>
