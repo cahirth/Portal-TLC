@@ -1,4 +1,4 @@
-// Portal TLC | adjuntos.js | v2026.09.30.2 — Cristian: "necesito que un adjunto subido aparezca en la lista". Tras subir, el "✅ Subido" se borraba al instante (el re-render de la lista pisaba el estado) y si Firebase tardaba un instante el archivo no aparecía. Ahora: botón bloqueado mientras sube (evita subir dos veces), recarga con hasta 3 reintentos hasta que el archivo aparece, y el mensaje final queda visible.
+// Portal TLC | adjuntos.js | v2026.09.30.13 — si la página no expone adjuntosRecargar, ahora se avisa (antes decía "✅ subido" aunque la lista no se actualizara). || v2026.09.30.2 — Cristian: "necesito que un adjunto subido aparezca en la lista". Tras subir, el "✅ Subido" se borraba al instante (el re-render de la lista pisaba el estado) y si Firebase tardaba un instante el archivo no aparecía. Ahora: botón bloqueado mientras sube (evita subir dos veces), recarga con hasta 3 reintentos hasta que el archivo aparece, y el mensaje final queda visible.
 // Portal TLC | adjuntos.js | Módulo reutilizable de archivos adjuntos
 // ══════════════════════════════════════════════════════════════════
 // Se usa igual en servicio.html (modulo:'servicio') y cotizaciones.html
@@ -100,7 +100,10 @@ function adjuntosRenderSeccion(containerId, apiUrl, modulo, id, adjuntosData, su
 // vuelve a mostrar el mensaje de estado (el re-render lo borraba: antes
 // el "✅ Subido" desaparecía al instante y no quedaba ninguna señal).
 async function _adjuntosRecargarHastaVer(modulo, id, containerId, cantidadEsperada, sube) {
-  if (typeof adjuntosRecargar !== 'function') return true;
+  if (typeof adjuntosRecargar !== 'function') {
+    console.error('[adjuntos.js] La página no expone adjuntosRecargar (window.adjuntosRecargar): la lista no se puede refrescar sola.');
+    return false; // así se muestra el aviso en vez de un falso "✅ subido" sin el archivo en la lista
+  }
   for (let intento = 0; intento < 4; intento++) {
     if (intento > 0) await new Promise(function(r) { setTimeout(r, 1200); });
     await adjuntosRecargar(modulo, id, containerId);

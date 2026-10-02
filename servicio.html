@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.09.30.13 (BUG REAL — Cristian: "cuando en Servicio adjunto archivos, los sube, pero no los muestra hasta que refresco el navegador". adjuntosRecargar estaba dentro del IIFE que envuelve el archivo y adjuntos.js no podía llamarla, así que después de subir/borrar nunca se refrescaba la lista. Ahora se publica en window. Además actualiza también _ticketActual.adjuntos, para que un repintado posterior del detalle no vuelva a mostrar la lista vieja. En Cotizaciones no pasaba porque ahí la función ya era global.) -->
 <!-- Portal TLC | servicio.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
 <!-- Portal TLC | servicio.html | v2026.09.30.2 (Cristian: "necesito que un adjunto subido aparezca en la lista". adjuntosRecargar ya no se corta si el ticket no está en memoria, y lee sin caché del navegador. El resto del arreglo (mensaje de confirmación visible, reintento hasta que el archivo aparezca, botón bloqueado mientras sube) está en adjuntos.js.) -->
 <!-- Portal TLC | servicio.html | v2026.09.29.4 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". De paso se corrigió un bug real: si el pedido a listarInternos fallaba UNA vez, la lista de menciones quedaba vacía para siempre en esa sesión (un array vacío es "verdadero" en JS, así que nunca reintentaba) — explica el "a veces aparece, a veces no" — ahora reintenta solo la próxima vez que alguien escribe "@".) -->
@@ -2531,9 +2532,15 @@ async function adjuntosRecargar(modulo, id, containerId) {
     const res = await fetch(RTDB_URL + '/servicio_tecnico/' + encodeURIComponent(id) + '/adjuntos.json?_=' + Date.now(), { cache:'no-store' });
     const adjuntosFrescos = res.ok ? await res.json() : null;
     if (t) t.adjuntos = adjuntosFrescos;
+    if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual.adjuntos = adjuntosFrescos; // por si el detalle quedó con otra copia del ticket
     adjuntosRenderSeccion(containerId, GAS_URL, 'servicio', id, adjuntosFrescos, (_session && _session.name) || '');
   } catch(e) { console.warn('adjuntosRecargar (servicio):', e); }
 }
+// BUG REAL: esta función vive dentro del (function(){...})() que envuelve
+// todo el archivo, así que adjuntos.js (que la llama después de subir o
+// borrar) nunca la encontraba: el archivo se subía pero la lista no se
+// actualizaba hasta refrescar el navegador. Se publica en window.
+window.adjuntosRecargar = adjuntosRecargar;
 
 // Consulta en Firebase si el checklist técnico del ticket ya fue completado
 // y actualiza el texto de estado en la tarjeta (si la tarjeta está presente).
