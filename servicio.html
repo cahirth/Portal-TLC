@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.02.1 (Cristian: "quiero el micrófono en los 3 módulos". Botón 🎤 de dictado por voz al lado de "Enviar" en el chat de mensajes internos, vía dictado.js (compartido con los otros 2 módulos). Escribe en el cuadro, nunca envía solo.) -->
 <!-- Portal TLC | servicio.html | v2026.09.30.13 (BUG REAL — Cristian: "cuando en Servicio adjunto archivos, los sube, pero no los muestra hasta que refresco el navegador". adjuntosRecargar estaba dentro del IIFE que envuelve el archivo y adjuntos.js no podía llamarla, así que después de subir/borrar nunca se refrescaba la lista. Ahora se publica en window. Además actualiza también _ticketActual.adjuntos, para que un repintado posterior del detalle no vuelva a mostrar la lista vieja. En Cotizaciones no pasaba porque ahí la función ya era global.) -->
 <!-- Portal TLC | servicio.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
 <!-- Portal TLC | servicio.html | v2026.09.30.2 (Cristian: "necesito que un adjunto subido aparezca en la lista". adjuntosRecargar ya no se corta si el ticket no está en memoria, y lee sin caché del navegador. El resto del arreglo (mensaje de confirmación visible, reintento hasta que el archivo aparezca, botón bloqueado mientras sube) está en adjuntos.js.) -->
@@ -5334,5 +5335,7 @@ function _iaToggleMic() {
 
 
 
+<script>window.DICTADO_CAMPOS = [{ textarea: 'mensaje-nuevo-txt', enviar: 'btn-enviar-mensaje-st' }];</script>
+<script src="dictado.js"></script>
 </body>
 </html>

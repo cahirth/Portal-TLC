@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.02.1 (Cristian: "quiero el micrófono en los 3 módulos". Botón 🎤 de dictado por voz al lado de "Enviar" en el chat de mensajes internos, vía dictado.js (compartido con los otros 2 módulos). Escribe en el cuadro, nunca envía solo.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.30.2 (Cristian: "quiero que cuando abras la tarjeta... se abra de inmediato y que los mensajes aparezcan de inmediato" + "necesito que un adjunto subido aparezca en la lista". MENSAJES: dejaron de esperar a Apps Script (cot_listarMensajes, 1-3 s + polling cada 8 s también por Apps Script). Ahora se pintan al instante con lo que ya vino del negocio desde Firebase y se refrescan leyendo directo cotizaciones/{id}/mensajes (mismo criterio que Servicio Técnico); los internos para @menciones cargan en paralelo en vez de en fila. El polling detecta también reacciones nuevas (antes solo si cambiaba la cantidad). Apps Script queda solo como respaldo si Firebase no responde o si no se confirma que los mensajes viven en ese nodo. ADJUNTOS: adjuntosRecargar ya no se corta si el negocio no está en la lista filtrada en memoria; antes en ese caso el archivo subido nunca aparecía hasta recargar la página.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.09.30.1 (Cristian: "no quiero que se cambie solo de dueño... a menos que tenga rol de administrador... y que pregunte ¿realmente lo quiere cambiar?". El selector de Vendedor del detalle ahora aparece solo para Administrador (antes también para el dueño) y pide confirmación antes de reasignar; si se cancela vuelve al valor anterior. _mutarVendedorCotizacion también rechaza si no es admin. Complementa el arreglo en presupuesto-editor.html, que al editar pisaba el dueño con el usuario logueado.) -->
@@ -5606,5 +5607,7 @@ window._confirmarOrdenPreparacion = async function() {
     <div id="dash-negocios-ranking"></div>
   </div>
 </div>
+<script>window.DICTADO_CAMPOS = [{ textarea: 'mensaje-nuevo-txt-cot', enviar: 'btn-enviar-mensaje-cot' }];</script>
+<script src="dictado.js"></script>
 </body>
 </html>

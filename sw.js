@@ -135,6 +135,7 @@ const HTML_LOCAL = [
     './version.js',
     './permisos.js',
     './adjuntos.js',
+    './dictado.js',
     './eventos.html',
     './orden-preparacion.html',
     './etiqueta-despacho.html',
