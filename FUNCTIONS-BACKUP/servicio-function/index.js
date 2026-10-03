@@ -1,5 +1,10 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v2 — 2026.10.03 — Entregas parciales: nueva acción st_dividirOrdenPreparacion
+//   (separa equipos de una Orden de Preparación en una orden nueva -E2, -E3...,
+//   vinculada al mismo negocio). El progreso y el estado del negocio en Ventas
+//   ahora se calculan sobre toda la familia de entregas (estado = la entrega
+//   más atrasada).
 // v1 — 2026.09.28
 //
 // Séptimo módulo migrado — el más grande hasta ahora: 19 acciones de
@@ -198,6 +203,30 @@ async function sincronizarNegocioDesdeOrdenPrep(ticket, nuevoDeposito) {
     const claveNegocio = 'cotizaciones/' + rtdbKeySeguro(idNegocio);
     const negocio = await fbGet(claveNegocio);
     if (!negocio) return;
+    // Entregas parciales: el negocio refleja la entrega MÁS ATRASADA de la
+    // familia (si una entrega llegó a Para Instalar y otra sigue en
+    // Preparación, el negocio sigue en Preparación). La entrega que avanza
+    // deja igual un mensaje en el negocio.
+    const esFamilia = !!(ticket.orden_padre || comoArray(ticket.entregas_hijas).length);
+    if (esFamilia) {
+      const familia = (await familiaOrdenPrep(ticket)).map((x) => (x.id_ticket === ticket.id_ticket ? Object.assign({}, x, { deposito: nuevoDeposito }) : x));
+      const activos = familia.filter((x) => x.deposito !== 'cancelado');
+      const idx = (d) => { const i = ST_DEPOSITOS.indexOf(d); return i < 0 ? 999 : i; };
+      const masAtrasado = activos.reduce((min, x) => (idx(x.deposito) < idx(min) ? x.deposito : min), nuevoDeposito);
+      if (nuevoDeposito === 'para_instalar' && masAtrasado !== 'para_instalar') {
+        try {
+          const mensajesP = comoArray(await fbGet(claveNegocio + '/mensajes'));
+          const nroEntrega = ticket.entrega_parcial_nro ? ' ' + ticket.entrega_parcial_nro : '';
+          mensajesP.push({ texto: '📦 Entrega parcial' + nroEntrega + ' (' + ticket.id_ticket + ') llegó a "Para Instalar". Quedan otras entregas de este negocio en curso.', autor_nombre: 'Portal TLC (automático)', autor_email: '', menciones: [], fecha: new Date().toISOString() });
+          await fbSet(claveNegocio + '/mensajes', mensajesP);
+        } catch (eMsgP) { console.warn('No se pudo dejar el mensaje de entrega parcial:', eMsgP.message); }
+      }
+      if (masAtrasado !== nuevoDeposito) {
+        await fbPatch(claveNegocio, { orden_preparacion_estado: masAtrasado });
+        return;
+      }
+      ticket = Object.assign({}, ticket, { equipos: [].concat(...familia.map((x) => comoArray(x.equipos))) });
+    }
     const patchNegocio = { orden_preparacion_estado: nuevoDeposito };
     if (nuevoDeposito === 'para_instalar') {
       const equipos = Array.isArray(ticket.equipos) ? ticket.equipos : [];
@@ -246,10 +275,32 @@ function calcularProgresoST(equipos) {
   return { porcentaje: Math.round(sumaPorcentajes / total), listos, total };
 }
 
+// ── Entregas parciales: "familia" de órdenes ───────────────────────
+// Una Orden de Preparación puede dividirse en varias entregas (ver
+// st_dividirOrdenPreparacion). La original guarda entregas_hijas: [ids]
+// y cada entrega guarda orden_padre: id. Para el negocio de Ventas, la
+// familia completa cuenta como UNA sola orden.
+async function familiaOrdenPrep(ticket) {
+  if (!ticket) return [];
+  const idPadre = ticket.orden_padre || ticket.id_ticket;
+  const padre = ticket.orden_padre ? await fbGet('servicio_tecnico/' + idPadre) : ticket;
+  if (!padre) return [ticket];
+  const familia = [padre];
+  for (const idHija of comoArray(padre.entregas_hijas)) {
+    if (idHija === ticket.id_ticket) { familia.push(ticket); continue; }
+    const hija = await fbGet('servicio_tecnico/' + idHija);
+    if (hija) familia.push(hija);
+  }
+  if (!familia.some((x) => x.id_ticket === ticket.id_ticket)) familia.push(ticket);
+  return familia.map((x) => (x.id_ticket === ticket.id_ticket ? ticket : x));
+}
+
 async function actualizarProgresoSTEnNegocio(ticket) {
   try {
     if (!ticket || !ticket.negocio_id) return;
-    const progreso = calcularProgresoST(ticket.equipos);
+    const familia = (ticket.orden_padre || comoArray(ticket.entregas_hijas).length) ? await familiaOrdenPrep(ticket) : [ticket];
+    const todosLosEquipos = [].concat(...familia.map((x) => comoArray(x.equipos)));
+    const progreso = calcularProgresoST(todosLosEquipos);
     await fbPatch('cotizaciones/' + rtdbKeySeguro(ticket.negocio_id), { progreso_st: progreso });
   } catch (e) { console.warn('No se pudo actualizar progreso_st en el negocio:', e.message); }
 }
@@ -693,6 +744,84 @@ async function st_separarEquipoOrden(data) {
   return { ok: true, equipos: comoArray(ticket.equipos) };
 }
 
+// ══════════════════════════════════════════════════════════════════
+// DIVIDIR ENTREGA — v2 — 2026.10.03
+// ══════════════════════════════════════════════════════════════════
+// Cristian: "el único problema que veo es si al cliente se le hace una
+// entrega parcial" → "me gusta, hacelo". Separa los equipos elegidos
+// (indices) de una Orden de Preparación en una ORDEN NUEVA (entrega
+// parcial), con su propio remito, etiquetas y seguimiento, vinculada al
+// mismo negocio. La original se queda con los pendientes.
+// - Id de la entrega: <id original>-E2, -E3, ...
+// - Si todos los equipos de la entrega ya están "Listo para despacho" o
+//   "Enviado", nace a nombre de quien despacha (RESPONSABLE_DESPACHO);
+//   si no, del mismo técnico que la original.
+// - La original no puede quedar vacía: hay que dejar al menos 1 equipo.
+// - Las etiquetas de cajas ya generadas en la original se borran (los
+//   equipos cambiaron): hay que volver a generarlas en cada orden.
+const RESPONSABLE_DESPACHO = 'Lourdes Dávalos';
+async function st_dividirOrdenPreparacion(data) {
+  const idTicket = String(data.id_ticket || '').trim();
+  const indices = Array.isArray(data.indices) ? [...new Set(data.indices.map((n) => parseInt(n, 10)).filter((n) => !isNaN(n) && n >= 0))] : [];
+  const autor = String(data.autor_nombre || '').trim() || 'Portal TLC';
+  if (!idTicket || !indices.length) return { ok: false, error: 'Elegí al menos un equipo para la entrega' };
+  const previo = await fbGet('servicio_tecnico/' + idTicket);
+  if (!previo) return { ok: false, error: 'Orden no encontrada' };
+  if (previo.tipo_orden !== 'preparacion_equipos') return { ok: false, error: 'Solo se pueden dividir Órdenes de Preparación' };
+  if (previo.orden_padre) return { ok: false, error: 'Esta ya es una entrega parcial — dividí la orden original' };
+
+  const ahora = new Date().toISOString();
+  let errorValidacion = null, extraidos = [], idHija = '', nroEntrega = 0;
+  const original = await runTransaccionTicket(idTicket, (t) => {
+    errorValidacion = null; extraidos = [];
+    const equipos = comoArray(t.equipos);
+    if (indices.some((i) => !equipos[i])) { errorValidacion = 'La lista de equipos cambió — recargá e intentá de nuevo'; return t; }
+    if (indices.length >= equipos.length) { errorValidacion = 'Tiene que quedar al menos un equipo en la orden original'; return t; }
+    extraidos = indices.slice().sort((a, b) => a - b).map((i) => equipos[i]);
+    const hijas = comoArray(t.entregas_hijas);
+    nroEntrega = hijas.length + 2; // la original es la entrega 1
+    idHija = idTicket + '-E' + nroEntrega;
+    t.equipos = equipos.filter((_, i) => indices.indexOf(i) === -1);
+    t.entregas_hijas = hijas.concat([idHija]);
+    t.etiquetas_cajas = null; t.etiquetas_generadas_en = null;
+    const mensajes = comoArray(t.mensajes);
+    mensajes.push({ texto: '✂️ ' + autor + ' separó ' + extraidos.length + ' equipo(s) en la entrega parcial ' + nroEntrega + ' (' + idHija + '). En esta orden quedan ' + t.equipos.length + '.', autor_nombre: 'Portal TLC (automático)', autor_email: '', menciones: [], fecha: ahora });
+    t.mensajes = mensajes;
+    t.actualizado_en = ahora;
+    return t;
+  });
+  if (errorValidacion) return { ok: false, error: errorValidacion };
+
+  const todoListo = extraidos.every((eq) => eq && (eq.estado === 'Listo para despacho' || eq.estado === 'Enviado'));
+  const hija = {
+    id_ticket: idHija, tipo_orden: 'preparacion_equipos', negocio_id: original.negocio_id || '',
+    orden_padre: idTicket, entrega_parcial_nro: nroEntrega,
+    cliente: original.cliente || '', nombre_medico: original.nombre_medico || '', telefono: original.telefono || '',
+    domicilio: original.domicilio || '', domicilio_envio: original.domicilio_envio || '',
+    fecha_limite_despacho: original.fecha_limite_despacho || '', prioridad: original.prioridad || 'media',
+    tecnico_responsable_email: original.tecnico_responsable_email || '',
+    tecnico_responsable_nombre: todoListo ? RESPONSABLE_DESPACHO : (original.tecnico_responsable_nombre || ''),
+    // Un solo responsable: el código va siempre junto con el nombre
+    tecnico_asignado: todoListo ? 'lourdes_davalos' : (original.tecnico_asignado || 'sin_asignar'),
+    equipos: extraidos, deposito: 'preparacion_control_calidad', estado_progreso: 'activo',
+    mensajes: [{ texto: '✂️ Entrega parcial ' + nroEntrega + ' de la orden ' + idTicket + ', creada por ' + autor + ' con ' + extraidos.length + ' equipo(s).', autor_nombre: 'Portal TLC (automático)', autor_email: '', menciones: [], fecha: ahora }],
+    firma_digital: null, creado_en: ahora, actualizado_en: ahora,
+  };
+  await fbSet('servicio_tecnico/' + idHija, hija);
+
+  try {
+    if (original.negocio_id) {
+      const claveNegocio = 'cotizaciones/' + rtdbKeySeguro(original.negocio_id);
+      const mensajesN = comoArray(await fbGet(claveNegocio + '/mensajes'));
+      mensajesN.push({ texto: '✂️ La Orden de Preparación se dividió: entrega parcial ' + nroEntrega + ' con ' + extraidos.length + ' equipo(s) (' + idHija + '). El resto sigue en ' + idTicket + '.', autor_nombre: 'Portal TLC (automático)', autor_email: '', menciones: [], fecha: ahora });
+      await fbSet(claveNegocio + '/mensajes', mensajesN);
+    }
+  } catch (eN) { console.warn('No se pudo avisar la división en el negocio:', eN.message); }
+  await actualizarProgresoSTEnNegocio(original);
+
+  return { ok: true, id_hija: idHija, nro_entrega: nroEntrega, equipos_original: comoArray(original.equipos), responsable_hija: hija.tecnico_responsable_nombre };
+}
+
 async function st_actualizarEquipoOrden(data) {
   const idTicket = String(data.id_ticket || '').trim();
   const indice = parseInt(data.indice, 10);
@@ -754,7 +883,7 @@ const ACCIONES = {
   st_actualizarCampo, st_actualizarDeposito, st_actualizarNotas, st_actualizarGastos,
   st_agregarNota, st_agregarFoto, st_eliminarFoto,
   st_agregarMensaje, st_editarMensaje, st_borrarMensaje, st_reaccionarMensaje,
-  st_separarEquipoOrden, st_actualizarEquipoOrden,
+  st_separarEquipoOrden, st_actualizarEquipoOrden, st_dividirOrdenPreparacion,
   st_guardarEtiquetasCajas, eliminarVersionPresupuestoTicket, guardarAsignadosEtapa,
 };
 
