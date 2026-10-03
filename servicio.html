@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.03.3 (Cristian: "agregá la etapa Preparación también". El panel de carga por técnico suma la columna Preparación (preparacion_control_calidad), contando tanto los tickets de reparación en esa etapa como las Órdenes de Preparación de equipos; estas guardan el técnico por nombre (tecnico_responsable_nombre), que se traduce a su código con TECNICOS_LISTA. El filtro por técnico también reconoce ahora las Órdenes de Preparación.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.2 (Cristian: "quiero tener métricas de los servicios asignados a Damián y a Juan en diagnóstico, reparación, un contador para cada uno, para equiparar las asignaciones, que sean equitativas". Panel "⚖️ Carga actual por técnico" arriba de los filtros (solo Administrador): cuántos tickets tiene HOY cada uno en Diagnóstico y Reparación, total, cuál tiene menos carga, diferencia y cuántos hay sin asignar en esas etapas. Tocar un número filtra la lista por ese técnico y etapa (tocar de nuevo lo quita). En el modal "¿A quién asignás esta tarjeta?" cada candidato muestra su carga y se marca el de menos carga. No incluye Órdenes de Preparación. Técnicos y etapas configurables en METRICA_TECNICOS / METRICA_ETAPAS.) -->
 <!-- Portal TLC | servicio.html | v2026.10.02.1 (Cristian: "quiero el micrófono en los 3 módulos". Botón 🎤 de dictado por voz al lado de "Enviar" en el chat de mensajes internos, vía dictado.js (compartido con los otros 2 módulos). Escribe en el cuadro, nunca envía solo.) -->
 <!-- Portal TLC | servicio.html | v2026.09.30.13 (BUG REAL — Cristian: "cuando en Servicio adjunto archivos, los sube, pero no los muestra hasta que refresco el navegador". adjuntosRecargar estaba dentro del IIFE que envuelve el archivo y adjuntos.js no podía llamarla, así que después de subir/borrar nunca se refrescaba la lista. Ahora se publica en window. Además actualiza también _ticketActual.adjuntos, para que un repintado posterior del detalle no vuelva a mostrar la lista vieja. En Cotizaciones no pasaba porque ahí la función ya era global.) -->
@@ -1303,8 +1304,8 @@ window._selFiltroDD = function(tipo, sel) {
 // Cristian: "quiero tener métricas de los servicios asignados a Damián y a
 // Juan en diagnóstico, reparación, un contador para cada uno, para
 // equiparar las asignaciones, que sean equitativas". Cuenta en vivo los
-// tickets que cada técnico tiene HOY en cada etapa (no incluye Órdenes de
-// Preparación). Tocar un número filtra la lista por ese técnico y etapa.
+// tickets que cada técnico tiene HOY en cada etapa (en Preparación cuenta
+// también las Órdenes de Preparación de equipos). Tocar un número filtra la lista por ese técnico y etapa.
 // Solo lo ve el Administrador. Para sumar técnicos o etapas, alcanza con
 // editar estas dos listas.
 var METRICA_TECNICOS = [
@@ -1312,9 +1313,21 @@ var METRICA_TECNICOS = [
   { cod:'juan_garro',  nombre:'Juan'   }
 ];
 var METRICA_ETAPAS = [
-  { key:'diagnostico', label:'Diagnóstico' },
-  { key:'reparacion',  label:'Reparación'  }
+  { key:'diagnostico',                 label:'Diagnóstico' },
+  { key:'reparacion',                  label:'Reparación'  },
+  { key:'preparacion_control_calidad', label:'Preparación' }
 ];
+
+// Técnico de un ticket para la métrica. Las Órdenes de Preparación
+// guardan el técnico por NOMBRE (tecnico_responsable_nombre, p. ej.
+// "Juan Garro"); los tickets de reparación, por código (tecnico_asignado).
+function _codTecnicoTicket(t) {
+  if (t && t.tipo_orden === 'preparacion_equipos' && t.tecnico_responsable_nombre) {
+    var m = (typeof TECNICOS_LISTA !== 'undefined' ? TECNICOS_LISTA : []).find(function(x) { return x.l === t.tecnico_responsable_nombre; });
+    if (m) return m.v;
+  }
+  return (t && t.tecnico_asignado) || 'sin_asignar';
+}
 
 function _cargaPorTecnico() {
   var carga = {};
@@ -1323,11 +1336,11 @@ function _cargaPorTecnico() {
     METRICA_ETAPAS.forEach(function(e) { carga[tec.cod][e.key] = 0; });
   });
   (_tickets || []).forEach(function(t) {
-    if (!t || t.tipo_orden === 'preparacion_equipos') return;
+    if (!t) return;
     var etapaOk = METRICA_ETAPAS.some(function(e) { return e.key === t.deposito; });
     if (!etapaOk) return;
-    var cod = (t.tecnico_asignado && carga[t.tecnico_asignado]) ? t.tecnico_asignado
-            : ((!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') ? 'sin_asignar' : null);
+    var codT = _codTecnicoTicket(t);
+    var cod = carga[codT] ? codT : null;
     if (!cod) return; // asignado a alguien que no está en la métrica
     carga[cod][t.deposito]++;
     carga[cod].total++;
@@ -1414,7 +1427,7 @@ window._aplicarFiltros = function() {
     if (fTec === '__asignados_a_mi__') {
       if (t.tecnico_asignado !== miClave) return false;
     } else if (fTec !== 'todos') {
-      if (t.tecnico_asignado !== fTec) return false;
+      if (t.tecnico_asignado !== fTec && _codTecnicoTicket(t) !== fTec) return false;
     }
     if (_filtros.etapa  && _filtros.etapa  !== 'todos' && t.deposito        !== _filtros.etapa)  return false;
     if (_filtros.prio   && _filtros.prio   !== 'todos' && t.prioridad        !== _filtros.prio)   return false;
