@@ -1,4 +1,4 @@
-// Portal TLC | permisos.js | v2026.09.30.11 — BUG REAL de fondo en Comisiones: en Firebase quedó "Comisiones": 0 (una columna numérica con el mismo nombre pisa a la de tildes al sincronizar) y "Ver_Comisiones": true. Ahora una columna solo cuenta como permiso si su valor es un tilde (true/false); si no, se usa el alias "Ver Comisiones". || v2026.09.30.9 — BUG REAL (Cristian: "está habilitada pero me dice no tenés permiso para este módulo"): el resultado de cada permiso se guardaba 10 min en sessionStorage, incluido el "NO". Si se entraba antes de sincronizar el permiso nuevo, quedaba bloqueado 10 min aunque ya estuviera habilitado. Ahora solo se reutiliza un "SÍ"; un "NO" se vuelve a consultar siempre. (v2026.09.30.8: se acepta la columna "Comisiones" o "Ver Comisiones".)
+// Portal TLC | permisos.js | v2026.10.03.8 — Cristian: "que la PWA lea cada vez si el usuario tiene acceso o no a tal módulo". Sin caché: cada apertura de un módulo consulta /permisos en Firebase (sin caché del navegador). Además, si el Rol cambió en Firebase, actualiza la sesión y recarga una vez, para que el módulo use el rol nuevo (Servicio, Cotizaciones, Eventos, Cuenta Corriente y Comisiones lo leen de la sesión). || v2026.09.30.11 — BUG REAL de fondo en Comisiones: en Firebase quedó "Comisiones": 0 (una columna numérica con el mismo nombre pisa a la de tildes al sincronizar) y "Ver_Comisiones": true. Ahora una columna solo cuenta como permiso si su valor es un tilde (true/false); si no, se usa el alias "Ver Comisiones". || v2026.09.30.9 — BUG REAL (Cristian: "está habilitada pero me dice no tenés permiso para este módulo"): el resultado de cada permiso se guardaba 10 min en sessionStorage, incluido el "NO". Si se entraba antes de sincronizar el permiso nuevo, quedaba bloqueado 10 min aunque ya estuviera habilitado. Ahora solo se reutiliza un "SÍ"; un "NO" se vuelve a consultar siempre. (v2026.09.30.8: se acepta la columna "Comisiones" o "Ver Comisiones".)
 // Portal TLC | permisos.js | v2026.08.30.1 | Validación de acceso a módulos secundarios
 // v2026.08.30.1: BUG DE FONDO REAL resuelto de raíz — hasta ahora,
 //      cada llamada (con el caché de sessionStorage vencido) pedía
@@ -87,7 +87,7 @@ async function _leerFilaPermisosJs(email) {
   const timeoutId = setTimeout(() => controller.abort(), 4000);
   try {
     const clave = _rtdbKeySeguroJs(email.toLowerCase().trim());
-    const res = await fetch(`${RTDB_URL_PERMISOS_JS}/permisos/${clave}.json`, { signal: controller.signal });
+    const res = await fetch(`${RTDB_URL_PERMISOS_JS}/permisos/${clave}.json?_=${Date.now()}`, { signal: controller.signal, cache: 'no-store' });
     if (!res.ok) throw new Error('Firebase respondió ' + res.status);
     return await res.json(); // null acá es válido: la clave no existe
   } finally {
@@ -123,6 +123,27 @@ function _claveColumnaConAliasJs(fila, columnaSheet) {
   return primeraPresente !== null ? primeraPresente : _rtdbHeaderSeguroJs(columnaSheet);
 }
 
+// Si el Rol o el nombre de la sesión no coinciden con Firebase, actualiza
+// la sesión (mismo vencimiento) y devuelve true para que el llamador
+// recargue. Al recargar ya coinciden, así que no puede entrar en bucle.
+function _actualizarSesionDesdeFilaJs(payload, fila) {
+  try {
+    const rol = String(fila[_rtdbHeaderSeguroJs('Rol')] || '').trim();
+    const nombre = String(fila[_rtdbHeaderSeguroJs('Nombre Vendedor')] || '').trim();
+    if (!rol || !payload || !payload.account) return false;
+    let cambio = false;
+    if (payload.account.rol !== rol) { console.log('[permisos.js] Rol actualizado desde Firebase: ' + (payload.account.rol || '—') + ' → ' + rol); payload.account.rol = rol; cambio = true; }
+    if (nombre && payload.account.name !== nombre) { payload.account.name = nombre; cambio = true; }
+    if (!cambio) return false;
+    localStorage.setItem(SESSION_KEY_PERMISOS_JS, JSON.stringify(payload));
+    // Seguro anti-bucle: como mucho una recarga por rol en esta pestaña
+    const marca = 'permisos_recarga_' + rol;
+    if (sessionStorage.getItem(marca)) return false;
+    sessionStorage.setItem(marca, '1');
+    return true;
+  } catch (e) { return false; }
+}
+
 async function validarAccesoModulo(columnaSheet) {
   try {
     // 1) Sesión — si no hay sesión válida, ni vale la pena consultar
@@ -139,23 +160,10 @@ async function validarAccesoModulo(columnaSheet) {
     const email = payload.account && payload.account.username;
     if (!email) { window.location.href = 'index.html'; return false; }
 
-    // 2) Caché — si ya se validó este mismo acceso (módulo + email)
-    // hace menos de 10 minutos EN ESTA PESTAÑA, se resuelve al
-    // instante sin pedir nada de nuevo.
-    const TTL_PERMISOS_MS = 10 * 60 * 1000; // 10 minutos
-    const claveCache = 'permiso_cache_' + columnaSheet + '_' + email.toLowerCase().trim();
-    try {
-      const cacheRaw = sessionStorage.getItem(claveCache);
-      if (cacheRaw) {
-        const cache = JSON.parse(cacheRaw);
-        // Solo se confía en un "SÍ" guardado. Un "NO" guardado se vuelve a
-        // consultar siempre: si el permiso se acaba de habilitar en la
-        // planilla y sincronizar, no hay que esperar 10 minutos.
-        if (cache && cache.permitido === true && (Date.now() - cache.ts) < TTL_PERMISOS_MS) {
-          return true;
-        }
-      }
-    } catch(eCacheGet) { /* sessionStorage no disponible o corrupto — se sigue de largo y se pide fresco */ }
+    // 2) SIN CACHÉ — Cristian: "que la PWA lea cada vez si el usuario
+    // tiene acceso o no a tal módulo". Cada apertura consulta Firebase
+    // (una lectura chica, ~100 ms). Lo que se cambie en la planilla y se
+    // sincronice con el botón aplica la próxima vez que se abra el módulo.
 
     // 3) Leer de Firebase (sincronizado con el botón manual en el
     // Sheet — ver sincronizarPermisosAFirebase en FotoMap.gs).
@@ -168,6 +176,12 @@ async function validarAccesoModulo(columnaSheet) {
       return false;
     }
 
+    // ROL AL DÍA — los módulos usan el rol guardado en la sesión (se
+    // guardaba solo al iniciar sesión). Si en Firebase cambió, se
+    // actualiza la sesión y se recarga la página UNA vez, para que el
+    // módulo arranque con el rol nuevo.
+    if (_actualizarSesionDesdeFilaJs(payload, fila)) { window.location.reload(); return false; }
+
     const claveColumna = _claveColumnaConAliasJs(fila, columnaSheet);
     if (!(claveColumna in fila)) {
       // La columna todavía no existe / no se sincronizó — fail-open
@@ -178,8 +192,6 @@ async function validarAccesoModulo(columnaSheet) {
 
     const valorCrudo = fila[claveColumna];
     const permitido = valorCrudo === true || valorCrudo === 'TRUE' || valorCrudo === 'true' || valorCrudo === 1;
-
-    try { sessionStorage.setItem(claveCache, JSON.stringify({ permitido: permitido, ts: Date.now() })); } catch(eCacheSet) { /* no crítico */ }
 
     if (!permitido) {
       alert('🔒 No tienes permiso para acceder a este módulo');
@@ -211,18 +223,7 @@ async function consultarPermisoModulo(columnaSheet) {
     const email = payload.account && payload.account.username;
     if (!email) return false;
 
-    const TTL_PERMISOS_MS = 10 * 60 * 1000;
-    const claveCache = 'permiso_visual_cache_' + columnaSheet + '_' + email.toLowerCase().trim();
-    try {
-      const cacheRaw = sessionStorage.getItem(claveCache);
-      if (cacheRaw) {
-        const cache = JSON.parse(cacheRaw);
-        if (cache && cache.permitido === true && (Date.now() - cache.ts) < TTL_PERMISOS_MS) {
-          return true; // un "NO" guardado no se usa: se vuelve a consultar (ver validarAccesoModulo)
-        }
-      }
-    } catch(eCacheGet) {}
-
+    // Sin caché: se consulta Firebase cada vez (ver validarAccesoModulo).
     const fila = await _leerFilaPermisosJs(email);
     if (!fila) return false; // usuario no encontrado — sin acceso
 
@@ -235,7 +236,6 @@ async function consultarPermisoModulo(columnaSheet) {
     const valorCrudo = fila[claveColumna];
     const permitido = valorCrudo === true || valorCrudo === 'TRUE' || valorCrudo === 'true' || valorCrudo === 1;
 
-    try { sessionStorage.setItem(claveCache, JSON.stringify({ permitido: permitido, ts: Date.now() })); } catch(eCacheSet) {}
     return permitido;
   } catch(e) {
     console.warn('[permisos.js] Error consultando permiso visual (fail-open, se muestra igual):', e);

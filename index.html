@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.10.03.8 (Cristian: "al apretar el botón de sincronización se actualice en Firebase, y que la PWA lea cada vez si el usuario tiene acceso o no a tal módulo". El menú ya leía /permisos de Firebase en cada apertura; ahora sin caché del navegador, y además deja la sesión con el Rol y el nombre actuales (los demás módulos leen el rol de la sesión, que antes solo se guardaba al iniciar sesión). Complementa permisos.js v2026.10.03.8, que hace lo mismo al abrir cada módulo.) -->
 <!-- Portal TLC | index.html | v2026.09.30.11 (Causa de fondo de Comisiones, confirmada con el dato real de Firebase de Cristian: "Comisiones": 0 y "Ver_Comisiones": true. En la hoja Vendedores hay más de una columna llamada "Comisiones" (una numérica) y al sincronizar la numérica pisa a la de tildes. El inicio y permisos.js ahora toman "Comisiones" como permiso solo si es un tilde (true/false); si es un número, usan "Ver Comisiones".) -->
 <!-- Portal TLC | index.html | v2026.09.30.10 (Corrección de la v2026.09.30.8 — Cristian: Comisiones aparecía habilitada en el inicio pero comisiones.html decía "No tienes permiso". Causa: el inicio aceptaba "Comisiones" O "Ver Comisiones", y en /permisos de Firebase quedó una clave vieja "Ver_Comisiones" en TRUE mientras "Comisiones" (la columna real de la planilla) está en FALSE; permisos.js usa "Comisiones" y rechazaba. Ahora el inicio usa el mismo criterio que permisos.js: manda "Comisiones" y solo si no existe mira "Ver Comisiones". Así el botón y el acceso siempre coinciden.) -->
 <!-- Portal TLC | index.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
@@ -1282,6 +1283,27 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
         } catch(e) {}
     }
 
+    // El inicio ya lee los permisos de Firebase en cada apertura; además
+    // deja la sesión con el Rol y el nombre actuales, que es de donde lo
+    // leen los demás módulos.
+    function _actualizarRolEnSesionIdx(rolNuevo, nombreNuevo) {
+        try {
+            rolNuevo = String(rolNuevo || '').trim();
+            nombreNuevo = String(nombreNuevo || '').trim();
+            if (!rolNuevo) return;
+            const raw = localStorage.getItem(SESSION_KEY_IDX);
+            if (!raw) return;
+            const payload = JSON.parse(raw);
+            if (!payload || !payload.account) return;
+            let cambio = false;
+            if (payload.account.rol !== rolNuevo) { console.log('[index.html] Rol actualizado desde Firebase: ' + (payload.account.rol || '—') + ' → ' + rolNuevo); payload.account.rol = rolNuevo; cambio = true; }
+            if (nombreNuevo && payload.account.name !== nombreNuevo) { payload.account.name = nombreNuevo; cambio = true; }
+            if (!cambio) return;
+            localStorage.setItem(SESSION_KEY_IDX, JSON.stringify(payload));
+            if (currentUserIndex) { currentUserIndex.rol = payload.account.rol; currentUserIndex.name = payload.account.name; }
+        } catch(e) { console.warn('[index.html] No se pudo actualizar el rol en la sesión:', e); }
+    }
+
     function _leerSesionIdx() {
         try {
             const raw = localStorage.getItem(SESSION_KEY_IDX);
@@ -1343,7 +1365,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
             // sincronizado a mano con el botón "Sincronizar permisos a
             // Firebase ahora" — mismo criterio que permisos.js.
             const url = RTDB_URL_PERMISOS + '/permisos/' + _emailKeySeguroIdx(email) + '.json';
-            const res = await fetch(url);
+            const res = await fetch(url + '?_=' + Date.now(), { cache: 'no-store' });
             const fila = await res.json(); // objeto plano { Email, Rol, Ventas, Servicio_Tecnico, ... } o null
 
             if (!fila) console.warn('[index.html] Email "' + email + '" no encontrado en /permisos (Firebase) — se aplica acceso mínimo. ¿Se sincronizó ya con el botón de la planilla?');
@@ -1379,6 +1401,8 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
                     reportes:      bool('Reportes'),
                     verComisiones: (typeof fila[_headerSeguroIdx('Comisiones')] === 'boolean' || ['TRUE','FALSE','true','false'].includes(fila[_headerSeguroIdx('Comisiones')])) ? bool('Comisiones') : bool('Ver Comisiones'), // mismo criterio que permisos.js: "Comisiones" solo si es un tilde; si es un número (columna homónima de %), se usa "Ver Comisiones"
                 };
+                // Rol al día en la sesión (ver permisos.js v2026.10.03.8)
+                _actualizarRolEnSesionIdx(fila[_headerSeguroIdx('Rol')], fila[_headerSeguroIdx('Nombre Vendedor')]);
             } else {
                 // Email no encontrado → acceso mínimo
                 userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, empresas: false, eventos: false, regulatoria: false, reportes: false, verComisiones: false };
