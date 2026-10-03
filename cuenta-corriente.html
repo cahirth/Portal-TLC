@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.10.03.11 (Cristian: "la idea es que leas lo que yo tildo dentro de la hoja de Excel; en Cuenta Corriente debe poder hacer todo" [Lourdes]. Liquidar y deshacer liquidaciones ya no dependen de Rol = Administrador sino del tilde "Liquidar Gastos" de la hoja Vendedores, leído de Firebase cada vez que se abre el módulo. Mientras la columna no exista, se mantiene el criterio anterior (por rol).) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.30.4 (Cristian: "a veces tardan un poco en cargar todos los gastos de todas las tarjetas". Causa: cada apertura baja servicio_tecnico.json y eventos.json completos (con fotos) + 3 consultas a Apps Script, y repite todo después de cada acción. Arreglo inmediato (el de fondo queda en el plan: fotos de Servicio a otro nodo + Cuenta Corriente a Cloud Function): se abre al instante con la última lista guardada en este navegador (por usuario que mira y colaborador elegido) y se actualiza sola atrás con "Actualizando...". Después de liquidar/editar/agregar ya no se vacía la pantalla. Agregar, editar, liquidar y deshacer quedan bloqueados (con aviso) hasta que llegan los datos frescos, porque escriben usando la lista completa de gastos de cada tarjeta y no deben usar una copia vieja. Si se cambia de colaborador mientras carga, gana siempre la carga más nueva.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". Este archivo no cacheaba la lista (la pide fresca cada vez), así que no tenía el bug de caché de los otros 3 — solo cambia a qué URL apunta.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.08.2 (2 bugs reales de Cristian: (1) "cuando despliego gastos de la tarjeta, edito un gastos y de cierra el desplegado, tengo que volver a desplegar" — toggleGroup solo alternaba una clase CSS en el DOM vivo, sin guardar en ningún lado qué grupos estaban abiertos; como renderGroups() reconstruye todo el innerHTML de #groups desde cero, cualquier grupo abierto perdía la marca apenas algo disparaba un re-render (como editarItemClick, que llama a renderGroups() para mostrar el formulario de edición). Ahora se trackea en un Set (openGroups) que sobrevive a cualquier re-render. (2) "guardar... No se encontro el gasto en el origen" — BUG REAL encontrado con el JSON crudo de Firebase que pasó Cristian: esta tarjeta de Eventos (y cualquier otra de antes de que se empezara a guardar el campo "id" en cada tarjeta) NO TIENE t.id en absoluto. El id del ítem se armaba con t.id DIRECTO sin respaldo ("evento:...:" + t.id + ":" + idx) — si faltaba, quedaba literalmente como "evento:EV-XXX:undefined:0". La caché de edición (_origenGastosCompletos) SÍ usaba el respaldo correcto (t.id || la clave real de Firebase) para su propia clave — esa desalineación entre los dos (uno con "undefined" literal, el otro con la clave real) es lo que hacía que nunca lo encontrara al guardar, en CUALQUIER gasto de esa tarjeta, siempre. Confirmado con una reproducción completa usando los datos reales exactos (incluida la tarjeta real sin campo id) — el código viejo efectivamente generaba el id con "undefined" literal y fallaba exactamente como se reportó; con el fix (mismo respaldo aplicado en los dos lugares), el gasto se encuentra correctamente.) -->
@@ -327,7 +328,7 @@ function openPaymentDetail(id){let p=state.liquidaciones.find(x=>x.id===id);if(!
 
 window.deshacerLiquidacion = async function() {
   if (!_ccPuedeEscribir()) return;
-  if (!CURRENT.esAdmin) { toast("Solo Administradores pueden deshacer liquidaciones"); return; }
+  if (!CURRENT.esAdmin) { toast("Para deshacer liquidaciones necesitás el tilde \"Liquidar Gastos\""); return; }
   const id = _detailLiquidacionId;
   if (!id) return;
   if (!confirm('¿Deshacer esta liquidación? Los gastos incluidos vuelven a PENDIENTE y este registro se borra. No se puede deshacer esta acción.')) return;
@@ -367,7 +368,7 @@ function updatePaymentMethodUI(){
   $("confirm").disabled = false;
   $("payRef").value = "";
 }
-function openModal(){if(!CURRENT.esAdmin){toast('Solo Administradores pueden liquidar gastos');return}let s=selTotals();$("mArs").textContent=money(s.ars,"ARS");$("mUsd").textContent=money(s.usd,"USD");$("payDate").value=today();$("payMethod").value="Transferencia";updatePaymentMethodUI();let rows=[];if(selInitial){let a=Number($("partArs").value||0),u=Number($("partUsd").value||0);if(a)rows.push(["Saldo inicial histórico",money(a,"ARS")]);if(u)rows.push(["Saldo inicial histórico",money(u,"USD")])}visible().forEach(g=>g.items.forEach(i=>{if(selected.has(i.id))rows.push([i.concepto,money(i.monto,i.moneda)])}));$("modalItems").innerHTML=rows.map(r=>`<div class="modal-item"><span>${esc(r[0])}</span><strong>${r[1]}</strong></div>`).join("");$("modalWrap").hidden=false}
+function openModal(){if(!CURRENT.esAdmin){toast('Para liquidar necesitás el tilde "Liquidar Gastos"');return}let s=selTotals();$("mArs").textContent=money(s.ars,"ARS");$("mUsd").textContent=money(s.usd,"USD");$("payDate").value=today();$("payMethod").value="Transferencia";updatePaymentMethodUI();let rows=[];if(selInitial){let a=Number($("partArs").value||0),u=Number($("partUsd").value||0);if(a)rows.push(["Saldo inicial histórico",money(a,"ARS")]);if(u)rows.push(["Saldo inicial histórico",money(u,"USD")])}visible().forEach(g=>g.items.forEach(i=>{if(selected.has(i.id))rows.push([i.concepto,money(i.monto,i.moneda)])}));$("modalItems").innerHTML=rows.map(r=>`<div class="modal-item"><span>${esc(r[0])}</span><strong>${r[1]}</strong></div>`).join("");$("modalWrap").hidden=false}
 function closeModal(){$("modalWrap").hidden=true}
 
 $("detailClose").onclick=closePaymentDetail;$("detailOk").onclick=closePaymentDetail;$("detailUndo").onclick=deshacerLiquidacion;$("detailWrap").onclick=e=>{if(e.target===$("detailWrap"))closePaymentDetail()};
@@ -381,7 +382,7 @@ $("payMethod").onchange=updatePaymentMethodUI;
 // se arma el pedido.
 $("confirm").onclick = async function() {
   if (!_ccPuedeEscribir()) return;
-  if (!CURRENT.esAdmin) { toast("Solo Administradores pueden liquidar gastos"); return; }
+  if (!CURRENT.esAdmin) { toast("Para liquidar necesitás el tilde \"Liquidar Gastos\""); return; }
   if (!$("payDate").value) { toast("Seleccioná la fecha"); return; }
   const btn = $("confirm");
   btn.disabled = true; btn.textContent = 'Guardando...';
@@ -733,13 +734,23 @@ async function _initCC() {
   // Estas 3 tampoco dependen una de otra - antes iban en fila, ahora
   // salen juntas (mismo motivo que en cargarTodo: "no tarde tanto en
   // cargar").
-  const [esInterno, tcOficial, usuarios] = await Promise.all([
+  const [esInterno, tcOficial, usuarios, tildeLiquidar] = await Promise.all([
     (async function() { try { return typeof consultarPermisoModulo === 'function' ? await consultarPermisoModulo('Internos') : false; } catch(e) { return false; } })(),
     _obtenerTCOficialCC(),
     _cargarUsuarios(),
+    (async function() { try { return typeof leerTildeUsuario === 'function' ? await leerTildeUsuario('Liquidar Gastos') : { existe:false, valor:false }; } catch(e) { return { existe:false, valor:false }; } })(),
   ]);
 
-  CURRENT = { nombre: account.name || account.username, email: (account.username||'').toLowerCase(), permisos: { Internos: esInterno }, esAdmin: account.rol === 'Administrador' };
+  // QUIÉN PUEDE LIQUIDAR Y DESHACER — Cristian: "la idea es que leas lo
+  // que yo tildo dentro de la hoja de Excel; en Cuenta Corriente [Lourdes]
+  // debe poder hacer todo". Lo decide el tilde "Liquidar Gastos" de la
+  // hoja Vendedores. Mientras esa columna no exista, sigue el criterio
+  // anterior (Rol = Administrador), para que nadie gane ni pierda nada
+  // antes de crearla. (Se sigue llamando esAdmin para no tocar el resto.)
+  const puedeLiquidar = tildeLiquidar.existe ? tildeLiquidar.valor : (account.rol === 'Administrador');
+  console.log('[cuenta-corriente] Liquidar/deshacer: ' + (puedeLiquidar ? 'SÍ' : 'NO') + (tildeLiquidar.existe ? ' (tilde "Liquidar Gastos")' : ' (sin columna "Liquidar Gastos" — por rol)'));
+
+  CURRENT = { nombre: account.name || account.username, email: (account.username||'').toLowerCase(), permisos: { Internos: esInterno }, esAdmin: puedeLiquidar };
   TC_OFICIAL_CC = tcOficial;
   USERS = usuarios;
   if (!USERS.some(function(u){ return u.email === CURRENT.email; })) USERS.unshift({ email: CURRENT.email, nombre: CURRENT.nombre });

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.03.10 (BUG REAL — Cristian: "me puse rol de Técnico y Vend_Interno, y no veo mi métrica en Servicio Técnico". EMAIL_A_TECNICO tenía emails de la forma cristian.hirth / juan.garro, que no son los reales (cristian@, juan@, damian@...): nadie quedaba identificado con su código de técnico, así que "Mi carga actual" no aparecía y el filtro "Asignados a mí" no le funcionaba a nadie. Ahora usa los emails reales y, de respaldo, el nombre de la sesión. Reglas de la métrica: Administrador ve a todos; el resto ve su propia fila si está asignado a alguna etapa o tiene tickets en ellas.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.6 (BUG REAL — Cristian: "la tarjeta Rivero Néstor Eduardo la filtra para mí porque el responsable soy yo, pero con la tarjeta cerrada dice LD". Las Órdenes de Preparación tenían dos campos de responsable que se desincronizaban: tecnico_asignado (tarjeta; se actualiza al mover de etapa) y tecnico_responsable_nombre (con el que se creó la orden; lo usaban el desplegable del detalle, el filtro y las métricas). Ahora hay UN solo responsable: manda tecnico_asignado y el nombre solo si no hay código. El desplegable del detalle muestra ese mismo responsable y al cambiarlo guarda los dos campos juntos; el traspaso automático a Lourdes también. Tarjeta, detalle, filtro y métricas dicen siempre lo mismo.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.5 (Cristian: "el único problema que veo si al cliente se le hace una entrega parcial" → "me gusta, hacelo". Orden de Preparación: botón "✂️ Dividir entrega (envío parcial)" en la etapa Preparación. Se marcan los equipos que salen ahora (vienen pre-marcados los que ya están Listo para despacho/Enviado) y la Cloud Function servicio (v2, st_dividirOrdenPreparacion) crea una orden nueva <id>-E2, -E3... del mismo negocio, con su propio remito, etiquetas y seguimiento; si todo lo que sale está listo, nace a nombre de Lourdes. La original se queda con los pendientes (no puede quedar vacía) y, si lo que queda ya está todo listo, también pasa a Lourdes. Cada orden muestra los vínculos a las otras entregas. En Ventas el negocio refleja la entrega más atrasada y recibe un mensaje por cada entrega que llega a Para Instalar.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.4 (Cristian: "cada usuario ve sus métricas, los administradores ven todo" + "agregar Presupuesto y Para facturar" + "las métricas leer asignados en cada etapa" + "en Preparación, cuando todos los ítems están en Listo para despacho, se cambia el responsable a Lourdes". (1) Panel de carga rehecho como tabla: etapas Diagnóstico, Presupuesto, Reparación, Preparación y Para facturar + Total. Las personas de cada etapa salen de los asignados de esa columna del Kanban (más quien tenga tickets ahí); "—" si la persona no está en esa etapa. En cada etapa se marca en verde quien tiene menos carga entre sus asignados. Administrador ve a todos; el resto ve solo su fila ("Mi carga actual"). (2) El cartel de asignación muestra la carga de cada candidato en ESA etapa. (3) Orden de Preparación: cuando todos los equipos quedan en "Listo para despacho" (o "Enviado"), el técnico responsable pasa automáticamente a Lourdes Dávalos (una sola vez, no vuelve atrás solo).) -->
@@ -1091,18 +1092,29 @@ async function _cargarSesion() {
       vistaGuardada = window.innerWidth >= 768 ? 'kanban' : 'lista';
     }
     // Derivar clave interna del técnico desde el email
+    // BUG REAL (v2026.10.03.10) — Cristian: "me puse rol de Técnico y no
+    // veo mi métrica". Esta tabla tenía emails de la forma
+    // "cristian.hirth", "juan.garro"... pero los reales son cristian@,
+    // juan@, damian@: nunca coincidía, y cada uno quedaba identificado
+    // como "cristian", "juan"... en vez de "cristian_hirth", "juan_garro".
+    // Eso rompía "Mi carga actual" y el filtro "Asignados a mí" para
+    // TODOS. Ahora usa los emails reales (los mismos que la Cloud Function
+    // servicio) y, si no aparece, busca por el nombre de la sesión.
     var EMAIL_A_TECNICO = {
-      'cristian.hirth':'cristian_hirth', 'cristian.hirth@tlcsrl.com.ar':'cristian_hirth',
-      'fernando.del.campo':'fernando_del_campo',
-      'juan.garro':'juan_garro',
-      'damian.sosa':'damian_sosa',
-      'veronica.ribaita':'veronica_ribaita',
-      'lourdes.davalos':'lourdes_davalos',
-      'lucio.raineri':'lucio_raineri',
+      'cristian@tlcsrl.com.ar':'cristian_hirth',
+      'fernando@tlcsrl.com.ar':'fernando_del_campo',
+      'juan@tlcsrl.com.ar':'juan_garro',
+      'damian@tlcsrl.com.ar':'damian_sosa',
+      'veronica@tlcsrl.com.ar':'veronica_ribaita',
+      'lourdes@tlcsrl.com.ar':'lourdes_davalos',
+      'lucio@tlcsrl.com.ar':'lucio_raineri',
     };
-    var emailCompleto = (_session.username || '').toLowerCase();
+    var emailCompleto = (_session.username || '').toLowerCase().trim();
     var prefixEmail   = emailCompleto.split('@')[0];
-    _session.tecnico_key = EMAIL_A_TECNICO[emailCompleto] || EMAIL_A_TECNICO[prefixEmail] || prefixEmail.replace(/\./g, '_');
+    var _sinTildes = function(x) { return String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); };
+    var porNombre = (typeof TECNICOS_LISTA !== 'undefined' ? TECNICOS_LISTA : []).find(function(t) { return _sinTildes(t.l) === _sinTildes(_session.name); });
+    _session.tecnico_key = EMAIL_A_TECNICO[emailCompleto] || (porNombre && porNombre.v) || prefixEmail.replace(/\./g, '_');
+    console.log('[servicio.html] Técnico de la sesión: ' + _session.tecnico_key);
 
     _setVista(vistaGuardada, true);
     _actualizarBtnMostrarFin();

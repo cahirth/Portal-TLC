@@ -1,4 +1,4 @@
-// Portal TLC | permisos.js | v2026.10.03.9 — CORRECCIÓN DE SEGURIDAD: se quita el alias Comisiones → "Ver Comisiones" (son permisos distintos; el alias les abría el módulo Comisiones a vendedores externos). || v2026.10.03.8 — Cristian: "que la PWA lea cada vez si el usuario tiene acceso o no a tal módulo". Sin caché: cada apertura de un módulo consulta /permisos en Firebase (sin caché del navegador). Además, si el Rol cambió en Firebase, actualiza la sesión y recarga una vez, para que el módulo use el rol nuevo (Servicio, Cotizaciones, Eventos, Cuenta Corriente y Comisiones lo leen de la sesión). || v2026.09.30.11 — BUG REAL de fondo en Comisiones: en Firebase quedó "Comisiones": 0 (una columna numérica con el mismo nombre pisa a la de tildes al sincronizar) y "Ver_Comisiones": true. Ahora una columna solo cuenta como permiso si su valor es un tilde (true/false); si no, se usa el alias "Ver Comisiones". || v2026.09.30.9 — BUG REAL (Cristian: "está habilitada pero me dice no tenés permiso para este módulo"): el resultado de cada permiso se guardaba 10 min en sessionStorage, incluido el "NO". Si se entraba antes de sincronizar el permiso nuevo, quedaba bloqueado 10 min aunque ya estuviera habilitado. Ahora solo se reutiliza un "SÍ"; un "NO" se vuelve a consultar siempre. (v2026.09.30.8: se acepta la columna "Comisiones" o "Ver Comisiones".)
+// Portal TLC | permisos.js | v2026.10.03.11 — nueva leerTildeUsuario(columna): lee un tilde de la hoja Vendedores para capacidades dentro de un módulo (si la columna no existe, no habilita). || v2026.10.03.9 — CORRECCIÓN DE SEGURIDAD: se quita el alias Comisiones → "Ver Comisiones" (son permisos distintos; el alias les abría el módulo Comisiones a vendedores externos). || v2026.10.03.8 — Cristian: "que la PWA lea cada vez si el usuario tiene acceso o no a tal módulo". Sin caché: cada apertura de un módulo consulta /permisos en Firebase (sin caché del navegador). Además, si el Rol cambió en Firebase, actualiza la sesión y recarga una vez, para que el módulo use el rol nuevo (Servicio, Cotizaciones, Eventos, Cuenta Corriente y Comisiones lo leen de la sesión). || v2026.09.30.11 — BUG REAL de fondo en Comisiones: en Firebase quedó "Comisiones": 0 (una columna numérica con el mismo nombre pisa a la de tildes al sincronizar) y "Ver_Comisiones": true. Ahora una columna solo cuenta como permiso si su valor es un tilde (true/false); si no, se usa el alias "Ver Comisiones". || v2026.09.30.9 — BUG REAL (Cristian: "está habilitada pero me dice no tenés permiso para este módulo"): el resultado de cada permiso se guardaba 10 min en sessionStorage, incluido el "NO". Si se entraba antes de sincronizar el permiso nuevo, quedaba bloqueado 10 min aunque ya estuviera habilitado. Ahora solo se reutiliza un "SÍ"; un "NO" se vuelve a consultar siempre. (v2026.09.30.8: se acepta la columna "Comisiones" o "Ver Comisiones".)
 // Portal TLC | permisos.js | v2026.08.30.1 | Validación de acceso a módulos secundarios
 // v2026.08.30.1: BUG DE FONDO REAL resuelto de raíz — hasta ahora,
 //      cada llamada (con el caché de sessionStorage vencido) pedía
@@ -230,5 +230,31 @@ async function consultarPermisoModulo(columnaSheet) {
   } catch(e) {
     console.warn('[permisos.js] Error consultando permiso visual (fail-open, se muestra igual):', e);
     return true;
+  }
+}
+
+// ── TILDE ESTRICTO ────────────────────────────────────────────────
+// Cristian: "la idea es que leas lo que yo tildo dentro de la hoja".
+// Para CAPACIDADES dentro de un módulo (no para entrar): devuelve
+// { existe, valor } leyendo /permisos en Firebase, sin caché. A
+// diferencia de consultarPermisoModulo, si la columna no existe NO
+// habilita: el llamador decide qué hacer (p. ej. usar el rol mientras
+// la columna todavía no se creó en la planilla).
+async function leerTildeUsuario(columnaSheet) {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY_PERMISOS_JS);
+    if (!raw) return { existe: false, valor: false };
+    const payload = JSON.parse(raw);
+    const email = payload && payload.account && payload.account.username;
+    if (!email) return { existe: false, valor: false };
+    const fila = await _leerFilaPermisosJs(email);
+    if (!fila) return { existe: false, valor: false };
+    const clave = _rtdbHeaderSeguroJs(columnaSheet);
+    if (!(clave in fila)) return { existe: false, valor: false };
+    const v = fila[clave];
+    return { existe: true, valor: v === true || v === 'TRUE' || v === 'true' || v === 1 };
+  } catch (e) {
+    console.warn('[permisos.js] leerTildeUsuario("' + columnaSheet + '") falló:', e);
+    return { existe: false, valor: false };
   }
 }
