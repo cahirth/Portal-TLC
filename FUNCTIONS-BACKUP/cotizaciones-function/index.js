@@ -1,4 +1,9 @@
 // Portal TLC | Cloud Function — módulo Cotizaciones
+// v2 — 2026.10.01 — Cristian: "no quiero que se cambie solo de dueño...
+//   porque se editó". guardarPresupuestoEditor ya no pisa el vendedor de
+//   un negocio existente (solo lo asigna si es nuevo o no tiene dueño), y
+//   el presupuesto guardado muestra al dueño real del negocio. Complementa
+//   el arreglo del frontend (presupuesto-editor.html v2026.09.30.1).
 // v1 — 2026.09.29
 //
 // Cristian: "vayamos de a poco... función por función... podemos
@@ -192,7 +197,10 @@ async function guardarPresupuestoEditor(data) {
         .map((ct) => ({ id: String(ct.id || '').trim(), nombre: String(ct.nombre || '').trim(), email: String(ct.email || '').trim(), telefono: String(ct.telefono || '').trim() }))
         .filter((ct) => ct.nombre);
     }
-    if (vendedor) entrada.vendedor = vendedor;
+    // DUEÑO DEL NEGOCIO (v2): editar NUNCA cambia el vendedor. Solo se
+    // asigna en un negocio nuevo o si el existente no tiene dueño.
+    // Reasignar es exclusivo del Administrador, por reasignarVendedor.
+    if (vendedor && (esNuevo || !entrada.vendedor)) entrada.vendedor = vendedor;
     entrada.carrito = carrito;
     entrada.nombreNegocio = generarNombreNegocio(entrada.razonSocial, carrito);
     entrada.montoUSD = totalConIva;
@@ -215,7 +223,7 @@ async function guardarPresupuestoEditor(data) {
   if (!soloRegistrarNegocio) {
     try {
       const presupuestoData = {
-        idCot, fecha: fechaISO, vendedor, nombreMedico: data.contactoNombre || '',
+        idCot, fecha: fechaISO, vendedor: entradaFinal.vendedor || vendedor, nombreMedico: data.contactoNombre || '',
         contactoTelefono: data.contactoTelefono || (entradaFinal.contacto && entradaFinal.contacto.telefono) || '',
         razonSocial: entradaFinal.razonSocial, cuit: entradaFinal.cuit, telefono: entradaFinal.telefono, domicilio: entradaFinal.domicilio,
         carrito, formaPago: condicionesComerciales.formaPago, validez: condicionesComerciales.validez,
