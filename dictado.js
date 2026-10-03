@@ -1,4 +1,5 @@
-// Portal TLC | dictado.js | v2026.10.02.1
+// Portal TLC | dictado.js | v2026.10.03.1 — BUG REAL en Android: repetía las palabras (Chrome Android manda la frase acumulada varias veces como definitiva). Ahora en Android una frase por sesión con reinicio automático, y en todos los navegadores el texto de la sesión se rearma completo en cada evento (nunca se suma).
+// (v2026.10.02.1: versión inicial)
 // Cristian: "¿se podría hacer en mensajes internos dictado por voz?... quiero
 // el micrófono en los 3 módulos". Agrega un botón 🎤 al lado de "Enviar" en
 // los chats de Cotizaciones, Servicio Técnico y Eventos.
@@ -51,65 +52,95 @@
     alert(msg);
   }
 
+  var esAndroid = /Android/i.test(navigator.userAgent);
+  var quiereEscuchar = false;
+
   function detener() {
+    quiereEscuchar = false;
     if (rec) { try { rec.stop(); } catch (e) {} }
   }
 
   function limpiarEstado() {
     if (botonActivo) { botonActivo.classList.remove('escuchando'); botonActivo.title = 'Dictar por voz'; }
-    rec = null; textareaActivo = null; botonActivo = null;
+    rec = null; textareaActivo = null; botonActivo = null; quiereEscuchar = false;
   }
 
+  // ANDROID: con reconocimiento continuo, Chrome en Android manda la frase
+  // ACUMULADA una y otra vez ("Hola", "Hola Lore", "Hola Lore todo"...),
+  // cada una marcada como definitiva; sumarlas repetía las palabras
+  // (Cristian: "fijate que repite las palabras"). Por eso en Android se usa
+  // una frase por sesión (continuous=false) y se reinicia sola mientras el
+  // usuario siga hablando. Además, en cada evento se REARMA el texto de la
+  // sesión desde cero (nunca se suma sobre lo anterior), así un resultado
+  // repetido no puede duplicar nada en ningún navegador.
   function empezar(textarea, boton) {
-    if (rec) { detener(); return; }
-
-    var r = new SR();
-    r.lang = 'es-AR';
-    r.interimResults = true;
-    r.continuous = true;
-    r.maxAlternatives = 1;
+    if (rec || quiereEscuchar) { detener(); return; }
 
     var original = textarea.value;
-    var base = original;
-    if (base && !/\s$/.test(base)) base += ' ';
-    var finales = '';
-
-    r.onresult = function (ev) {
-      var provisorio = '';
-      for (var i = ev.resultIndex; i < ev.results.length; i++) {
-        var txt = ev.results[i][0].transcript;
-        if (ev.results[i].isFinal) finales += txt.trim() + ' ';
-        else provisorio += txt;
-      }
-      textarea.value = base + finales + provisorio;
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      textarea.scrollTop = textarea.scrollHeight;
-    };
-    r.onerror = function (ev) {
-      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
-        avisar('🎤 Permití el acceso al micrófono para dictar (ícono del candado, al lado de la dirección).');
-      } else if (ev.error === 'no-speech') {
-        // silencio: se corta solo, sin aviso
-      } else if (ev.error !== 'aborted') {
-        console.warn('[dictado.js] error:', ev.error);
-      }
-    };
-    r.onend = function () {
-      textarea.value = finales ? (base + finales) : original; // sin nada dictado, queda exactamente como estaba
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      limpiarEstado();
-    };
-
-    try {
-      r.start();
-    } catch (e) {
-      console.warn('[dictado.js] no se pudo iniciar:', e);
-      return;
-    }
-    rec = r; textareaActivo = textarea; botonActivo = boton;
+    var acumulado = original;           // lo ya confirmado de sesiones anteriores
+    quiereEscuchar = true;
+    textareaActivo = textarea; botonActivo = boton;
     boton.classList.add('escuchando');
     boton.title = 'Escuchando… tocá para terminar';
     textarea.focus();
+
+    function unir(a, b) {
+      b = (b || '').trim();
+      if (!b) return a;
+      if (a && !/\s$/.test(a)) a += ' ';
+      return a + b;
+    }
+
+    function sesion() {
+      var r = new SR();
+      r.lang = 'es-AR';
+      r.interimResults = true;
+      r.continuous = !esAndroid;
+      r.maxAlternatives = 1;
+      var textoSesion = '';      // rearmado completo en cada evento
+      var huboTexto = false;
+
+      r.onresult = function (ev) {
+        var finales = [], provisorio = '';
+        if (esAndroid) {
+          // En Android el último resultado ya trae la frase completa
+          var ult = ev.results[ev.results.length - 1];
+          if (ult.isFinal) finales.push(ult[0].transcript); else provisorio = ult[0].transcript;
+        } else {
+          for (var i = 0; i < ev.results.length; i++) {
+            if (ev.results[i].isFinal) finales.push(ev.results[i][0].transcript.trim());
+            else provisorio += ev.results[i][0].transcript;
+          }
+        }
+        textoSesion = finales.join(' ').trim();
+        if (textoSesion || provisorio.trim()) huboTexto = true;
+        textarea.value = unir(unir(acumulado, textoSesion), provisorio);
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        textarea.scrollTop = textarea.scrollHeight;
+      };
+      r.onerror = function (ev) {
+        if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+          quiereEscuchar = false;
+          avisar('🎤 Permití el acceso al micrófono para dictar (ícono del candado, al lado de la dirección).');
+        } else if (ev.error !== 'no-speech' && ev.error !== 'aborted') {
+          console.warn('[dictado.js] error:', ev.error);
+        }
+      };
+      r.onend = function () {
+        acumulado = unir(acumulado, textoSesion);
+        textarea.value = (acumulado === original) ? original : acumulado + ' ';
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        // Android: si el usuario sigue en modo dictado y esta frase trajo
+        // texto, se abre otra sesión. Si hubo silencio, se termina solo.
+        if (esAndroid && quiereEscuchar && huboTexto && document.body.contains(textarea)) {
+          try { sesion(); return; } catch (e) {}
+        }
+        limpiarEstado();
+      };
+      try { r.start(); rec = r; }
+      catch (e) { console.warn('[dictado.js] no se pudo iniciar:', e); limpiarEstado(); }
+    }
+    sesion();
   }
 
   function engancharCampo(cfg) {
