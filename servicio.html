@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.03.5 (Cristian: "el único problema que veo si al cliente se le hace una entrega parcial" → "me gusta, hacelo". Orden de Preparación: botón "✂️ Dividir entrega (envío parcial)" en la etapa Preparación. Se marcan los equipos que salen ahora (vienen pre-marcados los que ya están Listo para despacho/Enviado) y la Cloud Function servicio (v2, st_dividirOrdenPreparacion) crea una orden nueva <id>-E2, -E3... del mismo negocio, con su propio remito, etiquetas y seguimiento; si todo lo que sale está listo, nace a nombre de Lourdes. La original se queda con los pendientes (no puede quedar vacía) y, si lo que queda ya está todo listo, también pasa a Lourdes. Cada orden muestra los vínculos a las otras entregas. En Ventas el negocio refleja la entrega más atrasada y recibe un mensaje por cada entrega que llega a Para Instalar.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.4 (Cristian: "cada usuario ve sus métricas, los administradores ven todo" + "agregar Presupuesto y Para facturar" + "las métricas leer asignados en cada etapa" + "en Preparación, cuando todos los ítems están en Listo para despacho, se cambia el responsable a Lourdes". (1) Panel de carga rehecho como tabla: etapas Diagnóstico, Presupuesto, Reparación, Preparación y Para facturar + Total. Las personas de cada etapa salen de los asignados de esa columna del Kanban (más quien tenga tickets ahí); "—" si la persona no está en esa etapa. En cada etapa se marca en verde quien tiene menos carga entre sus asignados. Administrador ve a todos; el resto ve solo su fila ("Mi carga actual"). (2) El cartel de asignación muestra la carga de cada candidato en ESA etapa. (3) Orden de Preparación: cuando todos los equipos quedan en "Listo para despacho" (o "Enviado"), el técnico responsable pasa automáticamente a Lourdes Dávalos (una sola vez, no vuelve atrás solo).) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.3 (Cristian: "agregá la etapa Preparación también". El panel de carga por técnico suma la columna Preparación (preparacion_control_calidad), contando tanto los tickets de reparación en esa etapa como las Órdenes de Preparación de equipos; estas guardan el técnico por nombre (tecnico_responsable_nombre), que se traduce a su código con TECNICOS_LISTA. El filtro por técnico también reconoce ahora las Órdenes de Preparación.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.2 (Cristian: "quiero tener métricas de los servicios asignados a Damián y a Juan en diagnóstico, reparación, un contador para cada uno, para equiparar las asignaciones, que sean equitativas". Panel "⚖️ Carga actual por técnico" arriba de los filtros (solo Administrador): cuántos tickets tiene HOY cada uno en Diagnóstico y Reparación, total, cuál tiene menos carga, diferencia y cuántos hay sin asignar en esas etapas. Tocar un número filtra la lista por ese técnico y etapa (tocar de nuevo lo quita). En el modal "¿A quién asignás esta tarjeta?" cada candidato muestra su carga y se marca el de menos carga. No incluye Órdenes de Preparación. Técnicos y etapas configurables en METRICA_TECNICOS / METRICA_ETAPAS.) -->
@@ -2545,7 +2546,9 @@ function _renderSeccionOrdenPreparacion(t) {
   }).join('');
 
   return '<div style="padding:0 16px 10px;">' +
-    '<div class="op-banner">📦 <b>Orden de Preparación de Equipos</b></div>' +
+    '<div class="op-banner">📦 <b>Orden de Preparación de Equipos</b>' +
+      (t.orden_padre ? ' · <span style="font-weight:700;">Entrega parcial ' + (t.entrega_parcial_nro || '') + '</span>' : '') + '</div>' +
+    _htmlVinculosEntregas(t) +
     '<div class="det-card">' +
       '<div class="det-field">' +
         '<div class="det-field-label">Cliente / Clínica</div>' +
@@ -2587,6 +2590,9 @@ function _renderSeccionOrdenPreparacion(t) {
     '<div style="margin-bottom:10px;"><button class="op-btn" onclick="window.open(\'https://cahirth.github.io/Portal-TLC/orden-preparacion.html?id=' + t.id_ticket + '\',\'_blank\')" style="width:100%;">🖨 Imprimir / Exportar Orden de Preparación</button></div>' +
     (t.deposito === 'preparacion_control_calidad' ?
       '<div style="margin-bottom:10px;"><button type="button" id="btn-generar-etiquetas-' + t.id_ticket + '" class="op-btn" style="width:100%;background:#8b5cf6;color:#fff;border-color:#8b5cf6;" onclick="_abrirModalEtiquetasCajas(\'' + t.id_ticket + '\', this)">🏷️ Generar Etiquetas de Despacho</button></div>'
+      : '') +
+    ((t.deposito === 'preparacion_control_calidad' && !t.orden_padre && equipos.length >= 2) ?
+      '<div style="margin-bottom:10px;"><button type="button" class="op-btn" style="width:100%;" onclick="_abrirModalDividirEntrega(\'' + t.id_ticket + '\')">✂️ Dividir entrega (envío parcial)</button></div>'
       : '') +
   '</div>';
 }
@@ -2672,6 +2678,111 @@ window._separarEquipoOrden = function(idTicket, indice, cantidad, btn) {
       _toastServicio('✅ Separado en ' + cantidad + ' filas');
     })
     .catch(function(){ alert('Error de conexión al separar.'); if (btn) btn.disabled = false; });
+};
+
+// ── DIVIDIR ENTREGA (envío parcial) ───────────────────────────────
+// Cristian: "el único problema que veo si al cliente se le hace una
+// entrega parcial" → "me gusta, hacelo". Separa los equipos elegidos en
+// una Orden de Preparación nueva (-E2, -E3...) del mismo negocio, con su
+// propio remito, etiquetas y seguimiento. La original se queda con los
+// pendientes. Lo hace la Cloud Function servicio (st_dividirOrdenPreparacion).
+function _htmlVinculosEntregas(t) {
+  var link = function(id, texto) {
+    return '<button type="button" onclick="_abrirEntregaVinculada(\'' + id + '\')" style="background:none;border:none;color:#3a86ff;font-weight:700;text-decoration:underline;cursor:pointer;padding:0 2px;font-size:12px;">' + _esc(texto) + '</button>';
+  };
+  if (t.orden_padre) {
+    return '<div style="font-size:12px;color:var(--text-muted);margin:-4px 0 8px;">Parte de la orden ' + link(t.orden_padre, t.orden_padre) + ' (entrega 1).</div>';
+  }
+  var hijas = Array.isArray(t.entregas_hijas) ? t.entregas_hijas.filter(Boolean) : [];
+  if (!hijas.length) return '';
+  return '<div style="font-size:12px;color:var(--text-muted);margin:-4px 0 8px;">Esta es la entrega 1. Otras entregas: ' +
+    hijas.map(function(id) { return link(id, id.split('-').pop()); }).join(' · ') + '</div>';
+}
+
+window._abrirEntregaVinculada = function(id) {
+  if (_tickets.find(function(x) { return x.id_ticket === id; })) { _abrirDetalle(id); return; }
+  _refrescarTicketsPuntuales([id]).then(function() { _abrirDetalle(id); });
+};
+
+// Trae solo estos tickets de Firebase (no la lista entera, que pesa por
+// las fotos) y los actualiza/agrega en memoria.
+function _refrescarTicketsPuntuales(ids) {
+  return Promise.all(ids.filter(Boolean).map(function(id) {
+    return fetch(RTDB_URL + '/servicio_tecnico/' + encodeURIComponent(id) + '.json?_=' + Date.now(), { cache:'no-store' })
+      .then(function(res) { return res.ok ? res.json() : null; })
+      .then(function(tk) {
+        if (!tk) return;
+        if (!tk.id_ticket) tk.id_ticket = id;
+        var i = _tickets.findIndex(function(x) { return x.id_ticket === id; });
+        if (i >= 0) _tickets[i] = tk; else _tickets.push(tk);
+      })
+      .catch(function() {});
+  })).then(function() { _aplicarFiltros(); });
+}
+
+window._abrirModalDividirEntrega = function(idTicket) {
+  var t = (_ticketActual && _ticketActual.id_ticket === idTicket) ? _ticketActual : _tickets.find(function(x) { return x.id_ticket === idTicket; });
+  if (!t) return;
+  var equipos = Array.isArray(t.equipos) ? t.equipos : [];
+  var viejo = document.getElementById('modal-dividir-entrega'); if (viejo) viejo.remove();
+  var m = document.createElement('div');
+  m.id = 'modal-dividir-entrega';
+  m.style.cssText = 'position:fixed;inset:0;z-index:600;background:rgba(3,7,18,.75);display:flex;align-items:center;justify-content:center;padding:16px;';
+  m.innerHTML =
+    '<div style="background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.5);">' +
+      '<div style="font-size:15px;font-weight:800;color:var(--text-main);margin-bottom:4px;">✂️ Dividir entrega</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Marcá los equipos que <b>salen ahora</b>. Van a una orden nueva, con su propio remito y etiquetas. Los demás quedan en esta orden.</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">' +
+        equipos.map(function(eq, i) {
+          var listo = eq.estado === 'Listo para despacho' || eq.estado === 'Enviado';
+          return '<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--border-glow);border-radius:10px;cursor:pointer;">' +
+            '<input type="checkbox" class="chk-dividir" value="' + i + '" ' + (listo ? 'checked' : '') + ' style="margin-top:3px;">' +
+            '<span style="font-size:13px;color:var(--text-main);"><b>' + _esc(eq.descripcion || eq.sku || 'Equipo') + '</b>' +
+            '<br><span style="font-size:11px;color:var(--text-muted);">' + (eq.nro_serie ? 'N° ' + _esc(eq.nro_serie) + ' · ' : '') + _esc(eq.estado || 'Pendiente') + '</span></span>' +
+          '</label>';
+        }).join('') +
+      '</div>' +
+      '<div id="dividir-aviso" style="font-size:11.5px;color:#f59e0b;min-height:16px;margin-bottom:10px;"></div>' +
+      '<div style="display:flex;gap:8px;">' +
+        '<button type="button" onclick="document.getElementById(\'modal-dividir-entrega\').remove()" style="flex:1;padding:10px;border-radius:8px;background:transparent;border:1px solid var(--border-glow);color:var(--text-muted);font-weight:700;cursor:pointer;">Cancelar</button>' +
+        '<button type="button" id="btn-confirmar-dividir" onclick="_confirmarDividirEntrega(\'' + idTicket + '\')" style="flex:1;padding:10px;border-radius:8px;background:#3a86ff;border:none;color:#fff;font-weight:800;cursor:pointer;">Crear entrega</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  var actualizarAviso = function() {
+    var marcados = m.querySelectorAll('.chk-dividir:checked').length;
+    var aviso = document.getElementById('dividir-aviso');
+    var btn = document.getElementById('btn-confirmar-dividir');
+    var invalido = !marcados || marcados >= equipos.length;
+    aviso.textContent = !marcados ? 'Marcá al menos un equipo.' : (marcados >= equipos.length ? 'Tiene que quedar al menos un equipo en esta orden.' : marcados + ' equipo(s) a la entrega nueva · ' + (equipos.length - marcados) + ' quedan acá.');
+    aviso.style.color = invalido ? '#f59e0b' : 'var(--text-muted)';
+    btn.disabled = invalido; btn.style.opacity = invalido ? '.5' : '1';
+  };
+  m.addEventListener('change', actualizarAviso);
+  actualizarAviso();
+};
+
+window._confirmarDividirEntrega = function(idTicket) {
+  var m = document.getElementById('modal-dividir-entrega');
+  if (!m) return;
+  var indices = [].map.call(m.querySelectorAll('.chk-dividir:checked'), function(c) { return parseInt(c.value, 10); });
+  var btn = document.getElementById('btn-confirmar-dividir');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_dividirOrdenPreparacion', id_ticket:idTicket, indices:indices, autor_nombre:(_session && _session.name) || '' }) })
+    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('No se pudo dividir: ' + (r.error || '')); if (btn) { btn.disabled = false; btn.textContent = 'Crear entrega'; } return; }
+      m.remove();
+      _toastServicio('✂️ Entrega ' + r.nro_entrega + ' creada (' + r.id_hija + ') — responsable: ' + (r.responsable_hija || '—'));
+      return _refrescarTicketsPuntuales([idTicket, r.id_hija]).then(function() {
+        var t = _tickets.find(function(x) { return x.id_ticket === idTicket; });
+        if (t && _ticketActual && _ticketActual.id_ticket === idTicket) { _ticketActual = t; _renderDetalle(t); }
+        // Si los que quedaron ya están todos listos, la original pasa a despacho
+        if (t) _pasarADespachoSiCorresponde(idTicket, t.equipos);
+      });
+    })
+    .catch(function() { alert('Error de conexión al dividir la entrega.'); if (btn) { btn.disabled = false; btn.textContent = 'Crear entrega'; } });
 };
 
 window._actualizarFilaOrden = function(idTicket, indice, campo, valor) {
