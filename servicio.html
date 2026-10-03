@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.03.6 (BUG REAL — Cristian: "la tarjeta Rivero Néstor Eduardo la filtra para mí porque el responsable soy yo, pero con la tarjeta cerrada dice LD". Las Órdenes de Preparación tenían dos campos de responsable que se desincronizaban: tecnico_asignado (tarjeta; se actualiza al mover de etapa) y tecnico_responsable_nombre (con el que se creó la orden; lo usaban el desplegable del detalle, el filtro y las métricas). Ahora hay UN solo responsable: manda tecnico_asignado y el nombre solo si no hay código. El desplegable del detalle muestra ese mismo responsable y al cambiarlo guarda los dos campos juntos; el traspaso automático a Lourdes también. Tarjeta, detalle, filtro y métricas dicen siempre lo mismo.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.5 (Cristian: "el único problema que veo si al cliente se le hace una entrega parcial" → "me gusta, hacelo". Orden de Preparación: botón "✂️ Dividir entrega (envío parcial)" en la etapa Preparación. Se marcan los equipos que salen ahora (vienen pre-marcados los que ya están Listo para despacho/Enviado) y la Cloud Function servicio (v2, st_dividirOrdenPreparacion) crea una orden nueva <id>-E2, -E3... del mismo negocio, con su propio remito, etiquetas y seguimiento; si todo lo que sale está listo, nace a nombre de Lourdes. La original se queda con los pendientes (no puede quedar vacía) y, si lo que queda ya está todo listo, también pasa a Lourdes. Cada orden muestra los vínculos a las otras entregas. En Ventas el negocio refleja la entrega más atrasada y recibe un mensaje por cada entrega que llega a Para Instalar.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.4 (Cristian: "cada usuario ve sus métricas, los administradores ven todo" + "agregar Presupuesto y Para facturar" + "las métricas leer asignados en cada etapa" + "en Preparación, cuando todos los ítems están en Listo para despacho, se cambia el responsable a Lourdes". (1) Panel de carga rehecho como tabla: etapas Diagnóstico, Presupuesto, Reparación, Preparación y Para facturar + Total. Las personas de cada etapa salen de los asignados de esa columna del Kanban (más quien tenga tickets ahí); "—" si la persona no está en esa etapa. En cada etapa se marca en verde quien tiene menos carga entre sus asignados. Administrador ve a todos; el resto ve solo su fila ("Mi carga actual"). (2) El cartel de asignación muestra la carga de cada candidato en ESA etapa. (3) Orden de Preparación: cuando todos los equipos quedan en "Listo para despacho" (o "Enviado"), el técnico responsable pasa automáticamente a Lourdes Dávalos (una sola vez, no vuelve atrás solo).) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.3 (Cristian: "agregá la etapa Preparación también". El panel de carga por técnico suma la columna Preparación (preparacion_control_calidad), contando tanto los tickets de reparación en esa etapa como las Órdenes de Preparación de equipos; estas guardan el técnico por nombre (tecnico_responsable_nombre), que se traduce a su código con TECNICOS_LISTA. El filtro por técnico también reconoce ahora las Órdenes de Preparación.) -->
@@ -1325,13 +1326,40 @@ var METRICA_ETAPAS = [
 // Técnico de un ticket para la métrica. Las Órdenes de Preparación
 // guardan el técnico por NOMBRE (tecnico_responsable_nombre, p. ej.
 // "Juan Garro"); los tickets de reparación, por código (tecnico_asignado).
+// UN SOLO RESPONSABLE (v2026.10.03.6): las Órdenes de Preparación tenían
+// dos campos que se desincronizaban — tecnico_asignado (lo que muestra la
+// tarjeta, se actualiza al mover de etapa) y tecnico_responsable_nombre
+// (con el que se creó la orden). Cristian: "la filtra para mí porque el
+// responsable soy yo, pero con la tarjeta cerrada dice LD". Manda
+// tecnico_asignado (lo más reciente); el nombre solo si no hay código.
+// Desde ahora todo cambio de responsable guarda los dos campos juntos.
 function _codTecnicoTicket(t) {
+  if (t && t.tecnico_asignado && t.tecnico_asignado !== 'sin_asignar') return t.tecnico_asignado;
   if (t && t.tipo_orden === 'preparacion_equipos' && t.tecnico_responsable_nombre) {
     var m = (typeof TECNICOS_LISTA !== 'undefined' ? TECNICOS_LISTA : []).find(function(x) { return x.l === t.tecnico_responsable_nombre; });
     if (m) return m.v;
   }
-  return (t && t.tecnico_asignado) || 'sin_asignar';
+  return 'sin_asignar';
 }
+function _nombreTecnicoPorCod(cod) {
+  var m = (typeof TECNICOS_LISTA !== 'undefined' ? TECNICOS_LISTA : []).find(function(x) { return x.v === cod; });
+  return m ? m.l : '';
+}
+
+// Cambia el responsable de una Orden de Preparación guardando LOS DOS
+// campos (código y nombre), para que tarjeta, detalle, filtro y métricas
+// digan siempre lo mismo.
+window._cambiarResponsablePrep = function(idTicket, nombre) {
+  var m = (typeof TECNICOS_LISTA !== 'undefined' ? TECNICOS_LISTA : []).find(function(x) { return x.l === nombre; });
+  var cod = m ? m.v : 'sin_asignar';
+  var nombreFinal = m ? m.l : '';
+  _guardarCampoSiCambio(idTicket, 'tecnico_asignado', cod);
+  _guardarCampoSiCambio(idTicket, 'tecnico_responsable_nombre', nombreFinal);
+  if (_ticketActual && _ticketActual.id_ticket === idTicket) {
+    _ticketActual.tecnico_asignado = cod;
+    _ticketActual.tecnico_responsable_nombre = nombreFinal;
+  }
+};
 
 function _nombreCortoTecnico(cod) {
   var m = (typeof TECNICOS_LISTA !== 'undefined' ? TECNICOS_LISTA : []).find(function(x) { return x.v === cod; });
@@ -1466,7 +1494,7 @@ window._aplicarFiltros = function() {
     if (fTec === '__asignados_a_mi__') {
       if (t.tecnico_asignado !== miClave) return false;
     } else if (fTec !== 'todos') {
-      if (t.tecnico_asignado !== fTec && _codTecnicoTicket(t) !== fTec) return false;
+      if (_codTecnicoTicket(t) !== fTec) return false;
     }
     if (_filtros.etapa  && _filtros.etapa  !== 'todos' && t.deposito        !== _filtros.etapa)  return false;
     if (_filtros.prio   && _filtros.prio   !== 'todos' && t.prioridad        !== _filtros.prio)   return false;
@@ -1516,8 +1544,8 @@ function _renderLista(tickets) {
     if (!items.length) return '';
     var headerStyle = 'background:' + col.bg + ';border-color:' + col.border + ';';
     var tarjetas = items.map(function(t) {
-      var tecLabel = TECNICO_LABEL[t.tecnico_asignado] || '?';
-      var tecColor = TECNICO_COLOR[t.tecnico_asignado] || '#475569';
+      var tecLabel = TECNICO_LABEL[_codTecnicoTicket(t)] || '?';
+      var tecColor = TECNICO_COLOR[_codTecnicoTicket(t)] || '#475569';
       var fechaHtml = _fechaHtml(t.fecha_vencimiento);
       var esUrgenteLista = t.prioridad === 'urgente';
       var pinHtmlLista = '<span onclick="event.stopPropagation(); _guardarCampoSiCambio(\'' + t.id_ticket + '\',\'prioridad\',\'' +
@@ -1607,8 +1635,8 @@ function _renderKanban(tickets) {
 }
 
 function _renderTarjeta(t) {
-  var tecLabel  = TECNICO_LABEL[t.tecnico_asignado] || '?';
-  var tecColor  = TECNICO_COLOR[t.tecnico_asignado] || '#475569';
+  var tecLabel  = TECNICO_LABEL[_codTecnicoTicket(t)] || '?';
+  var tecColor  = TECNICO_COLOR[_codTecnicoTicket(t)] || '#475569';
   var fechaHtml = _fechaHtml(t.fecha_vencimiento);
   var puedeEditar = _permisos.servicio;
 
@@ -2579,7 +2607,7 @@ function _renderSeccionOrdenPreparacion(t) {
         '</div>' +
         '<div class="det-field">' +
           '<div class="det-field-label">Técnico responsable</div>' +
-          '<select class="det-field-select" onchange="_guardarCampoSiCambio(\'' + t.id_ticket + '\',\'tecnico_responsable_nombre\',this.value,\'' + _esc(t.tecnico_responsable_nombre||'') + '\')">' + _optsTecnicoResponsableNombre(t.tecnico_responsable_nombre) + '</select>' +
+          '<select class="det-field-select" onchange="_cambiarResponsablePrep(\'' + t.id_ticket + '\',this.value)">' + _optsTecnicoResponsableNombre(_nombreTecnicoPorCod(_codTecnicoTicket(t)) || 'Sin asignar') + '</select>' +
         '</div>' +
       '</div>' +
     '</div>' +
@@ -2816,13 +2844,9 @@ function _pasarADespachoSiCorresponde(idTicket, equipos) {
   if (!t || t.tipo_orden !== 'preparacion_equipos') return;
   if (t.deposito !== 'preparacion_control_calidad') return;
   var todoListo = equipos.every(function(eq) { return eq && (eq.estado === 'Listo para despacho' || eq.estado === 'Enviado'); });
-  if (!todoListo || t.tecnico_responsable_nombre === RESPONSABLE_DESPACHO) return;
-  var anterior = t.tecnico_responsable_nombre || '';
-  _guardarCampoSiCambio(idTicket, 'tecnico_responsable_nombre', RESPONSABLE_DESPACHO, anterior);
-  if (_ticketActual && _ticketActual.id_ticket === idTicket) {
-    _ticketActual.tecnico_responsable_nombre = RESPONSABLE_DESPACHO;
-    _renderDetalle(_ticketActual);
-  }
+  if (!todoListo || _nombreTecnicoPorCod(_codTecnicoTicket(t)) === RESPONSABLE_DESPACHO) return;
+  _cambiarResponsablePrep(idTicket, RESPONSABLE_DESPACHO);
+  if (_ticketActual && _ticketActual.id_ticket === idTicket) _renderDetalle(_ticketActual);
   _toastServicio('📦 Todo listo para despacho — responsable: ' + RESPONSABLE_DESPACHO);
 }
 
