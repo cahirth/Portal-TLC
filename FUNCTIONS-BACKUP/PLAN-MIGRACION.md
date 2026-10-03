@@ -1,0 +1,218 @@
+# Plan de migración — Apps Script → Cloud Functions
+
+**Última actualización:** 03/10/2026 (frontend en `v2026.10.02.1`)
+
+**Objetivo:** sacar el Portal TLC de Apps Script por completo, sacar `historico.json` (y los datos en general) del repositorio de código, y eliminar todo lo que ralentiza la app. Se hace módulo por módulo, con el patrón ya probado: una Cloud Function equivalente, testeada, con su propia URL, apuntada desde el frontend sin tocar el resto.
+
+**Cómo usar este archivo:** es la fuente única del estado de la migración. Al empezar un chat nuevo, alcanza con decir "seguimos con el plan": Claude lee este archivo, el frontend y el backend (`FUNCTIONS-BACKUP/`) directamente del repo. Al terminar cada sesión, se actualiza este archivo.
+
+---
+
+## 🗂️ Dónde está cada cosa en el repo
+
+| Qué | Dónde |
+|---|---|
+| Frontend (páginas y scripts compartidos) | raíz: `*.html`, `adjuntos.js`, `permisos.js`, `dictado.js`, `version.js`, `sw.js`, `avatar.js` |
+| Checklists y POE | `Check lists/`, `POE/` |
+| Cloud Functions (respaldo del código desplegado) | `FUNCTIONS-BACKUP/<modulo>-function/` (`index.js` + `package.json`) |
+| Asistente IA | `FUNCTIONS-BACKUP/functions/` |
+| Apps Script | `FUNCTIONS-BACKUP/apps-script/FotoMap.gs` *(pendiente de subir)* |
+| Este plan | raíz: `PLAN-MIGRACION.md` |
+
+**Regla:** cada vez que se despliega una Cloud Function, se sube el mismo `index.js` a su carpeta en `FUNCTIONS-BACKUP/`, para que el respaldo coincida con lo que corre.
+
+**Desplegar una función (CMD, en la carpeta con `index.js` y `package.json`):**
+```
+gcloud functions deploy <nombre> --gen2 --region=us-central1 --runtime=nodejs20 --source=. --entry-point=<nombre> --trigger-http --allow-unauthenticated
+```
+
+---
+
+## 📊 Estado en números (relevado del código el 30/09)
+
+- **66 llamadas** a Apps Script en el frontend, **~40 acciones distintas**, repartidas en 13 archivos.
+- **Ya no llaman a Apps Script:** `presupuesto-editor.html`, `mi-dia.html`, `comisiones.html`.
+- **Commits de datos al repo:** ~113 por día (57 de `sincronizarRTDBaGitHub` + 56 de `precios.json`). Cada uno dispara un build de GitHub Pages.
+- **El mayor problema de velocidad que queda:** `servicio_tecnico.json` pesa ~11 MB por las fotos en base64, y lo descargan completo **Servicio Técnico, Cuenta Corriente y Tareas**.
+
+---
+
+## ✅ Ya migrado
+
+| Módulo | Acciones | Cloud Function |
+|---|---|---|
+| Empresas | listarEmpresas, guardarEmpresa, borrarEmpresa, guardarContacto, borrarContacto, reasignarEmpresaNegocio | `empresas` |
+| Tareas | crearTarea, listarTareas, completarTarea, eliminarTarea | `tareas` |
+| Fotos | lectura del mapa de fotos | `fotos` |
+| Eventos (completo) | 33 acciones: checklist, notas, listado, eventos, logo, columnas, tarjetas, gastos, portada, mensajes, reacciones, adjuntos | `eventosChecklist` |
+| Notificaciones | guardarTokenPush, listarNotificaciones, marcarNotificacionLeida, reaccionarNotificacion, marcarTodasNotificacionesLeidas | `notificaciones` |
+| Pipelines | listarPipelines, guardarPipeline, eliminarPipeline | `pipelines` |
+| Servicio Técnico | 21 acciones `st_*` + marcarNegocioUrgente, marcarTarjetaUrgenteEv, st_crearOrdenPreparacion | `servicio` |
+| Internos | listarInternos | `internos` |
+| Comisiones | calcularComisiones, guardarComisionManual | `internos` |
+| Cotizaciones (parcial) | guardarPresupuestoEditor | `cotizaciones` (v2) |
+| Cotizaciones — lectura de mensajes | cot_listarMensajes lee directo `cotizaciones/{id}/mensajes` de Firebase (Apps Script solo como respaldo) | — (Firebase directo) |
+
+---
+
+## 🆕 Hecho entre el 30/09 y el 03/10
+
+| Versión | Qué |
+|---|---|
+| .09.30.1 | **Dueño del negocio:** editar un presupuesto ya no cambia el vendedor. Solo un Administrador puede reasignarlo, y con confirmación. |
+| .09.30.2 | **Mensajes al instante** en Cotizaciones (Firebase directo) y Eventos (abre la tarjeta al toque, refresco cada 10 s). Arreglados 2 bugs: el refresco de mensajes de Cotizaciones nunca funcionó y las reacciones dentro del chat no hacían nada; en Eventos con caché los mensajes nuevos nunca se mostraban. **Adjuntos:** confirmación visible, reintento y botón bloqueado mientras sube. |
+| .09.30.3 | `index.html`: eliminado el escaneo QR de FacoExtrema. |
+| .09.30.4 | Cuenta Corriente abre al instante (caché) y bloquea escrituras hasta tener datos frescos. |
+| .09.30.5 | Tareas (Mi Día) abre al instante (caché); eliminada la URL de Apps Script sin uso. |
+| .09.30.6 | `empresas.html`: eliminado el escaneo QR completo. |
+| .09.30.7 | Oculto el botón flotante del Asistente IA en los 7 módulos (el código queda). |
+| .09.30.8 → .11 | **Permisos de Comisiones:** ver lecciones 8 y 9. |
+| .09.30.12 | Comisiones: cálculo en paralelo con el permiso + apertura al instante (caché). |
+| .09.30.13 | **Adjuntos en Servicio:** se subían pero no aparecían hasta refrescar (ver lección 13). |
+| .10.02.1 | **Dictado por voz 🎤** en el chat de Cotizaciones, Servicio y Eventos (`dictado.js`, compartido). |
+| Función `cotizaciones` v2 | `guardarPresupuestoEditor` ya no pisa el vendedor de un negocio existente (blindaje del lado del servidor). En el repo ✅ · desplegada ⏳ *(confirmar)*. |
+| Backend | Subidas las 10 Cloud Functions a `FUNCTIONS-BACKUP/`. Sin claves en el código (Brevo y Gemini por variables de entorno). |
+
+---
+
+## 📍 Lo que todavía llama a Apps Script (por archivo)
+
+| Archivo | Acciones | Destino propuesto |
+|---|---|---|
+| `cotizaciones.html` (21 llamadas) | actualizarCheckCierre, actualizarColaborador, actualizarContactoCotizacion, actualizarCotizacion, actualizarEstado, actualizarTelefono, agregarNota, editarNota, eliminarNota, asignarPipelineNegocio, cot_agregarMensaje, cot_reaccionarMensaje, eliminarDeal, eliminarVersionPresupuesto, reasignarVendedor, subirCotizacion · **listarEmpresas** · respaldo de cot_listarMensajes · reacción desde la campanita | `cotizaciones` (listarEmpresas → `empresas`, asignarPipelineNegocio → `pipelines`) |
+| `adjuntos.js` (Servicio y Cotizaciones) | subirAdjunto, eliminarAdjunto | `servicio` / `cotizaciones` (idealmente a Firebase Storage) |
+| `ficha-equipo.html` | **listarEmpresas, guardarEmpresa, guardarContacto** · agregarNota, apilarFichaTecnica, buscarNegocioAgrupable · buscarContactoParaQR, guardarEmpresaContactoQR (QR, a borrar) | `empresas` / `cotizaciones` |
+| `cuenta-corriente.html` | listarGastosGeneralesPendientes, agregarGastoGeneral, editarGastoGeneral, crearLiquidacion, listarLiquidaciones, revertirLiquidacion, obtenerSaldoInicial | Cloud Function nueva o extender `internos` |
+| `Check lists/` (5 archivos) | listarTecnicos, st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden | `internos` / `servicio` |
+| `POE/POE8_Instalacion.html` | registrarInstalacionPOE8 | `servicio` |
+| `index.html`, `selector-dispositivos.html` | solicitarCodigoLogin, verificarCodigoLogin (LOGIN) | Cloud Function nueva, con fallback |
+| `selector-dispositivos.html` | registrarCotizacion · consultarCliente (ARCA) y sincronizarHubSpot (a borrar) | `cotizaciones` |
+| `empresas.html` | crearNegocioVacio | `cotizaciones` |
+| `eventos.html`, `servicio.html`, `cotizaciones.html` | reacción a un mensaje desde la campanita (`st_/ev_/cot_reaccionarMensaje`) | `servicio` / `eventosChecklist` (ya las tienen) / `cotizaciones` |
+| Triggers de Apps Script | sincronizarPermisosAFirebase, sincronizarPreciosAFirebase, sincronizarRTDBaGitHub | Ver Fase 6 y 8 |
+
+---
+
+## ❌ Dado de baja — se elimina, no se migra
+
+Decidido el 28/09/2026: **ARCA** (validación de CUIT) y **contacto por QR**.
+
+- ✅ QR eliminado de `index.html` y `empresas.html`.
+- ⏳ QR: queda el código en `ficha-equipo.html` (el botón ya estaba oculto).
+- ⏳ ARCA: queda la UI en `empresas.html` y `consultarCliente` en `selector-dispositivos.html`.
+- `sincronizarHubSpot`: HubSpot está desactivado, se borra junto con ARCA.
+
+---
+
+## 🔎 Correcciones al plan anterior (29/09)
+
+1. **Checklists y POE8 NO son código muerto.** La búsqueda anterior no entró en las subcarpetas `Check lists/` y `POE/`. `listarTecnicos`, `st_guardarChecklist`, `registrarChecklistCompletado`, `reabrirChecklistOrden` y `registrarInstalacionPOE8` **están en uso**. **No borrarlas de `FotoMap.gs`.**
+2. **Empresas (Negocios Asociados) ya lee de Firebase.** El único lector directo de `historico.json` en GitHub que queda es el **Radar de Inicio**. Cotizaciones lo usa solo como respaldo.
+3. **Cuenta Corriente no figuraba en el plan:** 7 acciones en Apps Script.
+4. **Adjuntos de Servicio y Cotizaciones** siguen en Apps Script (solo los de Eventos estaban migrados).
+5. `ficha-equipo.html` sí usa `PIPELINES_URL` para pipelines, pero sigue llamando a Apps Script para empresas y contactos aunque `empresas` ya existe.
+
+---
+
+## 📚 Lecciones aprendidas
+
+1. `admin.initializeApp()` necesita `databaseURL` explícito.
+2. El body del POST se lee de `req.rawBody` (el Portal manda `text/plain`).
+3. `package.json` y `package-lock.json` son archivos distintos: revisar que cada uno tenga su contenido.
+4. Firebase RTDB rechaza claves con punto (`.`): codificar nombres de archivo, emails, etc.
+5. **Condiciones de carrera:** para arrays/objetos compartidos usar `db.ref(path).transaction(fn)`, nunca leer-todo → modificar → escribir-todo.
+6. La caché de localStorage del frontend también hay que mantenerla al día cuando se edita, no solo al cargar.
+7. **Buscar siempre en subcarpetas** del repo (`Check lists/`, `POE/`, etc.) antes de declarar una acción "sin uso".
+8. **Columnas con el mismo nombre en la planilla se pisan al sincronizar.** En la hoja Vendedores hay dos columnas "Comisiones" (la de tildes y una numérica); en Firebase quedó `"Comisiones": 0`. Un permiso solo cuenta si su valor es un tilde (`true`/`false`); si no, se usa el alias "Ver Comisiones".
+9. **Nunca cachear un "NO".** `permisos.js` guardaba 10 minutos también el "sin permiso". Ahora solo se reutiliza un "SÍ".
+10. **Un mismo criterio en todos lados.** Si el inicio y el módulo deciden un permiso con reglas distintas, aparece "botón habilitado + acceso denegado".
+11. **La clave de un email en Firebase conserva la `@`** (solo se reemplazan los puntos): `permisos/cristian@tlcsrl_com_ar`. Para ver los permisos de alguien: `https://portal-tlc-default-rtdb.firebaseio.com/permisos/<email-con-puntos-como-_>.json`.
+12. Al reemplazar una lectura por Firebase directo, verificar primero dónde vive el dato.
+13. **Funciones que llaman los scripts compartidos tienen que estar en `window`.** `servicio.html` envuelve todo en `(function(){...})()`, así que `adjuntos.js` no veía `adjuntosRecargar`. Toda función que un `.js` compartido necesite llamar se publica con `window.nombre = nombre`.
+14. **Un arreglo no está terminado hasta probarlo en el flujo real.** El arreglo de adjuntos del 30/09 corrigió la función, pero no detectó que no se podía llamar.
+
+---
+
+## 🐢 Lentitud — diagnóstico y estado
+
+| Módulo | Causa | Estado |
+|---|---|---|
+| Servicio Técnico | `servicio_tecnico.json` ~11 MB por fotos base64 | ⏳ Fase 3 |
+| Cuenta Corriente | Baja Servicio + Eventos completos + 3 llamadas a Apps Script | ✅ Mitigado (caché) · ⏳ fondo: Fase 3 + Fase 4 |
+| Tareas (Mi Día) | Baja Ventas + Servicio + Eventos completos | ✅ Mitigado (caché) · ⏳ fondo: Fase 3 |
+| Comisiones | Cálculo en la Cloud Function, esperaba al permiso en fila | ✅ Mitigado (paralelo + caché) · ⏳ revisar `calcularComisiones` |
+| Cotizaciones — mensajes | Apps Script 1-3 s + polling por Apps Script | ✅ Resuelto (Firebase directo) |
+| Eventos — abrir tarjeta | Esperaba la Cloud Function sin caché | ✅ Resuelto (abre al instante) |
+| Precios (selector) | Consulta la API de GitHub (límite 60/hora por IP, compartida en la oficina); la caché se invalida con cada commit de precios | ⏳ Fase 1 |
+| Radar de Inicio | Lee `historico.json` de GitHub (hasta ~10 min de atraso) | ⏳ Fase 1 |
+
+### Fotos de Servicio a un nodo aparte (Fase 3)
+Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al abrirse. La lista pasa a leer un nodo chico.
+- Migración única de las fotos ya guardadas, **con backup antes**, con calma, lejos de un evento.
+- Páginas que leen fotos del ticket: `servicio.html`, `orden-servicio.html` (`fotos`, `fotos_antes_reparar`, `fotos_despues_reparar`), `remito-ingreso.html` (`fotos`), `orden-preparacion.html` (`firma_digital`, evaluar).
+- Cloud Function `servicio`: `st_crearTicket`, `st_agregarFoto`, `st_eliminarFoto`, `st_duplicarTicket` escriben en el nodo nuevo.
+- Mejora a la vez Servicio, Cuenta Corriente y Tareas.
+
+---
+
+## 🗄️ Sacar `historico.json` y los datos del repo
+
+- **Lectores:** solo el Radar de Inicio (directo) y Cotizaciones (respaldo).
+- **Escritores con dependencia real:** solo `eliminarVersionPresupuesto` (las versiones viven solo ahí). Hay que pasarlas a `cotizaciones/{id}/versiones_presupuesto`.
+- **Orden:**
+  1. Radar lee Firebase primero (Fase 1).
+  2. `eliminarVersionPresupuesto` con versiones en Firebase (Fase 5).
+  3. Respaldo diario fuera del repo para `historico.json` y `precios.json`; se cortan los ~113 commits de datos por día (Fase 6).
+  4. Retirar `_leerHistorico`/`_escribirHistorico`/`_pushHistoricoEntry` y el fallback a GitHub de `cotizaciones.html`.
+
+---
+
+## 🗺️ Orden de trabajo
+
+### Fase 1 — Victorias rápidas (una sesión, cambios chicos)
+- [ ] `cotizaciones.html`: `listarEmpresas` → `empresas`; `asignarPipelineNegocio` → `pipelines` (si la función lo tiene o se agrega).
+- [ ] `ficha-equipo.html`: `listarEmpresas`, `guardarEmpresa`, `guardarContacto` → `empresas`; borrar código QR.
+- [ ] Reacciones desde la campanita (`st_`/`ev_`) → `servicio` / `eventosChecklist`.
+- [ ] Radar de Inicio lee Firebase en vez de GitHub.
+- [ ] Precios del selector desde el nodo `precios` de Firebase, sin la API de GitHub.
+- [ ] Borrar ARCA (`empresas.html`, `consultarCliente`) y `sincronizarHubSpot`.
+
+### Fase 2 — Módulos chicos, Firebase puro
+- [ ] Checklists (5 archivos) y POE8.
+- [ ] `adjuntos.js` (Servicio y Cotizaciones), idealmente a Firebase Storage.
+
+### Fase 3 — Fotos de Servicio a un nodo aparte
+- [ ] Ver sección "Fotos de Servicio" arriba.
+
+### Fase 4 — Cuenta Corriente
+- [ ] 7 acciones a Cloud Function. Que devuelva los gastos pendientes **ya filtrados** (hoy el celular baja todo y filtra).
+
+### Fase 5 — Cotizaciones, función por función
+- [ ] 5a — Firebase: chat (agregar, reaccionar), notas, estado, teléfono, contacto, colaborador, vendedor, check de cierre.
+- [ ] 5b — atadas a `historico.json`: subirCotizacion, actualizarCotizacion, eliminarVersionPresupuesto (con versiones a Firebase), eliminarDeal, crearNegocioVacio, registrarCotizacion, apilarFichaTecnica, buscarNegocioAgrupable.
+- [ ] Bug conocido: `actualizarCotizacion` no regenera `cotizaciones/{id}/presupuesto` en RTDB.
+
+### Fase 6 — Cortar los commits de datos
+- [ ] Respaldo diario fuera del repo (historico y precios); sacar el fallback a GitHub.
+
+### Fase 7 — Login
+- [ ] `solicitarCodigoLogin` / `verificarCodigoLogin` con envío por Brevo probado y fallback a Apps Script unos días.
+
+### Fase 8 — Sheets y apagado
+- [ ] Decidir qué reemplaza a la planilla (precios, Vendedores/permisos): pantalla de edición en el Portal o seguir con la planilla como paso manual.
+- [ ] Mover los triggers de sincronización.
+- [ ] Dejar `FotoMap.gs` sin tráfico unos días mirando logs, borrar `APPS_SCRIPT_URL`/`GAS_URL` de todos los archivos y apagarlo.
+
+---
+
+## 📌 Pendientes sueltos
+
+- [ ] **Confirmar el despliegue de la función `cotizaciones` v2** (en el repo ya está). Prueba: editar un presupuesto de un negocio de Lucio y verificar que siga a su nombre.
+- [ ] **Subir `FotoMap.gs`** a `FUNCTIONS-BACKUP/apps-script/`, revisando antes que no tenga claves escritas en el código (`token`, `key`, `secret`, `ghp_`, `xkeysib`). Si las tiene, pasarlas a Propiedades del script primero.
+- [ ] Renombrar la columna numérica "Comisiones" de la hoja Vendedores (lección 8), después de confirmar en `FotoMap.gs` y en `internos` que nada la lee por ese nombre.
+- [ ] Revisar `calcularComisiones` (función `internos`) para acelerar el cálculo.
+- [ ] Adjuntos de Eventos: confirmar que también aparecen bien en la lista después de subir.
+- [ ] Probar el dictado 🎤 con voz real en PC y Android.
+- [ ] Negocios que cambiaron de dueño por el bug del 30/09: reasignarlos a mano desde el selector de Vendedor.
+
+Cada fase es independiente: se puede pausar en cualquier punto sin dejar nada roto a medio camino.
