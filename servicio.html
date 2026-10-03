@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.03.2 (Cristian: "quiero tener métricas de los servicios asignados a Damián y a Juan en diagnóstico, reparación, un contador para cada uno, para equiparar las asignaciones, que sean equitativas". Panel "⚖️ Carga actual por técnico" arriba de los filtros (solo Administrador): cuántos tickets tiene HOY cada uno en Diagnóstico y Reparación, total, cuál tiene menos carga, diferencia y cuántos hay sin asignar en esas etapas. Tocar un número filtra la lista por ese técnico y etapa (tocar de nuevo lo quita). En el modal "¿A quién asignás esta tarjeta?" cada candidato muestra su carga y se marca el de menos carga. No incluye Órdenes de Preparación. Técnicos y etapas configurables en METRICA_TECNICOS / METRICA_ETAPAS.) -->
 <!-- Portal TLC | servicio.html | v2026.10.02.1 (Cristian: "quiero el micrófono en los 3 módulos". Botón 🎤 de dictado por voz al lado de "Enviar" en el chat de mensajes internos, vía dictado.js (compartido con los otros 2 módulos). Escribe en el cuadro, nunca envía solo.) -->
 <!-- Portal TLC | servicio.html | v2026.09.30.13 (BUG REAL — Cristian: "cuando en Servicio adjunto archivos, los sube, pero no los muestra hasta que refresco el navegador". adjuntosRecargar estaba dentro del IIFE que envuelve el archivo y adjuntos.js no podía llamarla, así que después de subir/borrar nunca se refrescaba la lista. Ahora se publica en window. Además actualiza también _ticketActual.adjuntos, para que un repintado posterior del detalle no vuelva a mostrar la lista vieja. En Cotizaciones no pasaba porque ahí la función ya era global.) -->
 <!-- Portal TLC | servicio.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
@@ -529,6 +530,9 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
   </div>
 
 </header>
+
+<!-- CARGA POR TÉCNICO (solo Administrador) -->
+<div id="st-carga-tecnicos" style="display:none;"></div>
 
 <!-- FILTROS -->
 <div class="st-filtros">
@@ -1295,6 +1299,111 @@ window._selFiltroDD = function(tipo, sel) {
   _aplicarFiltros();
 };
 
+// ── CARGA POR TÉCNICO ─────────────────────────────────────────────
+// Cristian: "quiero tener métricas de los servicios asignados a Damián y a
+// Juan en diagnóstico, reparación, un contador para cada uno, para
+// equiparar las asignaciones, que sean equitativas". Cuenta en vivo los
+// tickets que cada técnico tiene HOY en cada etapa (no incluye Órdenes de
+// Preparación). Tocar un número filtra la lista por ese técnico y etapa.
+// Solo lo ve el Administrador. Para sumar técnicos o etapas, alcanza con
+// editar estas dos listas.
+var METRICA_TECNICOS = [
+  { cod:'damian_sosa', nombre:'Damián' },
+  { cod:'juan_garro',  nombre:'Juan'   }
+];
+var METRICA_ETAPAS = [
+  { key:'diagnostico', label:'Diagnóstico' },
+  { key:'reparacion',  label:'Reparación'  }
+];
+
+function _cargaPorTecnico() {
+  var carga = {};
+  METRICA_TECNICOS.concat([{ cod:'sin_asignar' }]).forEach(function(tec) {
+    carga[tec.cod] = { total: 0 };
+    METRICA_ETAPAS.forEach(function(e) { carga[tec.cod][e.key] = 0; });
+  });
+  (_tickets || []).forEach(function(t) {
+    if (!t || t.tipo_orden === 'preparacion_equipos') return;
+    var etapaOk = METRICA_ETAPAS.some(function(e) { return e.key === t.deposito; });
+    if (!etapaOk) return;
+    var cod = (t.tecnico_asignado && carga[t.tecnico_asignado]) ? t.tecnico_asignado
+            : ((!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') ? 'sin_asignar' : null);
+    if (!cod) return; // asignado a alguien que no está en la métrica
+    carga[cod][t.deposito]++;
+    carga[cod].total++;
+  });
+  return carga;
+}
+
+function _renderCargaTecnicos() {
+  var el = document.getElementById('st-carga-tecnicos');
+  if (!el) return;
+  if (!_permisos || !_permisos.admin) { el.style.display = 'none'; return; }
+  var carga = _cargaPorTecnico();
+  var totales = METRICA_TECNICOS.map(function(tec) { return carga[tec.cod].total; });
+  var min = Math.min.apply(null, totales), max = Math.max.apply(null, totales);
+  var parejo = (max - min) <= 1;
+
+  var celda = function(cod, etapa, n) {
+    var activo = _filtros.tecnico === cod && _filtros.etapa === etapa;
+    return '<button type="button" onclick="_filtrarCargaTecnico(\'' + cod + '\',\'' + etapa + '\')" title="Ver estos tickets" ' +
+      'style="flex:1;min-width:0;background:' + (activo ? 'rgba(58,134,255,.18)' : 'var(--bg)') + ';border:1px solid ' + (activo ? '#3a86ff' : 'var(--border-glow)') + ';' +
+      'border-radius:10px;padding:6px 4px;cursor:pointer;color:var(--text-main);text-align:center;">' +
+      '<div style="font-size:20px;font-weight:800;line-height:1.1;">' + n + '</div>' +
+      '<div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px;">' +
+        (etapa === 'todos' ? 'Total' : (METRICA_ETAPAS.find(function(e){ return e.key === etapa; }) || {}).label) + '</div>' +
+      '</button>';
+  };
+
+  var filas = METRICA_TECNICOS.map(function(tec) {
+    var c = carga[tec.cod];
+    var menos = !parejo && c.total === min;
+    var color = TECNICO_COLOR[tec.cod] || '#64748b';
+    return '<div style="display:flex;align-items:center;gap:8px;">' +
+      '<div style="width:74px;flex:0 0 74px;">' +
+        '<div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:800;color:var(--text-main);">' +
+          '<span style="width:9px;height:9px;border-radius:50%;background:' + color + ';display:inline-block;"></span>' + _esc(tec.nombre) + '</div>' +
+        (menos ? '<div style="font-size:10px;font-weight:800;color:#06d6a0;margin-top:2px;">⬇ menos carga</div>' : '') +
+      '</div>' +
+      METRICA_ETAPAS.map(function(e) { return celda(tec.cod, e.key, c[e.key]); }).join('') +
+      celda(tec.cod, 'todos', c.total) +
+    '</div>';
+  }).join('');
+
+  var sinAsig = carga['sin_asignar'];
+  var pie = (sinAsig.total ? '<span style="color:#f59e0b;">⚠ ' + sinAsig.total + ' sin asignar en estas etapas</span> · ' : '') +
+    (parejo ? '<span style="color:#06d6a0;">✓ Carga pareja</span>'
+            : '<span style="color:#f59e0b;">Diferencia: ' + (max - min) + ' ticket' + (max - min === 1 ? '' : 's') + '</span>');
+
+  el.style.display = 'block';
+  el.innerHTML =
+    '<div style="margin:10px 12px 4px;background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:14px;padding:10px 12px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;">' +
+        '<span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">⚖️ Carga actual por técnico</span>' +
+        '<span style="font-size:11px;font-weight:700;">' + pie + '</span>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;">' + filas + '</div>' +
+    '</div>';
+}
+
+window._filtrarCargaTecnico = function(cod, etapa) {
+  var yaActivo = _filtros.tecnico === cod && _filtros.etapa === etapa;
+  _filtros.tecnico = yaActivo ? 'todos' : cod;
+  _filtros.etapa   = yaActivo ? 'todos' : etapa;
+  [['dd-tecnico', _filtros.tecnico], ['dd-etapa', _filtros.etapa]].forEach(function(par) {
+    var sel = document.getElementById(par[0]);
+    if (!sel) return;
+    if (![].some.call(sel.options, function(o) { return o.value === par[1]; })) {
+      var op = document.createElement('option'); op.value = par[1];
+      op.textContent = (METRICA_TECNICOS.find(function(t){ return t.cod === par[1]; }) || {}).nombre || par[1];
+      sel.appendChild(op);
+    }
+    sel.value = par[1];
+    sel.classList.toggle('tiene-filtro', par[1] !== 'todos');
+  });
+  _aplicarFiltros();
+};
+
 window._aplicarFiltros = function() {
   var query   = (document.getElementById('st-buscador').value || '').toLowerCase().trim();
   // tecnico_key calculado en _cargarSesion una sola vez
@@ -1318,6 +1427,7 @@ window._aplicarFiltros = function() {
   });
   var elContadorUrgentesSt = document.getElementById('contador-urgentes-st');
   if (elContadorUrgentesSt) elContadorUrgentesSt.textContent = _tickets.filter(function(t) { return t.prioridad === 'urgente'; }).length;
+  _renderCargaTecnicos();
   if (_vistaActual === 'lista') {
     _renderLista(filtrados);
   } else {
@@ -1614,9 +1724,18 @@ function _resolverAsignacionYMover(t, nuevaCol, depositoAnterior, cerrarDetalleA
   if (elNombreEtapa) elNombreEtapa.textContent = 'Etapa: ' + (colDef ? colDef.label : nuevaCol);
   var elLista = document.getElementById('modal-asignar-lista');
   if (elLista) {
+    // Carga actual de cada candidato, para asignar parejo
+    var cargaModal = _cargaPorTecnico();
+    var totalesModal = candidatos.map(function(cod) { return cargaModal[cod] ? cargaModal[cod].total : null; }).filter(function(n){ return n !== null; });
+    var minModal = totalesModal.length ? Math.min.apply(null, totalesModal) : null;
+    var hayDif = totalesModal.length > 1 && Math.max.apply(null, totalesModal) !== minModal;
     elLista.innerHTML = candidatos.map(function(cod) {
+      var c = cargaModal[cod];
+      var detalle = c ? ' <span style="font-size:11px;color:var(--text-muted);font-weight:600;">· ' +
+        METRICA_ETAPAS.map(function(e){ return e.label.slice(0,4) + '. ' + c[e.key]; }).join(' · ') + '</span>' : '';
+      var marca = (c && hayDif && c.total === minModal) ? ' <span style="font-size:10px;font-weight:800;color:#06d6a0;">⬇ menos carga</span>' : '';
       return '<button type="button" class="modal-asignar-opcion" onclick="_confirmarAsignacionModal(\'' + cod + '\')">' +
-        '<i class="fa-solid fa-user"></i> ' + (TECNICO_LABEL[cod] || cod) +
+        '<i class="fa-solid fa-user"></i> ' + (TECNICO_LABEL[cod] || cod) + detalle + marca +
       '</button>';
     }).join('');
   }
