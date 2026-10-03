@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.03.4 (Cristian: "cada usuario ve sus métricas, los administradores ven todo" + "agregar Presupuesto y Para facturar" + "las métricas leer asignados en cada etapa" + "en Preparación, cuando todos los ítems están en Listo para despacho, se cambia el responsable a Lourdes". (1) Panel de carga rehecho como tabla: etapas Diagnóstico, Presupuesto, Reparación, Preparación y Para facturar + Total. Las personas de cada etapa salen de los asignados de esa columna del Kanban (más quien tenga tickets ahí); "—" si la persona no está en esa etapa. En cada etapa se marca en verde quien tiene menos carga entre sus asignados. Administrador ve a todos; el resto ve solo su fila ("Mi carga actual"). (2) El cartel de asignación muestra la carga de cada candidato en ESA etapa. (3) Orden de Preparación: cuando todos los equipos quedan en "Listo para despacho" (o "Enviado"), el técnico responsable pasa automáticamente a Lourdes Dávalos (una sola vez, no vuelve atrás solo).) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.3 (Cristian: "agregá la etapa Preparación también". El panel de carga por técnico suma la columna Preparación (preparacion_control_calidad), contando tanto los tickets de reparación en esa etapa como las Órdenes de Preparación de equipos; estas guardan el técnico por nombre (tecnico_responsable_nombre), que se traduce a su código con TECNICOS_LISTA. El filtro por técnico también reconoce ahora las Órdenes de Preparación.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.2 (Cristian: "quiero tener métricas de los servicios asignados a Damián y a Juan en diagnóstico, reparación, un contador para cada uno, para equiparar las asignaciones, que sean equitativas". Panel "⚖️ Carga actual por técnico" arriba de los filtros (solo Administrador): cuántos tickets tiene HOY cada uno en Diagnóstico y Reparación, total, cuál tiene menos carga, diferencia y cuántos hay sin asignar en esas etapas. Tocar un número filtra la lista por ese técnico y etapa (tocar de nuevo lo quita). En el modal "¿A quién asignás esta tarjeta?" cada candidato muestra su carga y se marca el de menos carga. No incluye Órdenes de Preparación. Técnicos y etapas configurables en METRICA_TECNICOS / METRICA_ETAPAS.) -->
 <!-- Portal TLC | servicio.html | v2026.10.02.1 (Cristian: "quiero el micrófono en los 3 módulos". Botón 🎤 de dictado por voz al lado de "Enviar" en el chat de mensajes internos, vía dictado.js (compartido con los otros 2 módulos). Escribe en el cuadro, nunca envía solo.) -->
@@ -532,7 +533,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 
 </header>
 
-<!-- CARGA POR TÉCNICO (solo Administrador) -->
+<!-- CARGA POR TÉCNICO (Administrador: todos · resto: solo su fila) -->
 <div id="st-carga-tecnicos" style="display:none;"></div>
 
 <!-- FILTROS -->
@@ -1301,21 +1302,23 @@ window._selFiltroDD = function(tipo, sel) {
 };
 
 // ── CARGA POR TÉCNICO ─────────────────────────────────────────────
-// Cristian: "quiero tener métricas de los servicios asignados a Damián y a
-// Juan en diagnóstico, reparación, un contador para cada uno, para
-// equiparar las asignaciones, que sean equitativas". Cuenta en vivo los
-// tickets que cada técnico tiene HOY en cada etapa (en Preparación cuenta
-// también las Órdenes de Preparación de equipos). Tocar un número filtra la lista por ese técnico y etapa.
-// Solo lo ve el Administrador. Para sumar técnicos o etapas, alcanza con
-// editar estas dos listas.
-var METRICA_TECNICOS = [
-  { cod:'damian_sosa', nombre:'Damián' },
-  { cod:'juan_garro',  nombre:'Juan'   }
-];
+// Cristian: "métricas de los servicios asignados... un contador para cada
+// uno, para equiparar las asignaciones" + "cada usuario ve sus métricas,
+// los administradores ven todo" + "agregar Presupuesto y Para facturar" +
+// "las métricas leer asignados en cada etapa".
+// Cuenta en vivo los tickets que cada persona tiene HOY en cada etapa.
+// Las personas de cada etapa salen de los "asignados" de esa columna del
+// Kanban (servicio_config/asignados_por_etapa), más cualquiera que tenga
+// tickets ahí aunque no figure como asignado (para no esconder carga).
+// En cada etapa se marca en verde a quien tiene menos carga entre los
+// asignados. Administrador: ve a todos. Resto: solo su propia fila.
+// En Preparación cuenta también las Órdenes de Preparación de equipos.
 var METRICA_ETAPAS = [
-  { key:'diagnostico',                 label:'Diagnóstico' },
-  { key:'reparacion',                  label:'Reparación'  },
-  { key:'preparacion_control_calidad', label:'Preparación' }
+  { key:'diagnostico',                 label:'Diagnóstico', corto:'Diag.' },
+  { key:'presupuesto',                 label:'Presupuesto', corto:'Presup.' },
+  { key:'reparacion',                  label:'Reparación',  corto:'Repar.' },
+  { key:'preparacion_control_calidad', label:'Preparación', corto:'Prep.' },
+  { key:'para_facturar',               label:'Para facturar', corto:'Fact.' }
 ];
 
 // Técnico de un ticket para la métrica. Las Órdenes de Preparación
@@ -1329,73 +1332,108 @@ function _codTecnicoTicket(t) {
   return (t && t.tecnico_asignado) || 'sin_asignar';
 }
 
+function _nombreCortoTecnico(cod) {
+  var m = (typeof TECNICOS_LISTA !== 'undefined' ? TECNICOS_LISTA : []).find(function(x) { return x.v === cod; });
+  return m ? m.l.split(' ')[0] : (TECNICO_LABEL[cod] || cod);
+}
+
+// { conteo: {cod: {etapa: n, total: n}}, asignados: {etapa: [cod]}, personas: [cod], sinAsignar: n }
 function _cargaPorTecnico() {
-  var carga = {};
-  METRICA_TECNICOS.concat([{ cod:'sin_asignar' }]).forEach(function(tec) {
-    carga[tec.cod] = { total: 0 };
-    METRICA_ETAPAS.forEach(function(e) { carga[tec.cod][e.key] = 0; });
+  var conteo = {}, asignados = {}, sinAsignar = 0;
+  var asegurar = function(cod) {
+    if (!conteo[cod]) { conteo[cod] = { total: 0 }; METRICA_ETAPAS.forEach(function(e) { conteo[cod][e.key] = 0; }); }
+  };
+  METRICA_ETAPAS.forEach(function(e) {
+    asignados[e.key] = ((_asignadosPorEtapa && _asignadosPorEtapa[e.key]) || []).filter(function(c) { return c && c !== 'sin_asignar'; });
+    asignados[e.key].forEach(asegurar);
   });
   (_tickets || []).forEach(function(t) {
     if (!t) return;
-    var etapaOk = METRICA_ETAPAS.some(function(e) { return e.key === t.deposito; });
-    if (!etapaOk) return;
-    var codT = _codTecnicoTicket(t);
-    var cod = carga[codT] ? codT : null;
-    if (!cod) return; // asignado a alguien que no está en la métrica
-    carga[cod][t.deposito]++;
-    carga[cod].total++;
+    if (!METRICA_ETAPAS.some(function(e) { return e.key === t.deposito; })) return;
+    var cod = _codTecnicoTicket(t);
+    if (!cod || cod === 'sin_asignar') { sinAsignar++; return; }
+    asegurar(cod);
+    conteo[cod][t.deposito]++;
+    conteo[cod].total++;
   });
-  return carga;
+  var orden = (typeof TECNICOS_LISTA !== 'undefined' ? TECNICOS_LISTA : []).map(function(x) { return x.v; });
+  var personas = Object.keys(conteo).sort(function(a, b) {
+    var ia = orden.indexOf(a), ib = orden.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  return { conteo: conteo, asignados: asignados, personas: personas, sinAsignar: sinAsignar };
+}
+
+// Mínimo de carga en una etapa entre sus asignados (null si no hay con quién comparar o están todos iguales)
+function _minimoEtapa(carga, etapa) {
+  var lista = carga.asignados[etapa] || [];
+  if (lista.length < 2) return null;
+  var valores = lista.map(function(c) { return carga.conteo[c] ? carga.conteo[c][etapa] : 0; });
+  var min = Math.min.apply(null, valores), max = Math.max.apply(null, valores);
+  return min === max ? null : min;
 }
 
 function _renderCargaTecnicos() {
   var el = document.getElementById('st-carga-tecnicos');
   if (!el) return;
-  if (!_permisos || !_permisos.admin) { el.style.display = 'none'; return; }
   var carga = _cargaPorTecnico();
-  var totales = METRICA_TECNICOS.map(function(tec) { return carga[tec.cod].total; });
-  var min = Math.min.apply(null, totales), max = Math.max.apply(null, totales);
-  var parejo = (max - min) <= 1;
+  var esAdmin = !!(_permisos && _permisos.admin);
+  var miClave = _session ? (_session.tecnico_key || '') : '';
+  var filas = esAdmin ? carga.personas : carga.personas.filter(function(c) { return c === miClave; });
+  if (!filas.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
 
-  var celda = function(cod, etapa, n) {
+  var minimos = {};
+  METRICA_ETAPAS.forEach(function(e) { minimos[e.key] = esAdmin ? _minimoEtapa(carga, e.key) : null; });
+
+  var th = 'padding:4px 2px;font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;text-align:center;white-space:nowrap;';
+  var celda = function(cod, etapa, n, enEtapa, esMin) {
+    if (!enEtapa && !n) return '<td style="text-align:center;color:var(--text-muted);opacity:.45;font-size:13px;">—</td>';
     var activo = _filtros.tecnico === cod && _filtros.etapa === etapa;
-    return '<button type="button" onclick="_filtrarCargaTecnico(\'' + cod + '\',\'' + etapa + '\')" title="Ver estos tickets" ' +
-      'style="flex:1;min-width:0;background:' + (activo ? 'rgba(58,134,255,.18)' : 'var(--bg)') + ';border:1px solid ' + (activo ? '#3a86ff' : 'var(--border-glow)') + ';' +
-      'border-radius:10px;padding:6px 4px;cursor:pointer;color:var(--text-main);text-align:center;">' +
-      '<div style="font-size:20px;font-weight:800;line-height:1.1;">' + n + '</div>' +
-      '<div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px;">' +
-        (etapa === 'todos' ? 'Total' : (METRICA_ETAPAS.find(function(e){ return e.key === etapa; }) || {}).label) + '</div>' +
-      '</button>';
+    var borde = activo ? '#3a86ff' : (esMin ? '#06d6a0' : 'var(--border-glow)');
+    return '<td style="padding:2px;"><button type="button" onclick="_filtrarCargaTecnico(\'' + cod + '\',\'' + etapa + '\')" ' +
+      'title="' + (esMin ? 'Menos carga en esta etapa — ' : '') + 'Ver estos tickets" ' +
+      'style="width:100%;min-width:42px;background:' + (activo ? 'rgba(58,134,255,.18)' : (esMin ? 'rgba(6,214,160,.12)' : 'var(--bg)')) + ';' +
+      'border:1px solid ' + borde + ';border-radius:9px;padding:5px 2px;cursor:pointer;color:var(--text-main);' +
+      'font-size:17px;font-weight:800;line-height:1.1;">' + n + '</button></td>';
   };
 
-  var filas = METRICA_TECNICOS.map(function(tec) {
-    var c = carga[tec.cod];
-    var menos = !parejo && c.total === min;
-    var color = TECNICO_COLOR[tec.cod] || '#64748b';
-    return '<div style="display:flex;align-items:center;gap:8px;">' +
-      '<div style="width:74px;flex:0 0 74px;">' +
-        '<div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:800;color:var(--text-main);">' +
-          '<span style="width:9px;height:9px;border-radius:50%;background:' + color + ';display:inline-block;"></span>' + _esc(tec.nombre) + '</div>' +
-        (menos ? '<div style="font-size:10px;font-weight:800;color:#06d6a0;margin-top:2px;">⬇ menos carga</div>' : '') +
-      '</div>' +
-      METRICA_ETAPAS.map(function(e) { return celda(tec.cod, e.key, c[e.key]); }).join('') +
-      celda(tec.cod, 'todos', c.total) +
-    '</div>';
+  var cuerpo = filas.map(function(cod) {
+    var c = carga.conteo[cod];
+    var color = TECNICO_COLOR[cod] || '#64748b';
+    return '<tr>' +
+      '<td style="padding:2px 6px 2px 0;white-space:nowrap;font-size:13px;font-weight:800;color:var(--text-main);">' +
+        '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';display:inline-block;margin-right:5px;"></span>' +
+        _esc(_nombreCortoTecnico(cod)) + '</td>' +
+      METRICA_ETAPAS.map(function(e) {
+        var enEtapa = (carga.asignados[e.key] || []).indexOf(cod) !== -1;
+        var esMin = minimos[e.key] !== null && enEtapa && c[e.key] === minimos[e.key];
+        return celda(cod, e.key, c[e.key], enEtapa, esMin);
+      }).join('') +
+      celda(cod, 'todos', c.total, true, false) +
+    '</tr>';
   }).join('');
 
-  var sinAsig = carga['sin_asignar'];
-  var pie = (sinAsig.total ? '<span style="color:#f59e0b;">⚠ ' + sinAsig.total + ' sin asignar en estas etapas</span> · ' : '') +
-    (parejo ? '<span style="color:#06d6a0;">✓ Carga pareja</span>'
-            : '<span style="color:#f59e0b;">Diferencia: ' + (max - min) + ' ticket' + (max - min === 1 ? '' : 's') + '</span>');
+  var pie = '';
+  if (esAdmin) {
+    pie = (carga.sinAsignar ? '<span style="color:#f59e0b;">⚠ ' + carga.sinAsignar + ' sin asignar</span> · ' : '') +
+          '<span style="color:#06d6a0;">■</span> menos carga en la etapa';
+  }
 
   el.style.display = 'block';
   el.innerHTML =
     '<div style="margin:10px 12px 4px;background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:14px;padding:10px 12px;">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;">' +
-        '<span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">⚖️ Carga actual por técnico</span>' +
-        '<span style="font-size:11px;font-weight:700;">' + pie + '</span>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">' +
+        '<span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">⚖️ ' + (esAdmin ? 'Carga actual por técnico' : 'Mi carga actual') + '</span>' +
+        (pie ? '<span style="font-size:11px;font-weight:700;color:var(--text-muted);">' + pie + '</span>' : '') +
       '</div>' +
-      '<div style="display:flex;flex-direction:column;gap:6px;">' + filas + '</div>' +
+      '<div style="overflow-x:auto;">' +
+        '<table style="border-collapse:separate;border-spacing:0;width:100%;">' +
+          '<thead><tr><th style="' + th + 'text-align:left;"></th>' +
+            METRICA_ETAPAS.map(function(e) { return '<th style="' + th + '" title="' + e.label + '">' + e.corto + '</th>'; }).join('') +
+            '<th style="' + th + '">Total</th></tr></thead>' +
+          '<tbody>' + cuerpo + '</tbody>' +
+        '</table>' +
+      '</div>' +
     '</div>';
 }
 
@@ -1408,7 +1446,7 @@ window._filtrarCargaTecnico = function(cod, etapa) {
     if (!sel) return;
     if (![].some.call(sel.options, function(o) { return o.value === par[1]; })) {
       var op = document.createElement('option'); op.value = par[1];
-      op.textContent = (METRICA_TECNICOS.find(function(t){ return t.cod === par[1]; }) || {}).nombre || par[1];
+      op.textContent = _nombreCortoTecnico(par[1]);
       sel.appendChild(op);
     }
     sel.value = par[1];
@@ -1706,6 +1744,7 @@ window._toggleAsignadoEtapa = function(etapa, codigo, activo) {
   if (activo) { if (lista.indexOf(codigo) === -1) lista.push(codigo); }
   else { lista = lista.filter(function(c){ return c !== codigo; }); }
   _asignadosPorEtapa[etapa] = lista;
+  _renderCargaTecnicos(); // las métricas usan los asignados de cada etapa
 
   // Actualiza solo el contador del botón — no re-renderiza todo el Kanban
   // para no cerrar el dropdown que se está usando en este momento.
@@ -1737,16 +1776,16 @@ function _resolverAsignacionYMover(t, nuevaCol, depositoAnterior, cerrarDetalleA
   if (elNombreEtapa) elNombreEtapa.textContent = 'Etapa: ' + (colDef ? colDef.label : nuevaCol);
   var elLista = document.getElementById('modal-asignar-lista');
   if (elLista) {
-    // Carga actual de cada candidato, para asignar parejo
+    // Carga actual de cada candidato EN ESTA ETAPA, para asignar parejo
     var cargaModal = _cargaPorTecnico();
-    var totalesModal = candidatos.map(function(cod) { return cargaModal[cod] ? cargaModal[cod].total : null; }).filter(function(n){ return n !== null; });
-    var minModal = totalesModal.length ? Math.min.apply(null, totalesModal) : null;
-    var hayDif = totalesModal.length > 1 && Math.max.apply(null, totalesModal) !== minModal;
-    elLista.innerHTML = candidatos.map(function(cod) {
-      var c = cargaModal[cod];
-      var detalle = c ? ' <span style="font-size:11px;color:var(--text-muted);font-weight:600;">· ' +
-        METRICA_ETAPAS.map(function(e){ return e.label.slice(0,4) + '. ' + c[e.key]; }).join(' · ') + '</span>' : '';
-      var marca = (c && hayDif && c.total === minModal) ? ' <span style="font-size:10px;font-weight:800;color:#06d6a0;">⬇ menos carga</span>' : '';
+    var valoresModal = candidatos.map(function(cod) { return cargaModal.conteo[cod] ? (cargaModal.conteo[cod][nuevaCol] || 0) : 0; });
+    var minModal = valoresModal.length ? Math.min.apply(null, valoresModal) : 0;
+    var hayDif = valoresModal.length > 1 && Math.max.apply(null, valoresModal) !== minModal;
+    elLista.innerHTML = candidatos.map(function(cod, i) {
+      var c = cargaModal.conteo[cod];
+      var detalle = ' <span style="font-size:11px;color:var(--text-muted);font-weight:600;">· ' + valoresModal[i] + ' en esta etapa' +
+        (c ? ' · ' + c.total + ' en total' : '') + '</span>';
+      var marca = (hayDif && valoresModal[i] === minModal) ? ' <span style="font-size:10px;font-weight:800;color:#06d6a0;">⬇ menos carga</span>' : '';
       return '<button type="button" class="modal-asignar-opcion" onclick="_confirmarAsignacionModal(\'' + cod + '\')">' +
         '<i class="fa-solid fa-user"></i> ' + (TECNICO_LABEL[cod] || cod) + detalle + marca +
       '</button>';
@@ -2643,10 +2682,38 @@ window._actualizarFilaOrden = function(idTicket, indice, campo, valor) {
     .then(function(r) {
       if (!r.ok) { alert('No se pudo guardar: ' + (r.error||'')); return; }
       if (_ticketActual && _ticketActual.id_ticket === idTicket) _ticketActual.equipos = r.equipos;
+      var tLista = _tickets.find(function(x) { return x.id_ticket === idTicket; });
+      if (tLista) tLista.equipos = r.equipos;
       _toastServicio('✅ Guardado');
+      if (campo === 'estado') _pasarADespachoSiCorresponde(idTicket, r.equipos);
     })
     .catch(function(){ alert('Error de conexión al guardar.'); });
 };
+
+// ── TRASPASO AUTOMÁTICO A DESPACHO ────────────────────────────────
+// Cristian: "en la etapa Preparación, cuando todos los ítems están en
+// Listo para despacho, se cambia el responsable a Lourdes". Cuando TODOS
+// los equipos de una Orden de Preparación quedan en "Listo para despacho"
+// (o "Enviado"), el técnico responsable pasa a ser quien despacha. Solo
+// cambia una vez (si ya es ella, no hace nada) y NO vuelve atrás solo si
+// después se cambia algún estado: eso queda a mano.
+var RESPONSABLE_DESPACHO = 'Lourdes Dávalos'; // tiene que coincidir con TECNICOS_LISTA
+function _pasarADespachoSiCorresponde(idTicket, equipos) {
+  if (!Array.isArray(equipos) || !equipos.length) return;
+  var t = (_ticketActual && _ticketActual.id_ticket === idTicket) ? _ticketActual
+        : _tickets.find(function(x) { return x.id_ticket === idTicket; });
+  if (!t || t.tipo_orden !== 'preparacion_equipos') return;
+  if (t.deposito !== 'preparacion_control_calidad') return;
+  var todoListo = equipos.every(function(eq) { return eq && (eq.estado === 'Listo para despacho' || eq.estado === 'Enviado'); });
+  if (!todoListo || t.tecnico_responsable_nombre === RESPONSABLE_DESPACHO) return;
+  var anterior = t.tecnico_responsable_nombre || '';
+  _guardarCampoSiCambio(idTicket, 'tecnico_responsable_nombre', RESPONSABLE_DESPACHO, anterior);
+  if (_ticketActual && _ticketActual.id_ticket === idTicket) {
+    _ticketActual.tecnico_responsable_nombre = RESPONSABLE_DESPACHO;
+    _renderDetalle(_ticketActual);
+  }
+  _toastServicio('📦 Todo listo para despacho — responsable: ' + RESPONSABLE_DESPACHO);
+}
 
 // (Firma Digital por canvas — removida: la Orden de Preparación se
 // firma en papel, holográficamente, por el técnico y por el
