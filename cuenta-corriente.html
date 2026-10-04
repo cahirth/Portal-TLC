@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.10.04.7 (MUERTE A APPS SCRIPT, Fase 4: todo el módulo va a la nueva Cloud Function cuentaCorriente — gastos generales, saldo inicial, liquidaciones, liquidar y revertir (con escrituras atómicas). Los gastos de las tarjetas se guardan en la función servicio / eventosChecklist. Y lo más notorio: ya no descarga servicio_tecnico.json (~11 MB con fotos) ni eventos.json completos; la función devuelve solo los gastos (pocos KB) en una sola llamada.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.03.11 (Cristian: "la idea es que leas lo que yo tildo dentro de la hoja de Excel; en Cuenta Corriente debe poder hacer todo" [Lourdes]. Liquidar y deshacer liquidaciones ya no dependen de Rol = Administrador sino del tilde "Liquidar Gastos" de la hoja Vendedores, leído de Firebase cada vez que se abre el módulo. Mientras la columna no exista, se mantiene el criterio anterior (por rol).) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.30.4 (Cristian: "a veces tardan un poco en cargar todos los gastos de todas las tarjetas". Causa: cada apertura baja servicio_tecnico.json y eventos.json completos (con fotos) + 3 consultas a Apps Script, y repite todo después de cada acción. Arreglo inmediato (el de fondo queda en el plan: fotos de Servicio a otro nodo + Cuenta Corriente a Cloud Function): se abre al instante con la última lista guardada en este navegador (por usuario que mira y colaborador elegido) y se actualiza sola atrás con "Actualizando...". Después de liquidar/editar/agregar ya no se vacía la pantalla. Agregar, editar, liquidar y deshacer quedan bloqueados (con aviso) hasta que llegan los datos frescos, porque escriben usando la lista completa de gastos de cada tarjeta y no deben usar una copia vieja. Si se cambia de colaborador mientras carga, gana siempre la carga más nueva.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". Este archivo no cacheaba la lista (la pide fresca cada vez), así que no tenía el bug de caché de los otros 3 — solo cambia a qué URL apunta.) -->
@@ -89,7 +90,13 @@
 // render se mantuvieron tal cual las mandó Cristian — solo cambió DE
 // DÓNDE sale la información y A DÓNDE va cuando se guarda algo.
 // ══════════════════════════════════════════════════════════════════
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+// MUERTE A APPS SCRIPT (Fase 4, v2026.10.04.7): todo Cuenta Corriente va a su propia
+// Cloud Function. Los gastos de las tarjetas se guardan en la función de su
+// módulo (Servicio / Eventos), como en el resto del Portal.
+const CC_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/cuentaCorriente';
+const SERVICIO_URL_CC = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio';
+const EVENTOS_URL_CC = 'https://us-central1-portal-tlc.cloudfunctions.net/eventosChecklist';
+const GAS_URL = CC_URL; // nombre viejo: todas las acciones propias del módulo van a la función nueva
 // MUERTE A APPS SCRIPT — solo listarInternos de este archivo va acá.
 const INTERNOS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/internos'; // Cloud Function desplegada 2026.09.29
 const RTDB_URL = 'https://portal-tlc-default-rtdb.firebaseio.com';
@@ -221,7 +228,7 @@ window.guardarEdicionItem = async function(id) {
       const payload = info.origen_tipo === 'servicio'
         ? { accion, id_ticket: info.id_ticket, gastos: gastosCompletos }
         : { accion, id_evento: info.id_evento, id_tarjeta: info.id_tarjeta, gastos: gastosCompletos };
-      const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+      const r = await fetch(info.origen_tipo === 'servicio' ? SERVICIO_URL_CC : EVENTOS_URL_CC, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
       rr = await r.json();
     }
     if (!rr.ok) { toast('Error al guardar: ' + (rr.error||'')); return; }
@@ -297,7 +304,7 @@ window.addExpense = async function(id) {
       gastosCompletos.push({ fecha, descripcion:c, importe:importeAGuardar, moneda, creado_por:CURRENT.nombre, creado_en:new Date().toISOString(), a_favor_de: ben, estado:'PENDIENTE' });
       const accion = info.tipo === 'servicio' ? 'st_actualizarGastos' : 'ev_actualizarGastos';
       const payload = info.tipo === 'servicio' ? { accion, id_ticket: info.id_ticket, gastos: gastosCompletos } : { accion, id_evento: info.id_evento, id_tarjeta: info.id_tarjeta, gastos: gastosCompletos };
-      const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+      const r = await fetch(info.tipo === 'servicio' ? SERVICIO_URL_CC : EVENTOS_URL_CC, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
       const rr = await r.json();
       if (!rr.ok) { toast('Error: ' + (rr.error||'')); return; }
     }
@@ -565,11 +572,27 @@ async function cargarTodo() {
   const _origenInfoLocal = {};
   const _origenGastosCompletosLocal = {};
 
+  // LIVIANO (v2026.10.04.7): antes se descargaban servicio_tecnico.json (~11 MB,
+  // con fotos) y eventos.json completos para quedarse con los gastos.
+  // Ahora la función cuentaCorriente devuelve SOLO los gastos (pocos KB)
+  // en una sola llamada que comparten Servicio y Eventos.
+  const pedidoOrigenes = fetch(CC_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'cc_gastosOrigenes' }) })
+    .then(function(r) { return r.json(); })
+    .then(function(r) { if (!r || !r.ok) throw new Error((r && r.error) || 'sin respuesta'); return r; })
+    .catch(function(e) {
+      // Respaldo: si la función no responde, se usa la lectura pesada de
+      // antes (mismo formato), así la pantalla nunca queda sin gastos.
+      console.warn('[cuenta-corriente] cc_gastosOrigenes falló, uso la lectura completa de respaldo:', e);
+      return Promise.all([
+        fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now()).then(function(r) { return r.json(); }),
+        fetch(RTDB_URL + '/eventos.json?_=' + Date.now()).then(function(r) { return r.json(); }),
+      ]).then(function(res) { return { servicio: res[0] || {}, eventos: res[1] || {} }; });
+    });
+
   async function cargarServicio() {
     const grupos = [];
     try {
-      const rSt = await fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now());
-      const dataSt = await rSt.json();
+      const dataSt = (await pedidoOrigenes).servicio;
       Object.keys(dataSt || {}).forEach(function(id) {
         const t = dataSt[id];
         if (!t || !Array.isArray(t.gastos) && !t.gastos) return;
@@ -598,8 +621,7 @@ async function cargarTodo() {
   async function cargarEventos() {
     const grupos = [];
     try {
-      const rEv = await fetch(RTDB_URL + '/eventos.json?_=' + Date.now());
-      const dataEv = await rEv.json();
+      const dataEv = (await pedidoOrigenes).eventos;
       Object.keys(dataEv || {}).forEach(function(idEvento) {
         const ev = dataEv[idEvento];
         const tarjetas = (ev && ev.tarjetas) ? Object.values(ev.tarjetas) : [];
