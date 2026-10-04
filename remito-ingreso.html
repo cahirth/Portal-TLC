@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | remito-ingreso.html | v2026.10.04.8 (Fase 3: las fotos de ingreso pueden ser un link a Firebase Storage además de base64.) -->
 <!-- Portal TLC | remito-ingreso.html | v2026.07.22.1 -->
 <html lang="es">
 <head>
@@ -266,7 +267,7 @@
                 fotosWrap.innerHTML = fotos.map(function(f) {
                     var src = (typeof f === 'string') ? f : (f && f.data ? f.data : '');
                     if (!src) return '';
-                    var srcFinal = src.indexOf('data:') === 0 ? src : ('data:image/jpeg;base64,' + src);
+                    var srcFinal = (src.indexOf('data:') === 0 || src.indexOf('http') === 0) ? src : ('data:image/jpeg;base64,' + src); // v2026.10.04.8: las fotos ahora pueden ser un link a Storage
                     return '<div class="foto-item"><img src="' + srcFinal + '" alt="Foto del equipo al ingreso"></div>';
                 }).join('');
             } else {

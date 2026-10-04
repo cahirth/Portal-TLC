@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.04.8 (Fase 3 — Cristian: "para cargar Servicio es lento". Las fotos nuevas ya se guardan en Firebase Storage (función servicio v7) y en el ticket queda el link. Para las fotos viejas, un Administrador ve el aviso "⚡ N tickets tienen fotos a la vieja usanza" con el botón "Optimizar ahora": hace backup completo de servicio_tecnico en Firebase y mueve las fotos a Storage en tandas, mostrando el avance. Al terminar, la lista de Servicio (y Tareas y Cuenta Corriente) pesa una fracción.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.6 (MUERTE A APPS SCRIPT, Fase 2: los adjuntos (subir/borrar) van a la Cloud Function servicio v6 en vez de Apps Script.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.4 (Link desde Ventas: servicio.html?ticket=<id>&ver=preparacion abre la Orden de Preparación y la deja en la sección de equipos en vez del chat.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: las reacciones desde la campanita a mensajes de Servicio y Eventos van a sus Cloud Functions; las de Cotizaciones siguen en Apps Script hasta la Fase 5.) -->
@@ -543,6 +544,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 </header>
 
 <!-- CARGA POR TÉCNICO (Administrador: todos · resto: solo su fila) -->
+<div id="st-aviso-fotos" style="display:none;"></div>
 <div id="st-carga-tecnicos" style="display:none;"></div>
 
 <!-- FILTROS -->
@@ -1412,6 +1414,71 @@ function _recalcularProgresosUnaVez() {
     .catch(function() { _recalculoProgresoPedido = false; });
 }
 
+// ── FASE 3: OPTIMIZAR FOTOS (una sola vez) ────────────────────────
+// Cristian: "para cargar Servicio es lento, ¿podemos encarar la Fase 3?".
+// Las fotos de los tickets estaban guardadas como texto (base64) adentro
+// de cada ticket: la lista pesaba ~11 MB. Las nuevas ya se guardan en
+// Firebase Storage (función servicio v7). Este aviso aparece SOLO para un
+// Administrador mientras queden tickets con fotos viejas embebidas, y
+// "Optimizar ahora" hace: (1) backup completo de servicio_tecnico dentro
+// de Firebase, (2) mueve las fotos a Storage en tandas, mostrando avance.
+// Cuando termina, el aviso desaparece para siempre.
+function _esFotoEmbebidaFront(f) {
+  var v = (f && typeof f === 'object') ? f.data : f;
+  return typeof v === 'string' && (v.indexOf('data:') === 0 || (v.length > 500 && v.indexOf('http') !== 0));
+}
+function _ticketsConFotosViejas() {
+  return (_tickets || []).filter(function(t) {
+    return ['fotos', 'fotos_antes_reparar', 'fotos_despues_reparar'].some(function(c) { return (Array.isArray(t[c]) ? t[c] : []).some(_esFotoEmbebidaFront); })
+      || _esFotoEmbebidaFront(t.firma_digital);
+  }).length;
+}
+var _migrandoFotos = false;
+function _renderAvisoFotos() {
+  var el = document.getElementById('st-aviso-fotos');
+  if (!el) return;
+  if (!_permisos || !_permisos.admin || _migrandoFotos) { if (!_migrandoFotos) el.style.display = 'none'; return; }
+  var n = _ticketsConFotosViejas();
+  if (!n) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '<div style="margin:10px 12px 0;background:rgba(58,134,255,.08);border:1px solid rgba(58,134,255,.35);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+    '<span style="font-size:12.5px;color:var(--text-main);flex:1;min-width:200px;">⚡ <b>' + n + ' ticket(s)</b> tienen fotos guardadas a la vieja usanza y hacen lenta la carga de Servicio. Se pueden optimizar una sola vez (se hace backup antes).</span>' +
+    '<button type="button" onclick="_optimizarFotosServicio()" style="padding:8px 14px;border-radius:8px;border:none;background:#3a86ff;color:#fff;font-weight:800;cursor:pointer;">Optimizar ahora</button>' +
+  '</div>';
+}
+window._optimizarFotosServicio = async function() {
+  if (_migrandoFotos) return;
+  if (!confirm('Se va a hacer un backup completo de Servicio Técnico y después se moverán las fotos a Firebase Storage. Puede tardar unos minutos. No cierres esta pantalla mientras tanto. ¿Seguimos?')) return;
+  _migrandoFotos = true;
+  var el = document.getElementById('st-aviso-fotos');
+  var pintar = function(txt) { if (el) { el.style.display = 'block'; el.innerHTML = '<div style="margin:10px 12px 0;background:rgba(58,134,255,.08);border:1px solid rgba(58,134,255,.35);border-radius:12px;padding:10px 12px;font-size:12.5px;color:var(--text-main);">' + txt + '</div>'; } };
+  var rol = (_session && _session.rol) || '';
+  var post = function(body) { return fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(body) }).then(function(r) { return r.json(); }); };
+  try {
+    pintar('⏳ Haciendo backup de Servicio Técnico…');
+    var b = await post({ accion:'st_backupServicio', vendedorRol: rol });
+    if (!b.ok) throw new Error('Backup: ' + (b.error || ''));
+    console.log('[servicio] Backup hecho en ' + b.destino + ' (' + b.tickets + ' tickets)');
+    var total = 0, fotos = 0, vueltas = 0;
+    while (vueltas < 200) {
+      vueltas++;
+      var r = await post({ accion:'st_migrarFotosServicio', vendedorRol: rol, tanda: 8 });
+      if (!r.ok) throw new Error(r.error || 'error');
+      total += r.migrados; fotos += r.fotosSubidas;
+      if (r.errores && r.errores.length) console.warn('[servicio] Tickets con error al migrar fotos:', r.errores);
+      pintar('⏳ Optimizando fotos… ' + total + ' ticket(s) listos, quedan ' + r.quedan + '.');
+      if (!r.quedan || !r.migrados) break;
+    }
+    pintar('✅ Listo: ' + fotos + ' foto(s) de ' + total + ' ticket(s) optimizadas. Recargando la lista…');
+    _migrandoFotos = false;
+    setTimeout(function() { window.location.reload(); }, 1500);
+  } catch (e) {
+    _migrandoFotos = false;
+    pintar('⚠️ Se cortó: ' + _esc(e.message || String(e)) + '. Lo que ya se movió quedó bien; podés tocar "Optimizar ahora" de nuevo para seguir.');
+    setTimeout(_renderAvisoFotos, 6000);
+  }
+};
+
 function _cargaPorTecnico() {
   var conteo = {}, asignados = {}, sinAsignar = 0;
   var asegurar = function(cod) {
@@ -1554,6 +1621,7 @@ window._aplicarFiltros = function() {
   if (elContadorUrgentesSt) elContadorUrgentesSt.textContent = _tickets.filter(function(t) { return t.prioridad === 'urgente'; }).length;
   _renderCargaTecnicos();
   _recalcularProgresosUnaVez();
+  _renderAvisoFotos();
   if (_vistaActual === 'lista') {
     _renderLista(filtrados);
   } else {
