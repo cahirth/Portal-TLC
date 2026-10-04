@@ -1,5 +1,8 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v7 — 2026.10.04 — Fase 3: las fotos de los tickets (y la firma de las
+//   órdenes) se guardan en Firebase Storage y en el ticket queda el link.
+//   st_backupServicio + st_migrarFotosServicio para mover las existentes.
 // v6 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 2): adjuntos (subirAdjunto,
 //   eliminarAdjunto) para Servicio y Cotizaciones, a Firebase Storage.
 // v5 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 2): checklists y POE-8
@@ -502,6 +505,31 @@ async function registrarInstalacionPOE8(data) {
 // usaba Apps Script, así que los adjuntos viejos siguen funcionando igual.
 const bucketAdjuntos = admin.storage().bucket('portal-tlc.firebasestorage.app');
 const ADJUNTOS_MAX_BYTES = 10 * 1024 * 1024;
+
+// ── FOTOS EN STORAGE — v7 — 2026.10.04 (Fase 3) ────────────────────
+// Cristian: "para cargar Servicio es lento". Las fotos de los tickets se
+// guardaban como base64 ADENTRO de cada ticket (~11 MB la lista entera).
+// Ahora se suben a Firebase Storage (mismo bucket y misma forma de link
+// que los adjuntos) y en el ticket queda solo el link. Las páginas que
+// las muestran no cambian: una imagen se ve igual con el link.
+function _esFotoEmbebida(f) {
+  const v = (f && typeof f === 'object') ? f.data : f;
+  return typeof v === 'string' && (v.indexOf('data:') === 0 || (v.length > 500 && v.indexOf('http') !== 0));
+}
+async function _subirFotoStorage(idTicket, campo, foto) {
+  let v = (foto && typeof foto === 'object') ? String(foto.data || '') : String(foto || '');
+  let mime = 'image/jpeg';
+  const m = v.match(/^data:([^;]+);base64,/);
+  if (m) { mime = m[1]; v = v.substring(m[0].length); }
+  const ext = mime === 'image/png' ? 'png' : (mime === 'image/webp' ? 'webp' : 'jpg');
+  const ruta = 'adjuntos/fotos_servicio/' + idTicket + '/' + campo + '_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6) + '.' + ext;
+  await bucketAdjuntos.file(ruta).save(Buffer.from(v, 'base64'), { contentType: mime, resumable: false });
+  return 'https://firebasestorage.googleapis.com/v0/b/portal-tlc.firebasestorage.app/o/' + encodeURIComponent(ruta) + '?alt=media';
+}
+function _rutaStorageDeUrl(url) {
+  const m = String(url || '').match(/\/o\/([^?]+)\?alt=media/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
 const ADJUNTOS_TIPOS_PERMITIDOS = {
   'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'text/plain': 'txt',
   'application/msword': 'doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
@@ -553,6 +581,69 @@ async function eliminarAdjunto(data) {
   }
   await db.ref(ruta).remove();
   return { ok: true };
+}
+
+// ── MIGRACIÓN ÚNICA DE FOTOS A STORAGE (Fase 3) ───────────────────
+// 1) st_backupServicio: copia servicio_tecnico entero a
+//    backups/servicio_tecnico_<fecha> ANTES de tocar nada.
+// 2) st_migrarFotosServicio: en tandas (para no pasar el límite de tiempo
+//    de la función), sube a Storage las fotos embebidas de cada ticket
+//    (fotos, fotos_antes_reparar, fotos_despues_reparar y firma_digital) y
+//    deja el link. Con transacción por ticket: si mientras tanto alguien
+//    agregó o borró una foto, se respeta. Devuelve cuántos tickets quedan;
+//    la página la llama hasta que quedan 0.
+async function st_backupServicio(data) {
+  if (String(data.vendedorRol || '').trim() !== 'Administrador') return { ok: false, error: 'Solo un Administrador' };
+  const todo = await fbGet('servicio_tecnico');
+  if (!todo) return { ok: false, error: 'servicio_tecnico vacío' };
+  const marca = new Date().toISOString().replace(/[-:]/g, '').replace('T', '_').substring(0, 13);
+  const destino = 'backups/servicio_tecnico_' + marca;
+  await fbSet(destino, todo);
+  return { ok: true, destino, tickets: Object.keys(todo).length };
+}
+
+function _ticketTieneFotosEmbebidas(t) {
+  if (!t) return false;
+  if (ST_CAMPOS_FOTOS.some((c) => comoArray(t[c]).some(_esFotoEmbebida))) return true;
+  return _esFotoEmbebida(t.firma_digital);
+}
+
+async function st_migrarFotosServicio(data) {
+  if (String(data.vendedorRol || '').trim() !== 'Administrador') return { ok: false, error: 'Solo un Administrador' };
+  const tanda = Math.min(Math.max(parseInt(data.tanda, 10) || 8, 1), 25);
+  const todo = (await fbGet('servicio_tecnico')) || {};
+  const pendientes = Object.keys(todo).filter((id) => _ticketTieneFotosEmbebidas(todo[id]));
+  let migrados = 0, fotosSubidas = 0;
+  const conError = [];
+  for (const id of pendientes.slice(0, tanda)) {
+    const t = todo[id];
+    // Subir primero (fuera de la transacción) y armar el reemplazo
+    const reemplazos = {}; // valor embebido -> link
+    try {
+      for (const campo of ST_CAMPOS_FOTOS) {
+        for (const f of comoArray(t[campo])) {
+          if (!_esFotoEmbebida(f)) continue;
+          const clave = (f && typeof f === 'object') ? String(f.data) : String(f);
+          if (!reemplazos[clave]) { reemplazos[clave] = await _subirFotoStorage(id, campo, f); fotosSubidas++; }
+        }
+      }
+      if (_esFotoEmbebida(t.firma_digital)) { reemplazos[String(t.firma_digital)] = await _subirFotoStorage(id, 'firma', t.firma_digital); fotosSubidas++; }
+    } catch (eSub) { conError.push(id + ': ' + eSub.message); continue; }
+    await runTransaccionTicket(id, (tk) => {
+      ST_CAMPOS_FOTOS.forEach((campo) => {
+        if (!tk[campo]) return;
+        tk[campo] = comoArray(tk[campo]).map((f) => {
+          const clave = (f && typeof f === 'object') ? String(f.data) : String(f);
+          return reemplazos[clave] || f;
+        });
+      });
+      if (tk.firma_digital && reemplazos[String(tk.firma_digital)]) tk.firma_digital = reemplazos[String(tk.firma_digital)];
+      return tk;
+    });
+    migrados++;
+  }
+  const quedan = Math.max(0, pendientes.length - migrados);
+  return { ok: true, migrados, fotosSubidas, quedan, errores: conError };
 }
 
 async function st_crearOrdenPreparacion(data) {
@@ -658,6 +749,13 @@ async function st_crearTicket(data) {
   const id = stGenerarId();
   const fechaISO = new Date().toISOString();
   const fotosRecibidas = Array.isArray(data.fotos) ? data.fotos.slice(0, 3) : [];
+  // Fase 3: las fotos de ingreso van a Storage; en el ticket queda el link.
+  for (let i = 0; i < fotosRecibidas.length; i++) {
+    if (_esFotoEmbebida(fotosRecibidas[i])) {
+      try { fotosRecibidas[i] = await _subirFotoStorage(id, 'fotos', fotosRecibidas[i]); }
+      catch (eF) { console.warn('No se pudo subir la foto de ingreso a Storage (queda embebida):', eF.message); }
+    }
+  }
   const ticket = {
     id_ticket: id, cliente: String(data.cliente || '').trim(), nombre_medico: String(data.nombre_medico || '').trim(),
     domicilio: String(data.domicilio || '').trim(), telefono: String(data.telefono || '').trim(),
@@ -780,11 +878,15 @@ async function st_actualizarGastos(data) {
 
 async function st_agregarFoto(data) {
   const id = String(data.id_ticket || '').trim();
-  const foto = String(data.foto || '').trim();
+  let foto = String(data.foto || '').trim();
   const campo = ST_CAMPOS_FOTOS.includes(data.campo) ? data.campo : 'fotos';
   if (!id) return { ok: false, error: 'Falta id_ticket' };
   if (!foto) return { ok: false, error: 'Falta foto' };
-  if (!(await fbGet('servicio_tecnico/' + id))) return { ok: false, error: 'Ticket no encontrado: ' + id };
+  const previoFoto = await fbGet('servicio_tecnico/' + id);
+  if (!previoFoto) return { ok: false, error: 'Ticket no encontrado: ' + id };
+  if (comoArray(previoFoto[campo]).length >= 3) return { ok: false, error: 'Este ticket ya tiene el máximo de 3 fotos en "' + campo + '"' };
+  // Fase 3: la foto va a Storage; en el ticket se guarda solo el link.
+  if (_esFotoEmbebida(foto)) foto = await _subirFotoStorage(id, campo, foto);
   let errorLimite = null;
   const ticket = await runTransaccionTicket(id, (t) => {
     const fotos = comoArray(t[campo]);
@@ -805,7 +907,7 @@ async function st_eliminarFoto(data) {
   if (!id) return { ok: false, error: 'Falta id_ticket' };
   if (isNaN(indice)) return { ok: false, error: 'Índice inválido' };
   if (!(await fbGet('servicio_tecnico/' + id))) return { ok: false, error: 'Ticket no encontrado: ' + id };
-  let errorValidacion = null;
+  let errorValidacion = null, fotoBorrada = null;
   const ticket = await runTransaccionTicket(id, (t) => {
     const fotos = comoArray(t[campo]);
     if (indice < 0 || indice >= fotos.length) { errorValidacion = 'Índice fuera de rango'; return t; }
@@ -813,12 +915,15 @@ async function st_eliminarFoto(data) {
       const bloqueadas = parseInt(t.fotos_bloqueadas) || 0;
       if (indice < bloqueadas) { errorValidacion = 'Esta foto se cargó en el ingreso del equipo y no se puede eliminar (queda como evidencia).'; return t; }
     }
+    fotoBorrada = fotos[indice];
     fotos.splice(indice, 1);
     t[campo] = fotos;
     t.actualizado_en = new Date().toISOString();
     return t;
   });
   if (errorValidacion) return { ok: false, error: errorValidacion };
+  const rutaBorrar = _rutaStorageDeUrl(fotoBorrada);
+  if (rutaBorrar) { try { await bucketAdjuntos.file(rutaBorrar).delete(); } catch (eDel) { if (eDel.code !== 404) console.warn('No se pudo borrar la foto de Storage:', eDel.message); } }
   return { ok: true, fotos: comoArray(ticket[campo]) };
 }
 
@@ -1127,6 +1232,7 @@ const ACCIONES = {
   st_separarEquipoOrden, st_actualizarEquipoOrden, st_dividirOrdenPreparacion, st_quitarGarantiasOrden, st_recalcularProgresosOrdenes,
   st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden, registrarInstalacionPOE8,
   subirAdjunto, eliminarAdjunto,
+  st_backupServicio, st_migrarFotosServicio,
   st_guardarEtiquetasCajas, eliminarVersionPresupuestoTicket, guardarAsignadosEtapa,
 };
 
