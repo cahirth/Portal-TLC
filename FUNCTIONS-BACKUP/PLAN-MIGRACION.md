@@ -1,6 +1,6 @@
 # Plan de migración — Apps Script → Cloud Functions
 
-**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.6`) — Fases 1 y 2 completas
+**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.7`) — Fases 1, 2 y 4 completas
 
 **Objetivo:** sacar el Portal TLC de Apps Script por completo, sacar `historico.json` (y los datos en general) del repositorio de código, y eliminar todo lo que ralentiza la app. Se hace módulo por módulo, con el patrón ya probado: una Cloud Function equivalente, testeada, con su propia URL, apuntada desde el frontend sin tocar el resto.
 
@@ -55,6 +55,7 @@ gcloud functions deploy <nombre> --gen2 --region=us-central1 --runtime=nodejs22 
 | Empresas desde Ficha de equipo y Cotizaciones | listarEmpresas, guardarEmpresa, guardarContacto | `empresas` (ya existían; se redirigió el frontend) |
 | Reacciones desde la campanita (Servicio y Eventos) | st_reaccionarMensaje, ev_reaccionarMensaje | `servicio` / `eventosChecklist` |
 | Radar de Inicio | lectura de negocios | Firebase directo (antes `historico.json` de GitHub) |
+| Cuenta Corriente (completo) | 8 acciones + cc_gastosOrigenes | `cuentaCorriente` (nueva) |
 | Cotizaciones — lectura de mensajes | cot_listarMensajes lee directo `cotizaciones/{id}/mensajes` de Firebase (Apps Script solo como respaldo) | — (Firebase directo) |
 
 ---
@@ -102,7 +103,6 @@ gcloud functions deploy <nombre> --gen2 --region=us-central1 --runtime=nodejs22 
 |---|---|---|
 | `cotizaciones.html` | actualizarCheckCierre, actualizarColaborador, actualizarContactoCotizacion, actualizarCotizacion, actualizarEstado, actualizarTelefono, agregarNota, editarNota, eliminarNota, cot_agregarMensaje, cot_reaccionarMensaje, eliminarDeal, eliminarVersionPresupuesto, reasignarVendedor, subirCotizacion · respaldo de cot_listarMensajes | `cotizaciones` (Fase 5) |
 | `ficha-equipo.html` | agregarNota, apilarFichaTecnica, buscarNegocioAgrupable | `cotizaciones` (Fase 5) |
-| `cuenta-corriente.html` | listarGastosGeneralesPendientes, agregarGastoGeneral, editarGastoGeneral, crearLiquidacion, listarLiquidaciones, revertirLiquidacion, obtenerSaldoInicial | Cloud Function nueva o extender `internos` |
 | `index.html`, `selector-dispositivos.html` | solicitarCodigoLogin, verificarCodigoLogin (LOGIN) | Cloud Function nueva, con fallback |
 | `selector-dispositivos.html` | registrarCotizacion · consultarCliente (ARCA) y sincronizarHubSpot (a borrar) | `cotizaciones` |
 | `empresas.html` | crearNegocioVacio | `cotizaciones` |
@@ -156,7 +156,7 @@ Decidido el 28/09/2026: **ARCA** (validación de CUIT) y **contacto por QR**.
 | Módulo | Causa | Estado |
 |---|---|---|
 | Servicio Técnico | `servicio_tecnico.json` ~11 MB por fotos base64 | ⏳ Fase 3 |
-| Cuenta Corriente | Baja Servicio + Eventos completos + 3 llamadas a Apps Script | ✅ Mitigado (caché) · ⏳ fondo: Fase 3 + Fase 4 |
+| Cuenta Corriente | Bajaba Servicio + Eventos completos + 3 llamadas a Apps Script | ✅ Resuelto (Fase 4: solo gastos, por Cloud Function) |
 | Tareas (Mi Día) | Baja Ventas + Servicio + Eventos completos | ✅ Mitigado (caché) · ⏳ fondo: Fase 3 |
 | Comisiones | Cálculo en la Cloud Function, esperaba al permiso en fila | ✅ Mitigado (paralelo + caché) · ⏳ revisar `calcularComisiones` |
 | Cotizaciones — mensajes | Apps Script 1-3 s + polling por Apps Script | ✅ Resuelto (Firebase directo) |
@@ -205,7 +205,9 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 - [ ] Ver sección "Fotos de Servicio" arriba.
 
 ### Fase 4 — Cuenta Corriente
-- [ ] 7 acciones a Cloud Function. Que devuelva los gastos pendientes **ya filtrados** (hoy el celular baja todo y filtra).
+- [x] Nueva Cloud Function **`cuentaCorriente`** con las 8 acciones (gastos generales, saldo inicial, liquidaciones, liquidar y revertir con transacciones). Nueva `cc_gastosOrigenes`: devuelve solo los gastos de Servicio y Eventos (pocos KB) en vez de que el celular descargue `servicio_tecnico.json` (~11 MB) y `eventos.json` completos. Los gastos de tarjetas se guardan en `servicio` / `eventosChecklist`. (04/10, v2026.10.04.7)
+
+**Fase 4 completa.**
 
 ### Fase 5 — Cotizaciones, función por función
 - [ ] 5a — Firebase: chat (agregar, reaccionar), notas, estado, teléfono, contacto, colaborador, vendedor, check de cierre.
@@ -228,7 +230,7 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 
 ## 📌 Pendientes sueltos
 
-- [ ] **Pasar las funciones a `nodejs22` antes del 30/10/2026** (después Google no deja desplegar con nodejs20). Ya están en 22: `servicio`, `pipelines`, `internos`. Faltan: `cotizaciones`, `empresas`, `eventosChecklist`, `fotos`, `notificaciones`, `tareas`, `asistenteIA`.
+- [ ] **Pasar las funciones a `nodejs22` antes del 30/10/2026** (después Google no deja desplegar con nodejs20). Ya están en 22: `servicio`, `pipelines`, `internos`, `cuentaCorriente`. Faltan: `cotizaciones`, `empresas`, `eventosChecklist`, `fotos`, `notificaciones`, `tareas`, `asistenteIA`.
 - [ ] **Sincronizar permisos** se cortó por tiempo (03/10) — confirmar que la hoja Vendedores llegue completa a Firebase (rol "Administrativo" de Lourdes, columna `Liquidar Gastos`) y renombrar la 2ª columna "Comisiones" (numérica).
 - [ ] Tildes de capacidades pendientes de decidir: `Ver Todos los Negocios` (Cotizaciones — Lourdes lo necesita para facturar), `Ver Métricas de Todos`, `Administrar Eventos`, `Reasignar Vendedor`.
 
