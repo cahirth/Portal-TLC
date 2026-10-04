@@ -1,6 +1,6 @@
 # Plan de migración — Apps Script → Cloud Functions
 
-**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.9`) — Fases 1, 2, 3 y 4 completas
+**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.10`) — Fases 1, 2, 3 y 4 completas
 
 **Objetivo:** sacar el Portal TLC de Apps Script por completo, sacar `historico.json` (y los datos en general) del repositorio de código, y eliminar todo lo que ralentiza la app. Se hace módulo por módulo, con el patrón ya probado: una Cloud Function equivalente, testeada, con su propia URL, apuntada desde el frontend sin tocar el resto.
 
@@ -216,7 +216,9 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 ### Fase 5 — Cotizaciones, función por función
 - [x] 5a — estado, notas (agregar/editar/eliminar), vendedor, colaborador, teléfono, contacto y checks de cierre → `cotizaciones` v3; chat (enviar con menciones, reaccionar, leer) y reacciones desde la campanita → `servicio` v8. (04/10, v2026.10.04.9)
 - [ ] Borrar `consultarCliente` (ARCA) y `sincronizarHubSpot` del selector.
-- [ ] 5b — atadas a `historico.json`: subirCotizacion, actualizarCotizacion, eliminarVersionPresupuesto (con versiones a Firebase), eliminarDeal, crearNegocioVacio, registrarCotizacion, apilarFichaTecnica, buscarNegocioAgrupable.
+- [x] 5b (parte 1) — eliminar negocio, eliminar versión de presupuesto (ahora en Firebase), crear negocio vacío (Empresas), y desde la Ficha de equipo: agregar nota, apilar ficha técnica y buscar negocio agrupable → `cotizaciones` v4. **Empresas y Ficha de equipo ya no llaman a Apps Script.** (04/10, v2026.10.04.10)
+- [ ] 5b (parte 2) — **"Pantalla Comercial"** (subirCotizacion / actualizarCotizacion): es código muerto (ningún botón la abre; la reemplazó el editor de presupuesto) → borrarla.
+- [ ] 5b (parte 3) — **Carrito del selector, "✉️ Confirmar y enviar cotización"** (registrarCotizacion + Power Automate + hoja "Cotizaciones" de la planilla + búsqueda de cliente en ARCA/HubSpot): decidir si se sigue usando o se reemplaza por el editor de presupuesto.
 - [ ] Bug conocido: `actualizarCotizacion` no regenera `cotizaciones/{id}/presupuesto` en RTDB.
 
 ### Fase 6 — Cortar los commits de datos
