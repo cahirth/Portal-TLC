@@ -1,6 +1,6 @@
 # Plan de migración — Apps Script → Cloud Functions
 
-**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.5`) — Fase 1 completa, Fase 2 en curso
+**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.6`) — Fases 1 y 2 completas
 
 **Objetivo:** sacar el Portal TLC de Apps Script por completo, sacar `historico.json` (y los datos en general) del repositorio de código, y eliminar todo lo que ralentiza la app. Se hace módulo por módulo, con el patrón ya probado: una Cloud Function equivalente, testeada, con su propia URL, apuntada desde el frontend sin tocar el resto.
 
@@ -101,7 +101,6 @@ gcloud functions deploy <nombre> --gen2 --region=us-central1 --runtime=nodejs22 
 | Archivo | Acciones | Destino propuesto |
 |---|---|---|
 | `cotizaciones.html` | actualizarCheckCierre, actualizarColaborador, actualizarContactoCotizacion, actualizarCotizacion, actualizarEstado, actualizarTelefono, agregarNota, editarNota, eliminarNota, cot_agregarMensaje, cot_reaccionarMensaje, eliminarDeal, eliminarVersionPresupuesto, reasignarVendedor, subirCotizacion · respaldo de cot_listarMensajes | `cotizaciones` (Fase 5) |
-| `adjuntos.js` (Servicio y Cotizaciones) | subirAdjunto, eliminarAdjunto | `servicio` / `cotizaciones` (idealmente a Firebase Storage) |
 | `ficha-equipo.html` | agregarNota, apilarFichaTecnica, buscarNegocioAgrupable | `cotizaciones` (Fase 5) |
 | `cuenta-corriente.html` | listarGastosGeneralesPendientes, agregarGastoGeneral, editarGastoGeneral, crearLiquidacion, listarLiquidaciones, revertirLiquidacion, obtenerSaldoInicial | Cloud Function nueva o extender `internos` |
 | `index.html`, `selector-dispositivos.html` | solicitarCodigoLogin, verificarCodigoLogin (LOGIN) | Cloud Function nueva, con fallback |
@@ -198,7 +197,9 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 
 ### Fase 2 — Módulos chicos, Firebase puro
 - [x] Checklists (5 archivos) y POE8 → `servicio` v5 + `internos` v3 (listarTecnicos). De paso: **"Reabrir checklist" funciona por primera vez** (la acción nunca existió en Apps Script). (04/10, v2026.10.04.5)
-- [ ] `adjuntos.js` (Servicio y Cotizaciones), idealmente a Firebase Storage.
+- [x] `adjuntos.js` (Servicio y Cotizaciones) → `servicio` v6 (Firebase Storage, mismas rutas; los adjuntos viejos siguen andando). (04/10, v2026.10.04.6)
+
+**Fase 2 completa.**
 
 ### Fase 3 — Fotos de Servicio a un nodo aparte
 - [ ] Ver sección "Fotos de Servicio" arriba.
