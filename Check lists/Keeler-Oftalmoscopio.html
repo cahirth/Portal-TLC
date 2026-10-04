@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | Check lists/Keeler-Oftalmoscopio.html | v2026.10.04.5 (MUERTE A APPS SCRIPT, Fase 2: guardar/completar/reabrir checklist → Cloud Function servicio v5; lista de técnicos → Cloud Function internos v3. "Reabrir" funciona por primera vez: la acción nunca había existido en Apps Script.) -->
 <!-- Portal TLC | checklist-Keeler-Oftalmoscopio.html | v2026.07.18.1 -->
 <html lang="es">
 <head>
@@ -371,7 +372,9 @@
 <script>
 // ── Integración con Firebase RTDB — Checklist técnico vinculado a un ticket ──
 const FIREBASE_RTDB_URL_CL = 'https://portal-tlc-default-rtdb.firebaseio.com';
-const GAS_URL_CL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+// MUERTE A APPS SCRIPT (Fase 2, v2026.10.04.5): checklists → Cloud Function servicio; lista de técnicos → internos.
+const GAS_URL_CL = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio';
+const INTERNOS_URL_CL = 'https://us-central1-portal-tlc.cloudfunctions.net/internos';
 const CL_MODELO = 'Keeler-Oftalmoscopio';
 const CL_CAMPOS_TEXTO = ['cat1-desc','cat1-catalogo','cat1-lote','cat2-desc','cat2-referencia','cat2-lote','cat2-fechafab'];
 const CL_CHECKBOXES = ['cat1-chk0','cat1-chk1','cat1-chk2','cat1-chk3','cat2-chk0','cat2-chk1','cat2-chk2','cat2-chk3'];
@@ -405,7 +408,7 @@ async function _cargarTecnicosDropdown() {
     const sel = document.getElementById('c-engineer');
     if (!sel) return;
     try {
-        const resp = await fetch(GAS_URL_CL, {
+        const resp = await fetch(INTERNOS_URL_CL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ accion: 'listarTecnicos' }),

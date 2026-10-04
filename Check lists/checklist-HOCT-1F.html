@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | Check lists/checklist-HOCT-1F.html | v2026.10.04.5 (MUERTE A APPS SCRIPT, Fase 2: guardar/completar/reabrir checklist → Cloud Function servicio v5; lista de técnicos → Cloud Function internos v3. "Reabrir" funciona por primera vez: la acción nunca había existido en Apps Script.) -->
 <!-- Portal TLC | checklist-HOCT-1F.html | v2026.08.13.1 (Cristian pegó el archivo viejo (v2026.07.18.1) directo en el chat, ya que no podía adjuntar más archivos — reconstruido con el mismo patrón "Prerrequisito #1" que ya tiene HRK-1.html v2026.08.10.2: (1) checklist_tecnico pasa de ser un campo ÚNICO a nivel del TICKET COMPLETO a ser por-equipo (ticket.equipos[i].checklist_completado), usando la acción registrarChecklistCompletado en vez de st_guardarChecklist para tickets con equipo_index — con 2+ equipos HOCT-1F en el mismo pedido, antes compartían el mismo campo de completado, y un checklist marcado en UNO aparecía como completado en TODOS. (2) N° de Serie ahora SÍ se prellena de verdad — antes intentaba leer ticket.equipo_modelo/ticket.equipo_serie, campos que NO EXISTEN en un ticket de Orden de Preparación (esos datos viven en ticket.equipos[i], no sueltos en el ticket) — por eso siempre aparecía vacío ("Serial number"), aunque la grilla de la Orden SÍ tuviera el número cargado. Ahora lee primero de los parámetros de la URL (cliente/serie/tecnico/rol, que servicio.html ya manda — ver _urlChecklistFila) y, si faltan, cae a ticket.equipos[equipo_index]. (3) Botón "Reabrir checklist" para Administrador (mismo criterio: reabrirChecklistOrden, FotoMap.gs v184). Reportado por Cristian con captura: "cuando se asigna manualmente el número de serie... se debe cargar el campo en el checklist".) -->
 <html lang="es">
 <head>
@@ -463,7 +464,9 @@
 <script>
 // ── Integración con Firebase RTDB — Checklist técnico vinculado a un ticket ──
 const FIREBASE_RTDB_URL_CL = 'https://portal-tlc-default-rtdb.firebaseio.com';
-const GAS_URL_CL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+// MUERTE A APPS SCRIPT (Fase 2, v2026.10.04.5): checklists → Cloud Function servicio; lista de técnicos → internos.
+const GAS_URL_CL = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio';
+const INTERNOS_URL_CL = 'https://us-central1-portal-tlc.cloudfunctions.net/internos';
 const CL_MODELO = 'HOCT-1F';
 // Numeración de ítems no correlativa en este formulario (salta del 9 al 12)
 const CL_ITEM_IDS = [1,2,3,4,5,6,7,8,9,12,13,14,15,16,17,18];
@@ -502,7 +505,7 @@ async function _cargarTecnicosDropdown() {
     const sel = document.getElementById('c-engineer');
     if (!sel) return;
     try {
-        const resp = await fetch(GAS_URL_CL, {
+        const resp = await fetch(INTERNOS_URL_CL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ accion: 'listarTecnicos' }),

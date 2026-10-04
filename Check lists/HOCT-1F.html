@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | Check lists/HOCT-1F.html | v2026.10.04.5 (MUERTE A APPS SCRIPT, Fase 2: guardar/completar/reabrir checklist → Cloud Function servicio v5; lista de técnicos → Cloud Function internos v3. "Reabrir" funciona por primera vez: la acción nunca había existido en Apps Script.) -->
 <!-- Portal TLC | checklist-HOCT-1F.html | v2026.07.18.1 -->
 <html lang="es">
 <head>
@@ -465,7 +466,9 @@
 <script>
 // ── Integración con Firebase RTDB — Checklist técnico vinculado a un ticket ──
 const FIREBASE_RTDB_URL_CL = 'https://portal-tlc-default-rtdb.firebaseio.com';
-const GAS_URL_CL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl59SzaKCMLvF99Zm3DSI7jB2sfo9x7nZis3V79YjfElha2KGDG7sC/exec';
+// MUERTE A APPS SCRIPT (Fase 2, v2026.10.04.5): checklists → Cloud Function servicio; lista de técnicos → internos.
+const GAS_URL_CL = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio';
+const INTERNOS_URL_CL = 'https://us-central1-portal-tlc.cloudfunctions.net/internos';
 const CL_MODELO = 'HOCT-1F';
 // Numeración de ítems no correlativa en este formulario (salta del 9 al 12)
 const CL_ITEM_IDS = [1,2,3,4,5,6,7,8,9,12,13,14,15,16,17,18];
@@ -499,7 +502,7 @@ async function _cargarTecnicosDropdown() {
     const sel = document.getElementById('c-engineer');
     if (!sel) return;
     try {
-        const resp = await fetch(GAS_URL_CL, {
+        const resp = await fetch(INTERNOS_URL_CL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ accion: 'listarTecnicos' }),
