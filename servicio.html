@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.04.6 (MUERTE A APPS SCRIPT, Fase 2: los adjuntos (subir/borrar) van a la Cloud Function servicio v6 en vez de Apps Script.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.4 (Link desde Ventas: servicio.html?ticket=<id>&ver=preparacion abre la Orden de Preparación y la deja en la sección de equipos en vez del chat.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: las reacciones desde la campanita a mensajes de Servicio y Eventos van a sus Cloud Functions; las de Cotizaciones siguen en Apps Script hasta la Fase 5.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.2 (Nueva regla de progreso de preparación (función servicio v4): Listo para despacho con serie y calidad = 100%. La primera vez que un Administrador abre Servicio con esta versión, se recalcula el % de todos los negocios con Orden de Preparación (st_recalcularProgresosOrdenes), una sola vez por navegador.) -->
@@ -2343,7 +2344,7 @@ function _renderDetalle(t) {
 
   _actualizarEstadoChecklistCard(t.id_ticket);
   _renderPanelMensajes(t);
-  adjuntosRenderSeccion('det-adjuntos-card', GAS_URL, 'servicio', t.id_ticket, t.adjuntos, (_session && _session.name) || '');
+  adjuntosRenderSeccion('det-adjuntos-card', SERVICIO_URL, 'servicio', t.id_ticket, t.adjuntos, (_session && _session.name) || '');
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -2941,7 +2942,7 @@ async function adjuntosRecargar(modulo, id, containerId) {
     const adjuntosFrescos = res.ok ? await res.json() : null;
     if (t) t.adjuntos = adjuntosFrescos;
     if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual.adjuntos = adjuntosFrescos; // por si el detalle quedó con otra copia del ticket
-    adjuntosRenderSeccion(containerId, GAS_URL, 'servicio', id, adjuntosFrescos, (_session && _session.name) || '');
+    adjuntosRenderSeccion(containerId, SERVICIO_URL, 'servicio', id, adjuntosFrescos, (_session && _session.name) || '');
   } catch(e) { console.warn('adjuntosRecargar (servicio):', e); }
 }
 // BUG REAL: esta función vive dentro del (function(){...})() que envuelve

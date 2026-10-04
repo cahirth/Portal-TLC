@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.04.6 (MUERTE A APPS SCRIPT, Fase 2: los adjuntos de Ventas (subir/borrar) van a la Cloud Function servicio v6, que maneja los adjuntos de Servicio y Cotizaciones con el mismo Storage y las mismas rutas.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.4 (Cristian: "en Estado de Preparación y Despacho permitime clickear e ir al servicio para ver más detalle". La tarjeta completa (y el enlace "Ver en Servicio ›" del título) abre la Orden de Preparación en servicio.html, directo en la sección de equipos.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: listarEmpresas → Cloud Function empresas; asignarPipelineNegocio → Cloud Function pipelines (agregada ahí, v2); las reacciones desde la campanita a mensajes de Servicio y Eventos van a sus Cloud Functions (las de Cotizaciones siguen en Apps Script hasta la Fase 5).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.2 (Cristian: "que Listo para despacho con serie y calidad sea 100% y cuente como listo, y que Enviado solo cambie el color o una marca". Con la función servicio v4: un equipo Listo para despacho con serie y calidad = 100% y cuenta en "X/Y Listos". Enviado no suma más: la barra muestra "🚚 N/M enviados" y, cuando está todo enviado, "🚚 Enviado" y pasa a violeta. En el detalle por equipo, "Enviado" tiene su propio color violeta.) -->
@@ -3348,7 +3349,7 @@ function _renderDetalle(c) {
 
     _renderPanelMensajesCot(id);
     _cargarOtrosContactosParaNegocio(id, c);
-    adjuntosRenderSeccion('det-adjuntos-card-' + id, APPS_SCRIPT_URL, 'ventas', id, c.adjuntos, currentUserNombre || '');
+    adjuntosRenderSeccion('det-adjuntos-card-' + id, SERVICIO_URL, 'ventas', id, c.adjuntos, currentUserNombre || '');
 }
 
 // Recarga solo la sección de Adjuntos de un negocio, sin re-renderizar
@@ -3359,7 +3360,7 @@ async function adjuntosRecargar(modulo, id, containerId) {
         const res = await fetch('https://portal-tlc-default-rtdb.firebaseio.com/cotizaciones/' + encodeURIComponent(id) + '/adjuntos.json?_=' + Date.now(), { cache:'no-store' });
         const adjuntosFrescos = res.ok ? await res.json() : null;
         if (c) c.adjuntos = adjuntosFrescos;
-        adjuntosRenderSeccion(containerId, APPS_SCRIPT_URL, 'ventas', id, adjuntosFrescos, currentUserNombre || '');
+        adjuntosRenderSeccion(containerId, SERVICIO_URL, 'ventas', id, adjuntosFrescos, currentUserNombre || '');
     } catch(e) { console.warn('adjuntosRecargar (ventas):', e); }
 }
 
