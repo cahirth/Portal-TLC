@@ -1,6 +1,6 @@
 # Plan de migración — Apps Script → Cloud Functions
 
-**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.8`) — Fases 1, 2, 3 y 4 completas
+**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.9`) — Fases 1, 2, 3 y 4 completas
 
 **Objetivo:** sacar el Portal TLC de Apps Script por completo, sacar `historico.json` (y los datos en general) del repositorio de código, y eliminar todo lo que ralentiza la app. Se hace módulo por módulo, con el patrón ya probado: una Cloud Function equivalente, testeada, con su propia URL, apuntada desde el frontend sin tocar el resto.
 
@@ -214,7 +214,7 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 **Fase 4 completa.**
 
 ### Fase 5 — Cotizaciones, función por función
-- [ ] 5a — Firebase: chat (agregar, reaccionar), notas, estado, teléfono, contacto, colaborador, vendedor, check de cierre.
+- [x] 5a — estado, notas (agregar/editar/eliminar), vendedor, colaborador, teléfono, contacto y checks de cierre → `cotizaciones` v3; chat (enviar con menciones, reaccionar, leer) y reacciones desde la campanita → `servicio` v8. (04/10, v2026.10.04.9)
 - [ ] Borrar `consultarCliente` (ARCA) y `sincronizarHubSpot` del selector.
 - [ ] 5b — atadas a `historico.json`: subirCotizacion, actualizarCotizacion, eliminarVersionPresupuesto (con versiones a Firebase), eliminarDeal, crearNegocioVacio, registrarCotizacion, apilarFichaTecnica, buscarNegocioAgrupable.
 - [ ] Bug conocido: `actualizarCotizacion` no regenera `cotizaciones/{id}/presupuesto` en RTDB.
