@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: las reacciones desde la campanita a mensajes de Servicio y Eventos van a sus Cloud Functions; las de Cotizaciones siguen en Apps Script hasta la Fase 5.) -->
 <!-- Portal TLC | eventos.html | v2026.10.02.1 (Cristian: "quiero el micrófono en los 3 módulos". Botón 🎤 de dictado por voz al lado de "Enviar" en el chat de mensajes internos, vía dictado.js (compartido con los otros 2 módulos). Escribe en el cuadro, nunca envía solo.) -->
 <!-- Portal TLC | eventos.html | v2026.09.30.2 (Cristian: "quiero que cuando abras la tarjeta, en cualquier módulo, se abra de inmediato y que los mensajes aparezcan de inmediato". 3 cambios en la tarjeta: (1) si no estaba en caché, el modal ahora se abre al instante con "Abriendo..." en vez de quedar sin respuesta hasta que contesta el servidor; si se cierra mientras carga, ya no se vuelve a abrir solo. (2) BUG REAL: con caché, el refresco de fondo traía los mensajes nuevos pero nunca los mostraba (a propósito no repintaba nada para no pisar ediciones); ahora repinta SOLO la lista de mensajes. (3) Mientras la tarjeta está abierta y la pestaña visible, los mensajes se consultan cada 10 s (antes no había ningún refresco: los mensajes de otros solo aparecían al cerrar y reabrir).) -->
 <!-- Portal TLC | eventos.html | v2026.09.29.2 (MUERTE A APPS SCRIPT — Cristian: "el enviarlo también se pone lento y todo lo que pasa por AppScript es realmente impredecible... tratemos de migrarlo a Cloud Function". La lista de @menciones (listarInternos) ahora va a INTERNOS_URL (Cloud Function nueva, ver /cloud-function-internos/) en vez de Apps Script — resuelto de raíz sin necesitar ninguna decisión nueva sobre Sheets: "Internos" no es una hoja aparte, es la misma hoja Vendedores que ya sincroniza a Firebase (permisos) el botón que Cristian ya usa, filtrada por su columna "Internos". Mismo bug real corregido que en servicio.html (la lista de menciones quedaba vacía para siempre tras un solo fallo).) -->
@@ -3162,7 +3163,11 @@ window._reaccionarNotifEv = function(ev, idNoti, tipo, origen, ticketId, mensaje
     if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId;
     else if (origen === 'evento') { payloadMsg.id_evento = ticketId; payloadMsg.id_tarjeta = tarjetaId; }
     else payloadMsg.id_ticket = ticketId;
-    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
+    // Reacción desde la campanita: Servicio y Eventos van a su Cloud Function (v2026.10.04.3);
+    // las de Cotizaciones siguen en Apps Script hasta la Fase 5.
+    var urlReaccion = origen === 'evento' ? 'https://us-central1-portal-tlc.cloudfunctions.net/eventosChecklist'
+                    : origen === 'cotizacion' ? GAS_URL : 'https://us-central1-portal-tlc.cloudfunctions.net/servicio';
+    fetch(urlReaccion, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
       .then(function(){ return fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'marcarNotificacionLeida', email:email, id:idNoti }) }); })
       .then(function(){ _cargarNotificaciones(true); });
     return;

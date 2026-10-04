@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.04.4 (Link desde Ventas: servicio.html?ticket=<id>&ver=preparacion abre la Orden de Preparación y la deja en la sección de equipos en vez del chat.) -->
+<!-- Portal TLC | servicio.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: las reacciones desde la campanita a mensajes de Servicio y Eventos van a sus Cloud Functions; las de Cotizaciones siguen en Apps Script hasta la Fase 5.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.2 (Nueva regla de progreso de preparación (función servicio v4): Listo para despacho con serie y calidad = 100%. La primera vez que un Administrador abre Servicio con esta versión, se recalcula el % de todos los negocios con Orden de Preparación (st_recalcularProgresosOrdenes), una sola vez por navegador.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.1 (Cristian: "el ítem Garantía no quiero que se pase a Preparación... pide N° de serie". Las Órdenes de Preparación ya no incluyen la garantía (lo hace la Cloud Function servicio v3 al crearlas). Las órdenes ya creadas que todavía la tienen se limpian solas la primera vez que se abren (st_quitarGarantiasOrden), y el progreso del negocio en Ventas se recalcula sin ella.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.12 (Cristian: "¿cómo hacemos para que las tarjetas pasen de No iniciada a En curso? Los técnicos no las pasan de estado". (1) Paso automático: una tarjeta en "No iniciada" pasa sola a "En curso" cuando la persona asignada trabaja en ella (completa un campo, nota, foto, gasto, equipo o mensaje). Lo que haga otra persona (p. ej. un administrador escribiendo un mensaje) no la marca. Solo tickets de reparación. (2) Se quitó la exigencia de poner "En curso" a mano para pasar de Diagnóstico a Presupuesto.) -->
@@ -1285,6 +1287,15 @@ function _abrirTicketDesdeUrlSiCorresponde() {
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
   if (!t) return;
   window._abrirDetalle(id);
+  // Desde Ventas ("Estado de Preparación y Despacho") llega con
+  // &ver=preparacion: en vez del chat, se muestra la lista de equipos.
+  if (params.get('ver') === 'preparacion') {
+    setTimeout(function() {
+      var op = document.querySelector('.op-banner');
+      if (op) op.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return;
+  }
   // Esperar al próximo frame para que el panel ya esté pintado en el DOM
   setTimeout(function() {
     var panel = document.getElementById('det-mensajes-panel');
@@ -3864,7 +3875,11 @@ window._reaccionarNotif = function(ev, idNoti, tipo, origen, ticketId, mensajeIn
     if (origen === 'cotizacion') payloadMsg.id_cotizacion = ticketId;
     else if (origen === 'evento') { payloadMsg.id_evento = ticketId; payloadMsg.id_tarjeta = tarjetaId; }
     else payloadMsg.id_ticket = ticketId;
-    fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
+    // Reacción desde la campanita: Servicio y Eventos van a su Cloud Function (v2026.10.04.3);
+    // las de Cotizaciones siguen en Apps Script hasta la Fase 5.
+    var urlReaccion = origen === 'evento' ? 'https://us-central1-portal-tlc.cloudfunctions.net/eventosChecklist'
+                    : origen === 'cotizacion' ? GAS_URL : 'https://us-central1-portal-tlc.cloudfunctions.net/servicio';
+    fetch(urlReaccion, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
       .then(function(){
         return fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
           body: JSON.stringify({ accion:'marcarNotificacionLeida', email:email, id:idNoti }) });

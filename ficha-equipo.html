@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: listarEmpresas, guardarEmpresa y guardarContacto pasan a la Cloud Function empresas (ya existían ahí, misma respuesta). Eliminado el escáner QR de FacoExtrema (dado de baja el 28/09): botón, modal, funciones, estilos y la librería html5-qrcode, con las llamadas buscarContactoParaQR/guardarEmpresaContactoQR. Siguen en Apps Script agregarNota, apilarFichaTecnica y buscarNegocioAgrupable (van con Cotizaciones, Fase 5).) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — módulo Pipelines migrado. listarPipelines y guardarPipeline (este archivo no usa eliminarPipeline) ahora apuntan a PIPELINES_URL en vez de GAS_URL — el resto de este archivo sigue sin tocar. De paso, Cristian pidió sacarle visibilidad al botón de "Escanear QR del visitante" (buscarContactoParaQR no se va a migrar, se decidió dar de baja la función de contacto por QR) — el botón y su etiqueta quedan ocultos con display:none, sin tocar la lógica de abajo (_abrirScannerQRFicha, _precargarContactoQR, etc.), que se deja intacta para una limpieza más a fondo en otro momento.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.09.23.1 (MUERTE A APPS SCRIPT — Cristian: "vamos a pasar a todo el Cloud Function... modulo por modulo... que sea un cambio de arquitectura total". Tercer módulo migrado (después de Empresas y Tareas): Fotos. cargarFotoMap() ahora lee de FOTOS_URL (Cloud Function nueva, ver /cloud-function-fotos/) en vez de FOTO_MAP_URL (Apps Script), que recorría toda la carpeta de Drive en cada pedido — causa real de la lentitud/cuelgues de fotos reportados hoy. GAS_URL (todas las demás acciones de este archivo: precios, comisión, etc.) queda sin tocar, sigue en Apps Script — esas son Firebase directo y ya andan rápido, no comparten el problema de fotos.) -->
@@ -159,40 +160,6 @@
 
         .financiacion-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; padding:18px 24px; }
 
-        /* ── Escanear QR (stand FacoExtrema) — v2026.08.15 ──
-           Re-agregado a pedido de Cristian: "si le estoy mostrando la
-           ficha a un cliente desde ahí pum le escaneo y adentro, sino
-           tengo que volver al home" — el flujo del FAB en index.html
-           obliga a volver al home entre cada visitante. Mismo motor
-           (html5-qrcode) y mismo JSON de credencial que index.html,
-           para no mantener dos lectores de QR distintos.
-           FAB flotante abajo-centro — mismo patrón visual que el FAB
-           de index.html (.fab-qr), en vez del botón ancho que tenía
-           antes dentro del formulario. Pedido por Cristian: "quiero
-           el boton flotante del QR abajo en el medio igual que en el
-           index". */
-        .fab-qr-ficha { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); width:58px; height:58px;
-            border-radius:50%; background:var(--blue-tlc); border:none; color:#fff; font-size:24px;
-            display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:900;
-            box-shadow:0 6px 20px rgba(26,75,140,.4); }
-        .fab-qr-ficha:active { transform:translateX(-50%) scale(.92); }
-        .fab-qr-ficha-label { position:fixed; bottom:2px; left:50%; transform:translateX(-50%); font-size:9px;
-            color:var(--text-muted); z-index:900; background:var(--bg-body); padding:0 6px; }
-        .qrf-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); display:none;
-            align-items:center; justify-content:center; z-index:9999; padding:16px; }
-        .qrf-modal-overlay.abierto { display:flex; }
-        .qrf-modal-card { background:#fff; width:100%; max-width:420px; border-radius:16px; padding:20px; }
-        .qrf-modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-        .qrf-modal-header h3 { font-size:16px; margin:0; color:var(--text-dark); }
-        .qrf-modal-close { width:32px; height:32px; border-radius:50%; background:var(--bg-muted); border:none; cursor:pointer; font-size:16px; }
-        #qrf-reader { width:100%; border-radius:12px; overflow:hidden; }
-        .qrf-scan-txt { font-size:13px; color:var(--text-muted); text-align:center; margin:10px 0; line-height:1.5; }
-        .qrf-dato-fila { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-color); gap:10px; }
-        .qrf-dato-fila:last-child { border-bottom:none; }
-        .qrf-dato-fila .lbl { color:var(--text-muted); font-size:13px; }
-        .qrf-dato-fila input { flex:1; min-width:0; text-align:right; font-weight:700; font-size:14px; border:none; border-bottom:1px dashed var(--border-color); background:transparent; padding:2px 0; color:var(--text-dark); }
-        .qrf-dato-fila input:focus { outline:none; border-bottom-color:var(--blue-tlc); }
-        .qrf-btn-usar { width:100%; margin-top:14px; padding:13px; border-radius:10px; border:none; background:var(--green-tlc); color:#fff; font-weight:800; font-size:14px; cursor:pointer; }
         .fin-card { border:1px solid var(--border-color); border-radius:10px; padding:14px; background:#fff; position:relative; }
         .fin-card-oculta { opacity:.35; }
         @media print { .fin-card-oculta { display:none; } }
@@ -393,33 +360,6 @@
 
 </div>
 
-<!-- MUERTE A APPS SCRIPT — Cristian decidió (28/09/2026) dar de baja
-     el contacto por QR (buscarContactoParaQR no se va a migrar). Por
-     ahora solo se le saca la visibilidad ("al menos podemos sacarle
-     visibilidad en el frontend, cuando armes los html, no ahora") —
-     el botón queda oculto con display:none, el resto de la lógica de
-     abajo (_abrirScannerQRFicha, _precargarContactoQR, etc.) se deja
-     intacta sin tocar, para una limpieza más a fondo más adelante. -->
-<button type="button" class="fab-qr-ficha" id="fi-btn-escanear-qr" onclick="_abrirScannerQRFicha()" title="Escanear QR del visitante" style="display:none;"><i class="fa-solid fa-qrcode"></i></button>
-<div class="fab-qr-ficha-label" id="fi-btn-escanear-qr-label" style="display:none;">Escanear QR</div>
-
-<div class="qrf-modal-overlay" id="qrf-modal">
-  <div class="qrf-modal-card">
-    <div class="qrf-modal-header">
-      <h3>📷 Escanear QR del visitante</h3>
-      <button class="qrf-modal-close" onclick="_cerrarScannerQRFicha()">✕</button>
-    </div>
-    <div id="qrf-paso-scan">
-      <div id="qrf-reader"></div>
-      <div id="qrf-reader-vacio" class="qrf-scan-txt">Apuntá la cámara al código QR de la credencial del visitante.</div>
-    </div>
-    <div id="qrf-paso-datos" style="display:none;">
-      <div class="qrf-scan-txt" style="margin-top:0;">Revisá los datos antes de usarlos — podés corregir cualquier campo.</div>
-      <div id="qrf-datos-render"></div>
-      <button type="button" class="qrf-btn-usar" onclick="_usarDatosQRFicha()">✅ Usar estos datos</button>
-    </div>
-  </div>
-</div>
 
 <!-- Aviso de 5 segundos — reemplaza el modal con 2 campos de v2026.08.19.3
      (era un paso extra innecesario: los campos Nombre/Apellido y
@@ -436,9 +376,9 @@
 <script>
 // Definida ACÁ (antes de cargar calculo-financiacion.js) para poder
 // usarla como "cache-buster" del motor — ver más abajo.
+var EMPRESAS_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/empresas'; // MUERTE A APPS SCRIPT — listarEmpresas/guardarEmpresa/guardarContacto (v2026.10.04.3)
 var FICHA_EQUIPO_VERSION = '2026.08.30.2';
 </script>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 // CACHE-BUSTING REAL — el problema recurrente no era que
 // calculo-financiacion.js no se subiera; el archivo en el servidor
@@ -907,146 +847,7 @@ function _precargarContactoQR(telQr, nombreQr) {
   if (elLead && elLead.parentNode) elLead.parentNode.insertBefore(elBanner, elLead);
 }
 
-// ── Escaneo INLINE (botón nuevo dentro de la ficha) — usa el mismo
-// motor html5-qrcode y el mismo JSON de credencial que index.html
-// (id/nombre/apellido/dni/email/telefono/vip/categoria), para no
-// mantener dos lectores de QR con lógica distinta. A diferencia del
-// flujo viejo (index.html → selector-dispositivos.html → acá), este
-// no necesita volver al home: guarda Empresa+Contacto (con
-// dni/vip/categoria, igual que hace index.html vía
-// guardarEmpresaContactoQR) Y precarga el formulario de seguimiento
-// de ESTA ficha en el mismo paso. ──
-var _qrfScanner = null;
-var _qrfProcesando = false; // ver comentario en _iniciarCamaraQRFicha
-var _pipelinesFichaCache = null; // para poder forzar "FacoExtrema" también en el escaneo inline, sin recargar la lista
-
-window._abrirScannerQRFicha = function() {
-  document.getElementById('qrf-modal').classList.add('abierto');
-  document.getElementById('qrf-paso-scan').style.display = 'block';
-  document.getElementById('qrf-paso-datos').style.display = 'none';
-  _qrfProcesando = false;
-  _iniciarCamaraQRFicha();
-};
-
-window._cerrarScannerQRFicha = function() {
-  document.getElementById('qrf-modal').classList.remove('abierto');
-  _detenerCamaraQRFicha();
-};
-
-function _iniciarCamaraQRFicha() {
-  if (typeof Html5Qrcode === 'undefined') {
-    document.getElementById('qrf-reader-vacio').textContent = '⚠️ No se pudo cargar el lector de QR (revisá la conexión a internet).';
-    return;
-  }
-  try {
-    _qrfScanner = new Html5Qrcode('qrf-reader');
-    _qrfScanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: 220 },
-      function(textoLeido) {
-        // BUG REAL — html5-qrcode puede disparar este callback DOS
-        // VECES seguidas para el mismo código (la cámara sigue
-        // decodificando frames mientras _qrfScanner.stop() todavía
-        // no terminó, que es asíncrono). Sin este guard, la segunda
-        // llamada volvía a arrancar _procesarQRFichaEscaneado desde
-        // cero — pisando el teléfono que la primera pasada ya había
-        // completado (por venir en el QR, o recuperado vía
-        // buscarContactoParaQR) con un objeto nuevo, otra vez vacío.
-        // Reportado por Cristian: "el teléfono no aparece, es como
-        // que alguien lo pisa y lo borra" — coincide exacto con este
-        // patrón. Confirmado con test: 2 disparos seguidos del mismo
-        // QR solo procesan el primero.
-        if (_qrfProcesando) return;
-        _qrfProcesando = true;
-        _detenerCamaraQRFicha();
-        _procesarQRFichaEscaneado(textoLeido);
-      },
-      function() { /* frame sin QR, normal — se ignora a propósito */ }
-    ).then(function() {
-      document.getElementById('qrf-reader-vacio').style.display = 'none';
-    }).catch(function(err) {
-      document.getElementById('qrf-reader-vacio').textContent = '⚠️ No se pudo acceder a la cámara. ' + String(err);
-    });
-  } catch(e) {
-    document.getElementById('qrf-reader-vacio').textContent = '⚠️ Lector de QR no disponible acá.';
-  }
-}
-
-function _detenerCamaraQRFicha() {
-  if (_qrfScanner) {
-    try { _qrfScanner.stop().then(function(){ _qrfScanner.clear(); }).catch(function(){}); } catch(e) {}
-    _qrfScanner = null;
-  }
-}
-
-var _datosQRFichaActuales = null;
-
-function _procesarQRFichaEscaneado(textoLeido) {
-  var datos;
-  try { datos = JSON.parse(textoLeido); }
-  catch(e) { alert('El QR no tiene un JSON válido.'); _abrirScannerQRFicha(); return; }
-
-  var telefonoDetectado = datos.telefono || datos.tel || datos.phone || datos.celular || datos.movil || '';
-
-  _datosQRFichaActuales = {
-    id: datos.id, nombre: datos.nombre || '', apellido: datos.apellido || '',
-    dni: datos.dni || '', email: datos.email || '', telefono: telefonoDetectado,
-    vip: !!datos.vip, categoria: datos.categoria || '',
-  };
-
-  // Mismo criterio que index.html: si el QR no trae teléfono, buscar
-  // si este contacto ya existe con uno guardado, antes de mostrar los
-  // datos — así el vendedor lo ve completo, no vacío.
-  var promesaTelefono = telefonoDetectado ? Promise.resolve(null) : fetch(GAS_URL, {
-    method: 'POST', headers: {'Content-Type':'text/plain'},
-    body: JSON.stringify({ accion:'buscarContactoParaQR', nombre: datos.nombre || '', apellido: datos.apellido || '', dni: datos.dni || '' })
-  }).then(function(r){ return r.json(); })
-    .then(function(r){ return (r.ok && r.encontrado && r.contacto.telefono) ? r.contacto.telefono : null; })
-    .catch(function(){ return null; });
-
-  promesaTelefono.then(function(telefonoExistente) {
-    if (telefonoExistente && !_datosQRFichaActuales.telefono) _datosQRFichaActuales.telefono = telefonoExistente;
-    _renderDatosQRFicha();
-    document.getElementById('qrf-paso-scan').style.display = 'none';
-    document.getElementById('qrf-paso-datos').style.display = 'block';
-  });
-}
-
-function _renderDatosQRFicha() {
-  var d = _datosQRFichaActuales;
-  var campo = function(etiqueta, clave, tipo) {
-    return '<div class="qrf-dato-fila"><span class="lbl">' + etiqueta + '</span>' +
-      '<input type="' + (tipo||'text') + '" value="' + _esc(d[clave]||'') + '" oninput="_datosQRFichaActuales[\'' + clave + '\']=this.value"></div>';
-  };
-  document.getElementById('qrf-datos-render').innerHTML =
-    campo('Nombre','nombre') + campo('Apellido','apellido') + campo('Teléfono','telefono','tel') + campo('Email','email','email');
-}
-
-// "Usar estos datos" — guarda Empresa+Contacto (mismo backend que
-// index.html, con dni/vip/categoria incluidos) Y precarga el
-// formulario de seguimiento de esta ficha en el mismo paso, para que
-// el vendedor solo tenga que tocar "Crear Negocio" o "Enviar
-// WhatsApp" una vez.
-window._usarDatosQRFicha = function() {
-  var d = _datosQRFichaActuales;
-  if (!d) return;
-  var nombreCompleto = [d.nombre, d.apellido].filter(Boolean).join(' ');
-
-  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
-    accion:'guardarEmpresaContactoQR', id: d.id||'', nombre: d.nombre||'', apellido: d.apellido||'',
-    dni: d.dni||'', email: d.email||'', telefono: d.telefono||'', vip: !!d.vip, categoria: d.categoria||''
-  }) }).catch(function(){ /* no crítico para seguir con el flujo local */ });
-
-  _precargarContactoQR(d.telefono || '', nombreCompleto);
-
-  if (_pipelinesFichaCache) {
-    _forzarPipelineFacoExtrema(_pipelinesFichaCache);
-  } else {
-    _cargarPipelinesFicha().then(function(lista) { _pipelinesFichaCache = lista; _forzarPipelineFacoExtrema(lista); });
-  }
-
-  _cerrarScannerQRFicha();
-};
+var _pipelinesFichaCache = null; // para forzar "FacoExtrema" sin recargar la lista (el escáner QR que lo usaba se eliminó)
 
 async function _cargarFicha() {
     var params = new URLSearchParams(window.location.search);
@@ -1082,10 +883,6 @@ async function _cargarFicha() {
         if (elPipelineWrap) elPipelineWrap.closest('div').style.display = 'none';
         var elBtnCrearNegocio = document.getElementById('fi-btn-crear-negocio');
         if (elBtnCrearNegocio) elBtnCrearNegocio.style.display = 'none';
-        var elBtnEscanearQR = document.getElementById('fi-btn-escanear-qr');
-        if (elBtnEscanearQR) elBtnEscanearQR.style.display = 'none';
-        var elBtnEscanearQRLabel = document.getElementById('fi-btn-escanear-qr-label');
-        if (elBtnEscanearQRLabel) elBtnEscanearQRLabel.style.display = 'none';
         // BUG REAL — estos 3 son herramientas del VENDEDOR (mandar la
         // ficha, o guardarla en PDF para uso propio) — nunca deberían
         // verse cuando quien abre el link es el cliente (?modo=cliente)
@@ -1696,7 +1493,7 @@ function _formatearTelefonoWsp(raw) {
 async function _cargarEmpresasFicha() {
   if (_empresasCacheFicha) return _empresasCacheFicha;
   try {
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var resp = await fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'listarEmpresas' }) });
     var r = await resp.json();
     _empresasCacheFicha = (r.ok && Array.isArray(r.empresas)) ? r.empresas : [];
@@ -1924,7 +1721,7 @@ async function _registrarContactoYNota(empresaId, idCot, link, hijosEnviados) {
   var contacto = _contactoSeleccionadoFicha;
   if (contacto && contacto.nombre && empresaId) {
     try {
-      var respContacto = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      var respContacto = await fetch(EMPRESAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ accion:'guardarContacto', id: contacto.id || '', empresaId: empresaId,
           nombre: contacto.nombre, telefono: contacto.telefono || '' }) });
       var rContacto = await respContacto.json();
@@ -2107,7 +1904,7 @@ async function _guardarSeguimientoVentas(origen, linkFichaEnviada) {
     // que no hace falta esperar a que la empresa termine de crearse
     // para arrancar la búsqueda — se ahorra un viaje entero de ida y
     // vuelta al backend en el caso de cliente realmente nuevo.
-    var crearEmpresaPromise = empresaId ? Promise.resolve(null) : fetch(GAS_URL, {
+    var crearEmpresaPromise = empresaId ? Promise.resolve(null) : fetch(EMPRESAS_URL, {
       method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'guardarEmpresa', razonSocial: empresaTexto, telefono: (document.getElementById('fi-telefono-destino')||{}).value || '' })
     }).then(function(r){ return r.json(); });
