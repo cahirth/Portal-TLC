@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.10.04.9 (Fase 5a: las reacciones desde la campanita a mensajes de Cotizaciones también van a la función servicio.) -->
 <!-- Portal TLC | index.html | v2026.10.04.3 (MUERTE A APPS SCRIPT / historico.json, Fase 1: el Radar de Inicio lee los negocios directo de Firebase en vez de historico.json de GitHub (sin atraso; GitHub solo de respaldo). Las reacciones desde la campanita a mensajes de Servicio y Eventos van a sus Cloud Functions.) -->
 <!-- Portal TLC | index.html | v2026.10.03.9 (CORRECCIÓN DE SEGURIDAD: el botón Comisiones vuelve a depender SOLO de la columna "Comisiones". El respaldo a "Ver Comisiones" (v2026.09.30.8 a .11) era un error: es otro permiso (ver el % en la ficha de equipo) y les habilitaba el módulo a vendedores externos. El "Comisiones": 0 de Firebase se arregla renombrando la segunda columna "Comisiones" (numérica) de la hoja Vendedores.) -->
 <!-- Portal TLC | index.html | v2026.10.03.8 (Cristian: "al apretar el botón de sincronización se actualice en Firebase, y que la PWA lea cada vez si el usuario tiene acceso o no a tal módulo". El menú ya leía /permisos de Firebase en cada apertura; ahora sin caché del navegador, y además deja la sesión con el Rol y el nombre actuales (los demás módulos leen el rol de la sesión, que antes solo se guardaba al iniciar sesión). Complementa permisos.js v2026.10.03.8, que hace lo mismo al abrir cada módulo.) -->
@@ -2385,7 +2386,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
         // Reacción desde la campanita: Servicio y Eventos van a su Cloud Function (v2026.10.04.3);
         // las de Cotizaciones siguen en Apps Script hasta la Fase 5.
         var urlReaccion = origen === 'evento' ? 'https://us-central1-portal-tlc.cloudfunctions.net/eventosChecklist'
-                        : origen === 'cotizacion' ? GAS_URL_PUSH_IDX : 'https://us-central1-portal-tlc.cloudfunctions.net/servicio';
+                        : 'https://us-central1-portal-tlc.cloudfunctions.net/servicio'; // Cotizaciones también (Fase 5a)
         fetch(urlReaccion, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
           .then(function(){
             return fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},

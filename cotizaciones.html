@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.04.9 (MUERTE A APPS SCRIPT, Fase 5a: cambiar estado, notas (agregar/editar/eliminar), reasignar vendedor, colaborador, teléfono, contacto y checks de cierre van a la Cloud Function cotizaciones v3; el chat (enviar, reaccionar, respaldo de leer) y las reacciones desde la campanita, a la función servicio v8. Siguen en Apps Script: subir/actualizar cotización, eliminar negocio y eliminar versión de presupuesto (Fase 5b).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.6 (MUERTE A APPS SCRIPT, Fase 2: los adjuntos de Ventas (subir/borrar) van a la Cloud Function servicio v6, que maneja los adjuntos de Servicio y Cotizaciones con el mismo Storage y las mismas rutas.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.4 (Cristian: "en Estado de Preparación y Despacho permitime clickear e ir al servicio para ver más detalle". La tarjeta completa (y el enlace "Ver en Servicio ›" del título) abre la Orden de Preparación en servicio.html, directo en la sección de equipos.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: listarEmpresas → Cloud Function empresas; asignarPipelineNegocio → Cloud Function pipelines (agregada ahí, v2); las reacciones desde la campanita a mensajes de Servicio y Eventos van a sus Cloud Functions (las de Cotizaciones siguen en Apps Script hasta la Fase 5).) -->
@@ -1097,6 +1098,9 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbww2WC4wuvCiZnl
 // usado también en eventos/index/servicio/selector-dispositivos). Solo
 // estas 5 acciones puntuales van acá — el resto de este archivo sigue
 // en APPS_SCRIPT_URL sin tocar.
+// MUERTE A APPS SCRIPT (Fase 5a, v2026.10.04.9): estado, notas, vendedor, colaborador,
+// teléfono, contacto y checks de cierre → función cotizaciones; el chat → servicio.
+const COTIZACIONES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/cotizaciones';
 const NOTIFICACIONES_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/notificaciones'; // Cloud Function desplegada 2026.09.27
 // MUERTE A APPS SCRIPT — módulo Pipelines migrado. Solo estas 3
 // acciones puntuales van acá — el resto de este archivo sigue en
@@ -1474,7 +1478,7 @@ window._reaccionarMensajeCot = function(ev, indice, tipo) {
     if (!email || !_idCotActual) return;
     var entradaActual = (typeof todasLasCot !== 'undefined' ? todasLasCot : []).find(function(x){ return String(x.idCot || x.id_cotizacion || x.id || '') === String(_idCotActual); });
     var titulo = entradaActual ? (entradaActual.nombreNegocio || entradaActual.razonSocial || '') : '';
-    fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ accion:'cot_reaccionarMensaje', id_cotizacion:_idCotActual, indice:indice, autor_email:email, autor_nombre:nombre, reaccion:tipo, titulo:titulo }) })
         .then(function(r){ return r.json(); })
         .then(function(r) {
@@ -1587,7 +1591,7 @@ async function _leerMensajesCot(id) {
     } catch(eRtdb) { console.warn('[Mensajes] Firebase falló, uso Apps Script de respaldo:', eRtdb); }
     // Respaldo: el camino anterior, por Apps Script
     try {
-        var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        var resp = await fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'cot_listarMensajes', id_cotizacion:id }) });
         var r = await resp.json();
         return (r.ok && Array.isArray(r.mensajes)) ? r.mensajes : [];
@@ -1745,7 +1749,7 @@ window._enviarMensajeCot = function() {
     var boxSugerencias = document.getElementById('mencion-sugerencias-cot');
     if (boxSugerencias) boxSugerencias.style.display = 'none';
 
-    fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ accion:'cot_agregarMensaje', id_cotizacion:idParaEnviar, texto:texto,
             autor_nombre:autorNombre, autor_email:autorEmail, menciones:menciones, titulo:titulo, respuesta_a:respuestaAEnviar }) })
     .then(function(r){ return r.json(); })
@@ -1959,7 +1963,7 @@ window._reaccionarNotifCot = function(ev, idNoti, tipo, origen, ticketId, mensaj
         // Reacción desde la campanita: Servicio y Eventos ya van a su Cloud
         // Function; Cotizaciones sigue en Apps Script hasta la Fase 5.
         var urlReaccion = origen === 'evento' ? 'https://us-central1-portal-tlc.cloudfunctions.net/eventosChecklist'
-                        : origen === 'cotizacion' ? APPS_SCRIPT_URL : SERVICIO_URL;
+                        : SERVICIO_URL; // Cotizaciones también (Fase 5a)
         fetch(urlReaccion, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
             .then(function(){
                 return fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
@@ -3427,7 +3431,7 @@ window._toggleContactoCotizacion = async function(idCot, indice, marcado) {
     const principal = marcados[0];
     const adicionales = marcados.slice(1);
     try {
-        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        const resp = await fetch(COTIZACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({
                 accion: 'actualizarContactoCotizacion',
                 idCot: idCot,
@@ -3586,7 +3590,7 @@ function _mutarEstadoCotizacion(id, nuevoEstado, elSelect) {
 
     // Paso B: encolar escritura serializada → recargar JSON al confirmar
     _mutacionQueue = _mutacionQueue.then(() =>
-        fetch(APPS_SCRIPT_URL, {
+        fetch(COTIZACIONES_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({ accion: 'actualizarEstado', idCot: id, estado: nuevoEstado }),
@@ -3691,7 +3695,7 @@ function _mutarVendedorCotizacion(id, nuevoVendedor) {
 
     // Paso B: encolar escritura serializada (mismo patrón que estado)
     _mutacionQueue = _mutacionQueue.then(() =>
-        fetch(APPS_SCRIPT_URL, {
+        fetch(COTIZACIONES_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({ accion: 'reasignarVendedor', idCot: id, vendedor: nuevoVendedor }),
@@ -3725,7 +3729,7 @@ function _mutarColaboradorCotizacion(id, nuevoColaborador) {
 
     // Paso B: encolar escritura serializada (mismo patrón que vendedor/estado)
     _mutacionQueue = _mutacionQueue.then(() =>
-        fetch(APPS_SCRIPT_URL, {
+        fetch(COTIZACIONES_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({ accion: 'actualizarColaborador', idCot: id, colaborador: nuevoColaborador }),
@@ -3760,7 +3764,7 @@ function _guardarTelefonoSiCambio(id, inputEl) {
 
     // Paso B: persistir + sincronizar a HubSpot Contact (backend)
     _mutacionQueue = _mutacionQueue.then(() =>
-        fetch(APPS_SCRIPT_URL, {
+        fetch(COTIZACIONES_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({ accion: 'actualizarTelefono', idCot: id, telefono: nuevoTelefono }),
@@ -3856,7 +3860,7 @@ async function _eliminarNota(id, ni) {
     if (c && Array.isArray(c.notas_papiro)) {
         c.notas_papiro.splice(ni, 1);
         _renderDetalle(c); // re-renderizar sin la nota
-        fetch(APPS_SCRIPT_URL, {
+        fetch(COTIZACIONES_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({ accion: 'eliminarNota', idCot: id, indice: ni }),
@@ -3883,7 +3887,7 @@ async function _guardarEdicionNota(id, ni) {
         _cancelarEdicionNota(id, ni);
 
         // Persistir nota completa actualizada
-        fetch(APPS_SCRIPT_URL, {
+        fetch(COTIZACIONES_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({ accion: 'editarNota', idCot: id, indice: ni, texto: nuevoTexto }),
@@ -3913,7 +3917,7 @@ async function _guardarNotaInline(id) {
     };
 
     try {
-        const resp = await fetch(APPS_SCRIPT_URL, {
+        const resp = await fetch(COTIZACIONES_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({ accion: 'agregarNota', idCot: id, nota: nuevaNota }),
@@ -4017,7 +4021,7 @@ async function _toggleUrgenteDesdeTarjeta(id, activar) {
         const textoNotaUrgente = activar
             ? ('📌 Marcado como urgente' + (nota ? ': ' + nota : ''))
             : '📌 Desmarcado como urgente';
-        await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        await fetch(COTIZACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'agregarNota', idCot:id, nota:{
                 texto: textoNotaUrgente, fecha: new Date().toISOString(), vendedor: currentUserNombre,
             } }) });
@@ -4106,7 +4110,7 @@ function _toggleCheckCierre(id, checkKey) {
   if (cotActual && (cotActual.idCot || cotActual.id_cotizacion || String(cotActual.id || '')) === id) _renderDetalle(c);
   aplicarFiltros(); // refresca los puntitos de la tarjeta cerrada
 
-  fetch(APPS_SCRIPT_URL, {
+  fetch(COTIZACIONES_URL, {
     method:  'POST',
     headers: { 'Content-Type': 'text/plain' },
     body:    JSON.stringify({ accion: 'actualizarCheckCierre', idCot: id, check: checkKey, activo: nuevoActivo, autor: currentUserNombre || '' }),

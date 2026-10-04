@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.04.9 (Fase 5a: las reacciones desde la campanita a mensajes de Cotizaciones también van a la función servicio.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.8 (Fase 3 — Cristian: "para cargar Servicio es lento". Las fotos nuevas ya se guardan en Firebase Storage (función servicio v7) y en el ticket queda el link. Para las fotos viejas, un Administrador ve el aviso "⚡ N tickets tienen fotos a la vieja usanza" con el botón "Optimizar ahora": hace backup completo de servicio_tecnico en Firebase y mueve las fotos a Storage en tandas, mostrando el avance. Al terminar, la lista de Servicio (y Tareas y Cuenta Corriente) pesa una fracción.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.6 (MUERTE A APPS SCRIPT, Fase 2: los adjuntos (subir/borrar) van a la Cloud Function servicio v6 en vez de Apps Script.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.4 (Link desde Ventas: servicio.html?ticket=<id>&ver=preparacion abre la Orden de Preparación y la deja en la sección de equipos en vez del chat.) -->
@@ -3947,7 +3948,7 @@ window._reaccionarNotif = function(ev, idNoti, tipo, origen, ticketId, mensajeIn
     // Reacción desde la campanita: Servicio y Eventos van a su Cloud Function (v2026.10.04.3);
     // las de Cotizaciones siguen en Apps Script hasta la Fase 5.
     var urlReaccion = origen === 'evento' ? 'https://us-central1-portal-tlc.cloudfunctions.net/eventosChecklist'
-                    : origen === 'cotizacion' ? GAS_URL : 'https://us-central1-portal-tlc.cloudfunctions.net/servicio';
+                    : 'https://us-central1-portal-tlc.cloudfunctions.net/servicio'; // Cotizaciones también (Fase 5a)
     fetch(urlReaccion, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
       .then(function(){
         return fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},

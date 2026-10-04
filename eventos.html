@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.04.9 (Fase 5a: las reacciones desde la campanita a mensajes de Cotizaciones también van a la función servicio.) -->
 <!-- Portal TLC | eventos.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: las reacciones desde la campanita a mensajes de Servicio y Eventos van a sus Cloud Functions; las de Cotizaciones siguen en Apps Script hasta la Fase 5.) -->
 <!-- Portal TLC | eventos.html | v2026.10.02.1 (Cristian: "quiero el micrófono en los 3 módulos". Botón 🎤 de dictado por voz al lado de "Enviar" en el chat de mensajes internos, vía dictado.js (compartido con los otros 2 módulos). Escribe en el cuadro, nunca envía solo.) -->
 <!-- Portal TLC | eventos.html | v2026.09.30.2 (Cristian: "quiero que cuando abras la tarjeta, en cualquier módulo, se abra de inmediato y que los mensajes aparezcan de inmediato". 3 cambios en la tarjeta: (1) si no estaba en caché, el modal ahora se abre al instante con "Abriendo..." en vez de quedar sin respuesta hasta que contesta el servidor; si se cierra mientras carga, ya no se vuelve a abrir solo. (2) BUG REAL: con caché, el refresco de fondo traía los mensajes nuevos pero nunca los mostraba (a propósito no repintaba nada para no pisar ediciones); ahora repinta SOLO la lista de mensajes. (3) Mientras la tarjeta está abierta y la pestaña visible, los mensajes se consultan cada 10 s (antes no había ningún refresco: los mensajes de otros solo aparecían al cerrar y reabrir).) -->
@@ -3166,7 +3167,7 @@ window._reaccionarNotifEv = function(ev, idNoti, tipo, origen, ticketId, mensaje
     // Reacción desde la campanita: Servicio y Eventos van a su Cloud Function (v2026.10.04.3);
     // las de Cotizaciones siguen en Apps Script hasta la Fase 5.
     var urlReaccion = origen === 'evento' ? 'https://us-central1-portal-tlc.cloudfunctions.net/eventosChecklist'
-                    : origen === 'cotizacion' ? GAS_URL : 'https://us-central1-portal-tlc.cloudfunctions.net/servicio';
+                    : 'https://us-central1-portal-tlc.cloudfunctions.net/servicio'; // Cotizaciones también (Fase 5a)
     fetch(urlReaccion, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadMsg) })
       .then(function(){ return fetch(NOTIFICACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'marcarNotificacionLeida', email:email, id:idNoti }) }); })
       .then(function(){ _cargarNotificaciones(true); });
