@@ -1,5 +1,7 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v8 — 2026.10.04 — Fase 5a: chat de Cotizaciones (cot_listarMensajes,
+//   cot_agregarMensaje con menciones por mail/push, cot_reaccionarMensaje).
 // v7 — 2026.10.04 — Fase 3: las fotos de los tickets (y la firma de las
 //   órdenes) se guardan en Firebase Storage y en el ticket queda el link.
 //   st_backupServicio + st_migrarFotosServicio para mover las existentes.
@@ -646,6 +648,100 @@ async function st_migrarFotosServicio(data) {
   return { ok: true, migrados, fotosSubidas, quedan, errores: conError };
 }
 
+// ══════════════════════════════════════════════════════════════════
+// CHAT DE COTIZACIONES — v8 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 5a)
+// ══════════════════════════════════════════════════════════════════
+// Viven en esta función (y no en "cotizaciones") porque acá ya están el
+// mail por Brevo, el push y el registro de notificaciones que usan las
+// menciones. Misma lógica que FotoMap.gs, con transacción sobre la lista
+// de mensajes del negocio (cotizaciones/<id>/mensajes).
+function _rutaMensajesCot(id) { return 'cotizaciones/' + rtdbKeySeguro(id) + '/mensajes'; }
+
+async function cot_listarMensajes(data) {
+  const id = String(data.id_cotizacion || '').trim();
+  if (!id) return { ok: false, error: 'Falta id_cotizacion' };
+  return { ok: true, mensajes: comoArray(await fbGet(_rutaMensajesCot(id))) };
+}
+
+async function cot_agregarMensaje(data) {
+  const id = String(data.id_cotizacion || '').trim();
+  const texto = String(data.texto || '').trim();
+  const titulo = String(data.titulo || '').trim();
+  const autorNombre = String(data.autor_nombre || '').trim();
+  const autorEmail = String(data.autor_email || '').trim();
+  const menciones = Array.isArray(data.menciones) ? data.menciones.filter(Boolean) : [];
+  if (!id || !texto) return { ok: false, error: 'Faltan id_cotizacion o texto' };
+  if (!(await fbGet('cotizaciones/' + rtdbKeySeguro(id)))) return { ok: false, error: 'Negocio no encontrado: ' + id };
+  const respuestaA = (data.respuesta_a && typeof data.respuesta_a.indice === 'number')
+    ? { indice: data.respuesta_a.indice, autor_nombre: String(data.respuesta_a.autor_nombre || '').trim(), texto_snippet: String(data.respuesta_a.texto_snippet || '').trim() }
+    : null;
+  let indiceMensajeNuevo = -1;
+  const res = await db.ref(_rutaMensajesCot(id)).transaction((actual) => {
+    const mensajes = comoArray(actual);
+    const nuevo = { texto, autor_nombre: autorNombre, autor_email: autorEmail, menciones, fecha: new Date().toISOString() };
+    if (respuestaA) nuevo.respuesta_a = respuestaA;
+    mensajes.push(nuevo);
+    indiceMensajeNuevo = mensajes.length - 1;
+    return mensajes;
+  });
+  if (!res.committed) return { ok: false, error: 'No se pudo guardar el mensaje — probá de nuevo' };
+  const mensajes = comoArray(res.snapshot.val());
+  const linkCot = 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(id);
+  await Promise.all(menciones.filter((email) => email && email !== autorEmail).map(async (email) => {
+    await enviarEmailBrevo(email, '', 'Te mencionaron en una cotización — ' + (titulo || id),
+      '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;">' +
+        '<h2 style="color:#1a4b8c;margin-bottom:8px;">Portal TLC</h2>' +
+        '<p><strong>' + escHtml(autorNombre || autorEmail) + '</strong> te mencionó en la cotización <strong>' + escHtml(id) + '</strong>' + (titulo ? ' (' + escHtml(titulo) + ')' : '') + ':</p>' +
+        '<div style="background:#f1f5f9;border-left:4px solid #3a86ff;padding:12px 16px;border-radius:8px;margin:16px 0;font-style:italic;color:#0f172a;">' + escHtml(texto) + '</div>' +
+        '<a href="' + linkCot + '" style="display:inline-block;padding:10px 20px;background:#3a86ff;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">Abrir cotización</a>' +
+      '</div>');
+    const tokens = await obtenerTokensPush(email);
+    await Promise.all(tokens.map((tok) => enviarPush(tok, 'Te mencionaron en una cotización', (autorNombre || autorEmail) + ': ' + texto, linkCot)));
+    await registrarNotificacion(email, 'mencion', texto, id, titulo, autorNombre || autorEmail, 'cotizacion', indiceMensajeNuevo);
+  }));
+  return { ok: true, mensajes };
+}
+
+async function cot_reaccionarMensaje(data) {
+  const id = String(data.id_cotizacion || '').trim();
+  const indice = parseInt(data.indice, 10);
+  const email = String(data.autor_email || '').trim();
+  const nombre = String(data.autor_nombre || '').trim();
+  const reaccion = String(data.reaccion || '').trim();
+  const titulo = String(data.titulo || '').trim();
+  if (!id || isNaN(indice)) return { ok: false, error: 'Faltan id_cotizacion o indice' };
+  const emailKey = rtdbKeySeguro(email.toLowerCase());
+  if (!emailKey) return { ok: false, error: 'Falta email' };
+  if (!['ok', 'no_ok', 'corazon'].includes(reaccion)) return { ok: false, error: 'Reacción inválida' };
+  let errorValidacion = null, esNueva = false, autorMsgEmail = '', textoMsg = '';
+  const res = await db.ref(_rutaMensajesCot(id)).transaction((actual) => {
+    const mensajes = comoArray(actual);
+    errorValidacion = null;
+    if (!mensajes[indice]) { errorValidacion = 'Mensaje no encontrado'; return actual; }
+    if (!mensajes[indice].reacciones) mensajes[indice].reacciones = {};
+    const yaExiste = mensajes[indice].reacciones[emailKey];
+    esNueva = !yaExiste || yaExiste.reaccion !== reaccion;
+    if (yaExiste && yaExiste.reaccion === reaccion) delete mensajes[indice].reacciones[emailKey];
+    else mensajes[indice].reacciones[emailKey] = { reaccion, nombre: nombre || email };
+    autorMsgEmail = String(mensajes[indice].autor_email || '').trim();
+    textoMsg = String(mensajes[indice].texto || '');
+    return mensajes;
+  });
+  if (errorValidacion) return { ok: false, error: errorValidacion };
+  if (esNueva && autorMsgEmail && autorMsgEmail.toLowerCase() !== email.toLowerCase()) {
+    const emoji = ({ ok: '👍', no_ok: '👎', corazon: '❤️' })[reaccion] || '';
+    const quien = nombre || email || 'Alguien';
+    await registrarNotificacion(autorMsgEmail, 'reaccion', quien + ' reaccionó ' + emoji + ' a tu mensaje: "' + textoMsg.slice(0, 80) + '"', id, titulo, quien, 'cotizacion');
+    await enviarEmailBrevo(autorMsgEmail, '', quien + ' reaccionó a tu mensaje en Portal TLC',
+      '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;">' +
+        '<h2 style="color:#1a4b8c;margin-bottom:8px;">Portal TLC</h2>' +
+        '<p><strong>' + escHtml(quien) + '</strong> reaccionó ' + emoji + ' a tu mensaje:</p>' +
+        '<div style="background:#f1f5f9;border-left:4px solid #3a86ff;padding:12px 16px;border-radius:8px;margin:16px 0;font-style:italic;color:#0f172a;">' + escHtml(textoMsg) + '</div>' +
+      '</div>');
+  }
+  return { ok: true, mensajes: comoArray(res.snapshot.val()) };
+}
+
 async function st_crearOrdenPreparacion(data) {
   const idNegocio = String(data.id_negocio || '').trim();
   const fechaLimite = String(data.fecha_limite_despacho || '').trim();
@@ -1233,6 +1329,7 @@ const ACCIONES = {
   st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden, registrarInstalacionPOE8,
   subirAdjunto, eliminarAdjunto,
   st_backupServicio, st_migrarFotosServicio,
+  cot_listarMensajes, cot_agregarMensaje, cot_reaccionarMensaje,
   st_guardarEtiquetasCajas, eliminarVersionPresupuestoTicket, guardarAsignadosEtapa,
 };
 
