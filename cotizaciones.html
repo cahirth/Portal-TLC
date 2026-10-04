@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.04.10 (MUERTE A APPS SCRIPT, Fase 5b: eliminar negocio y eliminar versión de presupuesto → Cloud Function cotizaciones v4 (la versión ahora se borra en Firebase, antes solo en historico.json). En Apps Script queda solo la Pantalla Comercial (subir/actualizar cotización), que ya no es accesible desde ningún botón.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.9 (MUERTE A APPS SCRIPT, Fase 5a: cambiar estado, notas (agregar/editar/eliminar), reasignar vendedor, colaborador, teléfono, contacto y checks de cierre van a la Cloud Function cotizaciones v3; el chat (enviar, reaccionar, respaldo de leer) y las reacciones desde la campanita, a la función servicio v8. Siguen en Apps Script: subir/actualizar cotización, eliminar negocio y eliminar versión de presupuesto (Fase 5b).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.6 (MUERTE A APPS SCRIPT, Fase 2: los adjuntos de Ventas (subir/borrar) van a la Cloud Function servicio v6, que maneja los adjuntos de Servicio y Cotizaciones con el mismo Storage y las mismas rutas.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.4 (Cristian: "en Estado de Preparación y Despacho permitime clickear e ir al servicio para ver más detalle". La tarjeta completa (y el enlace "Ver en Servicio ›" del título) abre la Orden de Preparación en servicio.html, directo en la sección de equipos.) -->
@@ -3519,7 +3520,7 @@ async function _ejecutarBorradoDeal(idCot) {
         btn.style.opacity = '0.6';
     }
     try {
-        const resp = await fetch(APPS_SCRIPT_URL, {
+        const resp = await fetch(COTIZACIONES_URL, {
             method:  'POST',
             headers: { 'Content-Type': 'text/plain' },
             body:    JSON.stringify({ accion: 'eliminarDeal', idCot }),
@@ -4488,7 +4489,7 @@ let _pcItems    = [];    // array de ítems editables
 async function _borrarVersionPresupuesto(idCot, nroVersion) {
     if (!confirm('¿Borrar la versión v' + nroVersion + ' del historial? No se puede deshacer.')) return;
     try {
-        const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        const resp = await fetch(COTIZACIONES_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
             body: JSON.stringify({ accion:'eliminarVersionPresupuesto', idCot: idCot, version: nroVersion })
         });
         const r = await resp.json();

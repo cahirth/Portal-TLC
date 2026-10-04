@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.10.04.10 (MUERTE A APPS SCRIPT, Fase 5b: agregar nota, apilar ficha técnica y buscar negocio agrupable → Cloud Function cotizaciones v4. La Ficha de equipo ya no llama a Apps Script.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: listarEmpresas, guardarEmpresa y guardarContacto pasan a la Cloud Function empresas (ya existían ahí, misma respuesta). Eliminado el escáner QR de FacoExtrema (dado de baja el 28/09): botón, modal, funciones, estilos y la librería html5-qrcode, con las llamadas buscarContactoParaQR/guardarEmpresaContactoQR. Siguen en Apps Script agregarNota, apilarFichaTecnica y buscarNegocioAgrupable (van con Cotizaciones, Fase 5).) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.09.28.1 (MUERTE A APPS SCRIPT — módulo Pipelines migrado. listarPipelines y guardarPipeline (este archivo no usa eliminarPipeline) ahora apuntan a PIPELINES_URL en vez de GAS_URL — el resto de este archivo sigue sin tocar. De paso, Cristian pidió sacarle visibilidad al botón de "Escanear QR del visitante" (buscarContactoParaQR no se va a migrar, se decidió dar de baja la función de contacto por QR) — el botón y su etiqueta quedan ocultos con display:none, sin tocar la lógica de abajo (_abrirScannerQRFicha, _precargarContactoQR, etc.), que se deja intacta para una limpieza más a fondo en otro momento.) -->
@@ -1748,7 +1749,7 @@ async function _registrarContactoYNota(empresaId, idCot, link, hijosEnviados) {
 
   for (var i = 0; i < notasAAgregar.length; i++) {
     try {
-      await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      await fetch('https://us-central1-portal-tlc.cloudfunctions.net/cotizaciones', { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ accion:'agregarNota', idCot: idCot, nota: {
           texto: notasAAgregar[i],
           vendedor: (_sesionVendedor && _sesionVendedor.name) || '',
@@ -1822,7 +1823,7 @@ async function _guardarSeguimientoVentas(origen, linkFichaEnviada) {
   async function _apilarTodosLosItems(idCot) {
     var totalFinal = 0;
     for (var i = 0; i < itemsParaApilar.length; i++) {
-      var respItem = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+      var respItem = await fetch('https://us-central1-portal-tlc.cloudfunctions.net/cotizaciones', { method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ accion: 'apilarFichaTecnica', idCot: idCot, ficha: itemsParaApilar[i] }) });
       var rItem = await respItem.json();
       if (!rItem.ok) return { ok: false, error: rItem.error };
@@ -1909,7 +1910,7 @@ async function _guardarSeguimientoVentas(origen, linkFichaEnviada) {
       body: JSON.stringify({ accion:'guardarEmpresa', razonSocial: empresaTexto, telefono: (document.getElementById('fi-telefono-destino')||{}).value || '' })
     }).then(function(r){ return r.json(); });
 
-    var buscarPromise = fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    var buscarPromise = fetch('https://us-central1-portal-tlc.cloudfunctions.net/cotizaciones', { method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ accion:'buscarNegocioAgrupable', empresaId: empresaId, razonSocial: empresaTexto, pipeline_id: pipelineElegido })
     }).then(function(r){ return r.json(); });
 
