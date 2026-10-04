@@ -1,6 +1,6 @@
 # Plan de migración — Apps Script → Cloud Functions
 
-**Última actualización:** 03/10/2026 (frontend en `v2026.10.02.1`)
+**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.3`) — Fase 1 completa
 
 **Objetivo:** sacar el Portal TLC de Apps Script por completo, sacar `historico.json` (y los datos en general) del repositorio de código, y eliminar todo lo que ralentiza la app. Se hace módulo por módulo, con el patrón ya probado: una Cloud Function equivalente, testeada, con su propia URL, apuntada desde el frontend sin tocar el resto.
 
@@ -16,21 +16,21 @@
 | Checklists y POE | `Check lists/`, `POE/` |
 | Cloud Functions (respaldo del código desplegado) | `FUNCTIONS-BACKUP/<modulo>-function/` (`index.js` + `package.json`) |
 | Asistente IA | `FUNCTIONS-BACKUP/functions/` |
-| Apps Script | `FUNCTIONS-BACKUP/apps-script/FotoMap.gs` *(pendiente de subir)* |
-| Este plan | raíz: `PLAN-MIGRACION.md` |
+| Apps Script | `FUNCTIONS-BACKUP/apps-script/fotomap.gs.txt` |
+| Este plan | `FUNCTIONS-BACKUP/PLAN-MIGRACION.md` |
 
 **Regla:** cada vez que se despliega una Cloud Function, se sube el mismo `index.js` a su carpeta en `FUNCTIONS-BACKUP/`, para que el respaldo coincida con lo que corre.
 
 **Desplegar una función (CMD, en la carpeta con `index.js` y `package.json`):**
 ```
-gcloud functions deploy <nombre> --gen2 --region=us-central1 --runtime=nodejs20 --source=. --entry-point=<nombre> --trigger-http --allow-unauthenticated
+gcloud functions deploy <nombre> --gen2 --region=us-central1 --runtime=nodejs22 --source=. --entry-point=<nombre> --trigger-http --allow-unauthenticated
 ```
 
 ---
 
-## 📊 Estado en números (relevado del código el 30/09)
+## 📊 Estado en números (relevado del código el 04/10)
 
-- **66 llamadas** a Apps Script en el frontend, **~40 acciones distintas**, repartidas en 13 archivos.
+- **59 llamadas** a Apps Script en el frontend (eran 66 el 30/09), repartidas en 13 archivos. Lo que queda es Cotizaciones, Cuenta Corriente, Checklists/POE, Login y el selector.
 - **Ya no llaman a Apps Script:** `presupuesto-editor.html`, `mi-dia.html`, `comisiones.html`.
 - **Commits de datos al repo:** ~113 por día (57 de `sincronizarRTDBaGitHub` + 56 de `precios.json`). Cada uno dispara un build de GitHub Pages.
 - **El mayor problema de velocidad que queda:** `servicio_tecnico.json` pesa ~11 MB por las fotos en base64, y lo descargan completo **Servicio Técnico, Cuenta Corriente y Tareas**.
@@ -51,6 +51,10 @@ gcloud functions deploy <nombre> --gen2 --region=us-central1 --runtime=nodejs20 
 | Internos | listarInternos | `internos` |
 | Comisiones | calcularComisiones, guardarComisionManual | `internos` |
 | Cotizaciones (parcial) | guardarPresupuestoEditor | `cotizaciones` (v2) |
+| Pipelines (parcial Cotizaciones) | asignarPipelineNegocio | `pipelines` (v2) |
+| Empresas desde Ficha de equipo y Cotizaciones | listarEmpresas, guardarEmpresa, guardarContacto | `empresas` (ya existían; se redirigió el frontend) |
+| Reacciones desde la campanita (Servicio y Eventos) | st_reaccionarMensaje, ev_reaccionarMensaje | `servicio` / `eventosChecklist` |
+| Radar de Inicio | lectura de negocios | Firebase directo (antes `historico.json` de GitHub) |
 | Cotizaciones — lectura de mensajes | cot_listarMensajes lee directo `cotizaciones/{id}/mensajes` de Firebase (Apps Script solo como respaldo) | — (Firebase directo) |
 
 ---
@@ -75,20 +79,37 @@ gcloud functions deploy <nombre> --gen2 --region=us-central1 --runtime=nodejs20 
 
 ---
 
+## 🆕 Hecho el 03 y 04/10
+
+| Versión | Qué |
+|---|---|
+| .10.03.1 | Dictado 🎤: arreglado en Android (repetía palabras). |
+| .10.03.2 → .4 | **Servicio — métricas de carga por técnico** (tabla por etapa: Diagnóstico, Presupuesto, Reparación, Preparación, Para facturar; personas = asignados de cada columna; verde = menos carga). Administrador ve todo; el resto, su fila. |
+| .10.03.4 | Orden de Preparación: cuando todos los equipos quedan "Listo para despacho", el responsable pasa solo a Lourdes. |
+| .10.03.5 + función `servicio` v2 | **Dividir entrega (envío parcial)**: órdenes -E2, -E3… con su propio remito/etiquetas; el negocio refleja la entrega más atrasada. |
+| .10.03.6 | **Responsable único** en Órdenes de Preparación (tarjeta, detalle, filtro y métricas usan el mismo dato). |
+| .10.03.7 → .9 | **Permisos**: cada módulo consulta Firebase en cada apertura (sin caché); el rol de la sesión se actualiza solo; se quitó el alias "Ver Comisiones" (abría Comisiones a externos). |
+| .10.03.10 | Servicio reconoce al técnico por su email real (arregla "Mi carga" y "Asignados a mí"). |
+| .10.03.11 | Cuenta Corriente: liquidar/deshacer según el tilde **"Liquidar Gastos"** de la hoja Vendedores. |
+| .10.03.12 | Tarjetas de Servicio pasan solas a **"En curso"** cuando el asignado trabaja en ellas. |
+| .10.04.1 + `servicio` v3 | La **Garantía** ya no entra en las Órdenes de Preparación (y se limpia sola en las viejas). Editor de presupuesto: **filas ordenables** arrastrando ⠿. |
+| .10.04.2 + `servicio` v4 | **Progreso de preparación**: "Listo para despacho" con serie y calidad = 100 %; "Enviado" es solo una marca (🚚, violeta). |
+| .10.04.3 + `pipelines` v2 | **Fase 1 completa** (ver Orden de trabajo). |
+
 ## 📍 Lo que todavía llama a Apps Script (por archivo)
 
 | Archivo | Acciones | Destino propuesto |
 |---|---|---|
-| `cotizaciones.html` (21 llamadas) | actualizarCheckCierre, actualizarColaborador, actualizarContactoCotizacion, actualizarCotizacion, actualizarEstado, actualizarTelefono, agregarNota, editarNota, eliminarNota, asignarPipelineNegocio, cot_agregarMensaje, cot_reaccionarMensaje, eliminarDeal, eliminarVersionPresupuesto, reasignarVendedor, subirCotizacion · **listarEmpresas** · respaldo de cot_listarMensajes · reacción desde la campanita | `cotizaciones` (listarEmpresas → `empresas`, asignarPipelineNegocio → `pipelines`) |
+| `cotizaciones.html` | actualizarCheckCierre, actualizarColaborador, actualizarContactoCotizacion, actualizarCotizacion, actualizarEstado, actualizarTelefono, agregarNota, editarNota, eliminarNota, cot_agregarMensaje, cot_reaccionarMensaje, eliminarDeal, eliminarVersionPresupuesto, reasignarVendedor, subirCotizacion · respaldo de cot_listarMensajes | `cotizaciones` (Fase 5) |
 | `adjuntos.js` (Servicio y Cotizaciones) | subirAdjunto, eliminarAdjunto | `servicio` / `cotizaciones` (idealmente a Firebase Storage) |
-| `ficha-equipo.html` | **listarEmpresas, guardarEmpresa, guardarContacto** · agregarNota, apilarFichaTecnica, buscarNegocioAgrupable · buscarContactoParaQR, guardarEmpresaContactoQR (QR, a borrar) | `empresas` / `cotizaciones` |
+| `ficha-equipo.html` | agregarNota, apilarFichaTecnica, buscarNegocioAgrupable | `cotizaciones` (Fase 5) |
 | `cuenta-corriente.html` | listarGastosGeneralesPendientes, agregarGastoGeneral, editarGastoGeneral, crearLiquidacion, listarLiquidaciones, revertirLiquidacion, obtenerSaldoInicial | Cloud Function nueva o extender `internos` |
 | `Check lists/` (5 archivos) | listarTecnicos, st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden | `internos` / `servicio` |
 | `POE/POE8_Instalacion.html` | registrarInstalacionPOE8 | `servicio` |
 | `index.html`, `selector-dispositivos.html` | solicitarCodigoLogin, verificarCodigoLogin (LOGIN) | Cloud Function nueva, con fallback |
 | `selector-dispositivos.html` | registrarCotizacion · consultarCliente (ARCA) y sincronizarHubSpot (a borrar) | `cotizaciones` |
 | `empresas.html` | crearNegocioVacio | `cotizaciones` |
-| `eventos.html`, `servicio.html`, `cotizaciones.html` | reacción a un mensaje desde la campanita (`st_/ev_/cot_reaccionarMensaje`) | `servicio` / `eventosChecklist` (ya las tienen) / `cotizaciones` |
+| `index.html`, `eventos.html`, `servicio.html`, `cotizaciones.html` | reacción desde la campanita a un mensaje de **Cotizaciones** (cot_reaccionarMensaje) | `cotizaciones` (Fase 5) |
 | Triggers de Apps Script | sincronizarPermisosAFirebase, sincronizarPreciosAFirebase, sincronizarRTDBaGitHub | Ver Fase 6 y 8 |
 
 ---
@@ -98,8 +119,8 @@ gcloud functions deploy <nombre> --gen2 --region=us-central1 --runtime=nodejs20 
 Decidido el 28/09/2026: **ARCA** (validación de CUIT) y **contacto por QR**.
 
 - ✅ QR eliminado de `index.html` y `empresas.html`.
-- ⏳ QR: queda el código en `ficha-equipo.html` (el botón ya estaba oculto).
-- ⏳ ARCA: queda la UI en `empresas.html` y `consultarCliente` en `selector-dispositivos.html`.
+- ✅ QR eliminado también de `ficha-equipo.html` (04/10).
+- ⏳ ARCA: ya no está en `empresas.html`; queda `consultarCliente` en `selector-dispositivos.html`, dentro del flujo de registrar cotización → se borra en la Fase 5 junto con `registrarCotizacion`.
 - `sincronizarHubSpot`: HubSpot está desactivado, se borra junto con ARCA.
 
 ---
@@ -169,13 +190,13 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 
 ## 🗺️ Orden de trabajo
 
-### Fase 1 — Victorias rápidas (una sesión, cambios chicos)
-- [ ] `cotizaciones.html`: `listarEmpresas` → `empresas`; `asignarPipelineNegocio` → `pipelines` (si la función lo tiene o se agrega).
-- [ ] `ficha-equipo.html`: `listarEmpresas`, `guardarEmpresa`, `guardarContacto` → `empresas`; borrar código QR.
-- [ ] Reacciones desde la campanita (`st_`/`ev_`) → `servicio` / `eventosChecklist`.
-- [ ] Radar de Inicio lee Firebase en vez de GitHub.
-- [ ] Precios del selector desde el nodo `precios` de Firebase, sin la API de GitHub.
-- [ ] Borrar ARCA (`empresas.html`, `consultarCliente`) y `sincronizarHubSpot`.
+### Fase 1 — Victorias rápidas ✅ (04/10, v2026.10.04.3)
+- [x] `cotizaciones.html`: `listarEmpresas` → `empresas`; `asignarPipelineNegocio` → `pipelines` (agregada a la función, v2).
+- [x] `ficha-equipo.html`: `listarEmpresas`, `guardarEmpresa`, `guardarContacto` → `empresas`; código QR eliminado.
+- [x] Reacciones desde la campanita (`st_`/`ev_`) → `servicio` / `eventosChecklist` (en index, cotizaciones, eventos y servicio).
+- [x] Radar de Inicio lee Firebase (`cotizaciones.json`); GitHub solo de respaldo.
+- [x] Precios del selector: ya leían Firebase primero; se borró la función sin uso que consultaba la API de GitHub.
+- [→] ARCA y `sincronizarHubSpot`: viven en el flujo de registrar cotización del selector → pasan a la Fase 5.
 
 ### Fase 2 — Módulos chicos, Firebase puro
 - [ ] Checklists (5 archivos) y POE8.
@@ -189,6 +210,7 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 
 ### Fase 5 — Cotizaciones, función por función
 - [ ] 5a — Firebase: chat (agregar, reaccionar), notas, estado, teléfono, contacto, colaborador, vendedor, check de cierre.
+- [ ] Borrar `consultarCliente` (ARCA) y `sincronizarHubSpot` del selector.
 - [ ] 5b — atadas a `historico.json`: subirCotizacion, actualizarCotizacion, eliminarVersionPresupuesto (con versiones a Firebase), eliminarDeal, crearNegocioVacio, registrarCotizacion, apilarFichaTecnica, buscarNegocioAgrupable.
 - [ ] Bug conocido: `actualizarCotizacion` no regenera `cotizaciones/{id}/presupuesto` en RTDB.
 
@@ -207,8 +229,10 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 
 ## 📌 Pendientes sueltos
 
-- [ ] **Confirmar el despliegue de la función `cotizaciones` v2** (en el repo ya está). Prueba: editar un presupuesto de un negocio de Lucio y verificar que siga a su nombre.
-- [ ] **Subir `FotoMap.gs`** a `FUNCTIONS-BACKUP/apps-script/`, revisando antes que no tenga claves escritas en el código (`token`, `key`, `secret`, `ghp_`, `xkeysib`). Si las tiene, pasarlas a Propiedades del script primero.
+- [ ] **Pasar las funciones a `nodejs22` antes del 30/10/2026** (después Google no deja desplegar con nodejs20). Ya están en 22: `servicio`, `pipelines`. Faltan: `cotizaciones`, `empresas`, `eventosChecklist`, `fotos`, `internos`, `notificaciones`, `tareas`, `asistenteIA`.
+- [ ] **Sincronizar permisos** se cortó por tiempo (03/10) — confirmar que la hoja Vendedores llegue completa a Firebase (rol "Administrativo" de Lourdes, columna `Liquidar Gastos`) y renombrar la 2ª columna "Comisiones" (numérica).
+- [ ] Tildes de capacidades pendientes de decidir: `Ver Todos los Negocios` (Cotizaciones — Lourdes lo necesita para facturar), `Ver Métricas de Todos`, `Administrar Eventos`, `Reasignar Vendedor`.
+
 - [ ] Renombrar la columna numérica "Comisiones" de la hoja Vendedores (lección 8), después de confirmar en `FotoMap.gs` y en `internos` que nada la lee por ese nombre.
 - [ ] Revisar `calcularComisiones` (función `internos`) para acelerar el cálculo.
 - [ ] Adjuntos de Eventos: confirmar que también aparecen bien en la lista después de subir.
