@@ -1,5 +1,7 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v6 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 2): adjuntos (subirAdjunto,
+//   eliminarAdjunto) para Servicio y Cotizaciones, a Firebase Storage.
 // v5 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 2): checklists y POE-8
 //   (st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden
 //   —nueva, nunca existió en Apps Script— y registrarInstalacionPOE8).
@@ -488,6 +490,69 @@ async function registrarInstalacionPOE8(data) {
     });
   }
   return { ok: true, id: idRegistro };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ADJUNTOS — v6 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 2)
+// ══════════════════════════════════════════════════════════════════
+// subirAdjunto / eliminarAdjunto, portadas de FotoMap.gs. Los usa
+// adjuntos.js desde Servicio Técnico (modulo 'servicio') y Cotizaciones
+// (modulo 'ventas'). Mismo bucket de Firebase Storage, misma ruta
+// (adjuntos/<modulo>/<id>/<adjId>_<nombre>) y misma URL pública que ya
+// usaba Apps Script, así que los adjuntos viejos siguen funcionando igual.
+const bucketAdjuntos = admin.storage().bucket('portal-tlc.firebasestorage.app');
+const ADJUNTOS_MAX_BYTES = 10 * 1024 * 1024;
+const ADJUNTOS_TIPOS_PERMITIDOS = {
+  'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'text/plain': 'txt',
+  'application/msword': 'doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-excel': 'xls', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+};
+function _nodoAdjuntos(modulo) {
+  return modulo === 'servicio' ? 'servicio_tecnico/' : (modulo === 'eventos' ? 'eventos/' : (modulo === 'ventas' ? 'cotizaciones/' : null));
+}
+async function subirAdjunto(data) {
+  const modulo = String(data.modulo || '').trim();
+  const idRegistro = String(data.idRegistro || '').trim();
+  const nombre = String(data.nombre || '').trim();
+  const tipoMime = String(data.tipoMime || '').trim();
+  const base64 = String(data.base64 || '');
+  const subidoPorNombre = String(data.subidoPorNombre || '').trim();
+  const nodoBase = _nodoAdjuntos(modulo);
+  if (!nodoBase) return { ok: false, error: 'Módulo inválido: ' + modulo };
+  if (!idRegistro) return { ok: false, error: 'Falta idRegistro' };
+  if (!nombre) return { ok: false, error: 'Falta nombre de archivo' };
+  if (!base64) return { ok: false, error: 'Falta el contenido del archivo' };
+  if (!ADJUNTOS_TIPOS_PERMITIDOS[tipoMime]) {
+    const ext = (nombre.split('.').pop() || '').toLowerCase();
+    if (Object.values(ADJUNTOS_TIPOS_PERMITIDOS).indexOf(ext) === -1) return { ok: false, error: 'Tipo de archivo no permitido — solo PDF, JPG, PNG, TXT, DOC, DOCX, XLS, XLSX.' };
+  }
+  const buffer = Buffer.from(base64, 'base64');
+  if (buffer.length > ADJUNTOS_MAX_BYTES) return { ok: false, error: 'El archivo pesa más de 10MB — no se puede subir.' };
+  const adjId = 'adj_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+  const pathStorage = 'adjuntos/' + modulo + '/' + idRegistro + '/' + adjId + '_' + nombre;
+  await bucketAdjuntos.file(pathStorage).save(buffer, { contentType: tipoMime || 'application/octet-stream', resumable: false });
+  const metadata = {
+    nombre, tipo: tipoMime, url: 'https://firebasestorage.googleapis.com/v0/b/portal-tlc.firebasestorage.app/o/' + encodeURIComponent(pathStorage) + '?alt=media',
+    path: pathStorage, tamano: buffer.length, subido_por_nombre: subidoPorNombre, fecha: new Date().toISOString(),
+  };
+  await fbPatch(nodoBase + idRegistro + '/adjuntos', { [adjId]: metadata });
+  return { ok: true, adjId, adjunto: metadata };
+}
+async function eliminarAdjunto(data) {
+  const modulo = String(data.modulo || '').trim();
+  const idRegistro = String(data.idRegistro || '').trim();
+  const adjId = String(data.adjId || '').trim();
+  const nodoBase = _nodoAdjuntos(modulo);
+  if (!nodoBase) return { ok: false, error: 'Módulo inválido' };
+  if (!idRegistro || !adjId) return { ok: false, error: 'Faltan datos' };
+  const ruta = nodoBase + idRegistro + '/adjuntos/' + adjId;
+  const adjunto = await fbGet(ruta);
+  if (adjunto && adjunto.path) {
+    try { await bucketAdjuntos.file(adjunto.path).delete(); }
+    catch (e) { if (e.code !== 404) console.warn('No se pudo borrar el archivo de Storage (se borra igual la referencia):', e.message); }
+  }
+  await db.ref(ruta).remove();
+  return { ok: true };
 }
 
 async function st_crearOrdenPreparacion(data) {
@@ -1061,6 +1126,7 @@ const ACCIONES = {
   st_agregarMensaje, st_editarMensaje, st_borrarMensaje, st_reaccionarMensaje,
   st_separarEquipoOrden, st_actualizarEquipoOrden, st_dividirOrdenPreparacion, st_quitarGarantiasOrden, st_recalcularProgresosOrdenes,
   st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden, registrarInstalacionPOE8,
+  subirAdjunto, eliminarAdjunto,
   st_guardarEtiquetasCajas, eliminarVersionPresupuestoTicket, guardarAsignadosEtapa,
 };
 
