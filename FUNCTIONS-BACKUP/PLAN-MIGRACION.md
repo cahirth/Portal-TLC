@@ -1,6 +1,6 @@
 # Plan de migración — Apps Script → Cloud Functions
 
-**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.3`) — Fase 1 completa
+**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.5`) — Fase 1 completa, Fase 2 en curso
 
 **Objetivo:** sacar el Portal TLC de Apps Script por completo, sacar `historico.json` (y los datos en general) del repositorio de código, y eliminar todo lo que ralentiza la app. Se hace módulo por módulo, con el patrón ya probado: una Cloud Function equivalente, testeada, con su propia URL, apuntada desde el frontend sin tocar el resto.
 
@@ -104,8 +104,6 @@ gcloud functions deploy <nombre> --gen2 --region=us-central1 --runtime=nodejs22 
 | `adjuntos.js` (Servicio y Cotizaciones) | subirAdjunto, eliminarAdjunto | `servicio` / `cotizaciones` (idealmente a Firebase Storage) |
 | `ficha-equipo.html` | agregarNota, apilarFichaTecnica, buscarNegocioAgrupable | `cotizaciones` (Fase 5) |
 | `cuenta-corriente.html` | listarGastosGeneralesPendientes, agregarGastoGeneral, editarGastoGeneral, crearLiquidacion, listarLiquidaciones, revertirLiquidacion, obtenerSaldoInicial | Cloud Function nueva o extender `internos` |
-| `Check lists/` (5 archivos) | listarTecnicos, st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden | `internos` / `servicio` |
-| `POE/POE8_Instalacion.html` | registrarInstalacionPOE8 | `servicio` |
 | `index.html`, `selector-dispositivos.html` | solicitarCodigoLogin, verificarCodigoLogin (LOGIN) | Cloud Function nueva, con fallback |
 | `selector-dispositivos.html` | registrarCotizacion · consultarCliente (ARCA) y sincronizarHubSpot (a borrar) | `cotizaciones` |
 | `empresas.html` | crearNegocioVacio | `cotizaciones` |
@@ -199,7 +197,7 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 - [→] ARCA y `sincronizarHubSpot`: viven en el flujo de registrar cotización del selector → pasan a la Fase 5.
 
 ### Fase 2 — Módulos chicos, Firebase puro
-- [ ] Checklists (5 archivos) y POE8.
+- [x] Checklists (5 archivos) y POE8 → `servicio` v5 + `internos` v3 (listarTecnicos). De paso: **"Reabrir checklist" funciona por primera vez** (la acción nunca existió en Apps Script). (04/10, v2026.10.04.5)
 - [ ] `adjuntos.js` (Servicio y Cotizaciones), idealmente a Firebase Storage.
 
 ### Fase 3 — Fotos de Servicio a un nodo aparte
@@ -229,7 +227,7 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 
 ## 📌 Pendientes sueltos
 
-- [ ] **Pasar las funciones a `nodejs22` antes del 30/10/2026** (después Google no deja desplegar con nodejs20). Ya están en 22: `servicio`, `pipelines`. Faltan: `cotizaciones`, `empresas`, `eventosChecklist`, `fotos`, `internos`, `notificaciones`, `tareas`, `asistenteIA`.
+- [ ] **Pasar las funciones a `nodejs22` antes del 30/10/2026** (después Google no deja desplegar con nodejs20). Ya están en 22: `servicio`, `pipelines`, `internos`. Faltan: `cotizaciones`, `empresas`, `eventosChecklist`, `fotos`, `notificaciones`, `tareas`, `asistenteIA`.
 - [ ] **Sincronizar permisos** se cortó por tiempo (03/10) — confirmar que la hoja Vendedores llegue completa a Firebase (rol "Administrativo" de Lourdes, columna `Liquidar Gastos`) y renombrar la 2ª columna "Comisiones" (numérica).
 - [ ] Tildes de capacidades pendientes de decidir: `Ver Todos los Negocios` (Cotizaciones — Lourdes lo necesita para facturar), `Ver Métricas de Todos`, `Administrar Eventos`, `Reasignar Vendedor`.
 
