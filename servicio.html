@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.04.13 (Cristian: "esto está muy grande, en Administrador, ¿podemos ponerlo todo en un dropdown?". El panel "⚖️ Carga por técnico" ahora es desplegable: arranca cerrado mostrando una sola línea con el total de cada técnico (y los sin asignar); tocándola se abre la tabla por etapa. El estado abierto/cerrado se recuerda en el navegador.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.9 (Fase 5a: las reacciones desde la campanita a mensajes de Cotizaciones también van a la función servicio.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.8 (Fase 3 — Cristian: "para cargar Servicio es lento". Las fotos nuevas ya se guardan en Firebase Storage (función servicio v7) y en el ticket queda el link. Para las fotos viejas, un Administrador ve el aviso "⚡ N tickets tienen fotos a la vieja usanza" con el botón "Optimizar ahora": hace backup completo de servicio_tecnico en Firebase y mueve las fotos a Storage en tandas, mostrando el avance. Al terminar, la lista de Servicio (y Tareas y Cuenta Corriente) pesa una fracción.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.6 (MUERTE A APPS SCRIPT, Fase 2: los adjuntos (subir/borrar) van a la Cloud Function servicio v6 en vez de Apps Script.) -->
@@ -1561,13 +1562,29 @@ function _renderCargaTecnicos() {
           '<span style="color:#06d6a0;">■</span> menos carga en la etapa';
   }
 
+  // DESPLEGABLE (v2026.10.04.13) — Cristian: "esto está muy grande, en
+  // Administrador, ¿podemos ponerlo todo en un dropdown?". El panel arranca
+  // cerrado: se ve una sola línea con el total de cada uno; tocándola se
+  // despliega la tabla completa. Se recuerda abierto/cerrado en este navegador.
+  var abierto = false;
+  try { abierto = localStorage.getItem('st_carga_abierta') === '1'; } catch (eLs) {}
+  var resumen = filas.map(function(cod) {
+    return '<span style="white-space:nowrap;"><span style="width:7px;height:7px;border-radius:50%;background:' + (TECNICO_COLOR[cod] || '#64748b') + ';display:inline-block;margin-right:4px;"></span>' +
+      _esc(_nombreCortoTecnico(cod)) + ' <b style="color:var(--text-main);">' + carga.conteo[cod].total + '</b></span>';
+  }).join('<span style="opacity:.35;margin:0 6px;">·</span>');
+  if (esAdmin && carga.sinAsignar) resumen += '<span style="opacity:.35;margin:0 6px;">·</span><span style="color:#f59e0b;white-space:nowrap;">⚠ ' + carga.sinAsignar + ' sin asignar</span>';
+
   el.style.display = 'block';
   el.innerHTML =
-    '<div style="margin:10px 12px 4px;background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:14px;padding:10px 12px;">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">' +
-        '<span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">⚖️ ' + (esAdmin ? 'Carga actual por técnico' : 'Mi carga actual') + '</span>' +
-        (pie ? '<span style="font-size:11px;font-weight:700;color:var(--text-muted);">' + pie + '</span>' : '') +
+    '<div style="margin:10px 12px 4px;background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:14px;padding:' + (abierto ? '10px 12px' : '8px 12px') + ';">' +
+      '<div onclick="_toggleCargaTecnicos()" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;user-select:none;' + (abierto ? 'margin-bottom:6px;' : '') + '">' +
+        '<span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">⚖️ ' + (esAdmin ? 'Carga por técnico' : 'Mi carga actual') + '</span>' +
+        (abierto
+          ? (pie ? '<span style="font-size:11px;font-weight:700;color:var(--text-muted);flex:1;text-align:right;">' + pie + '</span>' : '<span style="flex:1;"></span>')
+          : '<span style="font-size:12px;color:var(--text-muted);flex:1;min-width:0;overflow-x:auto;white-space:nowrap;text-align:right;">' + resumen + '</span>') +
+        '<span style="font-size:12px;color:var(--text-muted);transition:transform .2s;transform:rotate(' + (abierto ? '180' : '0') + 'deg);">▾</span>' +
       '</div>' +
+      (abierto ?
       '<div style="overflow-x:auto;">' +
         '<table style="border-collapse:separate;border-spacing:0;width:100%;">' +
           '<thead><tr><th style="' + th + 'text-align:left;"></th>' +
@@ -1575,9 +1592,15 @@ function _renderCargaTecnicos() {
             '<th style="' + th + '">Total</th></tr></thead>' +
           '<tbody>' + cuerpo + '</tbody>' +
         '</table>' +
-      '</div>' +
+      '</div>' : '') +
     '</div>';
 }
+
+window._toggleCargaTecnicos = function() {
+  var abierto = false;
+  try { abierto = localStorage.getItem('st_carga_abierta') === '1'; localStorage.setItem('st_carga_abierta', abierto ? '0' : '1'); } catch (eLs) {}
+  _renderCargaTecnicos();
+};
 
 window._filtrarCargaTecnico = function(cod, etapa) {
   var yaActivo = _filtros.tecnico === cod && _filtros.etapa === etapa;
