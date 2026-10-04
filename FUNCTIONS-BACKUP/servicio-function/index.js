@@ -1,5 +1,8 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v5 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 2): checklists y POE-8
+//   (st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden
+//   —nueva, nunca existió en Apps Script— y registrarInstalacionPOE8).
 // v4 — 2026.10.04 — Progreso de preparación: "Listo para despacho" con serie y
 //   calidad = 100% y cuenta como listo; "Enviado" vale lo mismo y se informa
 //   aparte (progreso_st.enviados). Nueva st_recalcularProgresosOrdenes.
@@ -373,6 +376,118 @@ async function st_recalcularProgresosOrdenes() {
     negocios++;
   }
   return { ok: true, negocios };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CHECKLISTS Y POE-8 — v5 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 2)
+// ══════════════════════════════════════════════════════════════════
+// Portadas de FotoMap.gs (st_guardarChecklist, registrarChecklistCompletado,
+// registrarInstalacionPOE8), con transacción atómica sobre el ticket en vez
+// de leer-todo/escribir-todo, y actualizando el progreso del negocio cuando
+// cambia un equipo (el checklist completo marca la calidad). Además
+// reabrirChecklistOrden, que el checklist HOCT-1F llamaba pero NUNCA existió
+// en Apps Script (el botón "Reabrir" siempre fallaba).
+
+// Checklist general de un ticket de reparación (checklist_tecnico).
+async function st_guardarChecklist(data) {
+  const id = String(data.id_ticket || '').trim();
+  const checklist = data.checklist_tecnico;
+  if (!id) return { ok: false, error: 'Falta id_ticket' };
+  if (!checklist || typeof checklist !== 'object') return { ok: false, error: 'Falta checklist_tecnico' };
+  if (!(await fbGet('servicio_tecnico/' + id))) return { ok: false, error: 'Ticket no encontrado: ' + id };
+  let bloqueado = false;
+  await runTransaccionTicket(id, (t) => {
+    bloqueado = false;
+    const actual = t.checklist_tecnico;
+    if (actual && actual.completado && !checklist.completado) { bloqueado = true; return t; }
+    t.checklist_tecnico = checklist;
+    t.actualizado_en = new Date().toISOString();
+    return t;
+  });
+  if (bloqueado) return { ok: false, error: 'Este checklist ya está completado y no se puede editar.' };
+  return { ok: true };
+}
+
+function _registroIdST(prefijo) { return prefijo + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
+function _indiceEquipoST(v) { return (v !== undefined && v !== null && v !== '') ? parseInt(v, 10) : null; }
+
+// Checklist de UN equipo de una Orden de Preparación: guarda el registro y
+// marca el equipo con checklist completo + calidad verificada.
+async function registrarChecklistCompletado(data) {
+  const idTicket = String(data.id_ticket || '').trim();
+  const equipoIndex = _indiceEquipoST(data.equipo_index);
+  if (!idTicket || equipoIndex === null || isNaN(equipoIndex)) return { ok: false, error: 'Falta id_ticket o equipo_index' };
+  const idRegistro = _registroIdST('checklist');
+  await fbSet('checklist_registros/' + idRegistro, {
+    id_ticket: idTicket, equipo_index: equipoIndex, modelo: String(data.modelo || '').trim(), serie: String(data.serie || '').trim(),
+    tecnico: String(data.tecnico || '').trim(), cliente: String(data.cliente || '').trim(), respuestas: data.respuestas || {},
+    observaciones: String(data.observaciones || '').trim(), fecha: data.fecha || new Date().toISOString(), registrado_en: new Date().toISOString(),
+  });
+  if (await fbGet('servicio_tecnico/' + idTicket)) {
+    const t = await runTransaccionTicket(idTicket, (tk) => {
+      const equipos = comoArray(tk.equipos);
+      if (!equipos[equipoIndex]) return tk;
+      equipos[equipoIndex].checklist_completado = true;
+      equipos[equipoIndex].checklist_registro_id = idRegistro;
+      equipos[equipoIndex].calidad_verificada = true;
+      tk.equipos = equipos;
+      tk.actualizado_en = new Date().toISOString();
+      return tk;
+    });
+    if (t && t.tipo_orden === 'preparacion_equipos') await actualizarProgresoSTEnNegocio(t);
+  }
+  return { ok: true, id: idRegistro };
+}
+
+// Reabre el checklist de un equipo (solo Administrador): vuelve a quedar
+// editable y se desmarca la calidad, porque la marcaba el checklist.
+async function reabrirChecklistOrden(data) {
+  const idTicket = String(data.id_ticket || '').trim();
+  const equipoIndex = _indiceEquipoST(data.equipo_index);
+  if (String(data.vendedorRol || '').trim() !== 'Administrador') return { ok: false, error: 'Solo un Administrador puede reabrir un checklist' };
+  if (!idTicket || equipoIndex === null || isNaN(equipoIndex)) return { ok: false, error: 'Falta id_ticket o equipo_index' };
+  if (!(await fbGet('servicio_tecnico/' + idTicket))) return { ok: false, error: 'Orden no encontrada' };
+  let existe = false;
+  const t = await runTransaccionTicket(idTicket, (tk) => {
+    const equipos = comoArray(tk.equipos);
+    existe = !!equipos[equipoIndex];
+    if (!existe) return tk;
+    equipos[equipoIndex].checklist_completado = false;
+    equipos[equipoIndex].calidad_verificada = false;
+    tk.equipos = equipos;
+    tk.actualizado_en = new Date().toISOString();
+    return tk;
+  });
+  if (!existe) return { ok: false, error: 'Equipo no encontrado en la orden' };
+  if (t && t.tipo_orden === 'preparacion_equipos') await actualizarProgresoSTEnNegocio(t);
+  return { ok: true };
+}
+
+// POE-8 (instalación): guarda el registro con las firmas y marca el equipo.
+async function registrarInstalacionPOE8(data) {
+  const idTicket = String(data.id_ticket || '').trim();
+  const equipoIndex = _indiceEquipoST(data.equipo_index);
+  const idRegistro = _registroIdST('poe8');
+  const txt = (k) => String(data[k] || '').trim();
+  await fbSet('poe8_registros/' + idRegistro, {
+    id_ticket: idTicket, equipo_index: equipoIndex, tecnico: txt('tecnico'), cliente: txt('cliente'), domicilio: txt('domicilio'),
+    telefono: txt('telefono'), marca: txt('marca'), modelo: txt('modelo'), serie: txt('serie'), accesorios: txt('accesorios'),
+    capacitacion: txt('capacitacion'), observaciones: txt('observaciones'), clienteNombre: txt('clienteNombre'), clienteDni: txt('clienteDni'),
+    fecha: data.fecha || new Date().toISOString(), firmaTecnico: data.firmaTecnico || '', firmaCliente: data.firmaCliente || '',
+    registrado_en: new Date().toISOString(),
+  });
+  if (idTicket && equipoIndex !== null && !isNaN(equipoIndex) && (await fbGet('servicio_tecnico/' + idTicket))) {
+    await runTransaccionTicket(idTicket, (tk) => {
+      const equipos = comoArray(tk.equipos);
+      if (!equipos[equipoIndex]) return tk;
+      equipos[equipoIndex].poe8_completado = true;
+      equipos[equipoIndex].poe8_registro_id = idRegistro;
+      tk.equipos = equipos;
+      tk.actualizado_en = new Date().toISOString();
+      return tk;
+    });
+  }
+  return { ok: true, id: idRegistro };
 }
 
 async function st_crearOrdenPreparacion(data) {
@@ -945,6 +1060,7 @@ const ACCIONES = {
   st_agregarNota, st_agregarFoto, st_eliminarFoto,
   st_agregarMensaje, st_editarMensaje, st_borrarMensaje, st_reaccionarMensaje,
   st_separarEquipoOrden, st_actualizarEquipoOrden, st_dividirOrdenPreparacion, st_quitarGarantiasOrden, st_recalcularProgresosOrdenes,
+  st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden, registrarInstalacionPOE8,
   st_guardarEtiquetasCajas, eliminarVersionPresupuestoTicket, guardarAsignadosEtapa,
 };
 
