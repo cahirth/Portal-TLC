@@ -74,7 +74,26 @@ async function eliminarPipeline(data) {
   return { ok: true, tarjetasAfectadas: idsAfectados.length };
 }
 
-const ACCIONES = { listarPipelines, guardarPipeline, eliminarPipeline };
+// v2 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 1): asignarPipelineNegocio,
+// portada tal cual de FotoMap.gs (solo escribía en Firebase; el respaldo en
+// GitHub ya lo hacía aparte sincronizarRTDBaGitHub).
+function rtdbKeySeguro(id) {
+  let clave = String(id || '').trim().replace(/[.#$[\]/]/g, '_').replace(/[\s+]/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '');
+  if (clave.length > 200) clave = clave.substring(0, 200);
+  return clave;
+}
+async function asignarPipelineNegocio(data) {
+  const idCot = String(data.idCot || '').trim();
+  if (!idCot) return { ok: false, error: 'Falta idCot' };
+  const pipelineId = data.pipeline_id === 'GENERAL' ? '' : String(data.pipeline_id || '').trim();
+  const ruta = 'cotizaciones/' + rtdbKeySeguro(idCot);
+  const existe = await fbGet(ruta);
+  if (!existe) return { ok: false, error: 'Negocio no encontrado: ' + idCot };
+  await fbPatch(ruta, { pipeline_id: pipelineId, actualizado_en: new Date().toISOString() });
+  return { ok: true };
+}
+
+const ACCIONES = { listarPipelines, guardarPipeline, eliminarPipeline, asignarPipelineNegocio };
 
 // ── Punto de entrada HTTP ──────────────────────────────────────────
 functions.http('pipelines', async (req, res) => {
