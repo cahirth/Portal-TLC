@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.10.04.1 (Cristian: "me gustaría en el editor de presupuesto mover las filas verticalmente para ordenarlas a mano". Cada fila tiene un ícono ⠿ a la izquierda para arrastrarla (mouse o dedo, con SortableJS de cdnjs). El orden queda guardado y el presupuesto sale en ese orden. Si la librería no carga, el ícono se oculta y todo sigue igual.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.09.30.1 (Cristian: "no quiero que se cambie solo de dueño... porque se editó, porque se miró". Al guardar, si el negocio ya existe se conserva el vendedor que tiene en RTDB (cotizaciones/{id}/vendedor) en vez de poner al usuario logueado. Solo un negocio nuevo toma como dueño a quien lo crea. Si no se puede leer el dueño actual, no guarda.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.09.29.3 (Cristian: "por default siempre pone clínica del cliente... que por default aparezca que lo retiran en TLC". El default de "Lugar de entrega" cambió de "Clínica del Cliente" a "Nuestra oficina" — tanto para un presupuesto nuevo (se movió el <option> de oficina primero) como al reabrir un negocio viejo que no tenga este dato guardado (el fallback de la línea de restauración pasó de 'cliente' a 'oficina'). Un negocio que ya tenga guardado explícitamente "cliente" sigue mostrando "cliente" al reabrirlo — esto solo cambia el default, no toca datos ya guardados.) -->
@@ -21,6 +22,7 @@
 <!-- Portal TLC | presupuesto-editor.html | v2026.08.04.1 (BUG REAL encontrado: _irASelectorDispositivos() (el botón "+ Agregar ítem") guardaba el borrador SIN el TICKET_ID, y la URL de vuelta desde selector-dispositivos.html tampoco lo traía — así que agregar un ítem a mitad de armar un presupuesto de Servicio perdía el vínculo con el ticket, y el guardado siguiente creaba un negocio de Ventas en el Kanban en vez de quedarse en Servicio. Ahora se persiste y se restaura junto con el resto del borrador. Ver también FotoMap.gs v141 (el corte de fondo que ya no crea el negocio si el ticket SÍ llega). Reportado por Cristian con captura: "lo sigue generando en negocios, desde servicio".) -->
 <html lang="es">
 <head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 <script src="version.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -187,6 +189,9 @@
   body.tema-claro .section-title .hint { color:#94a3b8; }
   body.tema-claro .banco-card .moneda-tag { color:#1d4ed8; }
   body.tema-claro .banco-card .moneda-tag-green { color:#0d9268; }
+.item-drag{flex:0 0 22px;display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;color:var(--text-dim);cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;margin-right:2px;}
+.item-drag:active{cursor:grabbing;}
+.item-arrastrando{opacity:.4;}
 </style>
 </head>
 <body>
@@ -1126,8 +1131,9 @@ function _renderItems() {
     var calc = _calcularItem(it);
     var moneda = it.moneda || 'USD';
     var precioMostrado = moneda === 'ARS' ? _aMonedaItem(it.precio, it) : it.precio;
-    return '<div class="item-card">' +
+    return '<div class="item-card" data-id="' + it.id + '">' +
       '<div class="item-top">' +
+        '<div class="item-drag" title="Arrastrá para ordenar">⠿</div>' +
         '<div class="item-foto" onclick="document.getElementById(\'file-' + it.id + '\').click()">' +
           (it.foto ? '<img src="' + it.foto + '">' : '📷') +
           '<input type="file" id="file-' + it.id + '" accept="image/*" style="display:none;" onchange="_fotoItem(' + it.id + ', this)">' +
@@ -1175,6 +1181,35 @@ function _renderItems() {
   document.querySelectorAll('.item-desc-input').forEach(function(ta) {
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
+  });
+  _activarOrdenItems();
+}
+
+// ── ORDENAR FILAS ARRASTRANDO ─────────────────────────────────────
+// Cristian: "me gustaría en el editor de presupuesto mover las filas
+// verticalmente para ordenarlas a mano". Se arrastra desde el ícono ⠿ de
+// cada fila (funciona con mouse y con el dedo). El orden de ITEMS es el
+// que se guarda, así que el presupuesto final sale en ese mismo orden.
+// Usa SortableJS (cdnjs); si no llegara a cargar, el ⠿ se oculta.
+var _sortableItems = null;
+function _activarOrdenItems() {
+  var cont = document.getElementById('lista-items');
+  if (!cont) return;
+  if (typeof Sortable === 'undefined') {
+    document.querySelectorAll('.item-drag').forEach(function(el) { el.style.display = 'none'; });
+    return;
+  }
+  if (_sortableItems) return; // el contenedor es siempre el mismo: alcanza con activarlo una vez
+  _sortableItems = Sortable.create(cont, {
+    handle: '.item-drag',
+    animation: 150,
+    ghostClass: 'item-arrastrando',
+    onEnd: function(ev) {
+      if (ev.oldIndex === ev.newIndex) return;
+      var movido = ITEMS.splice(ev.oldIndex, 1)[0];
+      ITEMS.splice(ev.newIndex, 0, movido);
+      _render();
+    }
   });
 }
 

@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.04.2 (Nueva regla de progreso de preparación (función servicio v4): Listo para despacho con serie y calidad = 100%. La primera vez que un Administrador abre Servicio con esta versión, se recalcula el % de todos los negocios con Orden de Preparación (st_recalcularProgresosOrdenes), una sola vez por navegador.) -->
+<!-- Portal TLC | servicio.html | v2026.10.04.1 (Cristian: "el ítem Garantía no quiero que se pase a Preparación... pide N° de serie". Las Órdenes de Preparación ya no incluyen la garantía (lo hace la Cloud Function servicio v3 al crearlas). Las órdenes ya creadas que todavía la tienen se limpian solas la primera vez que se abren (st_quitarGarantiasOrden), y el progreso del negocio en Ventas se recalcula sin ella.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.12 (Cristian: "¿cómo hacemos para que las tarjetas pasen de No iniciada a En curso? Los técnicos no las pasan de estado". (1) Paso automático: una tarjeta en "No iniciada" pasa sola a "En curso" cuando la persona asignada trabaja en ella (completa un campo, nota, foto, gasto, equipo o mensaje). Lo que haga otra persona (p. ej. un administrador escribiendo un mensaje) no la marca. Solo tickets de reparación. (2) Se quitó la exigencia de poner "En curso" a mano para pasar de Diagnóstico a Presupuesto.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.10 (BUG REAL — Cristian: "me puse rol de Técnico y Vend_Interno, y no veo mi métrica en Servicio Técnico". EMAIL_A_TECNICO tenía emails de la forma cristian.hirth / juan.garro, que no son los reales (cristian@, juan@, damian@...): nadie quedaba identificado con su código de técnico, así que "Mi carga actual" no aparecía y el filtro "Asignados a mí" no le funcionaba a nadie. Ahora usa los emails reales y, de respaldo, el nombre de la sesión. Reglas de la métrica: Administrador ve a todos; el resto ve su propia fila si está asignado a alguna etapa o tiene tickets en ellas.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.6 (BUG REAL — Cristian: "la tarjeta Rivero Néstor Eduardo la filtra para mí porque el responsable soy yo, pero con la tarjeta cerrada dice LD". Las Órdenes de Preparación tenían dos campos de responsable que se desincronizaban: tecnico_asignado (tarjeta; se actualiza al mover de etapa) y tecnico_responsable_nombre (con el que se creó la orden; lo usaban el desplegable del detalle, el filtro y las métricas). Ahora hay UN solo responsable: manda tecnico_asignado y el nombre solo si no hay código. El desplegable del detalle muestra ese mismo responsable y al cambiarlo guarda los dos campos juntos; el traspaso automático a Lourdes también. Tarjeta, detalle, filtro y métricas dicen siempre lo mismo.) -->
@@ -1380,6 +1382,24 @@ function _nombreCortoTecnico(cod) {
 }
 
 // { conteo: {cod: {etapa: n, total: n}}, asignados: {etapa: [cod]}, personas: [cod], sinAsignar: n }
+// Con la regla nueva de progreso (función servicio v4), los negocios que
+// ya tenían % calculado se actualizan una sola vez: lo dispara el primer
+// Administrador que abre Servicio con esta versión.
+var _recalculoProgresoPedido = false;
+function _recalcularProgresosUnaVez() {
+  if (_recalculoProgresoPedido || !_permisos || !_permisos.admin) return;
+  try { if (localStorage.getItem('st_progreso_v4_recalculado')) return; } catch (e) { return; }
+  _recalculoProgresoPedido = true;
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'st_recalcularProgresosOrdenes' }) })
+    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (!r.ok) return;
+      try { localStorage.setItem('st_progreso_v4_recalculado', '1'); } catch (e) {}
+      console.log('[servicio] Progreso de preparación recalculado en ' + r.negocios + ' negocio(s).');
+    })
+    .catch(function() { _recalculoProgresoPedido = false; });
+}
+
 function _cargaPorTecnico() {
   var conteo = {}, asignados = {}, sinAsignar = 0;
   var asegurar = function(cod) {
@@ -1521,6 +1541,7 @@ window._aplicarFiltros = function() {
   var elContadorUrgentesSt = document.getElementById('contador-urgentes-st');
   if (elContadorUrgentesSt) elContadorUrgentesSt.textContent = _tickets.filter(function(t) { return t.prioridad === 'urgente'; }).length;
   _renderCargaTecnicos();
+  _recalcularProgresosUnaVez();
   if (_vistaActual === 'lista') {
     _renderLista(filtrados);
   } else {
@@ -2541,7 +2562,33 @@ window._confirmarImprimirEtiquetas = function() {
     });
 };
 
+// Órdenes creadas antes del arreglo de la garantía (v2026.10.04.1): si
+// todavía tienen la fila "Garantía…", se limpia sola en la Cloud Function
+// la primera vez que alguien abre la orden.
+function _esFilaGarantia(eq) {
+  var n = String((eq && (eq.descripcion || eq.sku)) || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  return n.indexOf('garantia') === 0;
+}
+function _limpiarGarantiasSiHay(t) {
+  if (!t || t._limpiandoGarantias || !Array.isArray(t.equipos) || !t.equipos.some(_esFilaGarantia)) return;
+  t._limpiandoGarantias = true;
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_quitarGarantiasOrden', id_ticket:t.id_ticket }) })
+    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      t._limpiandoGarantias = false;
+      if (!r.ok || !r.quitadas) return;
+      t.equipos = r.equipos;
+      var enLista = _tickets.find(function(x) { return x.id_ticket === t.id_ticket; });
+      if (enLista && enLista !== t) enLista.equipos = r.equipos;
+      if (_ticketActual && _ticketActual.id_ticket === t.id_ticket) _renderDetalle(_ticketActual);
+      _toastServicio('🧹 Se quitó la garantía de la lista de equipos');
+    })
+    .catch(function() { t._limpiandoGarantias = false; });
+}
+
 function _renderSeccionOrdenPreparacion(t) {
+  _limpiarGarantiasSiHay(t);
   var equipos = Array.isArray(t.equipos) ? t.equipos : [];
   var filas = equipos.map(function(eq, i) {
     // Checklist técnico por equipo — el ticket-level "Checklist técnico
