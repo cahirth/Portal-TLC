@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.10.04.11 (Fase 5b: al compartir la ficha y crear un negocio nuevo, guardarPresupuestoEditor (soloRegistrarNegocio) va a la función cotizaciones; quedaba apuntando a Apps Script. Con esto la Ficha de equipo ya no llama a Apps Script.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.10.04.10 (MUERTE A APPS SCRIPT, Fase 5b: agregar nota, apilar ficha técnica y buscar negocio agrupable → Cloud Function cotizaciones v4. La Ficha de equipo ya no llama a Apps Script.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: listarEmpresas, guardarEmpresa y guardarContacto pasan a la Cloud Function empresas (ya existían ahí, misma respuesta). Eliminado el escáner QR de FacoExtrema (dado de baja el 28/09): botón, modal, funciones, estilos y la librería html5-qrcode, con las llamadas buscarContactoParaQR/guardarEmpresaContactoQR. Siguen en Apps Script agregarNota, apilarFichaTecnica y buscarNegocioAgrupable (van con Cotizaciones, Fase 5).) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
@@ -1992,7 +1993,7 @@ async function _guardarSeguimientoVentas(origen, linkFichaEnviada) {
       tcOficial: null,
       pipeline_id: pipelineElegido,
     };
-    var resp = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+    var resp = await fetch('https://us-central1-portal-tlc.cloudfunctions.net/cotizaciones', { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) }); // guardarPresupuestoEditor (soloRegistrarNegocio) ya vive en la función cotizaciones
     var r = await resp.json();
     if (!r.ok) { if (elResultado) { elResultado.textContent = '⚠️ No se pudo guardar el seguimiento: ' + (r.error||'error desconocido'); elResultado.style.color = '#f8961e'; } return; }
     _negocioActualFicha = { idCot: r.idCot, razonSocial: empresaTexto };
