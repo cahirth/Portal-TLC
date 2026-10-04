@@ -1,6 +1,6 @@
 # Plan de migración — Apps Script → Cloud Functions
 
-**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.11`) — Fases 1, 2, 3 y 4 completas
+**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.12`) — Fases 1 a 5 completas
 
 **Objetivo:** sacar el Portal TLC de Apps Script por completo, sacar `historico.json` (y los datos en general) del repositorio de código, y eliminar todo lo que ralentiza la app. Se hace módulo por módulo, con el patrón ya probado: una Cloud Function equivalente, testeada, con su propia URL, apuntada desde el frontend sin tocar el resto.
 
@@ -215,10 +215,11 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 
 ### Fase 5 — Cotizaciones, función por función
 - [x] 5a — estado, notas (agregar/editar/eliminar), vendedor, colaborador, teléfono, contacto y checks de cierre → `cotizaciones` v3; chat (enviar con menciones, reaccionar, leer) y reacciones desde la campanita → `servicio` v8. (04/10, v2026.10.04.9)
-- [ ] Borrar `consultarCliente` (ARCA) y `sincronizarHubSpot` del selector.
 - [x] 5b (parte 1) — eliminar negocio, eliminar versión de presupuesto (ahora en Firebase), crear negocio vacío (Empresas), y desde la Ficha de equipo: agregar nota, apilar ficha técnica y buscar negocio agrupable → `cotizaciones` v4. **Empresas y Ficha de equipo ya no llaman a Apps Script.** (04/10, v2026.10.04.10)
-- [ ] 5b (parte 2) — **"Pantalla Comercial"** (subirCotizacion / actualizarCotizacion): es código muerto (ningún botón la abre; la reemplazó el editor de presupuesto) → borrarla.
-- [ ] 5b (parte 3) — **Carrito viejo del selector** ("✉️ Confirmar y enviar cotización": registrarCotizacion + Power Automate + hoja "Cotizaciones" + búsqueda en ARCA/HubSpot): **código muerto** — en modo catálogo tocar un equipo abre la Ficha, y nadie abre el selector con `?ticket=` (Servicio usa el editor) → borrarlo.
+- [x] 5b (parte 2) — **Pantalla Comercial** borrada de `cotizaciones.html` (~760 líneas; era código muerto). Cotizaciones ya no llama a Apps Script. (v2026.10.04.12)
+- [x] 5b (parte 3) — **Carrito viejo del selector** borrado (~2.400 líneas: carrito, modal Nueva Cotización, formulario viejo, registrarCotizacion, Power Automate, ARCA/HubSpot, accesos por `?ticket=`). El selector solo llama a Apps Script para el login. (v2026.10.04.12)
+
+**Fase 5 completa.** Lo único vivo que queda en Apps Script del lado del Portal es el **login** (Fase 7).
 - [x] Ficha de equipo: el alta de negocio al compartir la ficha (guardarPresupuestoEditor, soloRegistrarNegocio) quedaba apuntando a Apps Script → `cotizaciones`. (v2026.10.04.11)
 - [ ] Bug conocido: `actualizarCotizacion` no regenera `cotizaciones/{id}/presupuesto` en RTDB.
 
