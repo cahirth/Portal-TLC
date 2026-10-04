@@ -1,6 +1,6 @@
 # Plan de migración — Apps Script → Cloud Functions
 
-**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.7`) — Fases 1, 2 y 4 completas
+**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.8`) — Fases 1, 2 y 4 completas
 
 **Objetivo:** sacar el Portal TLC de Apps Script por completo, sacar `historico.json` (y los datos en general) del repositorio de código, y eliminar todo lo que ralentiza la app. Se hace módulo por módulo, con el patrón ya probado: una Cloud Function equivalente, testeada, con su propia URL, apuntada desde el frontend sin tocar el resto.
 
@@ -155,7 +155,7 @@ Decidido el 28/09/2026: **ARCA** (validación de CUIT) y **contacto por QR**.
 
 | Módulo | Causa | Estado |
 |---|---|---|
-| Servicio Técnico | `servicio_tecnico.json` ~11 MB por fotos base64 | ⏳ Fase 3 |
+| Servicio Técnico | `servicio_tecnico.json` ~11 MB por fotos base64 | ✅ Fase 3 (fotos a Storage; falta correr la optimización) |
 | Cuenta Corriente | Bajaba Servicio + Eventos completos + 3 llamadas a Apps Script | ✅ Resuelto (Fase 4: solo gastos, por Cloud Function) |
 | Tareas (Mi Día) | Baja Ventas + Servicio + Eventos completos | ✅ Mitigado (caché) · ⏳ fondo: Fase 3 |
 | Comisiones | Cálculo en la Cloud Function, esperaba al permiso en fila | ✅ Mitigado (paralelo + caché) · ⏳ revisar `calcularComisiones` |
@@ -201,8 +201,12 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 
 **Fase 2 completa.**
 
-### Fase 3 — Fotos de Servicio a un nodo aparte
-- [ ] Ver sección "Fotos de Servicio" arriba.
+### Fase 3 — Fotos de Servicio a Firebase Storage (04/10, v2026.10.04.8 + `servicio` v7)
+- [x] En vez de un nodo aparte: las fotos se suben a **Firebase Storage** (mismo bucket que los adjuntos) y en el ticket queda el **link**. Las páginas que las muestran no cambian.
+- [x] Fotos nuevas (ingreso, antes/después de reparar) y firma de órdenes → Storage. Borrar una foto borra también el archivo.
+- [x] Migración de las existentes: botón **"Optimizar ahora"** en Servicio (solo Administrador), con **backup completo** previo en `backups/servicio_tecnico_<fecha>` y migración en tandas.
+- [ ] Correr "Optimizar ahora" y confirmar que la carga de Servicio quedó liviana.
+- [ ] Después de unos días sin problemas, borrar el backup de Firebase (`backups/…`) para no ocupar lugar.
 
 ### Fase 4 — Cuenta Corriente
 - [x] Nueva Cloud Function **`cuentaCorriente`** con las 8 acciones (gastos generales, saldo inicial, liquidaciones, liquidar y revertir con transacciones). Nueva `cc_gastosOrigenes`: devuelve solo los gastos de Servicio y Eventos (pocos KB) en vez de que el celular descargue `servicio_tecnico.json` (~11 MB) y `eventos.json` completos. Los gastos de tarjetas se guardan en `servicio` / `eventosChecklist`. (04/10, v2026.10.04.7)
