@@ -1,6 +1,6 @@
 # Plan de migración — Apps Script → Cloud Functions
 
-**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.8`) — Fases 1, 2 y 4 completas
+**Última actualización:** 04/10/2026 (frontend en `v2026.10.04.8`) — Fases 1, 2, 3 y 4 completas
 
 **Objetivo:** sacar el Portal TLC de Apps Script por completo, sacar `historico.json` (y los datos en general) del repositorio de código, y eliminar todo lo que ralentiza la app. Se hace módulo por módulo, con el patrón ya probado: una Cloud Function equivalente, testeada, con su propia URL, apuntada desde el frontend sin tocar el resto.
 
@@ -205,7 +205,7 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 - [x] En vez de un nodo aparte: las fotos se suben a **Firebase Storage** (mismo bucket que los adjuntos) y en el ticket queda el **link**. Las páginas que las muestran no cambian.
 - [x] Fotos nuevas (ingreso, antes/después de reparar) y firma de órdenes → Storage. Borrar una foto borra también el archivo.
 - [x] Migración de las existentes: botón **"Optimizar ahora"** en Servicio (solo Administrador), con **backup completo** previo en `backups/servicio_tecnico_<fecha>` y migración en tandas.
-- [ ] Correr "Optimizar ahora" y confirmar que la carga de Servicio quedó liviana.
+- [x] Optimización corrida: `servicio_tecnico.json` pasó de 1,95 s a 0,30 s y la página de 12,5 MB a 1,0 MB.
 - [ ] Después de unos días sin problemas, borrar el backup de Firebase (`backups/…`) para no ocupar lugar.
 
 ### Fase 4 — Cuenta Corriente
@@ -234,7 +234,7 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 
 ## 📌 Pendientes sueltos
 
-- [ ] **Pasar las funciones a `nodejs22` antes del 30/10/2026** (después Google no deja desplegar con nodejs20). Ya están en 22: `servicio`, `pipelines`, `internos`, `cuentaCorriente`. Faltan: `cotizaciones`, `empresas`, `eventosChecklist`, `fotos`, `notificaciones`, `tareas`, `asistenteIA`.
+- [x] **Todas las funciones en uso pasaron a `nodejs22`** (04/10), antes del corte del 30/10. Comando de despliegue: siempre `--runtime=nodejs22`.
 - [ ] **Sincronizar permisos** se cortó por tiempo (03/10) — confirmar que la hoja Vendedores llegue completa a Firebase (rol "Administrativo" de Lourdes, columna `Liquidar Gastos`) y renombrar la 2ª columna "Comisiones" (numérica).
 - [ ] Tildes de capacidades pendientes de decidir: `Ver Todos los Negocios` (Cotizaciones — Lourdes lo necesita para facturar), `Ver Métricas de Todos`, `Administrar Eventos`, `Reasignar Vendedor`.
 
