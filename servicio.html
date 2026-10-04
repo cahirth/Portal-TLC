@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.03.12 (Cristian: "¿cómo hacemos para que las tarjetas pasen de No iniciada a En curso? Los técnicos no las pasan de estado". (1) Paso automático: una tarjeta en "No iniciada" pasa sola a "En curso" cuando la persona asignada trabaja en ella (completa un campo, nota, foto, gasto, equipo o mensaje). Lo que haga otra persona (p. ej. un administrador escribiendo un mensaje) no la marca. Solo tickets de reparación. (2) Se quitó la exigencia de poner "En curso" a mano para pasar de Diagnóstico a Presupuesto.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.10 (BUG REAL — Cristian: "me puse rol de Técnico y Vend_Interno, y no veo mi métrica en Servicio Técnico". EMAIL_A_TECNICO tenía emails de la forma cristian.hirth / juan.garro, que no son los reales (cristian@, juan@, damian@...): nadie quedaba identificado con su código de técnico, así que "Mi carga actual" no aparecía y el filtro "Asignados a mí" no le funcionaba a nadie. Ahora usa los emails reales y, de respaldo, el nombre de la sesión. Reglas de la métrica: Administrador ve a todos; el resto ve su propia fila si está asignado a alguna etapa o tiene tickets en ellas.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.6 (BUG REAL — Cristian: "la tarjeta Rivero Néstor Eduardo la filtra para mí porque el responsable soy yo, pero con la tarjeta cerrada dice LD". Las Órdenes de Preparación tenían dos campos de responsable que se desincronizaban: tecnico_asignado (tarjeta; se actualiza al mover de etapa) y tecnico_responsable_nombre (con el que se creó la orden; lo usaban el desplegable del detalle, el filtro y las métricas). Ahora hay UN solo responsable: manda tecnico_asignado y el nombre solo si no hay código. El desplegable del detalle muestra ese mismo responsable y al cambiarlo guarda los dos campos juntos; el traspaso automático a Lourdes también. Tarjeta, detalle, filtro y métricas dicen siempre lo mismo.) -->
 <!-- Portal TLC | servicio.html | v2026.10.03.5 (Cristian: "el único problema que veo si al cliente se le hace una entrega parcial" → "me gusta, hacelo". Orden de Preparación: botón "✂️ Dividir entrega (envío parcial)" en la etapa Preparación. Se marcan los equipos que salen ahora (vienen pre-marcados los que ya están Listo para despacho/Enviado) y la Cloud Function servicio (v2, st_dividirOrdenPreparacion) crea una orden nueva <id>-E2, -E3... del mismo negocio, con su propio remito, etiquetas y seguimiento; si todo lo que sale está listo, nace a nombre de Lourdes. La original se queda con los pendientes (no puede quedar vacía) y, si lo que queda ya está todo listo, también pasa a Lourdes. Cada orden muestra los vínculos a las otras entregas. En Ventas el negocio refleja la entrega más atrasada y recibe un mensaje por cada entrega que llega a Para Instalar.) -->
@@ -1996,7 +1997,9 @@ function _validarGate(t, destino) {
   // Gate 2: Diagnóstico → Presupuesto (o más adelante)
   if (idxOrigen <= FLUJO_ETAPAS.indexOf('diagnostico') && idxDestino >= FLUJO_ETAPAS.indexOf('presupuesto')) {
     if (!t.tecnico_asignado || t.tecnico_asignado === 'sin_asignar') errores.push('Asigná un técnico responsable');
-    if (t.estado_progreso !== 'en_curso') errores.push('El estado de progreso debe estar "En curso"');
+    // (v2026.10.03.12) Ya no se exige "En curso" a mano: pasa solo a En
+    // curso cuando el técnico asignado trabaja en la tarjeta (ver
+    // _marcarEnCursoSiTrabaja). Con el diagnóstico completo alcanza.
     if (!t.diagnostico || !t.diagnostico.trim()) errores.push('Completá el diagnóstico técnico');
     if (errores.length) return errores;
   }
@@ -4556,6 +4559,53 @@ function _optsEstado(sel) {
 }
 
 // Guarda un campo al cambiar — si campo === 'deposito_directo' usa st_actualizarDeposito
+// ── PASO AUTOMÁTICO A "EN CURSO" ──────────────────────────────────
+// Cristian: "los técnicos no las pasan de estado y quedan siempre en No
+// iniciada". Una tarjeta en "No iniciada" pasa sola a "En curso" cuando
+// la PERSONA ASIGNADA hace algo de trabajo en ella: completa un campo
+// (diagnóstico, tareas, partes, checks...), carga una nota, una foto, un
+// gasto, edita un equipo o escribe un mensaje. Los cambios de un
+// administrador u otra persona NO la marcan (p. ej. un "@Juan traé la
+// selladora" no significa que Juan empezó). Solo afecta tickets de
+// reparación (las Órdenes de Preparación usan otro estado).
+// Se engancha a todos los pedidos a la Cloud Function servicio, así no
+// hay que acordarse de llamarla en cada botón.
+var ACCIONES_TRABAJO_ST = ['st_actualizarCampo', 'st_actualizarGastos', 'st_agregarNota', 'st_actualizarNotas',
+  'st_agregarFoto', 'st_agregarMensaje', 'st_actualizarEquipoOrden'];
+var CAMPOS_QUE_NO_SON_TRABAJO = ['estado_progreso', 'tecnico_asignado', 'prioridad', 'fecha_vencimiento'];
+function _marcarEnCursoSiTrabaja(body) {
+  try {
+    if (!body || ACCIONES_TRABAJO_ST.indexOf(body.accion) === -1) return;
+    if (body.accion === 'st_actualizarCampo' && CAMPOS_QUE_NO_SON_TRABAJO.indexOf(body.campo) !== -1) return;
+    var id = body.id_ticket;
+    var t = _tickets.find(function(x) { return x.id_ticket === id; });
+    if (!t || t.tipo_orden === 'preparacion_equipos') return;
+    if (t.estado_progreso && t.estado_progreso !== 'no_iniciada') return;
+    var miClave = _session ? _session.tecnico_key : '';
+    if (!miClave || _codTecnicoTicket(t) !== miClave) return; // solo quien tiene asignada la tarjeta
+    t.estado_progreso = 'en_curso';
+    if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual.estado_progreso = 'en_curso';
+    _guardarCampoSiCambio(id, 'estado_progreso', 'en_curso');
+    if (_ticketActual && _ticketActual.id_ticket === id) _renderDetalle(_ticketActual);
+    _toastServicio('▶️ Tarjeta en curso');
+  } catch (e) { console.warn('[servicio] _marcarEnCursoSiTrabaja:', e); }
+}
+(function() {
+  var fetchOriginal = window.fetch;
+  window.fetch = function(url, opciones) {
+    var prom = fetchOriginal.apply(this, arguments);
+    try {
+      if (url === SERVICIO_URL && opciones && typeof opciones.body === 'string') {
+        var body = JSON.parse(opciones.body);
+        if (body && ACCIONES_TRABAJO_ST.indexOf(body.accion) !== -1) {
+          prom.then(function(res) { if (res && res.ok) _marcarEnCursoSiTrabaja(body); }).catch(function() {});
+        }
+      }
+    } catch (e) {}
+    return prom;
+  };
+})();
+
 window._guardarCampoSiCambio = function(id, campo, valor, valorAnterior) {
   if (valorAnterior !== undefined && valorAnterior !== '' && valor === valorAnterior) return;
   var t = _tickets.find(function(x){ return x.id_ticket === id; });
