@@ -166,7 +166,23 @@ async function guardarComisionManual(data) {
   return { ok: true };
 }
 
-const ACCIONES = { listarInternos, calcularComisiones, guardarComisionManual };
+// v3 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 2): listarTecnicos, para los
+// checklists. Antes leía la hoja Vendedores desde Apps Script; ahora lee
+// /permisos (la misma hoja, sincronizada con el botón). Técnicos = Rol que
+// contiene "tecn" (Técnico); si no hay ninguno, devuelve a todos, igual
+// que la versión de Apps Script.
+async function listarTecnicos() {
+  const permisos = (await fbGet('permisos')) || {};
+  const sinTildes = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const todos = Object.values(permisos)
+    .map((p) => ({ nombre: String(p.Nombre_Vendedor || p.Nombre || '').trim(), email: String(p.Email || '').trim(), rol: String(p.Rol || '').trim() }))
+    .filter((p) => p.nombre);
+  let tecnicos = todos.filter((p) => sinTildes(p.rol).indexOf('tecn') !== -1);
+  if (!tecnicos.length) tecnicos = todos;
+  return { ok: true, tecnicos };
+}
+
+const ACCIONES = { listarInternos, calcularComisiones, guardarComisionManual, listarTecnicos };
 
 // ── Punto de entrada HTTP ──────────────────────────────────────────
 functions.http('internos', async (req, res) => {
