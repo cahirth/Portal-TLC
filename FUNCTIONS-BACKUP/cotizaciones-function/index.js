@@ -1,4 +1,7 @@
 // Portal TLC | Cloud Function — módulo Cotizaciones
+// v4 — 2026.10.04 — Fase 5b: eliminar negocio, eliminar versión de presupuesto
+//   (ahora en Firebase), crear negocio vacío, y desde la Ficha de equipo:
+//   buscar negocio agrupable y apilar ficha técnica.
 // v3 — 2026.10.04 — Fase 5a: estado, notas (agregar/editar/eliminar), vendedor,
 //   colaborador, teléfono, contacto y checks de cierre (antes en Apps Script).
 // v2 — 2026.10.01 — Cristian: "no quiero que se cambie solo de dueño...
@@ -377,7 +380,133 @@ async function actualizarCheckCierre(data) {
   return { ok: true, checks_cierre: checks };
 }
 
+// ══════════════════════════════════════════════════════════════════
+// FASE 5b — v4 — 2026.10.04 — MUERTE A APPS SCRIPT
+// ══════════════════════════════════════════════════════════════════
+// Eliminar negocio, eliminar versión de presupuesto, crear negocio vacío
+// (Empresas) y las 3 acciones de la Ficha de equipo (agrupar, apilar
+// ficha técnica; agregarNota ya estaba en v3). Todo en Firebase.
+
+async function eliminarDeal(data) {
+  const idCot = String(data.idCot || '').trim();
+  if (!idCot) return { ok: false, error: 'Falta idCot' };
+  const { idRtdb, entrada } = await _negocioExistente(idCot);
+  if (!entrada) return { ok: false, error: 'No encontrado: ' + idCot };
+  await db.ref('cotizaciones/' + idRtdb).remove();
+  return { ok: true, hubspotArchivado: false };
+}
+
+// Antes solo funcionaba sobre historico.json (GitHub). Las versiones ya se
+// guardan en Firebase (cotizaciones/<id>/versiones_presupuesto), así que
+// se borra ahí, con transacción.
+async function eliminarVersionPresupuesto(data) {
+  const idCot = String(data.idCot || '').trim(); const version = parseInt(data.version, 10);
+  if (!idCot) return { ok: false, error: 'Falta idCot' };
+  if (isNaN(version)) return { ok: false, error: 'Falta version' };
+  const { idRtdb, entrada } = await _negocioExistente(idCot);
+  if (!entrada) return { ok: false, error: 'Negocio no encontrado: ' + idCot };
+  let error = null;
+  const final = await runTransaccionNegocio(idRtdb, (c) => {
+    if (!c) return c;
+    error = null;
+    const versiones = Array.isArray(c.versiones_presupuesto) ? c.versiones_presupuesto : (c.versiones_presupuesto ? Object.values(c.versiones_presupuesto) : []);
+    if (!versiones.length) { error = 'Este negocio no tiene versiones'; return c; }
+    const idx = versiones.findIndex((v) => v && v.version === version);
+    if (idx === -1) { error = 'Versión no encontrada: v' + version; return c; }
+    versiones.splice(idx, 1);
+    c.versiones_presupuesto = versiones;
+    c.actualizado_en = new Date().toISOString();
+    return c;
+  });
+  if (error) return { ok: false, error };
+  return { ok: true, entrada: final };
+}
+
+async function crearNegocioVacio(data) {
+  const t = (k) => String(data[k] || '').trim();
+  const razonSocial = t('razonSocial'), cuit = t('cuit'), telefono = t('telefono'), vendedor = t('vendedor');
+  const contactoTelefono = t('contactoTelefono');
+  const contactosAdicionales = Array.isArray(data.contactosAdicionales)
+    ? data.contactosAdicionales.map((ct) => ({ id: String(ct.id || '').trim(), nombre: String(ct.nombre || '').trim(), email: String(ct.email || '').trim(), telefono: String(ct.telefono || '').trim() })).filter((ct) => ct.nombre)
+    : [];
+  const ESTADOS_VALIDOS = ['10%', '25%', '50%', '75%', '90%', 'Ganada', 'Perdida'];
+  const estado = ESTADOS_VALIDOS.indexOf(t('estado')) !== -1 ? t('estado') : '10%';
+  const idCot = generarIdCotizacion();
+  const fechaISO = new Date().toISOString();
+  const entrada = {
+    idCot, id: idCot, fecha: fechaISO, fechaCreacion: fechaISO, nombreNegocio: generarNombreNegocio(razonSocial, []),
+    vendedor, razonSocial, cuit, telefono: telefono || contactoTelefono,
+    carrito: [], productos: [], montoUSD: 0, totales: { subtotal_neto: 0, iva_total: 0, total_con_iva: 0 },
+    estado, link: '', notas_papiro: [],
+    contacto: { nombre: t('contactoNombre'), email: t('contactoEmail'), telefono: contactoTelefono },
+    empresa: { razonSocial, cuit }, empresaId: t('empresaId'), contactoId: t('contactoId'), contactosAdicionales,
+  };
+  await fbPatch('cotizaciones/' + rtdbKeySeguro(idCot), entrada);
+  return { ok: true, idCot, entrada };
+}
+
+// Ficha de equipo: ¿hay un negocio del mismo cliente, mismo pipeline, en
+// 50% y tocado en los últimos 7 días? (para sumar ahí en vez de crear otro)
+async function buscarNegocioAgrupable(data) {
+  const empresaId = String(data.empresaId || '').trim();
+  const razonSocial = String(data.razonSocial || '').trim().toLowerCase();
+  const pipelineId = data.pipeline_id === 'GENERAL' ? '' : String(data.pipeline_id || '').trim();
+  if (!empresaId && !razonSocial) return { ok: true, idCot: null };
+  const todos = (await fbGet('cotizaciones')) || {};
+  const ahora = Date.now(), SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+  const match = Object.values(todos).find((c) => {
+    if (!c) return false;
+    const rs = String(c.razonSocial || '').trim().toLowerCase();
+    const mismoCliente = empresaId ? (c.empresaId === empresaId || rs === razonSocial) : (rs === razonSocial);
+    if (!mismoCliente || (c.pipeline_id || '') !== pipelineId || c.estado !== '50%') return false;
+    const tsRaw = c.actualizado_en || c.fechaCreacion || c.fecha;
+    const ts = tsRaw ? new Date(tsRaw).getTime() : 0;
+    return !!ts && (ahora - ts) <= SIETE_DIAS_MS;
+  });
+  return { ok: true, idCot: match ? String(match.idCot || match.id_cotizacion || match.id || '') : null };
+}
+
+// Ficha de equipo: registra la ficha enviada y suma el equipo al carrito
+// del negocio (recalculando totales y el presupuesto, si existe).
+async function apilarFichaTecnica(data) {
+  const idCot = String(data.idCot || '').trim();
+  if (!idCot) return { ok: false, error: 'Falta idCot' };
+  const ficha = data.ficha || {};
+  const { idRtdb, entrada } = await _negocioExistente(idCot);
+  if (!entrada) return { ok: false, error: 'Negocio no encontrado: ' + idCot };
+  let totalFichas = 0, totales = null, carritoFinal = null;
+  await runTransaccionNegocio(idRtdb, (c) => {
+    if (!c) return c;
+    const fichas = Array.isArray(c.fichas_tecnicas_enviadas) ? c.fichas_tecnicas_enviadas : [];
+    fichas.push({ nombre: String(ficha.nombre || '').trim(), precio: parseFloat(ficha.precio) || 0, foto: ficha.foto || '', fecha: new Date().toISOString(), vendedor: String(ficha.vendedor || '').trim() });
+    c.fichas_tecnicas_enviadas = fichas;
+    totalFichas = fichas.length;
+    const carrito = Array.isArray(c.carrito) ? c.carrito : [];
+    const precio = parseFloat(ficha.precio) || 0;
+    const precioContado = parseFloat(ficha.precioContado) || precio;
+    const descuentoValor = precio > 0 ? Math.max(0, Math.round(((precio - precioContado) / precio) * 10000) / 100) : 0;
+    const precioNeto = Math.round(precio * (1 - descuentoValor / 100) * 100) / 100;
+    carrito.push({ nombre: String(ficha.nombre || '').trim(), precioLista: precio, precioContado, descuentoTipo: '%', descuentoValor, precioNeto, cantidad: 1, ivaPct: 10.5, moneda: 'USD', foto: ficha.foto || '', linkFolleto: '', linkVideo: '' });
+    let subtotalNeto = 0, ivaTotal = 0;
+    carrito.forEach((it) => {
+      const neta = (it.precioNeto != null ? it.precioNeto : it.precioLista) * (it.cantidad || 1);
+      subtotalNeto += neta; ivaTotal += neta * (it.ivaPct || 0) / 100;
+    });
+    subtotalNeto = Math.round(subtotalNeto * 100) / 100; ivaTotal = Math.round(ivaTotal * 100) / 100;
+    totales = { subtotal_neto: subtotalNeto, iva_total: ivaTotal, total_con_iva: Math.round((subtotalNeto + ivaTotal) * 100) / 100 };
+    c.carrito = carrito; carritoFinal = carrito;
+    c.nombreNegocio = generarNombreNegocio(c.razonSocial, carrito);
+    c.montoUSD = totales.total_con_iva;
+    c.totales = totales;
+    c.actualizado_en = new Date().toISOString();
+    if (c.presupuesto) { c.presupuesto.carrito = carrito; c.presupuesto.totales = totales; }
+    return c;
+  });
+  return { ok: true, total: totalFichas };
+}
+
 const ACCIONES = {
+  eliminarDeal, eliminarVersionPresupuesto, crearNegocioVacio, buscarNegocioAgrupable, apilarFichaTecnica,
   guardarPresupuestoEditor,
   actualizarEstado, agregarNota, editarNota, eliminarNota, reasignarVendedor,
   actualizarColaborador, actualizarTelefono, actualizarContactoCotizacion, actualizarCheckCierre,
