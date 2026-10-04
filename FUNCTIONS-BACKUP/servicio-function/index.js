@@ -1,5 +1,11 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v4 — 2026.10.04 — Progreso de preparación: "Listo para despacho" con serie y
+//   calidad = 100% y cuenta como listo; "Enviado" vale lo mismo y se informa
+//   aparte (progreso_st.enviados). Nueva st_recalcularProgresosOrdenes.
+// v3 — 2026.10.04 — La garantía (ítem sin cargo de la ficha) ya no entra en
+//   las Órdenes de Preparación; nueva st_quitarGarantiasOrden limpia las
+//   órdenes ya creadas.
 // v2 — 2026.10.03 — Entregas parciales: nueva acción st_dividirOrdenPreparacion
 //   (separa equipos de una Orden de Preparación en una orden nueva -E2, -E3...,
 //   vinculada al mismo negocio). El progreso y el estado del negocio en Ventas
@@ -91,7 +97,12 @@ const TECNICO_NOMBRE_MAP = {
 };
 const ST_CAMPOS_FOTOS = ['fotos', 'fotos_antes_reparar', 'fotos_despues_reparar'];
 const ST_MSG_VENTANA_EDICION_MS = 2 * 60 * 1000;
-const ESCALON_ESTADO_ST = { 'Pendiente': 0, 'Retirado del depósito': 15, 'Verificado': 30, 'Listo para despacho': 45, 'Enviado': 60 };
+// v4 (2026.10.04) — Cristian: "que Listo para despacho con serie y calidad
+// sea 100% y cuente como listo, y que Enviado solo cambie el color o una
+// marca". Antes Listo para despacho valía 45 (tope 85%) y solo Enviado
+// llegaba a 100%: una orden preparada esperando despacho se veía "0/N
+// Listos". Ahora Listo para despacho y Enviado valen lo mismo (60).
+const ESCALON_ESTADO_ST = { 'Pendiente': 0, 'Retirado del depósito': 15, 'Verificado': 30, 'Listo para despacho': 60, 'Enviado': 60 };
 const CAMPOS_PERMITIDOS_ST = ['tecnico_asignado', 'prioridad', 'estado_progreso', 'fecha_vencimiento', 'cliente', 'nombre_medico', 'domicilio', 'telefono', 'equipo_marca', 'equipo_modelo', 'equipo_serie', 'etiquetas', 'falla_reportada', 'accesorios', 'diagnostico', 'presupuesto_link', 'presupuesto_aprobado', 'partes_utilizadas', 'tareas_realizadas', 'reparado', 'domicilio_envio', 'fecha_limite_despacho', 'tecnico_responsable_nombre'];
 
 function stGenerarId() {
@@ -261,9 +272,10 @@ async function sincronizarNegocioDesdeOrdenPrep(ticket, nuevoDeposito) {
 function calcularProgresoST(equipos) {
   equipos = Array.isArray(equipos) ? equipos : [];
   const total = equipos.length;
-  if (!total) return { porcentaje: 0, listos: 0, total: 0 };
-  let listos = 0, sumaPorcentajes = 0;
+  if (!total) return { porcentaje: 0, listos: 0, enviados: 0, total: 0 };
+  let listos = 0, enviados = 0, sumaPorcentajes = 0;
   equipos.forEach((eq) => {
+    if (eq && eq.estado === 'Enviado') enviados++;
     let pct = 0;
     if (eq.nro_serie && String(eq.nro_serie).trim()) pct += 20;
     if (eq.calidad_verificada === true) pct += 20;
@@ -272,7 +284,7 @@ function calcularProgresoST(equipos) {
     if (pct === 100) listos++;
     sumaPorcentajes += pct;
   });
-  return { porcentaje: Math.round(sumaPorcentajes / total), listos, total };
+  return { porcentaje: Math.round(sumaPorcentajes / total), listos, enviados, total };
 }
 
 // ── Entregas parciales: "familia" de órdenes ───────────────────────
@@ -315,6 +327,54 @@ async function actualizarProgresoSTEnNegocio(ticket) {
 // crea un ticket en servicio_tecnico/{id} (mismo nodo que el resto de
 // este módulo) y marca el negocio de origen — se agrega acá, sin
 // necesitar una Cloud Function nueva.
+// ── GARANTÍA ───────────────────────────────────────────────────────
+// Cristian: "el ítem Garantía no quiero que se pase a Preparación... pide
+// N° de serie". La ficha de equipo agrega la garantía como un ítem sin
+// cargo ("Garantía 1 año" / "Garantía Extendida 3 años"); en el
+// presupuesto se sigue mostrando, pero no es un equipo a preparar.
+function esItemGarantia(it) {
+  const n = String((it && (it.nombre || it.descripcion || it.sku)) || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  return n.indexOf('garantia') === 0;
+}
+
+// Saca las filas de garantía de una Orden de Preparación ya creada
+// (órdenes anteriores a este arreglo). La llama servicio.html sola al
+// abrir una orden que todavía las tiene.
+async function st_quitarGarantiasOrden(data) {
+  const idTicket = String(data.id_ticket || '').trim();
+  if (!idTicket) return { ok: false, error: 'Falta id_ticket' };
+  let quitadas = 0;
+  const t = await runTransaccionTicket(idTicket, (tk) => {
+    const equipos = comoArray(tk.equipos);
+    const quedan = equipos.filter((eq) => !esItemGarantia(eq));
+    quitadas = equipos.length - quedan.length;
+    if (!quitadas) return tk;
+    tk.equipos = quedan;
+    tk.actualizado_en = new Date().toISOString();
+    return tk;
+  });
+  if (!t) return { ok: false, error: 'Orden no encontrada' };
+  if (quitadas) await actualizarProgresoSTEnNegocio(t);
+  return { ok: true, quitadas, equipos: comoArray(t.equipos) };
+}
+
+// Recalcula el progreso_st de TODOS los negocios con Orden de Preparación,
+// con la regla de cálculo vigente. Se usa una sola vez al cambiar la regla
+// (v4): la llama servicio.html sola, la primera vez que un Administrador
+// abre Servicio con la versión nueva.
+async function st_recalcularProgresosOrdenes() {
+  const todos = (await fbGet('servicio_tecnico')) || {};
+  let negocios = 0;
+  for (const id of Object.keys(todos)) {
+    const t = todos[id];
+    if (!t || t.tipo_orden !== 'preparacion_equipos' || !t.negocio_id || t.orden_padre) continue;
+    if (!t.id_ticket) t.id_ticket = id;
+    await actualizarProgresoSTEnNegocio(t);
+    negocios++;
+  }
+  return { ok: true, negocios };
+}
+
 async function st_crearOrdenPreparacion(data) {
   const idNegocio = String(data.id_negocio || '').trim();
   const fechaLimite = String(data.fecha_limite_despacho || '').trim();
@@ -339,6 +399,7 @@ async function st_crearOrdenPreparacion(data) {
   const carrito = Array.isArray(negocio.carrito) ? negocio.carrito : [];
   const equipos = [];
   carrito.forEach((it) => {
+    if (esItemGarantia(it)) return; // la garantía no es un equipo físico: no se prepara ni lleva N° de serie
     const cant = it.cantidad || 1;
     for (let i = 0; i < cant; i++) equipos.push({ cantidad: 1, sku: nombreBaseEquipo(it.nombre), descripcion: it.nombre || '', nro_serie: '', calidad_verificada: false, estado: 'Pendiente' });
   });
@@ -883,7 +944,7 @@ const ACCIONES = {
   st_actualizarCampo, st_actualizarDeposito, st_actualizarNotas, st_actualizarGastos,
   st_agregarNota, st_agregarFoto, st_eliminarFoto,
   st_agregarMensaje, st_editarMensaje, st_borrarMensaje, st_reaccionarMensaje,
-  st_separarEquipoOrden, st_actualizarEquipoOrden, st_dividirOrdenPreparacion,
+  st_separarEquipoOrden, st_actualizarEquipoOrden, st_dividirOrdenPreparacion, st_quitarGarantiasOrden, st_recalcularProgresosOrdenes,
   st_guardarEtiquetasCajas, eliminarVersionPresupuestoTicket, guardarAsignadosEtapa,
 };
 
