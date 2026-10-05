@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.05.5 (Al abrir el editor desde un negocio sin lugar de entrega, por defecto va "Nuestra oficina" (antes "Clínica del Cliente").) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.14 (Cristian: "agregarle al filtro de Cotizaciones que reconozca las tildes, ejemplo: Parana, Paraná". El buscador ignora tildes y mayúsculas en el texto buscado y en todos los campos (cliente, contacto, equipo, ID, CUIT).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.12 (Cierre Fase 5 — Cristian: "borralo". Eliminada la Pantalla Comercial (overlay, ~24 funciones _pc*, estilos .pc-*): ya no se llegaba desde ningún botón, la reemplazó el editor de presupuesto. Era lo único que seguía llamando a Apps Script (subirCotizacion / actualizarCotizacion); también se quitó APPS_SCRIPT_URL. Cotizaciones ya no llama a Apps Script.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.10 (MUERTE A APPS SCRIPT, Fase 5b: eliminar negocio y eliminar versión de presupuesto → Cloud Function cotizaciones v4 (la versión ahora se borra en Firebase, antes solo en historico.json). En Apps Script queda solo la Pantalla Comercial (subir/actualizar cotización), que ya no es accesible desde ningún botón.) -->
@@ -4422,7 +4423,7 @@ function _irAPresupuestoEditor(idCot) {
                 validezFecha: cond.validezFecha || '',
                 tiempoEntrega: cond.tiempoEntrega || 'inmediato',
                 tiempoEntregaCustom: cond.tiempoEntregaCustom || '',
-                lugarEntrega: cond.lugarEntrega || 'cliente',
+                lugarEntrega: cond.lugarEntrega || 'oficina', // por defecto Nuestra oficina (v2026.10.05.5)
                 notas: cond.notas || '',
             },
             // El adelanto/anticipo real de la modalidad TLC6/TLC12/

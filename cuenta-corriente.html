@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.10.05.4 (Cristian: "una referencia chiquita del tipo de cambio de ese día en cada renglón, solo para referencia". Debajo del importe de cada gasto: "TC 1.500 · ≈ US$ 100,00" (o el equivalente en pesos si el gasto es en dólares), con el dólar del día de carga; si el gasto es viejo y no lo tiene, el de hoy marcado "(hoy)". No cambia ningún cálculo.) -->
+<!-- Portal TLC | cuenta-corriente.html | v2026.10.05.3 (BUG REAL — Cristian: "subo 150 mil pesos y aparece 147.500, cambia el importe". Los gastos en pesos se guardan en USD + el TC del día de carga (tc_al_cargar), y Servicio/Eventos lo respetan, pero Cuenta Corriente convertía con el dólar de HOY. Ahora usa el TC guardado de cada gasto para mostrar, editar y liquidar; los gastos nuevos (tarjetas y generales) guardan su TC, y los generales en pesos se convierten igual que el resto (antes se guardaban sin convertir).) -->
+<!-- Portal TLC | cuenta-corriente.html | v2026.10.05.2 (Cristian: "cuando editás un gasto aparece todo cortado y no se ve la descripción, ¿podés hacer responsivo todo ese renglón?". La fila de edición tiene su propio diseño: el concepto ocupa todo el ancho arriba; debajo, fecha, moneda, monto, beneficiario y botones. En celular, de a dos campos por línea y los botones a todo el ancho.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.05.1 (Cristian: "en Cuenta Corriente, ¿podemos implementar borrar o eliminar ítem de gasto?". Al tocar "Editar" en un gasto pendiente aparece "🗑 Eliminar este gasto" (con confirmación). Lo puede borrar quien lo cargó o quien tiene el tilde "Liquidar Gastos". Se borra en el origen: la tarjeta de Servicio/Evento (función servicio/eventosChecklist) o el gasto general (función cuentaCorriente v2, eliminarGastoGeneral). Los gastos ya liquidados no se pueden borrar.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.04.7 (MUERTE A APPS SCRIPT, Fase 4: todo el módulo va a la nueva Cloud Function cuentaCorriente — gastos generales, saldo inicial, liquidaciones, liquidar y revertir (con escrituras atómicas). Los gastos de las tarjetas se guardan en la función servicio / eventosChecklist. Y lo más notorio: ya no descarga servicio_tecnico.json (~11 MB con fotos) ni eventos.json completos; la función devuelve solo los gastos (pocos KB) en una sola llamada.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.03.11 (Cristian: "la idea es que leas lo que yo tildo dentro de la hoja de Excel; en Cuenta Corriente debe poder hacer todo" [Lourdes]. Liquidar y deshacer liquidaciones ya no dependen de Rol = Administrador sino del tilde "Liquidar Gastos" de la hoja Vendedores, leído de Firebase cada vez que se abre el módulo. Mientras la columna no exista, se mantiene el criterio anterior (por rol).) -->
@@ -65,6 +68,27 @@
 @media(max-width:620px){.topbar-in{align-items:center;padding:9px 10px}.logo-img{height:27px;max-width:118px}.brand small{display:none}.tlc-tag{display:none}.controls{flex:1}.controls label{flex:1}.controls select{width:100%;min-width:0}.summary{grid-template-columns:1fr}.selected{grid-column:auto}.initial-values,.partial-grid,.pay-summary,.form,.comp-grid,.detail-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.group-head{grid-template-columns:auto 1fr auto}.subtotal{grid-column:2;text-align:left}.chev{grid-column:3;grid-row:1/3}.row{grid-template-columns:auto 1fr auto;padding:10px 11px}.date,.concept-wrap{grid-column:2}.amount{grid-column:3;grid-row:1/4}.tools{grid-column:2/4}.new-grid{grid-template-columns:1fr}.history-item{grid-template-columns:1fr auto}.history-item .badge{grid-column:1/-1;justify-self:start}.page{padding:14px 9px 45px}}
 
 .sec-head h2{color:var(--text);font-weight:800}.group-type{color:var(--primary)}.receipt{border:1px solid rgba(58,134,255,.22)}.paid{border:1px solid rgba(6,214,160,.22)}.theme:hover{border-color:var(--primary)}.controls select:focus,.new-grid input:focus,.new-grid select:focus,.field input:focus,.field select:focus,.partial input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(58,134,255,.12)}
+
+/* Fila de edición de un gasto (v2026.10.05.2) — Cristian: "cuando editás un gasto
+   aparece todo cortado y no se ve la descripción; hacé responsivo ese renglón".
+   PC: el concepto ocupa todo el ancho de arriba y abajo van fecha, moneda,
+   monto, beneficiario y botones. Celular: concepto arriba, después de a dos
+   campos por línea y los botones a todo el ancho. */
+.row.row-edit{display:block;padding:12px 14px}
+.ei-grid{display:grid;grid-template-columns:150px 90px 140px 1fr auto;gap:8px;align-items:center}
+.ei-grid.con-benef{grid-template-columns:150px 90px 140px minmax(150px,1fr) auto}
+.ei-grid .ei-concepto{grid-column:1/-1}
+.ei-grid input,.ei-grid select{width:100%;min-width:0;height:38px;padding:6px 10px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;font-size:13px}
+.ei-grid .ei-concepto{font-size:14px;font-weight:600}
+.ei-grid input:focus,.ei-grid select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(58,134,255,.12)}
+.ei-acciones{display:flex;gap:8px;justify-content:flex-end}
+.ei-acciones .add{white-space:nowrap;height:38px;padding:0 14px}
+@media(max-width:620px){
+  .ei-grid,.ei-grid.con-benef{grid-template-columns:1fr 1fr}
+  .ei-acciones{grid-column:1/-1}
+  .ei-acciones .add{flex:1}
+  .ei-acciones .add:last-child{flex:0 0 52px}
+}
 </style>
 </head>
 <body>
@@ -121,8 +145,13 @@ const $=id=>document.getElementById(id), money=(n,c)=>c==="USD"?"U$S "+Number(n|
 
 // Convierte el importe interno (siempre en USD) a la moneda en la que
 // se cargó cada gasto (mismo criterio que servicio.html/eventos.html).
-function _aMoneda(montoUSD, moneda) {
-  if (moneda === 'ARS' && TC_OFICIAL_CC) return montoUSD * TC_OFICIAL_CC;
+// BUG REAL (v2026.10.05.3) — Cristian: "subo 150 mil pesos y aparece 147.500".
+// Cuenta Corriente convertía con el dólar de HOY; Servicio y Eventos usan
+// el TC guardado al cargar cada gasto (tc_al_cargar). Ahora acá también:
+// un gasto en pesos se muestra (y se liquida) siempre por lo que se cargó.
+function _aMoneda(montoUSD, moneda, tcAlCargar) {
+  const tc = parseFloat(tcAlCargar) || TC_OFICIAL_CC;
+  if (moneda === 'ARS' && tc) return Math.round(montoUSD * tc * 100) / 100;
   return montoUSD;
 }
 
@@ -143,9 +172,22 @@ function icon(t){return t==="SERVICE"?"🛠️":t==="EVENTO"?"🎪":"📌"}
 function sub(g){let ars=0,usd=0;g.items.forEach(i=>{if(i.estado!=="PENDIENTE")return;i.moneda==="USD"?usd+=i.monto:ars+=i.monto});return{ars,usd}}
 let _editandoItemId = null; // id del gasto que esta en modo edicion ahora mismo (o null)
 
+// REFERENCIA DEL TIPO DE CAMBIO (v2026.10.05.4) — Cristian: "quiero, aunque el
+// gasto esté en pesos (o en dólares), una referencia chiquita del tipo de
+// cambio de ese día en cada renglón — solo para referencia". No toca
+// ningún cálculo: muestra el TC del día de carga y el equivalente en la
+// otra moneda. Si el gasto es viejo y no lo tiene guardado, dice "hoy".
+function _refTC(i){
+  const tcGuardado = parseFloat(i.tc_al_cargar) || 0;
+  const tc = tcGuardado || TC_OFICIAL_CC;
+  if (!tc) return '';
+  const equiv = i.moneda === 'USD' ? money(i.monto * tc, 'ARS') : money(i.monto / tc, 'USD');
+  return `<div class="audit" style="text-align:right;font-weight:500;white-space:nowrap;" title="${tcGuardado ? 'Dólar oficial del día en que se cargó el gasto' : 'Este gasto no tiene guardado el dólar del día de carga: se muestra el de hoy'}">TC ${tc.toLocaleString('es-AR',{maximumFractionDigits:2})}${tcGuardado ? '' : ' (hoy)'} · ≈ ${equiv}</div>`;
+}
+
 function row(i){
   if (i.id === _editandoItemId) return editRow(i);
-  return `<div class="row"><input type="checkbox" ${i.estado==="PAGADO"?"disabled":""} ${selected.has(i.id)?"checked":""} onchange="toggleItem('${i.id}',this.checked)"><div class="date">${fmt(i.fecha)}</div><div class="concept-wrap"><div class="concept">${esc(i.concepto)}</div><div class="audit">Cargado por: ${esc(i.cargado_por)}</div></div><div class="amount">${money(i.monto,i.moneda)}</div><div class="tools">${i.estado==="PAGADO"?'<span class="audit">Sin comprobante</span>':`<button class="edit-link" onclick="editarItemClick('${i.id}')" title="Editar">\u270e Editar</button>`}</div></div>`;
+  return `<div class="row"><input type="checkbox" ${i.estado==="PAGADO"?"disabled":""} ${selected.has(i.id)?"checked":""} onchange="toggleItem('${i.id}',this.checked)"><div class="date">${fmt(i.fecha)}</div><div class="concept-wrap"><div class="concept">${esc(i.concepto)}</div><div class="audit">Cargado por: ${esc(i.cargado_por)}</div></div><div class="amount">${money(i.monto,i.moneda)}${_refTC(i)}</div><div class="tools">${i.estado==="PAGADO"?'<span class="audit">Sin comprobante</span>':`<button class="edit-link" onclick="editarItemClick('${i.id}')" title="Editar">\u270e Editar</button>`}</div></div>`;
 }
 
 // Fila en modo edicion - mismos campos que "+ Cargar gasto", con
@@ -166,14 +208,16 @@ function editRow(i){
   const selectorBenef = CURRENT.permisos.Internos
     ? `<select id="ei-benef-${i.id}" title="Reasignar a otro beneficiario">${opts}</select>`
     : '';
-  return `<div class="row row-edit"><div class="new-grid" style="grid-template-columns:auto 1fr auto auto ${CURRENT.permisos.Internos?'auto':''} auto auto;align-items:center;">
-    <input type="date" id="ei-fecha-${i.id}" value="${esc(i.fecha)}">
-    <input id="ei-concepto-${i.id}" value="${esc(i.concepto)}" placeholder="Concepto / descripcion">
+  return `<div class="row row-edit"><div class="ei-grid ${CURRENT.permisos.Internos ? 'con-benef' : ''}">
+    <input class="ei-concepto" id="ei-concepto-${i.id}" value="${esc(i.concepto)}" placeholder="Concepto / descripción">
+    <input class="ei-fecha" type="date" id="ei-fecha-${i.id}" value="${esc(i.fecha)}">
     <select id="ei-moneda-${i.id}"><option ${i.moneda==="ARS"?"selected":""}>ARS</option><option ${i.moneda==="USD"?"selected":""}>USD</option></select>
     <input id="ei-monto-${i.id}" type="text" inputmode="decimal" value="${_formatMontoARS(i.monto)}" onfocus="this.select()" onblur="this.value=_formatMontoARS(_parseMontoARS(this.value))">
     ${selectorBenef}
-    <button class="add" onclick="guardarEdicionItem('${i.id}')">\u2713 Guardar</button>
-    <button class="add" style="background:transparent;color:var(--muted);border:1px solid var(--border)" onclick="cancelarEdicionItem()">\u2715</button>
+    <div class="ei-acciones">
+      <button class="add" onclick="guardarEdicionItem('${i.id}')">\u2713 Guardar</button>
+      <button class="add" style="background:transparent;color:var(--muted);border:1px solid var(--border)" onclick="cancelarEdicionItem()">\u2715</button>
+    </div>
   </div>
   ${_puedeBorrarItem(i) ? `<div style="margin-top:8px;text-align:right;"><button type="button" onclick="eliminarItem('${i.id}')" style="background:transparent;border:1px solid rgba(239,68,68,.45);color:#ef4444;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">🗑 Eliminar este gasto</button></div>` : ''}
   </div>`;
@@ -257,12 +301,17 @@ window.guardarEdicionItem = async function(id) {
   // El importe se guarda SIEMPRE en USD internamente - mismo criterio
   // que addExpense - si el usuario tipeo en ARS, se convierte con el
   // TC oficial antes de mandar al backend.
-  const importeAGuardar = (moneda === 'ARS' && TC_OFICIAL_CC) ? (monto / TC_OFICIAL_CC) : monto;
+  // Se convierte con el TC HISTÓRICO del gasto (el del día que se cargó),
+  // así guardar sin cambios no altera el importe. Si no tiene, el de hoy.
+  let itemActual = null;
+  (state.grupos_gastos || []).forEach(g => (g.items || []).forEach(x => { if (x.id === id) itemActual = x; }));
+  const tcGasto = (itemActual && parseFloat(itemActual.tc_al_cargar)) || TC_OFICIAL_CC;
+  const importeAGuardar = (moneda === 'ARS' && tcGasto) ? (monto / tcGasto) : monto;
 
   try {
     let rr;
     if (info.origen_tipo === 'general') {
-      const payloadGeneral = { accion:'editarGastoGeneral', id: info.id_gasto, fecha, descripcion: concepto, moneda, importe: importeAGuardar };
+      const payloadGeneral = { accion:'editarGastoGeneral', id: info.id_gasto, fecha, descripcion: concepto, moneda, importe: importeAGuardar, tc_al_cargar: tcGasto || null };
       // Reasignar beneficiario — pedido por Cristian: "si se puede
       // asignar gastos viejos o los saneamos así como quedaron".
       if (nuevoBeneficiario) { payloadGeneral.a_favor_de = nuevoBeneficiario; payloadGeneral.solicitante_es_interno = CURRENT.permisos.Internos; }
@@ -273,7 +322,7 @@ window.guardarEdicionItem = async function(id) {
       const gastosCompletos = _origenGastosCompletos[tarjetaId] || [];
       const item = gastosCompletos[info.gasto_index];
       if (!item) { toast('No se encontro el gasto en el origen - proba recargar.'); return; }
-      Object.assign(item, { fecha, descripcion: concepto, moneda, importe: importeAGuardar });
+      Object.assign(item, { fecha, descripcion: concepto, moneda, importe: importeAGuardar, tc_al_cargar: item.tc_al_cargar || tcGasto || null });
       // Servicio/Evento reciben el array COMPLETO y lo reescriben tal
       // cual — no hace falta una acción de backend aparte para
       // reasignar, alcanza con tocar el campo antes de mandarlo.
@@ -344,7 +393,9 @@ window.addExpense = async function(id) {
     const info = _origenInfo[id];
     if (info.tipo === 'general') {
       const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
-        accion:'agregarGastoGeneral', a_favor_de: ben, descripcion: c, fecha: fecha, importe: a, moneda: moneda, creado_por: CURRENT.nombre,
+        accion:'agregarGastoGeneral', a_favor_de: ben, descripcion: c, fecha: fecha, moneda: moneda, creado_por: CURRENT.nombre,
+        // Igual que en las tarjetas: importe interno en USD + TC del día guardado
+        importe: (moneda === 'ARS' && TC_OFICIAL_CC) ? (a / TC_OFICIAL_CC) : a, tc_al_cargar: TC_OFICIAL_CC || null,
       }) });
       const rr = await r.json();
       if (!rr.ok) { toast('Error: ' + (rr.error||'')); return; }
@@ -355,7 +406,7 @@ window.addExpense = async function(id) {
       // es ARS, hay que guardarlo como equivalente en USD (mismo
       // criterio interno que ya usan servicio.html/eventos.html).
       const importeAGuardar = (moneda === 'ARS' && TC_OFICIAL_CC) ? (a / TC_OFICIAL_CC) : a;
-      gastosCompletos.push({ fecha, descripcion:c, importe:importeAGuardar, moneda, creado_por:CURRENT.nombre, creado_en:new Date().toISOString(), a_favor_de: ben, estado:'PENDIENTE' });
+      gastosCompletos.push({ fecha, descripcion:c, importe:importeAGuardar, moneda, creado_por:CURRENT.nombre, creado_en:new Date().toISOString(), a_favor_de: ben, estado:'PENDIENTE', tc_al_cargar: TC_OFICIAL_CC || null });
       const accion = info.tipo === 'servicio' ? 'st_actualizarGastos' : 'ev_actualizarGastos';
       const payload = info.tipo === 'servicio' ? { accion, id_ticket: info.id_ticket, gastos: gastosCompletos } : { accion, id_evento: info.id_evento, id_tarjeta: info.id_tarjeta, gastos: gastosCompletos };
       const r = await fetch(info.tipo === 'servicio' ? SERVICIO_URL_CC : EVENTOS_URL_CC, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
@@ -656,8 +707,8 @@ async function cargarTodo() {
           if (_esPendienteParaBeneficiario(g, beneficiarioNombre)) {
             pendientes.push({
               id: 'servicio:' + id + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
-              moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'),
-              cargado_por: g.creado_por || '', estado: 'PENDIENTE',
+              moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD', g.tc_al_cargar),
+              tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por || '', estado: 'PENDIENTE',
             });
           }
         });
@@ -701,8 +752,8 @@ async function cargarTodo() {
             if (_esPendienteParaBeneficiario(g, beneficiarioNombre)) {
               pendientes.push({
                 id: 'evento:' + idEvento + ':' + tarjetaId + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
-                moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'),
-                cargado_por: g.creado_por || '', estado: 'PENDIENTE',
+                moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD', g.tc_al_cargar),
+                tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por || '', estado: 'PENDIENTE',
               });
             }
           });
@@ -730,7 +781,7 @@ async function cargarTodo() {
           tarjeta_id: 'GENERAL', tipo_origen: 'GENERAL', titulo_origen: 'Gastos generales / directos',
           items: rrGen.gastos.map(function(g) {
             return { id: 'general:' + g.id, fecha: g.fecha||'', concepto: g.descripcion||'', moneda: g.moneda||'USD',
-              monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD'), cargado_por: g.creado_por||'', estado:'PENDIENTE' };
+              monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD', g.tc_al_cargar), tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por||'', estado:'PENDIENTE' };
           }),
         }];
       }

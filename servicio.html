@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.05.5 (Presupuestos de Servicio: lugar de entrega por defecto "Nuestra oficina" (antes "Clínica del Cliente").) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.13 (Cristian: "esto está muy grande, en Administrador, ¿podemos ponerlo todo en un dropdown?". El panel "⚖️ Carga por técnico" ahora es desplegable: arranca cerrado mostrando una sola línea con el total de cada técnico (y los sin asignar); tocándola se abre la tabla por etapa. El estado abierto/cerrado se recuerda en el navegador.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.9 (Fase 5a: las reacciones desde la campanita a mensajes de Cotizaciones también van a la función servicio.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.8 (Fase 3 — Cristian: "para cargar Servicio es lento". Las fotos nuevas ya se guardan en Firebase Storage (función servicio v7) y en el ticket queda el link. Para las fotos viejas, un Administrador ve el aviso "⚡ N tickets tienen fotos a la vieja usanza" con el botón "Optimizar ahora": hace backup completo de servicio_tecnico en Firebase y mueve las fotos a Storage en tandas, mostrando el avance. Al terminar, la lista de Servicio (y Tareas y Cuenta Corriente) pesa una fracción.) -->
@@ -4295,7 +4296,7 @@ window._generarPresupuestoTecnico = async function(id) {
   }
 
   var items = [];
-  var condiciones = { formaPago:'', validez:'15', validezFecha:'', tiempoEntrega:'inmediato', tiempoEntregaCustom:'', lugarEntrega:'cliente', notas:'' };
+  var condiciones = { formaPago:'', validez:'15', validezFecha:'', tiempoEntrega:'inmediato', tiempoEntregaCustom:'', lugarEntrega:'oficina', notas:'' };
   var moneda = 'USD';
 
   if (idCotExistente) {
@@ -4329,7 +4330,7 @@ window._generarPresupuestoTecnico = async function(id) {
         condiciones = {
           formaPago: c.formaPago || '', validez: c.validez || '15', validezFecha: c.validezFecha || '',
           tiempoEntrega: c.tiempoEntrega || 'inmediato', tiempoEntregaCustom: c.tiempoEntregaCustom || '',
-          lugarEntrega: c.lugarEntrega || 'cliente', notas: c.notas || '',
+          lugarEntrega: c.lugarEntrega || 'oficina', notas: c.notas || '',
         };
         moneda = c.monedaTotales || 'USD';
         // Si el presupuesto ya tiene su propio cliente/contacto guardado

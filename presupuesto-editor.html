@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.10.05.5 (Cristian: "en el lugar de entrega quiero que Nuestra oficina vaya por default y agregá una tercera opción, Otro, editable para escribir otro lugar". Nueva opción "Otro (escribir)…" con campo de texto; lo escrito se guarda en lugarEntrega y sale así en el presupuesto. Al reabrir, se restaura la opción y el texto.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.04.1 (Cristian: "me gustaría en el editor de presupuesto mover las filas verticalmente para ordenarlas a mano". Cada fila tiene un ícono ⠿ a la izquierda para arrastrarla (mouse o dedo, con SortableJS de cdnjs). El orden queda guardado y el presupuesto sale en ese orden. Si la librería no carga, el ícono se oculta y todo sigue igual.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.09.30.1 (Cristian: "no quiero que se cambie solo de dueño... porque se editó, porque se miró". Al guardar, si el negocio ya existe se conserva el vendedor que tiene en RTDB (cotizaciones/{id}/vendedor) en vez de poner al usuario logueado. Solo un negocio nuevo toma como dueño a quien lo crea. Si no se puede leer el dueño actual, no guarda.) -->
@@ -325,10 +326,12 @@
         </div>
         <div class="det-campo full">
           <label>Lugar de entrega</label>
-          <select id="cc-lugar-entrega">
+          <select id="cc-lugar-entrega" onchange="_toggleLugarEntregaOtro()">
             <option value="oficina">Nuestra oficina — Del Carmen 716 PB CABA (envío y seguro a cargo del comprador)</option>
             <option value="cliente">Clínica del Cliente</option>
+            <option value="otro">Otro (escribir)…</option>
           </select>
+          <input type="text" id="cc-lugar-entrega-otro" placeholder="Escribí el lugar de entrega" style="display:none;margin-top:6px;">
         </div>
         <div class="det-campo full">
           <label>Notas</label>
@@ -696,7 +699,7 @@ function _irASelectorDispositivos() {
         validezFecha: document.getElementById('cc-validez-fecha').value,
         tiempoEntrega: document.getElementById('cc-tiempo-entrega').value,
         tiempoEntregaCustom: document.getElementById('cc-tiempo-entrega-custom').value,
-        lugarEntrega: document.getElementById('cc-lugar-entrega').value,
+        lugarEntrega: _leerLugarEntrega(),
         notas: document.getElementById('cc-notas').value
       },
       moneda: document.getElementById('moneda-presupuesto').value
@@ -1213,6 +1216,29 @@ function _activarOrdenItems() {
   });
 }
 
+// LUGAR DE ENTREGA (v2026.10.05.5) — Cristian: "agregá una tercera opción, Otro, que
+// sea editable para escribir otro lugar". Con "Otro" aparece un campo de
+// texto; lo escrito se guarda tal cual en lugarEntrega y el presupuesto lo
+// muestra así. "Nuestra oficina" es la opción por defecto.
+function _toggleLugarEntregaOtro() {
+  var esOtro = document.getElementById('cc-lugar-entrega').value === 'otro';
+  var inp = document.getElementById('cc-lugar-entrega-otro');
+  inp.style.display = esOtro ? 'block' : 'none';
+  if (esOtro) inp.focus();
+}
+function _leerLugarEntrega() {
+  var v = document.getElementById('cc-lugar-entrega').value;
+  if (v !== 'otro') return v;
+  return document.getElementById('cc-lugar-entrega-otro').value.trim() || 'A convenir';
+}
+function _ponerLugarEntrega(valor) {
+  var sel = document.getElementById('cc-lugar-entrega');
+  var inp = document.getElementById('cc-lugar-entrega-otro');
+  if (valor === 'oficina' || valor === 'cliente') { sel.value = valor; inp.value = ''; }
+  else { sel.value = 'otro'; inp.value = valor || ''; }
+  _toggleLugarEntregaOtro();
+}
+
 function _toggleValidezPersonalizada() {
   var v = document.getElementById('cc-validez').value;
   document.getElementById('campo-validez-personalizada').style.display = v === 'personalizado' ? 'block' : 'none';
@@ -1680,7 +1706,7 @@ async function _generarPresupuesto() {
     validezFecha: document.getElementById('cc-validez-fecha').value,
     tiempoEntrega: document.getElementById('cc-tiempo-entrega').value,
     tiempoEntregaCustom: document.getElementById('cc-tiempo-entrega-custom').value,
-    lugarEntrega: document.getElementById('cc-lugar-entrega').value,
+    lugarEntrega: _leerLugarEntrega(),
     notas: document.getElementById('cc-notas').value,
     moneda: document.getElementById('moneda-presupuesto').value,
     tcOficial: TC_OFICIAL || null,
@@ -1795,7 +1821,7 @@ if (_draftCondiciones) {
   document.getElementById('cc-validez-fecha').value = _draftCondiciones.validezFecha || '';
   document.getElementById('cc-tiempo-entrega').value = _draftCondiciones.tiempoEntrega || 'inmediato';
   document.getElementById('cc-tiempo-entrega-custom').value = _draftCondiciones.tiempoEntregaCustom || '';
-  document.getElementById('cc-lugar-entrega').value = _draftCondiciones.lugarEntrega || 'oficina';
+  _ponerLugarEntrega(_draftCondiciones.lugarEntrega || 'oficina');
   document.getElementById('cc-notas').value = _draftCondiciones.notas || '';
   _toggleValidezPersonalizada();
   _toggleTiempoEntregaPersonalizado();
