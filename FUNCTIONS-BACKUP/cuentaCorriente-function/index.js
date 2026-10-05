@@ -1,4 +1,6 @@
 // Portal TLC | Cloud Function — Cuenta Corriente y Rendición de Gastos
+// v3 — 2026.10.05 — Los gastos en pesos se liquidan con el TC del día en que se
+//   cargaron (tc_al_cargar), no con el de hoy. Gastos generales guardan su TC.
 // v2 — 2026.10.05 — eliminarGastoGeneral (borrar un gasto pendiente).
 // v1 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 4)
 //
@@ -114,7 +116,7 @@ async function agregarGastoGeneral(data) {
   const id = generarId('GG');
   const gasto = {
     id, fecha: String(data.fecha || '').trim() || fechaHoyAR(), descripcion: String(data.descripcion || '').trim(),
-    importe: parseFloat(data.importe) || 0, moneda: data.moneda === 'ARS' ? 'ARS' : 'USD',
+    importe: parseFloat(data.importe) || 0, moneda: data.moneda === 'ARS' ? 'ARS' : 'USD', tc_al_cargar: parseFloat(data.tc_al_cargar) || null,
     creado_por: String(data.creado_por || '').trim(), creado_en: new Date().toISOString(), a_favor_de: aFavorDe, estado: 'PENDIENTE',
   };
   await fbSet('gastos_generales/' + id, gasto);
@@ -131,6 +133,7 @@ async function editarGastoGeneral(data) {
   const campos = {};
   ['fecha', 'descripcion', 'moneda'].forEach((c) => { if (data[c] !== undefined) campos[c] = String(data[c]).trim(); });
   if (data.importe !== undefined) campos.importe = parseFloat(data.importe) || 0;
+  if (data.tc_al_cargar !== undefined && !gasto.tc_al_cargar) campos.tc_al_cargar = parseFloat(data.tc_al_cargar) || null;
   if (data.a_favor_de !== undefined && String(data.a_favor_de).trim()) {
     if (data.solicitante_es_interno !== true) return { ok: false, error: 'Solo usuarios Internos pueden reasignar el beneficiario de un gasto.' };
     const nombre = String(data.a_favor_de).trim();
@@ -232,7 +235,7 @@ async function crearLiquidacion(data) {
       const idx = parseInt(item.gasto_index, 10);
       const previo = comoArray(await fbGet(ruta))[idx];
       if (!previo || previo.estado === 'PAGADO') continue; // borrado o ya pagado por otra vía
-      if ((previo.moneda || 'USD') === 'ARS' && tc === null) {
+      if ((previo.moneda || 'USD') === 'ARS' && !parseFloat(previo.tc_al_cargar) && tc === null) {
         tc = await obtenerTCOficial();
         if (!tc) return { ok: false, error: 'No se pudo obtener el tipo de cambio oficial — no se pudo calcular el monto en pesos. Probá de nuevo en un momento.' };
       }
@@ -251,7 +254,7 @@ async function crearLiquidacion(data) {
       const rutaGeneral = 'gastos_generales/' + String(item.id_gasto || '').trim();
       const previo = await fbGet(rutaGeneral);
       if (!previo || previo.estado === 'PAGADO') continue;
-      if ((previo.moneda || 'USD') === 'ARS' && tc === null) {
+      if ((previo.moneda || 'USD') === 'ARS' && !parseFloat(previo.tc_al_cargar) && tc === null) {
         tc = await obtenerTCOficial();
         if (!tc) return { ok: false, error: 'No se pudo obtener el tipo de cambio oficial — no se pudo calcular el monto en pesos. Probá de nuevo en un momento.' };
       }
@@ -269,7 +272,10 @@ async function crearLiquidacion(data) {
 
     const moneda = g.moneda || 'USD';
     const montoUSD = parseFloat(g.importe) || 0;
-    const monto = moneda === 'ARS' ? montoUSD * tc : montoUSD;
+    // v3: un gasto en pesos se paga por lo que se cargó: TC del día de carga
+    // (tc_al_cargar); el de hoy solo si el gasto no lo tiene guardado.
+    const tcGasto = parseFloat(g.tc_al_cargar) || tc;
+    const monto = moneda === 'ARS' ? Math.round(montoUSD * tcGasto * 100) / 100 : montoUSD;
     if (moneda === 'ARS') totalArs += monto; else totalUsd += monto;
     detalleItems.push({
       concepto: g.descripcion || '', fecha: g.fecha || '', moneda, monto, cargado_por: g.creado_por || '', origen_tipo: item.origen_tipo,
