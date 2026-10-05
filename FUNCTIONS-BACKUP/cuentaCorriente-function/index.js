@@ -1,4 +1,5 @@
 // Portal TLC | Cloud Function — Cuenta Corriente y Rendición de Gastos
+// v2 — 2026.10.05 — eliminarGastoGeneral (borrar un gasto pendiente).
 // v1 — 2026.10.04 — MUERTE A APPS SCRIPT (Fase 4)
 //
 // Cristian: "vamos con cuenta corriente". Porta de FotoMap.gs las 8
@@ -137,6 +138,25 @@ async function editarGastoGeneral(data) {
     campos.creado_por = gasto.creado_por || nombre;
   }
   await fbPatch(ruta, campos);
+  return { ok: true };
+}
+
+// v2 — 2026.10.05 — Cristian: "en Cuenta Corriente, ¿podemos implementar
+// borrar o eliminar ítem de gasto?". Borra un gasto general PENDIENTE (uno
+// ya liquidado no se puede borrar: hay que revertir la liquidación antes).
+// Puede borrarlo quien lo cargó o quien tiene el tilde "Liquidar Gastos".
+async function eliminarGastoGeneral(data) {
+  const id = String(data.id || '').trim();
+  if (!id) return { ok: false, error: 'Falta id' };
+  const ruta = 'gastos_generales/' + id;
+  const gasto = await fbGet(ruta);
+  if (!gasto) return { ok: false, error: 'Gasto no encontrado (puede que ya se haya borrado)' };
+  if (gasto.estado === 'PAGADO') return { ok: false, error: 'Este gasto ya fue liquidado — para borrarlo primero hay que deshacer la liquidación.' };
+  const solicitante = normalizarNombre(data.solicitante_nombre);
+  if (data.solicitante_es_admin !== true && (!solicitante || solicitante !== normalizarNombre(gasto.creado_por))) {
+    return { ok: false, error: 'Solo puede borrarlo quien lo cargó o alguien con el tilde "Liquidar Gastos".' };
+  }
+  await db.ref(ruta).remove();
   return { ok: true };
 }
 
@@ -358,7 +378,7 @@ async function revertirLiquidacion(data) {
 }
 
 const ACCIONES = {
-  cc_gastosOrigenes, listarGastosGeneralesPendientes, agregarGastoGeneral, editarGastoGeneral,
+  cc_gastosOrigenes, listarGastosGeneralesPendientes, agregarGastoGeneral, editarGastoGeneral, eliminarGastoGeneral,
   obtenerSaldoInicial, guardarSaldoInicial, listarLiquidaciones, crearLiquidacion, revertirLiquidacion,
 };
 
