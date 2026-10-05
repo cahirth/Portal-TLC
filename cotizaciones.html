@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.04.14 (Cristian: "agregarle al filtro de Cotizaciones que reconozca las tildes, ejemplo: Parana, Paraná". El buscador ignora tildes y mayúsculas en el texto buscado y en todos los campos (cliente, contacto, equipo, ID, CUIT).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.12 (Cierre Fase 5 — Cristian: "borralo". Eliminada la Pantalla Comercial (overlay, ~24 funciones _pc*, estilos .pc-*): ya no se llegaba desde ningún botón, la reemplazó el editor de presupuesto. Era lo único que seguía llamando a Apps Script (subirCotizacion / actualizarCotizacion); también se quitó APPS_SCRIPT_URL. Cotizaciones ya no llama a Apps Script.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.10 (MUERTE A APPS SCRIPT, Fase 5b: eliminar negocio y eliminar versión de presupuesto → Cloud Function cotizaciones v4 (la versión ahora se borra en Firebase, antes solo en historico.json). En Apps Script queda solo la Pantalla Comercial (subir/actualizar cotización), que ya no es accesible desde ningún botón.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.9 (MUERTE A APPS SCRIPT, Fase 5a: cambiar estado, notas (agregar/editar/eliminar), reasignar vendedor, colaborador, teléfono, contacto y checks de cierre van a la Cloud Function cotizaciones v3; el chat (enviar, reaccionar, respaldo de leer) y las reacciones desde la campanita, a la función servicio v8. Siguen en Apps Script: subir/actualizar cotización, eliminar negocio y eliminar versión de presupuesto (Fase 5b).) -->
@@ -2261,8 +2262,16 @@ function selFiltro(btn) {
     aplicarFiltros();
 }
 
+// Búsqueda sin importar tildes ni mayúsculas (v2026.10.04.14) — Cristian: "que
+// reconozca las tildes, ejemplo: Parana, Paraná". Se normalizan el texto
+// buscado y los campos (á→a, ñ→n, ü→u...), así "parana" encuentra "Paraná"
+// y "PARANÁ" encuentra "Parana".
+function _normBusq(x) {
+    return String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
 function aplicarFiltros() {
-    const q = (document.getElementById('buscador')?.value || '').toLowerCase().trim();
+    const q = _normBusq(document.getElementById('buscador')?.value || '').trim();
     cotFiltradas = todasLasCot.filter(c => {
         const matchEstado = filtroEstado === 'TODOS' || c.estado === filtroEstado;
         // Antes usaba || (primer campo que exista), lo que hacía que si
@@ -2270,16 +2279,16 @@ function aplicarFiltros() {
         // empresa.razonSocial quedaran sin comparar nunca. Ahora se
         // concatenan TODOS los campos posibles de nombre y se busca
         // contra el conjunto completo.
-        const razon   = String([
+        const razon   = _normBusq(String([
             c.nombreNegocio, c.razonSocial, c.empresa?.razonSocial, c.cliente?.nombre,
-        ].filter(Boolean).join(' ')).toLowerCase();
-        const contactoStr = String([c.contacto?.nombre, c.nombreMedico].filter(Boolean).join(' ')).toLowerCase();
-        const equipo  = String([
+        ].filter(Boolean).join(' ')));
+        const contactoStr = _normBusq(String([c.contacto?.nombre, c.nombreMedico].filter(Boolean).join(' ')));
+        const equipo  = _normBusq(String([
             ...(c.carrito||[]).map(i => i.nombre),
             ...(Array.isArray(c.productos) ? c.productos : []),
-        ].join(' ')).toLowerCase();
-        const id      = String(c.idCot || c.id_cotizacion || c.id || '').toLowerCase();
-        const cuit    = String(c.cuit || c.empresa?.cuit || '').toLowerCase();
+        ].join(' ')));
+        const id      = _normBusq(String(c.idCot || c.id_cotizacion || c.id || ''));
+        const cuit    = _normBusq(String(c.cuit || c.empresa?.cuit || ''));
         const matchQ  = !q || razon.includes(q) || contactoStr.includes(q) || equipo.includes(q) || id.includes(q) || cuit.includes(q);
         // Pipeline: una tarjeta sin pipeline_id cargado se considera
         // "GENERAL" — así, seleccionar "Pipeline General" muestra tanto
