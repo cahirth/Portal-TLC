@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.10.05.1 (Cristian: "en Cuenta Corriente, ¿podemos implementar borrar o eliminar ítem de gasto?". Al tocar "Editar" en un gasto pendiente aparece "🗑 Eliminar este gasto" (con confirmación). Lo puede borrar quien lo cargó o quien tiene el tilde "Liquidar Gastos". Se borra en el origen: la tarjeta de Servicio/Evento (función servicio/eventosChecklist) o el gasto general (función cuentaCorriente v2, eliminarGastoGeneral). Los gastos ya liquidados no se pueden borrar.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.04.7 (MUERTE A APPS SCRIPT, Fase 4: todo el módulo va a la nueva Cloud Function cuentaCorriente — gastos generales, saldo inicial, liquidaciones, liquidar y revertir (con escrituras atómicas). Los gastos de las tarjetas se guardan en la función servicio / eventosChecklist. Y lo más notorio: ya no descarga servicio_tecnico.json (~11 MB con fotos) ni eventos.json completos; la función devuelve solo los gastos (pocos KB) en una sola llamada.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.03.11 (Cristian: "la idea es que leas lo que yo tildo dentro de la hoja de Excel; en Cuenta Corriente debe poder hacer todo" [Lourdes]. Liquidar y deshacer liquidaciones ya no dependen de Rol = Administrador sino del tilde "Liquidar Gastos" de la hoja Vendedores, leído de Firebase cada vez que se abre el módulo. Mientras la columna no exista, se mantiene el criterio anterior (por rol).) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.09.30.4 (Cristian: "a veces tardan un poco en cargar todos los gastos de todas las tarjetas". Causa: cada apertura baja servicio_tecnico.json y eventos.json completos (con fotos) + 3 consultas a Apps Script, y repite todo después de cada acción. Arreglo inmediato (el de fondo queda en el plan: fotos de Servicio a otro nodo + Cuenta Corriente a Cloud Function): se abre al instante con la última lista guardada en este navegador (por usuario que mira y colaborador elegido) y se actualiza sola atrás con "Actualizando...". Después de liquidar/editar/agregar ya no se vacía la pantalla. Agregar, editar, liquidar y deshacer quedan bloqueados (con aviso) hasta que llegan los datos frescos, porque escriben usando la lista completa de gastos de cada tarjeta y no deben usar una copia vieja. Si se cambia de colaborador mientras carga, gana siempre la carga más nueva.) -->
@@ -173,8 +174,61 @@ function editRow(i){
     ${selectorBenef}
     <button class="add" onclick="guardarEdicionItem('${i.id}')">\u2713 Guardar</button>
     <button class="add" style="background:transparent;color:var(--muted);border:1px solid var(--border)" onclick="cancelarEdicionItem()">\u2715</button>
-  </div></div>`;
+  </div>
+  ${_puedeBorrarItem(i) ? `<div style="margin-top:8px;text-align:right;"><button type="button" onclick="eliminarItem('${i.id}')" style="background:transparent;border:1px solid rgba(239,68,68,.45);color:#ef4444;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">🗑 Eliminar este gasto</button></div>` : ''}
+  </div>`;
 }
+
+// ── BORRAR UN GASTO (v2026.10.05.1) ────────────────────────────────────
+// Cristian: "en Cuenta Corriente, ¿podemos implementar borrar o eliminar
+// ítem de gasto?". El botón aparece al tocar "Editar". Solo gastos
+// PENDIENTES (los liquidados no se listan acá). Puede borrar quien lo
+// cargó o quien tiene el tilde "Liquidar Gastos". Igual que al editar,
+// se borra en el ORIGEN: la tarjeta de Servicio/Evento o el gasto general.
+function _puedeBorrarItem(i) {
+  if (!i || i.estado === 'PAGADO') return false;
+  if (CURRENT.esAdmin) return true;
+  const n = x => String(x || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return !!i.cargado_por && n(i.cargado_por) === n(CURRENT.nombre);
+}
+
+window.eliminarItem = async function(id) {
+  if (!_ccPuedeEscribir()) return;
+  const info = _parseItemId(id);
+  let item = null;
+  (state.grupos_gastos || []).forEach(g => (g.items || []).forEach(x => { if (x.id === id) item = x; }));
+  if (!item) { toast('No se encontró el gasto — probá recargar.'); return; }
+  if (!_puedeBorrarItem(item)) { toast('Solo puede borrarlo quien lo cargó o alguien con el tilde "Liquidar Gastos".'); return; }
+  if (!confirm('¿Eliminar el gasto "' + (item.concepto || 'sin concepto') + '"?\n\nSe borra también de su tarjeta de origen. No se puede deshacer.')) return;
+  try {
+    let rr;
+    if (info.origen_tipo === 'general') {
+      const r = await fetch(CC_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ accion:'eliminarGastoGeneral', id: info.id_gasto, solicitante_nombre: CURRENT.nombre, solicitante_es_admin: CURRENT.esAdmin === true }) });
+      rr = await r.json();
+    } else {
+      const tarjetaId = info.origen_tipo === 'servicio' ? info.id_ticket : info.id_tarjeta;
+      const gastosCompletos = (_origenGastosCompletos[tarjetaId] || []).slice();
+      const original = gastosCompletos[info.gasto_index];
+      if (!original) { toast('No se encontró el gasto en el origen — probá recargar.'); return; }
+      if (original.estado === 'PAGADO') { toast('Ese gasto ya fue liquidado: primero hay que deshacer la liquidación.'); return; }
+      gastosCompletos.splice(info.gasto_index, 1);
+      const accion = info.origen_tipo === 'servicio' ? 'st_actualizarGastos' : 'ev_actualizarGastos';
+      const payload = info.origen_tipo === 'servicio'
+        ? { accion, id_ticket: info.id_ticket, gastos: gastosCompletos }
+        : { accion, id_evento: info.id_evento, id_tarjeta: info.id_tarjeta, gastos: gastosCompletos };
+      const r = await fetch(info.origen_tipo === 'servicio' ? SERVICIO_URL_CC : EVENTOS_URL_CC, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+      rr = await r.json();
+    }
+    if (!rr.ok) { toast('No se pudo eliminar: ' + (rr.error || '')); return; }
+    selected.delete(id);
+    _editandoItemId = null;
+    toast('Gasto eliminado');
+    await cargarTodo();
+  } catch (e) {
+    toast('Error de conexión al eliminar el gasto');
+  }
+};
 
 window.editarItemClick = function(id) {
   _editandoItemId = id;
