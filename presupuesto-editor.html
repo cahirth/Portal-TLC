@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.10.06.4 (Cristian: "si todos los ítems están en USD el total debe estar en dólares, y si todos están en AR$, en AR$, automáticamente". El selector de moneda del total se ajusta solo cuando todos los ítems quedan en la misma moneda; si están mezclados, se respeta la elección manual.) -->
+<!-- Portal TLC | presupuesto-editor.html | v2026.10.06.3 (Cristian: "poné el separador de miles" en el descuento. El campo Descuento se muestra con separador de miles y coma decimal, igual que el precio (600.000 / 12,5), y lee lo tipeado con o sin puntos. Un descuento en % se limita a 0–100.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.06.2 (Cristian: "%, USD — ¿podemos poner AR$ en vez de dólares cuando la moneda de la izquierda pasa a AR$?". Si el ítem está en AR$, el interruptor del descuento dice "% | AR$" y el descuento fijo se ve y se tipea en pesos (internamente sigue en USD, como el precio).) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.05.5 (Cristian: "en el lugar de entrega quiero que Nuestra oficina vaya por default y agregá una tercera opción, Otro, editable para escribir otro lugar". Nueva opción "Otro (escribir)…" con campo de texto; lo escrito se guarda en lugarEntrega y sale así en el presupuesto. Al reabrir, se restaura la opción y el texto.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.04.1 (Cristian: "me gustaría en el editor de presupuesto mover las filas verticalmente para ordenarlas a mano". Cada fila tiene un ícono ⠿ a la izquierda para arrastrarla (mouse o dedo, con SortableJS de cdnjs). El orden queda guardado y el presupuesto sale en ese orden. Si la librería no carga, el ícono se oculta y todo sigue igual.) -->
@@ -980,7 +982,12 @@ window._actualizarItem = function(id, campo, valor) {
   else if (campo === 'descuento' && (it.descuentoTipo || '%') === 'USD' && it.moneda === 'ARS' && TC_OFICIAL) {
     // Descuento fijo con el ítem en AR$: lo tipeado son pesos; se guarda en
     // USD como todo lo interno (v2026.10.06.2).
-    it.descuento = (parseFloat(valor) || 0) / TC_OFICIAL;
+    it.descuento = _parseMilesInput(valor) / TC_OFICIAL;
+  }
+  else if (campo === 'descuento') {
+    // Con separador de miles (v2026.10.06.3): "600.000" o "12,5" se leen bien.
+    var dNum = _parseMilesInput(valor);
+    it.descuento = ((it.descuentoTipo || '%') === '%') ? Math.min(100, Math.max(0, dNum)) : Math.max(0, dNum);
   }
   else { it[campo] = parseFloat(valor) || 0; }
   // El campo Descuento es el único que, una vez tocado a mano por el
@@ -1173,7 +1180,7 @@ function _renderItems() {
         '</div></div>' +
         '<div class="campo"><label>Cantidad</label><input type="number" min="1" value="' + it.cantidad + '" onchange="_actualizarItem(' + it.id + ',\'cantidad\',this.value)"></div>' +
         '<div class="campo"><label>Descuento</label><div class="descuento-input-wrap" style="display:flex;align-items:center;gap:6px;">' +
-          '<input type="number" min="0" step="any" ' + ((it.descuentoTipo||'%') === '%' ? 'max="100"' : '') + ' value="' + _descuentoMostrado(it) + '" onchange="_actualizarItem(' + it.id + ',\'descuento\',this.value)" style="flex:1;min-width:0;">' +
+          '<input type="text" inputmode="decimal" value="' + _formatMilesInput(_descuentoMostrado(it)) + '" onchange="_actualizarItem(' + it.id + ',\'descuento\',this.value)" style="flex:1;min-width:0;">' +
           '<div class="moneda-switch" onclick="_toggleDescuentoTipoItem(' + it.id + ')" title="Cambiar tipo de descuento">' +
             '<span class="' + ((it.descuentoTipo||'%') !== 'USD' ? 'activo' : '') + '">%</span>' +
             '<span class="' + ((it.descuentoTipo||'%') === 'USD' ? 'activo' : '') + '">' + ((it.moneda === 'ARS' && TC_OFICIAL) ? 'AR$' : 'USD') + '</span>' +
@@ -1617,8 +1624,30 @@ function _actualizarDisponibilidadLeasing36() {
   }
 }
 
+// MONEDA DEL TOTAL AUTOMÁTICA (v2026.10.06.4) — Cristian: "si todos los ítems
+// están en USD, el total debe estar en dólares, y si todos están en AR$,
+// en AR$, automáticamente". Cuando cambia la combinación de monedas de
+// los ítems (se agrega uno, se cambia el interruptor USD/AR$ de alguno) y
+// quedan TODOS en la misma moneda, el selector del total pasa a esa
+// moneda. Si están mezclados, se respeta lo que haya elegido el vendedor,
+// y siempre se puede cambiar a mano.
+var _firmaMonedasItems = null;
+function _autoMonedaTotal() {
+  var sel = document.getElementById('moneda-presupuesto');
+  if (!sel || !ITEMS.length) return;
+  var monedas = ITEMS.map(function(it) { return it.moneda === 'ARS' ? 'ARS' : 'USD'; });
+  var unica = monedas.every(function(m) { return m === monedas[0]; }) ? monedas[0] : 'MIXTA';
+  var firma = unica + ':' + ITEMS.length;
+  if (firma === _firmaMonedasItems) return;
+  _firmaMonedasItems = firma;
+  if (unica === 'MIXTA') return;
+  if (unica === 'ARS' && !TC_OFICIAL) { _firmaMonedasItems = null; return; } // reintenta cuando cargue el TC
+  sel.value = unica;
+}
+
 function _render() {
   _renderItems();
+  _autoMonedaTotal();
   _renderTotales();
   _actualizarDisponibilidadLeasing36();
   _renderModalidadesPago();
