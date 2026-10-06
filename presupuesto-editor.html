@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.10.06.5 (Cristian: "al pasar de 50% a AR$, redondealo". Con el ítem en AR$, pasar el descuento de % a monto fijo redondea a pesos enteros (600.000 en vez de 599.999,4).) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.06.4 (Cristian: "si todos los ítems están en USD el total debe estar en dólares, y si todos están en AR$, en AR$, automáticamente". El selector de moneda del total se ajusta solo cuando todos los ítems quedan en la misma moneda; si están mezclados, se respeta la elección manual.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.06.3 (Cristian: "poné el separador de miles" en el descuento. El campo Descuento se muestra con separador de miles y coma decimal, igual que el precio (600.000 / 12,5), y lee lo tipeado con o sin puntos. Un descuento en % se limita a 0–100.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.06.2 (Cristian: "%, USD — ¿podemos poner AR$ en vez de dólares cuando la moneda de la izquierda pasa a AR$?". Si el ítem está en AR$, el interruptor del descuento dice "% | AR$" y el descuento fijo se ve y se tipea en pesos (internamente sigue en USD, como el precio).) -->
@@ -1022,7 +1023,12 @@ window._toggleDescuentoTipoItem = function(id) {
   var descuentoViejo = Math.max(0, it.descuento || 0);
   var descuentoNuevo = 0;
   if (bruto > 0) {
-    if (tipoNuevo === 'USD') {
+    if (tipoNuevo === 'USD' && it.moneda === 'ARS' && TC_OFICIAL) {
+      // % -> AR$ (v2026.10.06.5): el monto se redondea a PESOS ENTEROS y recién
+      // ahí se pasa a USD sin redondear, así se ve exacto (600.000 y no
+      // 599.999,4, que salía de redondear antes en dólares).
+      descuentoNuevo = Math.round(bruto * TC_OFICIAL * (descuentoViejo / 100)) / TC_OFICIAL;
+    } else if (tipoNuevo === 'USD') {
       // % -> USD: mismo % de descuento, expresado en dólares.
       descuentoNuevo = Math.round(bruto * (descuentoViejo / 100) * 100) / 100;
     } else {
