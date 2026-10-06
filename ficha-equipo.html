@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | ficha-equipo.html | v2026.10.06.1 (Cristian: "Garantía 1 año — Sin stock: no quiero que aparezca". En "Ver stock" ya no se lista la garantía: no es un producto físico.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.10.04.11 (Fase 5b: al compartir la ficha y crear un negocio nuevo, guardarPresupuestoEditor (soloRegistrarNegocio) va a la función cotizaciones; quedaba apuntando a Apps Script. Con esto la Ficha de equipo ya no llama a Apps Script.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.10.04.10 (MUERTE A APPS SCRIPT, Fase 5b: agregar nota, apilar ficha técnica y buscar negocio agrupable → Cloud Function cotizaciones v4. La Ficha de equipo ya no llama a Apps Script.) -->
 <!-- Portal TLC | ficha-equipo.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: listarEmpresas, guardarEmpresa y guardarContacto pasan a la Cloud Function empresas (ya existían ahí, misma respuesta). Eliminado el escáner QR de FacoExtrema (dado de baja el 28/09): botón, modal, funciones, estilos y la librería html5-qrcode, con las llamadas buscarContactoParaQR/guardarEmpresaContactoQR. Siguen en Apps Script agregarNota, apilarFichaTecnica y buscarNegocioAgrupable (van con Cotizaciones, Fase 5).) -->
@@ -760,7 +761,11 @@ window._toggleStockFicha = function() {
 
     var lineas = [lineaStock(d['Nombre de Dispositivo'] || 'Equipo', d)];
     _fichaHijosDisponibles.forEach(function(h) {
-        lineas.push(lineaStock(h['Nombre de Dispositivo'] || '', h));
+        // La garantía no es un producto físico: no tiene stock y no se lista
+        // (v2026.10.06.1 — Cristian: "Garantía 1 año, sin stock: no quiero que aparezca").
+        var nombreHijo = String(h['Nombre de Dispositivo'] || '');
+        if (nombreHijo.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().indexOf('garantia') === 0) return;
+        lineas.push(lineaStock(nombreHijo, h));
     });
 
     wrap.style.background = '#f8fafc';
