@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.10.06.2 (Cristian: "%, USD — ¿podemos poner AR$ en vez de dólares cuando la moneda de la izquierda pasa a AR$?". Si el ítem está en AR$, el interruptor del descuento dice "% | AR$" y el descuento fijo se ve y se tipea en pesos (internamente sigue en USD, como el precio).) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.05.5 (Cristian: "en el lugar de entrega quiero que Nuestra oficina vaya por default y agregá una tercera opción, Otro, editable para escribir otro lugar". Nueva opción "Otro (escribir)…" con campo de texto; lo escrito se guarda en lugarEntrega y sale así en el presupuesto. Al reabrir, se restaura la opción y el texto.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.04.1 (Cristian: "me gustaría en el editor de presupuesto mover las filas verticalmente para ordenarlas a mano". Cada fila tiene un ícono ⠿ a la izquierda para arrastrarla (mouse o dedo, con SortableJS de cdnjs). El orden queda guardado y el presupuesto sale en ese orden. Si la librería no carga, el ícono se oculta y todo sigue igual.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
@@ -976,6 +977,11 @@ window._actualizarItem = function(id, campo, valor) {
     it.precio = (it.moneda === 'ARS' && TC_OFICIAL) ? (num / TC_OFICIAL) : num;
   }
   else if (campo === 'moneda') { it[campo] = valor; }
+  else if (campo === 'descuento' && (it.descuentoTipo || '%') === 'USD' && it.moneda === 'ARS' && TC_OFICIAL) {
+    // Descuento fijo con el ítem en AR$: lo tipeado son pesos; se guarda en
+    // USD como todo lo interno (v2026.10.06.2).
+    it.descuento = (parseFloat(valor) || 0) / TC_OFICIAL;
+  }
   else { it[campo] = parseFloat(valor) || 0; }
   // El campo Descuento es el único que, una vez tocado a mano por el
   // vendedor, no debe volver a ser pisado por el recálculo automático
@@ -1121,6 +1127,17 @@ function _calcularItem(it) {
   return { bruto:bruto, descontado:conDescuento, iva:iva, total:conDescuento + iva };
 }
 
+// DESCUENTO EN LA MONEDA DEL ÍTEM (v2026.10.06.2) — Cristian: "%, USD: ¿podemos poner
+// AR$ en vez de dólares cuando la moneda de la izquierda pasa a AR$?".
+// El descuento fijo se sigue guardando en USD (igual que el precio), pero
+// si el ítem se muestra en AR$, el interruptor dice "AR$" y el monto se
+// ve y se tipea en pesos.
+function _descuentoMostrado(it) {
+  var d = Math.max(0, it.descuento || 0);
+  if ((it.descuentoTipo || '%') === 'USD' && it.moneda === 'ARS' && TC_OFICIAL) return Math.round(d * TC_OFICIAL * 100) / 100;
+  return Math.round(d * 100) / 100;
+}
+
 // Convierte un monto en USD a la moneda de display de un ítem (AR$ si
 // it.moneda === 'ARS' y ya cargó el TC, si no lo deja en USD).
 function _aMonedaItem(montoUSD, it) {
@@ -1156,10 +1173,10 @@ function _renderItems() {
         '</div></div>' +
         '<div class="campo"><label>Cantidad</label><input type="number" min="1" value="' + it.cantidad + '" onchange="_actualizarItem(' + it.id + ',\'cantidad\',this.value)"></div>' +
         '<div class="campo"><label>Descuento</label><div class="descuento-input-wrap" style="display:flex;align-items:center;gap:6px;">' +
-          '<input type="number" min="0" ' + ((it.descuentoTipo||'%') === '%' ? 'max="100"' : '') + ' value="' + it.descuento + '" onchange="_actualizarItem(' + it.id + ',\'descuento\',this.value)" style="flex:1;min-width:0;">' +
+          '<input type="number" min="0" step="any" ' + ((it.descuentoTipo||'%') === '%' ? 'max="100"' : '') + ' value="' + _descuentoMostrado(it) + '" onchange="_actualizarItem(' + it.id + ',\'descuento\',this.value)" style="flex:1;min-width:0;">' +
           '<div class="moneda-switch" onclick="_toggleDescuentoTipoItem(' + it.id + ')" title="Cambiar tipo de descuento">' +
             '<span class="' + ((it.descuentoTipo||'%') !== 'USD' ? 'activo' : '') + '">%</span>' +
-            '<span class="' + ((it.descuentoTipo||'%') === 'USD' ? 'activo' : '') + '">USD</span>' +
+            '<span class="' + ((it.descuentoTipo||'%') === 'USD' ? 'activo' : '') + '">' + ((it.moneda === 'ARS' && TC_OFICIAL) ? 'AR$' : 'USD') + '</span>' +
           '</div>' +
         '</div></div>' +
         '<div class="campo"><label>IVA %</label><select onchange="_actualizarItem(' + it.id + ',\'iva\',this.value)">' +
