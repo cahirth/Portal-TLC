@@ -1,4 +1,9 @@
 // Portal TLC | Cloud Function — Eventos: Checklist + Notas + Listado
+// v2 — 2026.10.06 — Tildes de lectura tipo WhatsApp en los mensajes con
+//   @menciones (con_lectura + lecturas[<email>]); nueva acción
+//   ev_marcarMensajesLeidos. Corrige además el aviso de mención: guardaba
+//   el índice del mensaje en tarjeta_id (en vez de la tarjeta), así que
+//   tocar el aviso en la campanita no llevaba a la tarjeta correcta.
 // v1 — 2026.09.27
 //
 // Cuarto módulo migrado — pero DISTINTO a los anteriores: no es "todo
@@ -112,11 +117,12 @@ function escHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-async function registrarNotificacion(email, tipo, texto, ticketId, ticketTitulo, autorNombre, origen, tarjetaId) {
+async function registrarNotificacion(email, tipo, texto, ticketId, ticketTitulo, autorNombre, origen, tarjetaId, mensajeIndice) {
   try {
     const idNoti = Date.now() + '_' + Math.random().toString(36).substring(2, 8);
     const registro = { tipo, origen: origen || 'evento', texto, ticket_id: ticketId || '', ticket_titulo: ticketTitulo || '', autor_nombre: autorNombre || '', fecha: new Date().toISOString(), leido: false };
     if (tarjetaId) registro.tarjeta_id = tarjetaId;
+    if (mensajeIndice !== undefined && mensajeIndice !== null && mensajeIndice >= 0) registro.mensaje_indice = mensajeIndice;
     await fbSet('notificaciones/' + rtdbKeySeguro(email) + '/' + idNoti, registro);
   } catch (e) {
     console.warn('No se pudo registrar notificación para', email, ':', e.message);
@@ -542,7 +548,7 @@ async function reaccionarMensajeEnTarjeta(idEvento, idTarjeta, indice, email, no
     const emoji = { ok: '👍', no_ok: '👎', corazon: '❤️' }[reaccion] || '';
     const quien = nombre || email || 'Alguien';
     const evento = await fbGet('eventos/' + idEvento);
-    await registrarNotificacion(autorMsgEmail, 'reaccion', quien + ' reaccionó ' + emoji + ' a tu mensaje: "' + textoMsg.slice(0, 80) + '"', idEvento, (evento && evento.nombre) || '', quien, 'evento');
+    await registrarNotificacion(autorMsgEmail, 'reaccion', quien + ' reaccionó ' + emoji + ' a tu mensaje: "' + textoMsg.slice(0, 80) + '"', idEvento, (evento && evento.nombre) || '', quien, 'evento', idTarjeta);
     await enviarEmailBrevo(autorMsgEmail, '', quien + ' reaccionó a tu mensaje en Portal TLC',
       '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;">' +
         '<h2 style="color:#1a4b8c;margin-bottom:8px;">Portal TLC</h2>' +
@@ -859,6 +865,7 @@ async function ev_agregarMensaje(data) {
     const mensajes = comoArray(t.mensajes);
     const nuevoMensaje = { texto, autor_nombre: autorNombre, autor_email: autorEmail, menciones, fecha: new Date().toISOString() };
     if (respuestaA) nuevoMensaje.respuesta_a = respuestaA;
+    if (menciones.some((e) => String(e).trim().toLowerCase() !== autorEmail.toLowerCase())) nuevoMensaje.con_lectura = true;
     mensajes.push(nuevoMensaje);
     indiceMensajeNuevo = mensajes.length - 1;
     t.mensajes = mensajes;
@@ -868,7 +875,7 @@ async function ev_agregarMensaje(data) {
   const evento = await fbGet('eventos/' + idEvento);
   const linkEvento = 'https://cahirth.github.io/Portal-TLC/eventos.html?id=' + encodeURIComponent(idEvento) + '&tarjeta=' + encodeURIComponent(idTarjeta);
   await Promise.all(menciones.filter((email) => email && email !== autorEmail).map(async (email) => {
-    await registrarNotificacion(email, 'mencion', texto, idEvento, (evento && evento.nombre) || '', autorNombre || autorEmail, 'evento', indiceMensajeNuevo);
+    await registrarNotificacion(email, 'mencion', texto, idEvento, (evento && evento.nombre) || '', autorNombre || autorEmail, 'evento', idTarjeta, indiceMensajeNuevo);
     const tokens = await obtenerTokensPush(email);
     await Promise.all(tokens.map((tok) => enviarPush(tok, 'Te mencionaron en una tarjeta', (autorNombre || autorEmail) + ': ' + texto, linkEvento)));
     await enviarEmailBrevo(email, '', 'Te mencionaron en "' + (tarjetaOriginal.titulo || '') + '"',
@@ -934,6 +941,53 @@ async function eliminarAdjunto(data) {
   return { ok: true };
 }
 
+// ── Tildes de lectura (v2) — ver servicio-function v9 ───────────────
+async function ev_marcarMensajesLeidos(data) {
+  const idEvento = String(data.id_evento || '').trim();
+  const idTarjeta = String(data.id_tarjeta || '').trim();
+  const email = String(data.email || '').trim();
+  if (!idEvento || !idTarjeta || !email) return { ok: false, error: 'Faltan datos' };
+  const yo = email.toLowerCase();
+  const k = rtdbKeySeguro(yo);
+  const ruta = 'eventos/' + idEvento + '/tarjetas/' + idTarjeta;
+  const t0 = await fbGet(ruta);
+  if (!t0) return { ok: false, error: 'Tarjeta no encontrada' };
+  const meMenciona = (m) => m && m.con_lectura && comoArray(m.menciones).some((e) => String(e || '').trim().toLowerCase() === yo);
+  let mensajes = comoArray(t0.mensajes);
+  let marcados = 0;
+  if (mensajes.some((m) => meMenciona(m) && !(m.lecturas && m.lecturas[k]))) {
+    const ahora = new Date().toISOString();
+    const tarjeta = await runTransaccionTarjeta(ruta, (t) => {
+      const ms = comoArray(t.mensajes);
+      marcados = 0;
+      ms.forEach((m) => {
+        if (!meMenciona(m)) return;
+        if (!m.lecturas) m.lecturas = {};
+        if (m.lecturas[k]) return;
+        m.lecturas[k] = ahora;
+        marcados++;
+      });
+      t.mensajes = ms;
+      return t;
+    });
+    mensajes = comoArray(tarjeta.mensajes);
+  }
+  // Al abrir la tarjeta, sus avisos en la campanita quedan leídos
+  let avisos = 0;
+  try {
+    const rutaN = 'notificaciones/' + rtdbKeySeguro(email);
+    const notis = await fbGet(rutaN);
+    const cambios = {};
+    if (notis && typeof notis === 'object') Object.keys(notis).forEach((nk) => {
+      const n = notis[nk];
+      if (n && !n.leido && String(n.ticket_id || '') === idEvento && String(n.tarjeta_id || '') === idTarjeta) cambios[nk + '/leido'] = true;
+    });
+    avisos = Object.keys(cambios).length;
+    if (avisos) await db.ref(rutaN).update(cambios);
+  } catch (e) { console.warn('No se pudieron marcar avisos leídos:', e.message); }
+  return { ok: true, marcados, avisos_leidos: avisos, mensajes };
+}
+
 const ACCIONES = {
   ev_listarEventos, ev_crearChecklistGrupo, ev_editarChecklistGrupo, ev_borrarChecklistGrupo,
   ev_agregarChecklistItem, ev_toggleChecklistItem, ev_reordenarChecklistItems, ev_eliminarChecklistItem,
@@ -942,7 +996,7 @@ const ACCIONES = {
   ev_subirLogoEvento, ev_quitarLogoEvento,
   ev_crearColumna, ev_editarColumna, ev_borrarColumna,
   ev_crearTarjeta, ev_editarTarjeta, ev_moverTarjeta, ev_borrarTarjeta, ev_duplicarTarjeta,
-  ev_actualizarGastos, ev_marcarPortada, ev_agregarMensaje, ev_reaccionarMensaje,
+  ev_actualizarGastos, ev_marcarPortada, ev_agregarMensaje, ev_reaccionarMensaje, ev_marcarMensajesLeidos,
   subirAdjunto, eliminarAdjunto,
 };
 
