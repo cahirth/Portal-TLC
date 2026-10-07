@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | orden-servicio.html | v2026.10.07.1 (Cristian: "al guardar PDF lo guarda siempre con el mismo nombre: TLC SRL - ANEXO I POE 8 - ORDEN DE SERVICIO". Ahora el nombre del PDF es único por orden, como en los otros módulos: "Orden de Servicio TLC — {cliente} — {N° de orden}" (el navegador usa el título de la página como nombre del archivo).) -->
 <!-- Portal TLC | orden-servicio.html | v2026.08.19.1 (Los 3 campos de texto (Falla Reportada, Diagnóstico Técnico, Tareas Realizadas) ahora crecen automáticamente según su contenido, en vez de quedar con una altura fija (min-height:75px) y scroll interno — un textarea con scroll no tiene sentido en un documento pensado para imprimir/PDF, no se puede scrollear un papel, el texto quedaba cortado sin forma de verlo completo. Nueva función _autoAlturaTextarea(), aplicada a los 3 campos justo después de cargar los datos del ticket. Reportado por Cristian con captura, marcando el cuadro de Tareas Realizadas con scroll interno.) -->
 <!-- Portal TLC | orden-servicio.html | v2026.08.06.1 (Evidencia Fotográfica ahora muestra TODO, no solo las fotos "bloqueadas" del ingreso — se agregaron las secciones Fotos del Equipo (completas, no solo las protegidas), Antes de Reparar y Después de Reparar, mismos 3 campos que ya existen en el detalle del ticket de servicio.html (fotos, fotos_antes_reparar, fotos_despues_reparar). Reportado por Cristian con 2 capturas.) -->
 <html lang="es">
@@ -277,6 +278,9 @@
             // Número de orden
             document.querySelector('.doc-title').textContent = 'Orden de Asistencia Técnica N°: ' + t.id_ticket;
             _idTicketActual = t.id_ticket || '';
+
+            // Nombre del PDF al guardar (el navegador usa el título de la página)
+            document.title = 'Orden de Servicio TLC — ' + ((t.cliente || t.nombre_medico || '').trim() || 'Sin cliente') + ' — ' + (t.id_ticket || id);
 
             // Fecha de apertura
             document.querySelector('.doc-subdata').innerHTML =
