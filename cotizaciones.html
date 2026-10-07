@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
+<!-- Portal TLC | cotizaciones.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre.) -->
+<!-- Portal TLC | cotizaciones.html | v2026.10.06.7 (Mismo cambio que servicio.html v2026.10.06.7: "🔔 Se va a avisar a: ..." debajo del cuadro antes de enviar; tildes de lectura ✓✓ (gris = avisado, azul = lo leyeron todos) con detalle por persona; al abrir el negocio se marcan tus menciones como leídas y sus avisos en la campanita. Lógica compartida en menciones.js; backend servicio v9 (cot_marcarMensajesLeidos).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.05.5 (Al abrir el editor desde un negocio sin lugar de entrega, por defecto va "Nuestra oficina" (antes "Clínica del Cliente").) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.14 (Cristian: "agregarle al filtro de Cotizaciones que reconozca las tildes, ejemplo: Parana, Paraná". El buscador ignora tildes y mayúsculas en el texto buscado y en todos los campos (cliente, contacto, equipo, ID, CUIT).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.04.12 (Cierre Fase 5 — Cristian: "borralo". Eliminada la Pantalla Comercial (overlay, ~24 funciones _pc*, estilos .pc-*): ya no se llegaba desde ningún botón, la reemplazó el editor de presupuesto. Era lo único que seguía llamando a Apps Script (subirCotizacion / actualizarCotizacion); también se quitó APPS_SCRIPT_URL. Cotizaciones ya no llama a Apps Script.) -->
@@ -52,6 +55,7 @@
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="cierre-semanal.js"></script>
 <script src="avatar.js?v=4"></script>
 <script src="permisos.js"></script>
 <script src="adjuntos.js"></script>
@@ -1116,6 +1120,7 @@ function _escCot(s) {
 
 function _resaltarMencionesTextoCot(textoEscapado) {
     if (!_internosCacheCot) return textoEscapado;
+    if (window.TLCMenciones) return TLCMenciones.resaltar(textoEscapado, _internosCacheCot);
     var out = textoEscapado;
     _internosCacheCot.forEach(function(p) {
         if (!p.nombre) return;
@@ -1197,6 +1202,7 @@ window._cancelarRespuestaCot = function() {
 function _renderRespuestaPreviewCot() {
   var wrap = document.getElementById('respuesta-preview-wrap-cot');
   if (!wrap) return;
+  setTimeout(_actualizarAvisoDestinatariosCot, 0);
   if (!_respondiendoAMensajeCot) { wrap.innerHTML = ''; return; }
   var r = _respondiendoAMensajeCot;
   wrap.innerHTML =
@@ -1234,7 +1240,8 @@ function _construirHtmlListaMensajesCot() {
         return '<div class="msg-fila" tabindex="0" style="padding:8px 10px;border-radius:10px;background:#0f1b2e;border:1px solid #1e3050;margin-bottom:8px;">' +
             '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
                 '<span style="font-size:11px;font-weight:700;color:#f1f5f9;">' + _escCot(m.autor_nombre || m.autor_email || '—') + '</span>' +
-                '<span style="font-size:10px;color:#64748b;white-space:nowrap;">' + _tiempoRelativoCot(m.fecha) + '</span>' +
+                '<span style="font-size:10px;color:#64748b;white-space:nowrap;">' + _tiempoRelativoCot(m.fecha) +
+                    (window.TLCMenciones ? TLCMenciones.htmlTildes(m, _mensajesCotActual, i, _internosCacheCot) : '') + '</span>' +
             '</div>' +
             citaHtml +
             '<div class="msg-texto" style="color:#f1f5f9;white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTextoCot(_escCot(m.texto || '')) + '</div>' +
@@ -1377,6 +1384,7 @@ async function _renderPanelMensajesCot(id) {
                 'style="width:100%;min-height:64px;padding:8px 10px;border-radius:8px;background:#0f1b2e;border:1px solid #1e3050;' +
                 'color:#f1f5f9;font-size:12px;font-family:inherit;resize:vertical;" oninput="_onMensajeInputCot(event)" onkeydown="_onMensajeKeydownCot(event)" ' +
                 'onclick="_mencionUltimoCursorCot=this.selectionStart;" onkeyup="_mencionUltimoCursorCot=this.selectionStart;" ontouchend="_mencionUltimoCursorCot=this.selectionStart;"></textarea>' +
+            '<div id="aviso-destinatarios-cot" style="display:none;margin-top:5px;font-size:11px;color:#3a86ff;"></div>' +
             '<div id="mencion-sugerencias-cot" style="display:none;margin-top:6px;background:#0f1b2e;border:1px solid #1e3050;border-radius:8px;max-height:160px;overflow-y:auto;"></div>' +
             '<button type="button" id="btn-enviar-mensaje-cot" onclick="_enviarMensajeCot()" ' +
                 'style="margin-top:8px;width:100%;padding:8px;border-radius:8px;background:#3a86ff;color:#fff;border:none;font-size:12px;font-weight:700;cursor:pointer;">Enviar</button>' +
@@ -1403,6 +1411,44 @@ async function _renderPanelMensajesCot(id) {
     promInternos.then(function() { if (!yaEstabaCache && _idCotActual === id) _repintarListaMensajesCot(); });
 
     _iniciarPollingMensajesCot(id);
+    _marcarMensajesLeidosCot(id, true);
+}
+
+// Tildes de lectura (v2026.10.06.7) — ver servicio.html: al abrir el
+// negocio se guarda que leíste los mensajes que te mencionan y se marcan
+// como leídos sus avisos en la campanita.
+var _marcandoLeidosCot = false;
+function _marcarMensajesLeidosCot(id, siempre) {
+    var cuenta = _leerSesionCompartida();
+    var email = cuenta ? cuenta.username : '';
+    if (!email || !id || _marcandoLeidosCot) return;
+    if (!siempre && !(window.TLCMenciones && TLCMenciones.hayPendientesParaMi(_mensajesCotActual, email))) return;
+    _marcandoLeidosCot = true;
+    fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ accion:'cot_marcarMensajesLeidos', id_cotizacion:id, email:email }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r){
+        if (!r || !r.ok) return;
+        if (r.avisos_leidos && typeof _cargarNotificaciones === 'function') _cargarNotificaciones(true);
+        if (r.marcados && Array.isArray(r.mensajes) && _idCotActual === id) {
+            _mensajesCotActual = r.mensajes;
+            var cMem = _buscarCotEnMemoria(id); if (cMem) cMem.mensajes = r.mensajes;
+            _repintarListaMensajesCot();
+        }
+    })
+    .catch(function(){})
+    .finally(function(){ _marcandoLeidosCot = false; });
+}
+
+function _actualizarAvisoDestinatariosCot() {
+    var el = document.getElementById('aviso-destinatarios-cot');
+    var ta = document.getElementById('mensaje-nuevo-txt-cot');
+    if (!el || !ta || !window.TLCMenciones) return;
+    var cuenta = _leerSesionCompartida();
+    var extra = (_respondiendoAMensajeCot && _respondiendoAMensajeCot.autor_email) ? [_respondiendoAMensajeCot.autor_email] : [];
+    var html = TLCMenciones.textoAvisoDestinatarios(ta.value || '', _internosCacheCot || [], cuenta ? cuenta.username : '', extra);
+    el.innerHTML = html;
+    el.style.display = html ? 'block' : 'none';
 }
 
 function _repintarListaMensajesCot() {
@@ -1470,6 +1516,7 @@ function _iniciarPollingMensajesCot(id) {
         _mensajesCotActual = nuevos;
         var cMem = _buscarCotEnMemoria(id); if (cMem) cMem.mensajes = nuevos;
         _repintarListaMensajesCot();
+        _marcarMensajesLeidosCot(id, false); // llegó un mensaje que te menciona con el negocio abierto
     }, 8000);
 }
 
@@ -1507,6 +1554,7 @@ window._resaltarMencionHoverCot = function(i) {
 
 window._onMensajeInputCot = function(ev) {
     var ta = ev.target;
+    _actualizarAvisoDestinatariosCot();
     var cursor = ta.selectionStart;
     _mencionUltimoCursorCot = cursor;
     var match = ta.value.slice(0, cursor).match(/@([^\s@]*)$/);
@@ -1553,6 +1601,7 @@ window._elegirMencionCot = function(nombre) {
     _mencionCandidatosCot = [];
     _mencionIndiceResaltadoCot = -1;
     ta.focus();
+    _actualizarAvisoDestinatariosCot();
 };
 
 var _ultimaMencionElegidaEnCot = 0;
@@ -1580,8 +1629,16 @@ window._enviarMensajeCot = function() {
     var autorNombre = cuenta ? cuenta.name : '';
     var autorEmail  = cuenta ? cuenta.username : '';
 
-    var menciones = [];
-    (_internosCacheCot || []).forEach(function(p) { if (texto.indexOf('@' + p.nombre) !== -1) menciones.push(p.email); });
+    // Si la lista de internos todavía no cargó, se espera antes de enviar
+    // (si no, las @menciones salían vacías). Un solo reintento.
+    if (!_internosCacheCot && texto.indexOf('@') !== -1 && !window._reintentoInternosEnvioCot) {
+        window._reintentoInternosEnvioCot = true;
+        _cargarInternosMencionesCot().then(function(){ window._enviarMensajeCot(); });
+        return;
+    }
+    window._reintentoInternosEnvioCot = false;
+    // Menciones: nombre completo elegido de la lista (menciones.js).
+    var menciones = window.TLCMenciones ? TLCMenciones.detectar(texto, _internosCacheCot || []) : [];
 
     // Responder a un mensaje puntual — mismo mecanismo que servicio.html:
     // el autor original se agrega como una @mención más, reusando el
@@ -1744,6 +1801,7 @@ function _renderCampanaBadgeCot() {
     var badge = document.getElementById('campana-badge');
     if (!badge) return;
     var noLeidas = _notificacionesCacheCot2.filter(function(n){ return !n.leido; }).length;
+    if (typeof tlcIconoApp === 'function') tlcIconoApp(noLeidas); // contador en el ícono de la app
     if (noLeidas > 0) { badge.textContent = noLeidas > 9 ? '9+' : String(noLeidas); badge.style.display = 'flex'; }
     else badge.style.display = 'none';
 }
@@ -4916,5 +4974,6 @@ window._confirmarOrdenPreparacion = async function() {
 </div>
 <script>window.DICTADO_CAMPOS = [{ textarea: 'mensaje-nuevo-txt-cot', enviar: 'btn-enviar-mensaje-cot' }];</script>
 <script src="dictado.js"></script>
+<script src="menciones.js"></script>
 </body>
 </html>

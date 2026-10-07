@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre.) -->
+<!-- Portal TLC | empresas.html | v2026.10.06.6 (Cristian: "algo más simple, crear ticket nuevo desde Empresas y listo". Al llegar desde el "+" de Servicio (empresas.html?paraTicket=1) aparece el aviso "🔧 Nuevo ticket de Servicio": buscá la empresa (o creala) y tocá "Nuevo ticket (Servicio)" en su ficha.) -->
 <!-- Portal TLC | empresas.html | v2026.10.04.10 (MUERTE A APPS SCRIPT, Fase 5b: crear negocio vacío → Cloud Function cotizaciones v4. Empresas ya no llama a Apps Script.) -->
 <!-- Portal TLC | empresas.html | v2026.09.30.7 (Cristian: "quiero que saques en todos los módulos el iconito de IA abajo a la derecha, el código si querés dejalo". Se oculta el botón flotante 💬 del Asistente IA con una regla CSS (display:none !important), que también gana sobre el JS que lo mostraba. El panel y todo el código del asistente quedan intactos: para volver a mostrarlo alcanza con borrar esa regla.) -->
 <!-- Portal TLC | empresas.html | v2026.09.30.6 (Cristian: "en módulo empresas también sacá el símbolo del QR". Eliminado completo el escaneo QR de FacoExtrema, dado de baja el 28/09: el botón flotante "Escanear QR" del centro abajo (alta directa de empresa), el botón "📷 Escanear QR" del formulario de Nuevo Contacto, el modal de datos escaneados, el escáner de cámara compartido, sus funciones (incluida la llamada guardarEmpresaContactoQR), su CSS y la librería html5-qrcode. Nada más de la página dependía de ese código. La UI de ARCA queda sin tocar.) -->
@@ -34,6 +36,7 @@
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="cierre-semanal.js"></script>
 <script src="avatar.js?v=4"></script>
 <script src="permisos.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -204,6 +207,11 @@
 
     <!-- VISTA LISTA -->
     <div id="vista-lista">
+      <div id="aviso-para-ticket" style="display:none;margin-bottom:12px;padding:12px 14px;border-radius:12px;background:rgba(58,134,255,.1);border:1px solid rgba(58,134,255,.35);font-size:13px;line-height:1.5;">
+        <b>🔧 Nuevo ticket de Servicio</b><br>
+        Buscá la empresa del cliente (o creala con <b>+ Nueva empresa</b>), abrila y tocá <b>"🔧 Nuevo ticket (Servicio)"</b>.
+        <a href="servicio.html" style="display:inline-block;margin-left:6px;color:#3a86ff;font-weight:700;">Cancelar</a>
+      </div>
       <div class="buscador-row" style="margin-bottom:10px;">
         <input type="text" class="buscador-input" id="buscador-empresas" placeholder="Buscar por razón social, CUIT, contacto o N° de serie..." oninput="_onBuscarEmpresasConDebounce(this.value)">
       </div>
@@ -1574,6 +1582,13 @@ var _volverANegocioId = null;
   // El avatar lo arma avatar.js solo (unificado, ver comentario más arriba)
   var params = new URLSearchParams(window.location.search);
   var empresaId = params.get('empresa');
+  // Viene del "+" de Servicio (v2026.10.06.6): se avisa qué hay que hacer y se
+  // deja el buscador listo para escribir.
+  if (params.get('paraTicket') === '1') {
+    var avisoTicket = document.getElementById('aviso-para-ticket');
+    if (avisoTicket) avisoTicket.style.display = 'block';
+    setTimeout(function() { var b = document.getElementById('buscador-empresas'); if (b) b.focus(); }, 300);
+  }
   if (params.get('volverA') === 'negocio' && params.get('idNegocio')) {
     _volverANegocioId = params.get('idNegocio');
   }

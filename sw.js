@@ -1,4 +1,4 @@
-// Portal TLC | sw.js | v16
+// Portal TLC | sw.js | v22
 // v15: Firebase Cloud Messaging — recepción de push en segundo plano.
 //      importScripts de firebase-app + firebase-messaging (compat, es
 //      lo único que funciona dentro de un Service Worker clásico sin
@@ -29,6 +29,16 @@ _messaging.onBackgroundMessage(function(payload) {
         badge: './icons/icon-512.png',
         data: { link: link },
     });
+    // Contador rojo en el ícono (v22): suma 1 al último número conocido
+    // (lo guarda la campanita al abrir la app, ver tlcIconoApp en version.js).
+    if (self.navigator && self.navigator.setAppBadge) {
+        caches.open('tlc-badge').then(function(c) {
+            return c.match('./__badge__').then(function(r) { return r ? r.text() : '0'; }).then(function(t) {
+                var n = (parseInt(t, 10) || 0) + 1;
+                return c.put('./__badge__', new Response(String(n))).then(function() { return self.navigator.setAppBadge(n); });
+            });
+        }).catch(function() {});
+    }
 });
 
 self.addEventListener('notificationclick', function(event) {
@@ -116,7 +126,14 @@ self.addEventListener('notificationclick', function(event) {
 //      en los dos casos, la nueva siempre devuelve una Response real.
 //      CACHE_NAME bumpeado — fuerza la limpieza de la caché vieja en
 //      todos los dispositivos.
-const CACHE_NAME = 'portal-tlc-v20';
+// v22 (2026.10.07): contador rojo en el ícono de la app instalada — al
+//      llegar un push con la app cerrada suma 1 (caché 'tlc-badge', que
+//      no se borra al actualizar). CACHE_NAME bumpeado.
+// v21 (2026.10.06): archivos nuevos menciones.js (tildes de lectura),
+//      cierre-semanal.js (modal de cierre de semana de los viernes) y
+//      cierres.html (resumen de cierres para Administradores) — agregados
+//      a HTML_LOCAL (red primero). CACHE_NAME bumpeado.
+const CACHE_NAME = 'portal-tlc-v22';
 
 const HTML_LOCAL = [
     './',
@@ -136,6 +153,11 @@ const HTML_LOCAL = [
     './permisos.js',
     './adjuntos.js',
     './dictado.js',
+    './menciones.js',
+    './cierre-semanal.js',
+    './cierres.html',
+    './mi-dia.html',
+    './cuenta-corriente.html',
     './eventos.html',
     './orden-preparacion.html',
     './etiqueta-despacho.html',
@@ -164,7 +186,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(keys =>
-            Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => {
+            Promise.all(keys.filter(k => k !== CACHE_NAME && k !== 'tlc-badge').map(k => {
                 console.log('Portal TLC SW: limpiando caché vieja:', k);
                 return caches.delete(k);
             }))

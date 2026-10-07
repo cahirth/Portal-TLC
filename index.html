@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
+<!-- Portal TLC | index.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre.) -->
 <!-- Portal TLC | index.html | v2026.10.04.9 (Fase 5a: las reacciones desde la campanita a mensajes de Cotizaciones también van a la función servicio.) -->
 <!-- Portal TLC | index.html | v2026.10.04.3 (MUERTE A APPS SCRIPT / historico.json, Fase 1: el Radar de Inicio lee los negocios directo de Firebase en vez de historico.json de GitHub (sin atraso; GitHub solo de respaldo). Las reacciones desde la campanita a mensajes de Servicio y Eventos van a sus Cloud Functions.) -->
 <!-- Portal TLC | index.html | v2026.10.03.9 (CORRECCIÓN DE SEGURIDAD: el botón Comisiones vuelve a depender SOLO de la columna "Comisiones". El respaldo a "Ver Comisiones" (v2026.09.30.8 a .11) era un error: es otro permiso (ver el % en la ficha de equipo) y les habilitaba el módulo a vendedores externos. El "Comisiones": 0 de Firebase se arregla renombrando la segunda columna "Comisiones" (numérica) de la hoja Vendedores.) -->
@@ -31,6 +33,7 @@
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="cierre-semanal.js"></script>
 <script src="avatar.js?v=4"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2228,6 +2231,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
       var badge = document.getElementById('campana-badge');
       if (!badge) return;
       var noLeidas = _notificacionesCacheIdx.filter(function(n){ return !n.leido; }).length;
+      if (typeof tlcIconoApp === 'function') tlcIconoApp(noLeidas); // contador en el ícono de la app
       if (noLeidas > 0) { badge.textContent = noLeidas > 9 ? '9+' : String(noLeidas); badge.style.display = 'flex'; }
       else badge.style.display = 'none';
     }

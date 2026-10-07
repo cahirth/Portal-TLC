@@ -1,4 +1,8 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
+<!-- Portal TLC | servicio.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre. Además, en la Carga por técnico (Administrador) hay un acceso a "📋 Cierres" (cierres.html).) -->
+<!-- Portal TLC | servicio.html | v2026.10.06.7 (Cristian: "¿es posible tener una tilde o dos tildes como WhatsApp?". 1) Las @menciones siguen igual que siempre (se eligen de la lista, nombre completo; un mensaje puede mencionar a varios); si la lista de internos no había cargado al enviar, ahora espera a que cargue (antes salían sin avisar a nadie). 2) Debajo del cuadro de texto se ve "🔔 Se va a avisar a: ..." antes de enviar. 3) Tildes de lectura ✓✓ (gris = avisado, azul = lo leyeron todos) en los mensajes con menciones; tocándolas, detalle por persona. 4) Al abrir la tarjeta se marcan tus menciones como leídas y sus avisos en la campanita. Lógica compartida en menciones.js; backend servicio v9.) -->
+<!-- Portal TLC | servicio.html | v2026.10.06.6 (Cristian: "en el + debería invitarme a buscar en Empresas... algo más simple, crear ticket nuevo desde Empresas y listo". El botón "+" ya no abre el formulario en blanco: lleva a Empresas para elegir (o crear) la empresa, y desde su ficha "🔧 Nuevo ticket (Servicio)" abre el formulario precargado. El formulario manual sigue existiendo para ese camino.) -->
 <!-- Portal TLC | servicio.html | v2026.10.05.5 (Presupuestos de Servicio: lugar de entrega por defecto "Nuestra oficina" (antes "Clínica del Cliente").) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.13 (Cristian: "esto está muy grande, en Administrador, ¿podemos ponerlo todo en un dropdown?". El panel "⚖️ Carga por técnico" ahora es desplegable: arranca cerrado mostrando una sola línea con el total de cada técnico (y los sin asignar); tocándola se abre la tabla por etapa. El estado abierto/cerrado se recuerda en el navegador.) -->
 <!-- Portal TLC | servicio.html | v2026.10.04.9 (Fase 5a: las reacciones desde la campanita a mensajes de Cotizaciones también van a la función servicio.) -->
@@ -68,6 +72,7 @@
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="cierre-semanal.js"></script>
 <script src="avatar.js?v=4"></script>
 <script src="permisos.js"></script>
 <script src="adjuntos.js"></script>
@@ -623,7 +628,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 <div id="st-lista-outer" class="st-lista-wrap"></div>
 
 <!-- BTN NUEVO TICKET -->
-<button class="btn-nuevo-ticket" id="btn-nuevo-ticket" onclick="_abrirModalNuevo()" title="Nuevo ticket" style="display:none;">+</button>
+<button class="btn-nuevo-ticket" id="btn-nuevo-ticket" onclick="_irANuevoTicketDesdeEmpresas()" title="Nuevo ticket — elegí la empresa" style="display:none;">+</button>
 
 <!-- MODAL NUEVO TICKET -->
 <div class="modal-overlay" id="modal-nuevo">
@@ -1559,7 +1564,8 @@ function _renderCargaTecnicos() {
 
   var pie = '';
   if (esAdmin) {
-    pie = (carga.sinAsignar ? '<span style="color:#f59e0b;">⚠ ' + carga.sinAsignar + ' sin asignar</span> · ' : '') +
+    pie = '<a href="cierres.html" onclick="event.stopPropagation()" style="color:#3a86ff;text-decoration:none;font-weight:800;">📋 Cierres de semana</a> · ' +
+          (carga.sinAsignar ? '<span style="color:#f59e0b;">⚠ ' + carga.sinAsignar + ' sin asignar</span> · ' : '') +
           '<span style="color:#06d6a0;">■</span> menos carga en la etapa';
   }
 
@@ -2162,7 +2168,37 @@ window._abrirDetalle = function(id) {
   document.getElementById('st-detalle-overlay').classList.add('open');
   document.getElementById('st-detalle-overlay').scrollTop = 0;
   _iniciarPollingMensajes(id);
+  _marcarMensajesLeidosTicket(id, true);
 };
+
+// Tildes de lectura (v2026.10.06.7): al abrir la tarjeta se avisa al
+// backend que la leíste — guarda la fecha en los mensajes que te
+// mencionan (el que escribió ve ✓✓ azul) y marca como leídos tus avisos
+// de esta tarjeta en la campanita. siempre=true al abrir (los datos
+// locales pueden estar viejos); en el polling solo si hay pendientes.
+var _marcandoLeidos = false;
+function _marcarMensajesLeidosTicket(idTicket, siempre) {
+  var email = (_session && _session.username) || '';
+  if (!email || _marcandoLeidos) return;
+  if (!siempre && !(_ticketActual && window.TLCMenciones && TLCMenciones.hayPendientesParaMi(_ticketActual.mensajes, email))) return;
+  _marcandoLeidos = true;
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_marcarMensajesLeidos', id_ticket:idTicket, email:email }) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){
+    if (!r || !r.ok) return;
+    if (r.avisos_leidos && typeof _cargarNotificaciones === 'function') _cargarNotificaciones(true);
+    if (r.marcados && Array.isArray(r.mensajes) && _ticketActual && _ticketActual.id_ticket === idTicket && !document.querySelector('[id^="msg-edit-input-"]')) {
+      _ticketActual.mensajes = r.mensajes;
+      var t2 = _tickets.find(function(x){ return x.id_ticket === idTicket; });
+      if (t2) t2.mensajes = r.mensajes;
+      var listaEl = document.getElementById('mensajes-lista');
+      if (listaEl) listaEl.innerHTML = _construirHtmlListaMensajes(_ticketActual);
+    }
+  })
+  .catch(function(){})
+  .finally(function(){ _marcandoLeidos = false; });
+}
 window._cerrarDetalle = function() {
   document.getElementById('st-detalle-overlay').classList.remove('open');
   _ticketActual = null;
@@ -3115,6 +3151,7 @@ async function _cargarInternosMenciones() {
 // Resalta las @menciones conocidas dentro de un texto ya escapado
 function _resaltarMencionesTexto(textoEscapado) {
   if (!_internosCache) return textoEscapado;
+  if (window.TLCMenciones) return TLCMenciones.resaltar(textoEscapado, _internosCache);
   var out = textoEscapado;
   _internosCache.forEach(function(p) {
     if (!p.nombre) return;
@@ -3167,7 +3204,10 @@ async function _refrescarMensajesTicket(idTicket) {
     var hayMsgPropioReciente = emailActual && actuales.some(function(m){
       return m.autor_email === emailActual && (Date.now() - new Date(m.fecha||0).getTime()) < (MSG_VENTANA_EDICION_MS + 10000);
     });
-    if (!cambioCantidad && !hayMsgPropioReciente) return; // sin cambios reales, no re-pintar innecesariamente
+    // v2026.10.06.7: también re-pinta si cambió cualquier cosa de los
+    // mensajes (lecturas/reacciones) — así las tildes pasan a azul solas.
+    var cambioContenido = JSON.stringify(mensajesNuevos) !== JSON.stringify(actuales);
+    if (!cambioCantidad && !hayMsgPropioReciente && !cambioContenido) return; // sin cambios reales, no re-pintar innecesariamente
     if (document.querySelector('[id^="msg-edit-input-"]')) return; // hay una edición abierta — no pisarla
 
     _ticketActual.mensajes = mensajesNuevos;
@@ -3176,6 +3216,7 @@ async function _refrescarMensajesTicket(idTicket) {
 
     var listaEl = document.getElementById('mensajes-lista');
     if (listaEl) listaEl.innerHTML = _construirHtmlListaMensajes(_ticketActual);
+    _marcarMensajesLeidosTicket(idTicket, false); // llegó un mensaje que te menciona con la tarjeta abierta
   } catch(e) {
     // silencioso — un fallo de polling puntual no debería molestar al usuario
   }
@@ -3258,7 +3299,8 @@ function _construirHtmlListaMensajes(t) {
     return '<div class="msg-fila" tabindex="0" style="padding:8px 10px;border-radius:10px;background:var(--panel-dark);border:1px solid var(--border-glow);margin-bottom:8px;">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
         '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
-        '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + (m.editado ? ' <i>(editado)</i>' : '') + '</span>' +
+        '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + (m.editado ? ' <i>(editado)</i>' : '') +
+          (window.TLCMenciones ? TLCMenciones.htmlTildes(m, mensajes, i, _internosCache) : '') + '</span>' +
       '</div>' +
       citaHtml +
       '<div class="msg-texto" id="msg-texto-' + t.id_ticket + '-' + i + '" style="color:var(--text-main);white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTexto(_esc(m.texto || '')) + '</div>' +
@@ -3467,6 +3509,7 @@ window._cancelarRespuesta = function() {
 function _renderRespuestaPreview() {
   var wrap = document.getElementById('respuesta-preview-wrap');
   if (!wrap) return;
+  setTimeout(_actualizarAvisoDestinatarios, 0);
   if (!_respondiendoAMensaje) { wrap.innerHTML = ''; return; }
   var r = _respondiendoAMensaje;
   wrap.innerHTML =
@@ -3508,6 +3551,7 @@ function _renderPanelMensajes(t) {
       '<textarea id="mensaje-nuevo-txt" placeholder="Escribí un mensaje… usá @ para mencionar a alguien del equipo" ' +
         'style="width:100%;min-height:64px;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border-glow);' +
         'color:var(--text-main);font-size:12px;font-family:inherit;resize:vertical;" oninput="_onMensajeInput(event)" onkeydown="_onMensajeKeydown(event)" onclick="_mencionUltimoCursor=this.selectionStart;" onkeyup="_mencionUltimoCursor=this.selectionStart;" ontouchend="_mencionUltimoCursor=this.selectionStart;"></textarea>' +
+      '<div id="aviso-destinatarios" style="display:none;margin-top:5px;font-size:11px;color:#3a86ff;"></div>' +
       '<div id="mencion-sugerencias" style="display:none;margin-top:6px;background:var(--bg);' +
         'border:1px solid var(--border-glow);border-radius:8px;max-height:160px;overflow-y:auto;"></div>' +
       '<button type="button" id="btn-enviar-mensaje-st" onclick="_enviarMensajeTicket(\'' + t.id_ticket + '\')" ' +
@@ -3564,8 +3608,21 @@ window._renderSugerenciasMencion = function _renderSugerenciasMencion() {
   if (elResaltado) elResaltado.scrollIntoView({ block: 'nearest' });
 }
 
+// "🔔 Se va a avisar a: ..." — para ver ANTES de enviar a quién le
+// llega el aviso (v2026.10.06.7).
+function _actualizarAvisoDestinatarios() {
+  var el = document.getElementById('aviso-destinatarios');
+  var ta = document.getElementById('mensaje-nuevo-txt');
+  if (!el || !ta || !window.TLCMenciones) return;
+  var extra = (_respondiendoAMensaje && _respondiendoAMensaje.autor_email) ? [_respondiendoAMensaje.autor_email] : [];
+  var html = TLCMenciones.textoAvisoDestinatarios(ta.value || '', _internosCache || [], (_session && _session.username) || '', extra);
+  el.innerHTML = html;
+  el.style.display = html ? 'block' : 'none';
+}
+
 window._onMensajeInput = function(ev) {
   var ta = ev.target;
+  _actualizarAvisoDestinatarios();
   var cursor = ta.selectionStart;
   _mencionUltimoCursor = cursor; // guardado apenas se escribe, mientras el foco todavía está sano
   var textoHastaCursor = ta.value.slice(0, cursor);
@@ -3642,6 +3699,7 @@ window._elegirMencion = function(nombre) {
   // mención, sin importar de dónde venga el click de más.
   _ultimaMencionElegidaEn = Date.now();
   ta.focus();
+  _actualizarAvisoDestinatarios();
 };
 
 // Wrapper anti doble-disparo: en algunos navegadores, tocar el botón
@@ -3667,10 +3725,18 @@ window._enviarMensajeTicket = function(idTicket) {
   var autorNombre = (_session && _session.name) || '';
   var autorEmail  = (_session && _session.username) || '';
 
-  var menciones = [];
-  (_internosCache || []).forEach(function(p) {
-    if (texto.indexOf('@' + p.nombre) !== -1) menciones.push(p.email);
-  });
+  // Si la lista de internos todavía no cargó, se espera a que cargue
+  // antes de enviar — si no, las @menciones salían vacías y no se
+  // avisaba a nadie (v2026.10.06.7). Un solo reintento.
+  if (!_internosCache && texto.indexOf('@') !== -1 && !window._reintentoInternosEnvio) {
+    window._reintentoInternosEnvio = true;
+    _cargarInternosMenciones().then(function(){ window._enviarMensajeTicket(idTicket); });
+    return;
+  }
+  window._reintentoInternosEnvio = false;
+
+  // Menciones: nombre completo elegido de la lista (menciones.js).
+  var menciones = window.TLCMenciones ? TLCMenciones.detectar(texto, _internosCache || []) : [];
 
   // Si estás respondiendo un mensaje puntual, el destinatario obvio es
   // quien lo escribió — se agrega como si lo hubieras @mencionado, así
@@ -3881,6 +3947,7 @@ function _renderCampanaBadge() {
   var badge = document.getElementById('campana-badge');
   if (!badge) return;
   var noLeidas = _notificacionesCache.filter(function(n){ return !n.leido; }).length;
+  if (typeof tlcIconoApp === 'function') tlcIconoApp(noLeidas); // contador en el ícono de la app
   if (noLeidas > 0) {
     badge.textContent = noLeidas > 9 ? '9+' : String(noLeidas);
     badge.style.display = 'flex';
@@ -5081,6 +5148,14 @@ window._abrirModalNuevo = function() {
   if (!_permisos.servicio) return;
   document.getElementById('modal-nuevo').classList.add('open');
 };
+// "+" DE SERVICIO (v2026.10.06.6) — Cristian: "algo más simple: crear ticket nuevo
+// desde Empresas y listo". Un único camino para cargar un ticket: se elige
+// (o se crea) la empresa en Empresas, y su botón "Nuevo ticket" abre el
+// formulario con cliente, domicilio y contactos ya cargados.
+window._irANuevoTicketDesdeEmpresas = function() {
+  if (!_permisos.servicio) return;
+  window.location.href = 'empresas.html?paraTicket=1';
+};
 window._cerrarModalNuevo = function() {
   document.getElementById('modal-nuevo').classList.remove('open');
   _nuevoTicketFotos = [];
@@ -5889,5 +5964,6 @@ function _iaToggleMic() {
 
 <script>window.DICTADO_CAMPOS = [{ textarea: 'mensaje-nuevo-txt', enviar: 'btn-enviar-mensaje-st' }];</script>
 <script src="dictado.js"></script>
+<script src="menciones.js"></script>
 </body>
 </html>

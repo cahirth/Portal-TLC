@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
+<!-- Portal TLC | eventos.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre.) -->
+<!-- Portal TLC | eventos.html | v2026.10.06.7 (Mismo cambio que servicio.html v2026.10.06.7: las menciones se resaltan en azul (acá antes no se resaltaban); "🔔 Se va a avisar a: ..." debajo del cuadro antes de enviar; tildes de lectura ✓✓ (gris = avisado, azul = lo leyeron todos) con detalle por persona; al abrir la tarjeta se marcan tus menciones como leídas y sus avisos en la campanita. Lógica compartida en menciones.js; backend eventosChecklist v2 (ev_marcarMensajesLeidos).) -->
 <!-- Portal TLC | eventos.html | v2026.10.04.9 (Fase 5a: las reacciones desde la campanita a mensajes de Cotizaciones también van a la función servicio.) -->
 <!-- Portal TLC | eventos.html | v2026.10.04.3 (MUERTE A APPS SCRIPT, Fase 1: las reacciones desde la campanita a mensajes de Servicio y Eventos van a sus Cloud Functions; las de Cotizaciones siguen en Apps Script hasta la Fase 5.) -->
 <!-- Portal TLC | eventos.html | v2026.10.02.1 (Cristian: "quiero el micrófono en los 3 módulos". Botón 🎤 de dictado por voz al lado de "Enviar" en el chat de mensajes internos, vía dictado.js (compartido con los otros 2 módulos). Escribe en el cuadro, nunca envía solo.) -->
@@ -74,6 +77,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Eventos / Congresos — Portal TLC</title>
 <script src="version.js"></script>
+<script src="cierre-semanal.js"></script>
 <script src="avatar.js?v=4"></script>
 <script src="permisos.js"></script>
 <style>
@@ -1763,6 +1767,31 @@ async function _abrirTarjeta(idTarjeta) {
   document.getElementById('ev-overlay-tarjeta').classList.add('open');
   _autoResizeTodosItemsChecklistEv();
   _iniciarPollingMensajesEv(idTarjeta);
+  _marcarMensajesLeidosEv(idTarjeta, true);
+  if (!_internosCacheEv) _cargarInternosEv().then(function(){ var tt = _tarjetaActual(); if (tt && TARJETA_ACTUAL_ID === idTarjeta) _repintarListaMensajesEv(tt); });
+}
+
+// Tildes de lectura (v2026.10.06.7) — ver servicio.html: al abrir la
+// tarjeta se guarda que leíste los mensajes que te mencionan y se
+// marcan como leídos sus avisos en la campanita.
+var _marcandoLeidosEv = false;
+function _marcarMensajesLeidosEv(idTarjeta, siempre) {
+  var email = (_session && _session.username) || '';
+  if (!email || !EVENTO_ACTUAL || _marcandoLeidosEv) return;
+  var t = _tarjetaActual();
+  if (!siempre && !(t && window.TLCMenciones && TLCMenciones.hayPendientesParaMi(t.mensajes, email))) return;
+  _marcandoLeidosEv = true;
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_marcarMensajesLeidos', id_evento:EVENTO_ACTUAL.id, id_tarjeta:idTarjeta, email:email }) })
+  .then(function(r){ return r.json(); })
+  .then(function(r){
+    if (!r || !r.ok) return;
+    if (r.avisos_leidos && typeof _cargarNotificaciones === 'function') _cargarNotificaciones(true);
+    var tt = _tarjetaActual();
+    if (r.marcados && Array.isArray(r.mensajes) && tt && TARJETA_ACTUAL_ID === idTarjeta) { tt.mensajes = r.mensajes; _repintarListaMensajesEv(tt); }
+  })
+  .catch(function(){})
+  .finally(function(){ _marcandoLeidosEv = false; });
 }
 function _cerrarOverlayTarjeta() {
   document.getElementById('ev-overlay-tarjeta').classList.remove('open');
@@ -1799,6 +1828,7 @@ function _iniciarPollingMensajesEv(idTarjeta) {
         if (JSON.stringify(nuevos) === JSON.stringify(t.mensajes || [])) return;
         t.mensajes = nuevos;
         _repintarListaMensajesEv(t);
+        _marcarMensajesLeidosEv(idTarjeta, false); // llegó un mensaje que te menciona con la tarjeta abierta
         try {
           var clave = 'ev_cache_tarjeta_' + t.id;
           var c = JSON.parse(localStorage.getItem(clave) || '{}') || {};
@@ -1907,6 +1937,7 @@ function _renderOverlayTarjeta() {
           'oninput="_onMsgInputEv(event)" onkeydown="_onMsgKeydownEv(event)" ' +
           'onclick="_mencionUltimoCursorEv=this.selectionStart;" onkeyup="_mencionUltimoCursorEv=this.selectionStart;" ontouchend="_mencionUltimoCursorEv=this.selectionStart;"></textarea>' +
         '<div id="ev-msg-sugerencias" class="ev-mencion-sug"></div>' +
+        '<div id="aviso-destinatarios-ev" style="display:none;margin-top:5px;font-size:11px;color:#3a86ff;"></div>' +
         '<button type="button" id="ev-btn-enviar-mensaje" class="ev-btn-primario" style="margin-top:8px;" onclick="_enviarMensajeEv()">Enviar</button>' +
       '</div>' +
     '</div>';
@@ -2784,6 +2815,7 @@ window._cancelarRespuestaEv = function() {
 function _renderRespuestaPreviewEv() {
   var wrap = document.getElementById('respuesta-preview-wrap-ev');
   if (!wrap) return;
+  setTimeout(_actualizarAvisoDestinatariosEv, 0);
   if (!_respondiendoAMensajeEv) { wrap.innerHTML = ''; return; }
   var r = _respondiendoAMensajeEv;
   wrap.innerHTML =
@@ -2823,10 +2855,11 @@ function _construirHtmlListaMensajesEv(t) {
     return '<div class="msg-fila" tabindex="0">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
         '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
-        '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + '</span>' +
+        '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha +
+          (window.TLCMenciones ? TLCMenciones.htmlTildes(m, mensajes, i, _internosCacheEv) : '') + '</span>' +
       '</div>' +
       citaHtml +
-      '<div class="msg-texto">' + _esc(m.texto || '') + '</div>' +
+      '<div class="msg-texto">' + (window.TLCMenciones && _internosCacheEv ? TLCMenciones.resaltar(_esc(m.texto || ''), _internosCacheEv) : _esc(m.texto || '')) + '</div>' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
         _resumenReaccionesEv(m.reacciones) +
         '<div style="display:flex;align-items:center;gap:4px;">' +
@@ -2854,7 +2887,16 @@ window._reaccionarMensajeEv = function(ev, indice, tipo) {
     });
 };
 
-function _onMsgInputEv(ev) { _mencionAutocompletarGenerico(ev.target, 'ev-msg-sugerencias', 'ev-msg-nuevo'); }
+function _onMsgInputEv(ev) { _mencionAutocompletarGenerico(ev.target, 'ev-msg-sugerencias', 'ev-msg-nuevo'); _actualizarAvisoDestinatariosEv(); }
+function _actualizarAvisoDestinatariosEv() {
+  var el = document.getElementById('aviso-destinatarios-ev');
+  var ta = document.getElementById('ev-msg-nuevo');
+  if (!el || !ta || !window.TLCMenciones) return;
+  var extra = (_respondiendoAMensajeEv && _respondiendoAMensajeEv.autor_email) ? [_respondiendoAMensajeEv.autor_email] : [];
+  var html = TLCMenciones.textoAvisoDestinatarios(ta.value || '', _internosCacheEv || [], (_session && _session.username) || '', extra);
+  el.innerHTML = html;
+  el.style.display = html ? 'block' : 'none';
+}
 function _onMsgKeydownEv(ev) {
   // Mismo criterio que Negocios (cotizaciones.html): Enter NO envía el
   // mensaje — solo el botón "Enviar". Si el picker de menciones está
@@ -2868,6 +2910,14 @@ function _enviarMensajeEv() {
   var input = document.getElementById('ev-msg-nuevo');
   var texto = input.value.trim();
   if (!texto) return;
+  // Si la lista de internos todavía no cargó, se espera antes de enviar
+  // (si no, las @menciones salían vacías). Un solo reintento.
+  if (!_internosCacheEv && texto.indexOf('@') !== -1 && !window._reintentoInternosEnvioEv) {
+    window._reintentoInternosEnvioEv = true;
+    _cargarInternosEv().then(function(){ _enviarMensajeEv(); });
+    return;
+  }
+  window._reintentoInternosEnvioEv = false;
   var menciones = _extraerMencionesDeTexto(texto);
   var t = _tarjetaActual();
 
@@ -2955,6 +3005,8 @@ function _seleccionarMencionEv(idInputDestino, nombre) {
 
 function _extraerMencionesDeTexto(texto) {
   if (!_internosCacheEv) return [];
+  // Menciones: nombre completo elegido de la lista (menciones.js)
+  if (window.TLCMenciones) return TLCMenciones.detectar(texto, _internosCacheEv);
   var emails = [];
   _internosCacheEv.forEach(function(p) {
     if (texto.indexOf('@' + p.nombre) !== -1) emails.push(p.email);
@@ -3015,6 +3067,7 @@ function _insertarMencionEnInput(idInput, nombre) {
   input.value = antes + val.slice(cursor);
   input.focus();
   document.querySelectorAll('.ev-mencion-sug').forEach(function(b){ b.style.display = 'none'; });
+  if (idInput === 'ev-msg-nuevo') _actualizarAvisoDestinatariosEv();
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -3029,6 +3082,7 @@ async function _cargarNotificaciones(silencioso) {
     var lista = (r.ok && Array.isArray(r.notificaciones)) ? r.notificaciones : [];
     var noLeidas = lista.filter(function(n){ return !n.leido; }).length;
     var badge = document.getElementById('ev-campana-badge');
+    if (typeof tlcIconoApp === 'function') tlcIconoApp(noLeidas); // contador en el ícono de la app
     if (noLeidas > 0) { badge.style.display = 'flex'; badge.textContent = noLeidas > 9 ? '9+' : noLeidas; }
     else { badge.style.display = 'none'; }
     var cont = document.getElementById('campana-lista');
@@ -3185,5 +3239,6 @@ window._marcarTodasLeidasEv = function(ev) {
 </script>
 <script>window.DICTADO_CAMPOS = [{ textarea: 'ev-msg-nuevo', enviar: 'ev-btn-enviar-mensaje' }];</script>
 <script src="dictado.js"></script>
+<script src="menciones.js"></script>
 </body>
 </html>
