@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto.html | v2026.10.07.1 (Cristian: las Notas salían todas corridas en un solo renglón — ahora respetan los saltos de línea tal como se escriben en el editor ("Opcionales:" / "1-Sello..." / "2-Filter...").) -->
 <!-- Portal TLC | presupuesto.html | v2026.10.05.5 (Lugar de entrega "Otro": muestra el texto escrito a mano en el editor.) -->
 <!-- Portal TLC | presupuesto.html | v2026.08.29.2 (BUG REAL — Cristian, con captura: "porque en presupuesto editor calcula un descuento de 11$ si no tiene ningun descuento aplicado". Confirmado con el dato crudo de Firebase (precioLista === precioContado EXACTOS en los 2 ítems, sin ningún descuentoValor cargado) que no había ningún descuento real de por medio. Causa real: la fila "Descuentos (Contado)" salía de restar subtotalBruto (recién sumado acá arriba, con precisión completa: precioLista sin redondear) contra netoTotal (el total GUARDADO en p.totales, redondeado a 2 decimales en USD desde que se guardó la primera vez) — dos números de distinta precisión, sin ningún filtro de "¿esto es plata de verdad o solo el resto de redondear?". El residuo de redondear 478.82736... a 478.82 (guardado), multiplicado por el TC oficial (1535), daba justo esos ~$11 fantasma — ni siquiera un error de cálculo real, un artefacto de precisión puro. Mismo criterio que ya usa presupuesto-editor.html para su propio "ruido de redondeo" (ver el fix de v2026.08.14.1 en ese archivo): si la diferencia es menor al 0,05% del bruto, no es un descuento real — se descarta, y el residuo se absorbe también en el Total para que las filas de abajo sigan sumando entre sí sin quedar desalineadas por unos pesos. Confirmado con 2 tests: el caso real (precios idénticos, sin descuento) ya no muestra la fila "Descuentos" y "Subtotal con descuentos"/"Total" muestran el bruto completo sin el residuo; un descuento genuino (10%, bien por encima del umbral) sigue mostrándose exactamente igual que antes, sin ningún cambio de comportamiento.) -->
 <!-- Portal TLC | presupuesto.html | v2026.08.29.1 (Los botones "Guardar PDF" y "Enviar por WhatsApp" (arriba a la derecha) ahora NO aparecen cuando quien mira el presupuesto es el CLIENTE — antes este archivo no distinguía entre vendedor y cliente en absoluto, ambos veían exactamente lo mismo. Nueva función esModoCliente() (mismo criterio ?modo=cliente que ya usa ficha-equipo.html), y el link que se manda por WhatsApp (urlParaCompartir) ahora incluye ese parámetro — así el cliente SIEMPRE lo recibe así, sin importar desde qué negocio/vendedor haya salido. "Volver" y "Ver Orden de Servicio" quedaron sin tocar (no fueron nombrados en el pedido). Pedido por Cristian con captura: "al enviar el presupuesto, aparecen arriba a la derecha 2 botones, Guardar PDF y Enviar Whatsapp, el presupuesto que recibe el cliente no debe contener esos botones, si el sender, o sea el vendedor, pero no el receptor". Confirmado con test de punta a punta: el vendedor (sin modo=cliente) ve los 2 botones normal; el cliente (con modo=cliente) no ve ninguno de los 2; y el link real que arma "Enviar por WhatsApp" incluye &modo=cliente.) -->
@@ -322,7 +323,7 @@
       (tiempoTexto ? '<strong>Tiempo de Entrega:</strong> ' + esc(tiempoTexto) + '<br>' : '') +
       '<strong>Lugar de Entrega:</strong> ' + esc(lugarTexto) + '<br>' +
       tcTexto +
-      (p.notas ? '<strong>Notas:</strong> ' + esc(p.notas) : '');
+      (p.notas ? '<strong>Notas:</strong><br>' + esc(p.notas).replace(/\r?\n/g, '<br>') : '');
   }
 
   function buildFilasProductos(carrito, etiquetaMonedaIgnorada, tcOficial) {
@@ -605,7 +606,7 @@
         '<tbody>' + buildFilasProductos(c, etiquetaMoneda, p.tcOficial) + '</tbody>' +
       '</table>' +
 
-      (p.notas ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:10px 14px;margin-bottom:12px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#92400e;margin-bottom:4px;font-family:Arial,sans-serif;">Notas</div><div style="font-size:12px;color:#78350f;line-height:1.5;">' + esc(p.notas) + '</div></div>' : '') +
+      (p.notas ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:10px 14px;margin-bottom:12px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#92400e;margin-bottom:4px;font-family:Arial,sans-serif;">Notas</div><div style="font-size:12px;color:#78350f;line-height:1.5;white-space:pre-line;">' + esc(p.notas) + '</div></div>' : '') +
 
       '<div style="display:flex;justify-content:flex-end;margin-bottom:16px;">' +
         '<table style="border-collapse:collapse;min-width:260px;">' +
