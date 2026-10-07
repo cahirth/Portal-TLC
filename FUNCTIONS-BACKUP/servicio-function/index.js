@@ -1,5 +1,14 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v10 — 2026.10.06 — Cierre de semana: st_cierrePendiente,
+//   st_guardarCierreSemanal y st_listarCierres (nodo cierres_semanales).
+// v9 — 2026.10.06 — Tildes de lectura tipo WhatsApp en los mensajes con
+//   @menciones (Servicio y Cotizaciones): los mensajes nuevos con
+//   menciones llevan con_lectura:true; nuevas acciones
+//   st_marcarMensajesLeidos y cot_marcarMensajesLeidos guardan en
+//   mensaje.lecturas[<email>] la fecha en que cada mencionado abrió la
+//   tarjeta, y de paso marcan como leídos sus avisos de esa tarjeta en
+//   la campanita.
 // v8 — 2026.10.04 — Fase 5a: chat de Cotizaciones (cot_listarMensajes,
 //   cot_agregarMensaje con menciones por mail/push, cot_reaccionarMensaje).
 // v7 — 2026.10.04 — Fase 3: las fotos de los tickets (y la firma de las
@@ -680,6 +689,7 @@ async function cot_agregarMensaje(data) {
     const mensajes = comoArray(actual);
     const nuevo = { texto, autor_nombre: autorNombre, autor_email: autorEmail, menciones, fecha: new Date().toISOString() };
     if (respuestaA) nuevo.respuesta_a = respuestaA;
+    if (_tieneMencionadosAjenos(menciones, autorEmail)) nuevo.con_lectura = true;
     mensajes.push(nuevo);
     indiceMensajeNuevo = mensajes.length - 1;
     return mensajes;
@@ -1040,6 +1050,7 @@ async function st_agregarMensaje(data) {
     const mensajes = comoArray(t.mensajes);
     const nuevoMensaje = { texto, autor_nombre: autorNombre, autor_email: autorEmail, menciones, fecha: new Date().toISOString() };
     if (respuestaA) nuevoMensaje.respuesta_a = respuestaA;
+    if (_tieneMencionadosAjenos(menciones, autorEmail)) nuevoMensaje.con_lectura = true;
     mensajes.push(nuevoMensaje);
     indiceMensajeNuevo = mensajes.length - 1;
     t.mensajes = mensajes;
@@ -1319,6 +1330,273 @@ async function guardarAsignadosEtapa(data) {
   return { ok: true };
 }
 
+// ── Tildes de lectura (v9) ──────────────────────────────────────────
+// Cristian: "¿es posible tener una tilde o dos tildes como WhatsApp? para
+// empezar a ver si le llegó y si lo leyó". Cada mensaje con @menciones
+// guarda lecturas[<email>] = fecha en que ESE mencionado abrió la tarjeta.
+function _tieneMencionadosAjenos(menciones, autorEmail) {
+  const autor = String(autorEmail || '').trim().toLowerCase();
+  return (menciones || []).some((e) => e && String(e).trim().toLowerCase() !== autor);
+}
+function _claveLectura(email) { return rtdbKeySeguro(String(email || '').trim().toLowerCase()); }
+function _mensajesPendientesDeLeer(mensajes, email) {
+  const yo = String(email || '').trim().toLowerCase();
+  const k = _claveLectura(yo);
+  return comoArray(mensajes).some((m) => m && m.con_lectura &&
+    comoArray(m.menciones).some((e) => String(e || '').trim().toLowerCase() === yo) && !(m.lecturas && m.lecturas[k]));
+}
+function _marcarLecturas(mensajes, email) {
+  const yo = String(email || '').trim().toLowerCase();
+  const k = _claveLectura(yo);
+  const ahora = new Date().toISOString();
+  let marcados = 0;
+  mensajes.forEach((m) => {
+    if (!m || !m.con_lectura) return;
+    if (!comoArray(m.menciones).some((e) => String(e || '').trim().toLowerCase() === yo)) return;
+    if (!m.lecturas) m.lecturas = {};
+    if (m.lecturas[k]) return;
+    m.lecturas[k] = ahora;
+    marcados++;
+  });
+  return marcados;
+}
+// Al abrir la tarjeta, sus avisos en la campanita quedan leídos.
+async function _marcarAvisosLeidosDeTarjeta(email, ticketId) {
+  try {
+    const ruta = 'notificaciones/' + rtdbKeySeguro(email);
+    const notis = await fbGet(ruta);
+    if (!notis || typeof notis !== 'object') return 0;
+    const cambios = {};
+    Object.keys(notis).forEach((k) => {
+      const n = notis[k];
+      if (n && !n.leido && String(n.ticket_id || '') === String(ticketId)) cambios[k + '/leido'] = true;
+    });
+    if (Object.keys(cambios).length) await db.ref(ruta).update(cambios);
+    return Object.keys(cambios).length;
+  } catch (e) { console.warn('No se pudieron marcar avisos leídos:', e.message); return 0; }
+}
+
+async function st_marcarMensajesLeidos(data) {
+  const id = String(data.id_ticket || '').trim();
+  const email = String(data.email || '').trim();
+  if (!id || !email) return { ok: false, error: 'Faltan id_ticket o email' };
+  const t0 = await fbGet('servicio_tecnico/' + id);
+  if (!t0) return { ok: false, error: 'Ticket no encontrado: ' + id };
+  let marcados = 0;
+  let mensajes = comoArray(t0.mensajes);
+  if (_mensajesPendientesDeLeer(mensajes, email)) {
+    const ticket = await runTransaccionTicket(id, (t) => {
+      const ms = comoArray(t.mensajes);
+      marcados = _marcarLecturas(ms, email);
+      t.mensajes = ms;
+      return t;
+    });
+    mensajes = comoArray(ticket.mensajes);
+  }
+  const avisos = await _marcarAvisosLeidosDeTarjeta(email, id);
+  return { ok: true, marcados, avisos_leidos: avisos, mensajes };
+}
+
+async function cot_marcarMensajesLeidos(data) {
+  const id = String(data.id_cotizacion || '').trim();
+  const email = String(data.email || '').trim();
+  if (!id || !email) return { ok: false, error: 'Faltan id_cotizacion o email' };
+  let mensajes = comoArray(await fbGet(_rutaMensajesCot(id)));
+  let marcados = 0;
+  if (_mensajesPendientesDeLeer(mensajes, email)) {
+    const res = await db.ref(_rutaMensajesCot(id)).transaction((actual) => {
+      if (actual === null) return actual;
+      const ms = comoArray(actual);
+      marcados = _marcarLecturas(ms, email);
+      return ms;
+    });
+    if (res.committed) mensajes = comoArray(res.snapshot.val());
+  }
+  const avisos = await _marcarAvisosLeidosDeTarjeta(email, id);
+  return { ok: true, marcados, avisos_leidos: avisos, mensajes };
+}
+
+// ── Cierre de semana (v10) ──────────────────────────────────────────
+// Cristian: "los viernes al mediodía... que ellos se comprometan y sean
+// responsables de su carga laboral... que no apaguen la computadora y
+// vuelvan el lunes como si nada". Desde el viernes 12:00 (hora de
+// Buenos Aires), a cada persona con equipos a cargo le aparece en el
+// Portal un modal que no se puede cerrar hasta que marca el estado de
+// cada uno (cierre-semanal.js). Se guarda en
+// cierres_semanales/<viernes>/<email>, y cada estado queda además como
+// nota de seguimiento en su ticket.
+const CIERRE_INICIO = '2026-10-09';            // primer viernes con cierre
+const CIERRE_HORA = 12;                         // viernes desde las 12:00
+const CIERRE_AVISAR_A = ['cristian@tlcsrl.com.ar']; // aviso si alguien marca "trabado" o "no me corresponde"
+const CIERRE_ETAPAS = [
+  { key: 'diagnostico', label: 'Diagnóstico' },
+  { key: 'presupuesto', label: 'Presupuesto' },
+  { key: 'reparacion', label: 'Reparación' },
+  { key: 'preparacion_control_calidad', label: 'Preparación' },
+  { key: 'para_facturar', label: 'Para facturar' },
+];
+const CIERRE_ESTADOS = {
+  sale: '✅ Sale esta semana / ya salió',
+  proxima: '🔧 En trabajo, sale la semana que viene',
+  repuesto: '⏳ Espera repuesto',
+  cliente: '🧑‍💼 Espera al cliente',
+  trabado: '⚠️ Trabado, necesito ayuda',
+  no_mio: '🔁 No me corresponde',
+};
+
+// Fecha/hora "de pared" en Buenos Aires (UTC-3, sin horario de verano)
+function _ahoraBA() { return new Date(Date.now() - 3 * 3600 * 1000); }
+function _ymd(d) { return d.toISOString().slice(0, 10); }
+// Viernes (YYYY-MM-DD) del cierre vigente: el último viernes 12:00 ya pasado.
+function semanaCierreActual() {
+  const ba = _ahoraBA();
+  const dia = ba.getUTCDay(); // 5 = viernes
+  let atras = (dia - 5 + 7) % 7;
+  if (atras === 0 && ba.getUTCHours() < CIERRE_HORA) atras = 7;
+  const viernes = new Date(ba.getTime() - atras * 86400000);
+  const semana = _ymd(viernes);
+  return semana >= CIERRE_INICIO ? semana : null;
+}
+function _semanaAnterior(semana) { return _ymd(new Date(new Date(semana + 'T12:00:00Z').getTime() - 7 * 86400000)); }
+function _normNombre(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+
+// Email del responsable de un ticket — mismo criterio que la "Carga por
+// técnico" de servicio.html (_codTecnicoTicket).
+function _emailResponsableTicket(t) {
+  if (!t) return '';
+  let cod = (t.tecnico_asignado && t.tecnico_asignado !== 'sin_asignar') ? t.tecnico_asignado : '';
+  if (!cod && t.tipo_orden === 'preparacion_equipos' && t.tecnico_responsable_nombre) {
+    const n = _normNombre(t.tecnico_responsable_nombre);
+    cod = Object.keys(TECNICO_NOMBRE_MAP).find((c) => _normNombre(TECNICO_NOMBRE_MAP[c]) === n) || '';
+  }
+  return cod ? String(TECNICO_EMAIL_MAP[cod] || '').toLowerCase() : '';
+}
+function _tituloTicketCierre(t) {
+  const cliente = String(t.cliente || t.nombre_medico || '').trim() || 'Sin cliente';
+  let equipo = '';
+  if (t.tipo_orden === 'preparacion_equipos') {
+    const eq = comoArray(t.equipos);
+    if (eq.length) equipo = String(eq[0].descripcion || eq[0].sku || '').trim() + (eq.length > 1 ? ' (+' + (eq.length - 1) + ')' : '');
+  } else {
+    const marca = String(t.equipo_marca || '').trim(), modelo = String(t.equipo_modelo || '').trim();
+    equipo = (marca && modelo && modelo.toLowerCase().indexOf(marca.toLowerCase()) === 0) ? modelo : [marca, modelo].filter(Boolean).join(' ');
+  }
+  return cliente + ' — ' + (equipo || 'Sin equipo');
+}
+// Tickets a cargo de cada email, en las etapas de la carga
+function _cargaPorEmail(todos) {
+  const porEmail = {};
+  Object.keys(todos || {}).forEach((id) => {
+    const t = todos[id];
+    if (!t || !CIERRE_ETAPAS.some((e) => e.key === t.deposito)) return;
+    const email = _emailResponsableTicket(t);
+    if (!email) return;
+    (porEmail[email] = porEmail[email] || []).push({
+      id: t.id_ticket || id,
+      titulo: _tituloTicketCierre(t),
+      deposito: t.deposito,
+      etapa: (CIERRE_ETAPAS.find((e) => e.key === t.deposito) || {}).label || t.deposito,
+      prioridad: t.prioridad || '',
+      es_orden: t.tipo_orden === 'preparacion_equipos',
+    });
+  });
+  Object.keys(porEmail).forEach((e) => porEmail[e].sort((a, b) =>
+    CIERRE_ETAPAS.findIndex((x) => x.key === a.deposito) - CIERRE_ETAPAS.findIndex((x) => x.key === b.deposito)));
+  return porEmail;
+}
+
+async function st_cierrePendiente(data) {
+  const email = String(data.email || '').trim().toLowerCase();
+  if (!email) return { ok: false, error: 'Falta email' };
+  const prueba = !!data.prueba;
+  const semana = prueba ? 'prueba' : semanaCierreActual();
+  if (!semana) return { ok: true, pendiente: false };
+  const key = rtdbKeySeguro(email);
+  if (!prueba && await fbGet('cierres_semanales/' + semana + '/' + key)) return { ok: true, pendiente: false, semana, hecho: true };
+  const tickets = _cargaPorEmail(await fbGet('servicio_tecnico'))[email] || [];
+  if (!tickets.length) return { ok: true, pendiente: false, semana, sin_carga: true };
+  const anterior = await fbGet('cierres_semanales/' + (prueba ? semanaCierreActual() || CIERRE_INICIO : _semanaAnterior(semana)) + '/' + key);
+  const prev = {};
+  comoArray(anterior && anterior.items).forEach((it) => { if (it && it.id) prev[it.id] = { estado: it.estado, nota: it.nota || '' }; });
+  tickets.forEach((t) => { if (prev[t.id]) t.anterior = prev[t.id]; });
+  return { ok: true, pendiente: true, semana, prueba, tickets, estados: CIERRE_ESTADOS };
+}
+
+async function st_guardarCierreSemanal(data) {
+  const email = String(data.email || '').trim().toLowerCase();
+  const nombre = String(data.nombre || '').trim() || email;
+  const prueba = !!data.prueba;
+  if (!email) return { ok: false, error: 'Falta email' };
+  const semana = prueba ? 'prueba' : semanaCierreActual();
+  if (!semana) return { ok: false, error: 'Todavía no hay cierre de semana habilitado' };
+  if (!prueba && String(data.semana || '') !== semana) return { ok: false, error: 'La semana cambió — recargá la página' };
+  const carga = _cargaPorEmail(await fbGet('servicio_tecnico'))[email] || [];
+  const porId = {};
+  carga.forEach((t) => { porId[t.id] = t; });
+  const items = [];
+  for (const it of comoArray(data.items)) {
+    const t = porId[String(it && it.id || '')];
+    if (!t) continue; // ya no está a su cargo (lo movieron mientras completaba)
+    const estado = String(it.estado || '');
+    if (!CIERRE_ESTADOS[estado]) return { ok: false, error: 'Falta el estado de ' + t.titulo };
+    const nota = String(it.nota || '').trim().slice(0, 500);
+    if ((estado === 'trabado' || estado === 'no_mio') && !nota) return { ok: false, error: 'Contá en una línea por qué: ' + t.titulo };
+    items.push({ id: t.id, titulo: t.titulo, deposito: t.deposito, etapa: t.etapa, estado, nota });
+  }
+  const faltan = carga.filter((t) => !items.some((i) => i.id === t.id));
+  if (faltan.length) return { ok: false, error: 'Falta completar: ' + faltan.map((t) => t.titulo).join(', ') };
+  const registro = { email, nombre, fecha: new Date().toISOString(), items };
+  const key = rtdbKeySeguro(email);
+  if (prueba) {
+    await fbSet('cierres_semanales_prueba/' + key, registro);
+    return { ok: true, prueba: true, total: items.length };
+  }
+  await fbSet('cierres_semanales/' + semana + '/' + key, registro);
+  // Cada estado queda también en las notas de seguimiento del ticket
+  await Promise.all(items.map((it) => runTransaccionTicket(it.id, (t) => {
+    const notas = comoArray(t.notas_comentarios);
+    notas.unshift({ texto: '📋 Cierre de semana: ' + CIERRE_ESTADOS[it.estado] + (it.nota ? ' — ' + it.nota : ''), autor: nombre, fecha: registro.fecha });
+    t.notas_comentarios = notas;
+    return t;
+  }).catch((e) => console.warn('Cierre: no se pudo anotar en', it.id, e.message))));
+  // Aviso inmediato si hay algo trabado o mal asignado
+  const urgentes = items.filter((i) => i.estado === 'trabado' || i.estado === 'no_mio');
+  if (urgentes.length) {
+    const texto = nombre + ' cerró la semana con ' + urgentes.length + ' para revisar: ' +
+      urgentes.map((u) => (u.estado === 'trabado' ? '⚠️ ' : '🔁 ') + u.titulo + ' (' + u.nota + ')').join(' · ');
+    await Promise.all(CIERRE_AVISAR_A.filter((e) => e !== email).map(async (dest) => {
+      await registrarNotificacion(dest, 'cierre', texto, '', 'Cierre de semana', nombre, 'servicio');
+      const tokens = await obtenerTokensPush(dest);
+      await Promise.all(tokens.map((tok) => enviarPush(tok, 'Cierre de semana — ' + nombre, texto, 'https://cahirth.github.io/Portal-TLC/cierres.html')));
+    }));
+  }
+  return { ok: true, total: items.length, urgentes: urgentes.length };
+}
+
+// Resumen para administradores (cierres.html)
+async function st_listarCierres(data) {
+  if (String(data.vendedorRol || '').trim() !== 'Administrador') return { ok: false, error: 'Solo un Administrador' };
+  const actual = semanaCierreActual();
+  const semana = String(data.semana || '').trim() || actual || CIERRE_INICIO;
+  const todas = await db.ref('cierres_semanales').once('value');
+  const semanas = [];
+  todas.forEach((ch) => { semanas.push(ch.key); });
+  if (actual && !semanas.includes(actual)) semanas.push(actual);
+  semanas.sort().reverse();
+  const cierres = comoArray(await fbGet('cierres_semanales/' + semana));
+  // Quién tiene carga HOY y todavía no cerró (solo tiene sentido para la semana vigente)
+  let pendientes = [];
+  if (semana === actual) {
+    const carga = _cargaPorEmail(await fbGet('servicio_tecnico'));
+    const hechos = cierres.map((c) => String(c.email || '').toLowerCase());
+    pendientes = Object.keys(carga).filter((e) => !hechos.includes(e)).map((e) => {
+      const cod = Object.keys(TECNICO_EMAIL_MAP).find((c) => TECNICO_EMAIL_MAP[c] === e);
+      return { email: e, nombre: (cod && TECNICO_NOMBRE_MAP[cod]) || e, total: carga[e].length };
+    });
+  }
+  return { ok: true, semana, actual, semanas, cierres, pendientes, estados: CIERRE_ESTADOS };
+}
+
 const ACCIONES = {
   marcarNegocioUrgente, marcarTarjetaUrgenteEv, st_crearOrdenPreparacion,
   st_crearTicket, st_duplicarTicket, st_eliminarTicket,
@@ -1330,6 +1608,8 @@ const ACCIONES = {
   subirAdjunto, eliminarAdjunto,
   st_backupServicio, st_migrarFotosServicio,
   cot_listarMensajes, cot_agregarMensaje, cot_reaccionarMensaje,
+  st_marcarMensajesLeidos, cot_marcarMensajesLeidos,
+  st_cierrePendiente, st_guardarCierreSemanal, st_listarCierres,
   st_guardarEtiquetasCajas, eliminarVersionPresupuestoTicket, guardarAsignadosEtapa,
 };
 
