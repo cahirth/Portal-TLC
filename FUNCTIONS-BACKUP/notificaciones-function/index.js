@@ -1,4 +1,10 @@
 // Portal TLC | Cloud Function — módulo Notificaciones
+// v2 — 2026.10.07 — Cristian: "en la campanita siempre agrupar los no
+//   leídos arriba". listarNotificaciones devuelve primero TODOS los no
+//   leídos (más nuevos arriba) y después los leídos. De paso: antes se
+//   cortaba en las 40 más nuevas, así que un aviso sin leer más viejo
+//   quedaba afuera (ni se veía ni contaba en el número rojo). Ahora los no
+//   leídos van siempre (hasta 100) y los leídos completan hasta 40.
 // v1 — 2026.09.28
 //
 // Quinto módulo migrado (después de Empresas, Tareas, Fotos, y la
@@ -60,11 +66,13 @@ async function listarNotificaciones(data) {
   if (!email) return { ok: false, error: 'Falta email' };
   const nodo = await fbGet('notificaciones/' + rtdbKeySeguro(email));
   if (!nodo) return { ok: true, notificaciones: [] };
-  const lista = Object.keys(nodo)
+  const todas = Object.keys(nodo)
     .map((id) => { const n = nodo[id]; n.id = id; return n; })
-    .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))
-    .slice(0, 40);
-  return { ok: true, notificaciones: lista };
+    .filter((n) => n && typeof n === 'object')
+    .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const noLeidas = todas.filter((n) => !n.leido).slice(0, 100);
+  const leidas = todas.filter((n) => n.leido).slice(0, Math.max(0, 40 - noLeidas.length));
+  return { ok: true, notificaciones: noLeidas.concat(leidas) };
 }
 
 async function marcarNotificacionLeida(data) {
