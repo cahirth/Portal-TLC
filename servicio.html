@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.08.1 (Cristian: "agregá PARA INSTALAR también". La etapa Para instalar suma a la Carga del equipo (columna "Inst."), a las Prioridades y al Cierre de semana.) -->
+<!-- Portal TLC | servicio.html | v2026.10.07.4 (Cristian: "cambiar Carga por técnico a Carga del equipo". El panel del Administrador ahora se llama "⚖️ Carga del equipo" (incluye las etapas Diagnóstico, Presupuesto, Reparación, Preparación y Para facturar).) -->
 <!-- Portal TLC | servicio.html | v2026.10.07.3 (🔥 PRIORIDADES — Cristian: "la idea es que yo maneje y vea lo que quema, y cuando Damián o Juan lo vean sepan exactamente qué hacer cada mañana, y yo me quede tranquilo". Panel nuevo arriba: el Administrador ve "🔥 Prioridades del equipo" (cada persona, su #1 y botón Ordenar → editor con ⤒ ▲ ▼ e indicación corta por equipo; al guardar le llega un aviso); cada técnico ve "🔥 Tu orden de hoy" con su lista numerada y tus indicaciones. Las tarjetas (Kanban y Lista) muestran 🔥1, 🔥2... Se guarda en servicio_config/prioridades (backend servicio v11, st_guardarPrioridades).) -->
 <!-- Portal TLC | servicio.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
 <!-- Portal TLC | servicio.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre. Además, en la Carga por técnico (Administrador) hay un acceso a "📋 Cierres" (cierres.html).) -->
@@ -1360,7 +1362,8 @@ var METRICA_ETAPAS = [
   { key:'presupuesto',                 label:'Presupuesto', corto:'Presup.' },
   { key:'reparacion',                  label:'Reparación',  corto:'Repar.' },
   { key:'preparacion_control_calidad', label:'Preparación', corto:'Prep.' },
-  { key:'para_facturar',               label:'Para facturar', corto:'Fact.' }
+  { key:'para_facturar',               label:'Para facturar', corto:'Fact.' },
+  { key:'para_instalar',               label:'Para instalar', corto:'Inst.' }
 ];
 
 // Técnico de un ticket para la métrica. Las Órdenes de Preparación
@@ -1538,16 +1541,16 @@ function _renderCargaTecnicos() {
   var minimos = {};
   METRICA_ETAPAS.forEach(function(e) { minimos[e.key] = esAdmin ? _minimoEtapa(carga, e.key) : null; });
 
-  var th = 'padding:4px 2px;font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;text-align:center;white-space:nowrap;';
+  var th = 'padding:4px 1px;font-size:9.5px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;text-align:center;white-space:nowrap;';
   var celda = function(cod, etapa, n, enEtapa, esMin) {
     if (!enEtapa && !n) return '<td style="text-align:center;color:var(--text-muted);opacity:.45;font-size:13px;">—</td>';
     var activo = _filtros.tecnico === cod && _filtros.etapa === etapa;
     var borde = activo ? '#3a86ff' : (esMin ? '#06d6a0' : 'var(--border-glow)');
     return '<td style="padding:2px;"><button type="button" onclick="_filtrarCargaTecnico(\'' + cod + '\',\'' + etapa + '\')" ' +
       'title="' + (esMin ? 'Menos carga en esta etapa — ' : '') + 'Ver estos tickets" ' +
-      'style="width:100%;min-width:42px;background:' + (activo ? 'rgba(58,134,255,.18)' : (esMin ? 'rgba(6,214,160,.12)' : 'var(--bg)')) + ';' +
+      'style="width:100%;min-width:34px;background:' + (activo ? 'rgba(58,134,255,.18)' : (esMin ? 'rgba(6,214,160,.12)' : 'var(--bg)')) + ';' +
       'border:1px solid ' + borde + ';border-radius:9px;padding:5px 2px;cursor:pointer;color:var(--text-main);' +
-      'font-size:17px;font-weight:800;line-height:1.1;">' + n + '</button></td>';
+      'font-size:16px;font-weight:800;line-height:1.1;">' + n + '</button></td>';
   };
 
   var cuerpo = filas.map(function(cod) {
@@ -1589,7 +1592,7 @@ function _renderCargaTecnicos() {
   el.innerHTML =
     '<div style="margin:10px 12px 4px;background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:14px;padding:' + (abierto ? '10px 12px' : '8px 12px') + ';">' +
       '<div onclick="_toggleCargaTecnicos()" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;user-select:none;' + (abierto ? 'margin-bottom:6px;' : '') + '">' +
-        '<span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">⚖️ ' + (esAdmin ? 'Carga por técnico' : 'Mi carga actual') + '</span>' +
+        '<span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">⚖️ ' + (esAdmin ? 'Carga del equipo' : 'Mi carga actual') + '</span>' +
         (abierto
           ? (pie ? '<span style="font-size:11px;font-weight:700;color:var(--text-muted);flex:1;text-align:right;">' + pie + '</span>' : '<span style="flex:1;"></span>')
           : '<span style="font-size:12px;color:var(--text-muted);flex:1;min-width:0;overflow-x:auto;white-space:nowrap;text-align:right;">' + resumen + '</span>') +
@@ -1705,7 +1708,7 @@ function _renderPrioridades() {
       return '<div style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid var(--border-glow);">' +
         '<span style="width:8px;height:8px;border-radius:50%;background:' + (TECNICO_COLOR[cod] || '#64748b') + ';flex-shrink:0;"></span>' +
         '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:13px;font-weight:800;color:var(--text-main);">' + _esc(_nombreCortoTecnico(cod)) + ' <span style="font-weight:600;color:var(--text-muted);font-size:11px;">· ' + (l.ordenados.length + l.nuevos.length) + ' equipos' +
+          '<div style="font-size:13px;font-weight:800;color:var(--text-main);">' + _esc(_nombreCortoTecnico(cod)) + ' <span style="font-weight:600;color:var(--text-muted);font-size:11px;">· ' + (l.ordenados.length + l.nuevos.length) + ((l.ordenados.length + l.nuevos.length) === 1 ? ' equipo' : ' equipos') +
             (l.nuevos.length && l.ordenados.length ? ' · <span style="color:#f59e0b;">' + l.nuevos.length + ' sin ordenar</span>' : '') + '</span></div>' +
           '<div style="font-size:11.5px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
             (primero ? '🔥 1. ' + _esc(_nombreTarjetaTicket(primero.t)) : '<span style="color:#f59e0b;">Todavía sin orden</span>') +
