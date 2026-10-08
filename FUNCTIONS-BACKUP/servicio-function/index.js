@@ -1,5 +1,9 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v11 — 2026.10.07 — 🔥 Prioridades: st_guardarPrioridades (el
+//   Administrador ordena la carga de cada técnico, servicio_config/
+//   prioridades/<código>) y aviso al técnico. El Cierre de semana muestra
+//   los equipos en ese mismo orden.
 // v10 — 2026.10.06 — Cierre de semana: st_cierrePendiente,
 //   st_guardarCierreSemanal y st_listarCierres (nodo cierres_semanales).
 // v9 — 2026.10.06 — Tildes de lectura tipo WhatsApp en los mensajes con
@@ -1513,8 +1517,18 @@ async function st_cierrePendiente(data) {
   if (!semana) return { ok: true, pendiente: false };
   const key = rtdbKeySeguro(email);
   if (!prueba && await fbGet('cierres_semanales/' + semana + '/' + key)) return { ok: true, pendiente: false, semana, hecho: true };
-  const tickets = _cargaPorEmail(await fbGet('servicio_tecnico'))[email] || [];
+  let tickets = _cargaPorEmail(await fbGet('servicio_tecnico'))[email] || [];
   if (!tickets.length) return { ok: true, pendiente: false, semana, sin_carga: true };
+  // Mismo orden que "🔥 Tu orden de hoy" (lo ordenado primero, en ese orden)
+  const codPersona = Object.keys(TECNICO_EMAIL_MAP).find((c) => String(TECNICO_EMAIL_MAP[c]).toLowerCase() === email);
+  const prio = codPersona ? await fbGet('servicio_config/prioridades/' + codPersona) : null;
+  if (prio && prio.orden) {
+    const puesto = {};
+    comoArray(prio.orden).forEach((it, i) => { if (it && it.id) puesto[it.id] = i + 1; });
+    tickets = tickets.map((t, i) => Object.assign(t, { _i: i, puesto: puesto[t.id] || 0 }))
+      .sort((a, b) => (a.puesto || 9999) - (b.puesto || 9999) || a._i - b._i)
+      .map((t) => { delete t._i; return t; });
+  }
   const anterior = await fbGet('cierres_semanales/' + (prueba ? semanaCierreActual() || CIERRE_INICIO : _semanaAnterior(semana)) + '/' + key);
   const prev = {};
   comoArray(anterior && anterior.items).forEach((it) => { if (it && it.id) prev[it.id] = { estado: it.estado, nota: it.nota || '' }; });
@@ -1597,6 +1611,33 @@ async function st_listarCierres(data) {
   return { ok: true, semana, actual, semanas, cierres, pendientes, estados: CIERRE_ESTADOS };
 }
 
+// ── 🔥 Prioridades (v11) ────────────────────────────────────────────
+// Cristian: "la idea es que yo maneje y vea lo que quema... y cuando
+// Damián o Juan lo vean sepan exactamente qué hacer cada mañana".
+async function st_guardarPrioridades(data) {
+  if (String(data.vendedorRol || '').trim() !== 'Administrador') return { ok: false, error: 'Solo un Administrador puede ordenar prioridades' };
+  const cod = String(data.cod || '').trim();
+  if (!ST_TECNICOS.includes(cod) || cod === 'sin_asignar') return { ok: false, error: 'Persona inválida' };
+  const vistos = {};
+  const orden = comoArray(data.orden).map((it) => ({ id: String(it && it.id || '').trim(), nota: String(it && it.nota || '').trim().slice(0, 120) }))
+    .filter((it) => it.id && !vistos[it.id] && (vistos[it.id] = true));
+  const autor = String(data.autor_nombre || '').trim() || 'el Administrador';
+  const registro = { orden, actualizado_en: new Date().toISOString(), por: autor };
+  await fbSet('servicio_config/prioridades/' + cod, registro);
+  // Aviso a la persona (si no se está ordenando a sí mismo)
+  const email = String(TECNICO_EMAIL_MAP[cod] || '').toLowerCase();
+  const autorEmail = String(data.autor_email || '').trim().toLowerCase();
+  if (email && email !== autorEmail && orden.length) {
+    const t1 = await fbGet('servicio_tecnico/' + orden[0].id);
+    const primero = t1 ? _tituloTicketCierre(t1) : orden[0].id;
+    const texto = autor + ' actualizó tu orden de prioridades. Primero: ' + primero + (orden[0].nota ? ' — ' + orden[0].nota : '');
+    await registrarNotificacion(email, 'prioridades', texto, orden[0].id, 'Tu orden de hoy', autor, 'servicio');
+    const tokens = await obtenerTokensPush(email);
+    await Promise.all(tokens.map((tok) => enviarPush(tok, '🔥 Tu orden de prioridades', texto, 'https://cahirth.github.io/Portal-TLC/servicio.html')));
+  }
+  return { ok: true, registro };
+}
+
 const ACCIONES = {
   marcarNegocioUrgente, marcarTarjetaUrgenteEv, st_crearOrdenPreparacion,
   st_crearTicket, st_duplicarTicket, st_eliminarTicket,
@@ -1609,7 +1650,7 @@ const ACCIONES = {
   st_backupServicio, st_migrarFotosServicio,
   cot_listarMensajes, cot_agregarMensaje, cot_reaccionarMensaje,
   st_marcarMensajesLeidos, cot_marcarMensajesLeidos,
-  st_cierrePendiente, st_guardarCierreSemanal, st_listarCierres,
+  st_cierrePendiente, st_guardarCierreSemanal, st_listarCierres, st_guardarPrioridades,
   st_guardarEtiquetasCajas, eliminarVersionPresupuestoTicket, guardarAsignadosEtapa,
 };
 
