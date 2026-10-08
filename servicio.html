@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.08.2 (Cristian: "mostrame cómo lo ven ellos" + "¿se puede clickear en cada uno y que abra el ticket?". En "Ver como" cada equipo se toca y abre el ticket; también el #1 de cada persona en tu panel. En "🔥 Prioridades del equipo", cada persona tiene un botón "👁 Ver como" que muestra exactamente la tarjeta "🔥 Tu orden de hoy" que esa persona ve al abrir Servicio.) -->
 <!-- Portal TLC | servicio.html | v2026.10.08.1 (Cristian: "agregá PARA INSTALAR también". La etapa Para instalar suma a la Carga del equipo (columna "Inst."), a las Prioridades y al Cierre de semana.) -->
 <!-- Portal TLC | servicio.html | v2026.10.07.4 (Cristian: "cambiar Carga por técnico a Carga del equipo". El panel del Administrador ahora se llama "⚖️ Carga del equipo" (incluye las etapas Diagnóstico, Presupuesto, Reparación, Preparación y Para facturar).) -->
 <!-- Portal TLC | servicio.html | v2026.10.07.3 (🔥 PRIORIDADES — Cristian: "la idea es que yo maneje y vea lo que quema, y cuando Damián o Juan lo vean sepan exactamente qué hacer cada mañana, y yo me quede tranquilo". Panel nuevo arriba: el Administrador ve "🔥 Prioridades del equipo" (cada persona, su #1 y botón Ordenar → editor con ⤒ ▲ ▼ e indicación corta por equipo; al guardar le llega un aviso); cada técnico ve "🔥 Tu orden de hoy" con su lista numerada y tus indicaciones. Las tarjetas (Kanban y Lista) muestran 🔥1, 🔥2... Se guarda en servicio_config/prioridades (backend servicio v11, st_guardarPrioridades).) -->
@@ -1666,7 +1667,7 @@ function _haceCuanto(iso) {
 
 function _filaPrioHtml(n, item, conAbrir) {
   var t = item.t;
-  return '<div ' + (conAbrir ? 'onclick="_abrirDetalle(\'' + t.id_ticket + '\')" ' : '') +
+  return '<div ' + (conAbrir ? 'onclick="_abrirDesdePrio(\'' + t.id_ticket + '\')" ' : '') +
     'style="display:flex;gap:10px;align-items:flex-start;padding:8px 4px;border-top:1px solid var(--border-glow);' + (conAbrir ? 'cursor:pointer;' : '') + '">' +
     '<span style="flex-shrink:0;min-width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;' +
       (n && n <= 3 ? 'background:#ef4444;color:#fff;' : 'background:var(--bg);color:var(--text-muted);border:1px solid var(--border-glow);') + '">' + (n || '·') + '</span>' +
@@ -1711,9 +1712,10 @@ function _renderPrioridades() {
           '<div style="font-size:13px;font-weight:800;color:var(--text-main);">' + _esc(_nombreCortoTecnico(cod)) + ' <span style="font-weight:600;color:var(--text-muted);font-size:11px;">· ' + (l.ordenados.length + l.nuevos.length) + ((l.ordenados.length + l.nuevos.length) === 1 ? ' equipo' : ' equipos') +
             (l.nuevos.length && l.ordenados.length ? ' · <span style="color:#f59e0b;">' + l.nuevos.length + ' sin ordenar</span>' : '') + '</span></div>' +
           '<div style="font-size:11.5px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
-            (primero ? '🔥 1. ' + _esc(_nombreTarjetaTicket(primero.t)) : '<span style="color:#f59e0b;">Todavía sin orden</span>') +
+            (primero ? '<span onclick="_abrirDesdePrio(\'' + primero.t.id_ticket + '\')" style="cursor:pointer;text-decoration:underline dotted;">🔥 1. ' + _esc(_nombreTarjetaTicket(primero.t)) + '</span>' : '<span style="color:#f59e0b;">Todavía sin orden</span>') +
             (p && p.actualizado_en ? ' · ' + _haceCuanto(p.actualizado_en) : '') + '</div>' +
         '</div>' +
+        '<button type="button" title="Ver lo que ve ' + _esc(_nombreCortoTecnico(cod)) + '" onclick="_verComoTecnico(\'' + cod + '\')" style="flex-shrink:0;background:transparent;color:var(--text-main);border:1px solid var(--border-glow);border-radius:9px;padding:7px 10px;font-size:12px;font-weight:800;cursor:pointer;">👁 Ver como</button>' +
         '<button type="button" onclick="_abrirEditorPrioridades(\'' + cod + '\')" style="flex-shrink:0;background:#ef4444;color:#fff;border:none;border-radius:9px;padding:7px 11px;font-size:12px;font-weight:800;cursor:pointer;">Ordenar</button>' +
       '</div>';
     }).join('');
@@ -1739,6 +1741,43 @@ function _renderPrioridades() {
   el.style.display = 'block';
   el.innerHTML = caja(cab('🔥 Tu orden de hoy', sub) + (abierto ? '<div style="margin-top:6px;">' + cuerpo + '</div>' : ''));
 }
+// 👁 Ver como (Administrador): muestra EXACTAMENTE la tarjeta "🔥 Tu orden
+// de hoy" que ve esa persona al abrir Servicio (v2026.10.08.2).
+// Abre el ticket desde cualquier lista de prioridades (cierra el "Ver como" si estaba abierto)
+window._abrirDesdePrio = function(id) {
+  var vc = document.getElementById('prio-vercomo');
+  if (vc) vc.style.display = 'none';
+  _abrirDetalle(id);
+};
+
+window._verComoTecnico = function(cod) {
+  var l = _listaPrioridad(cod), pm = _prioridades[cod];
+  var lista = l.ordenados.concat(l.nuevos);
+  var sub = l.ordenados.length
+    ? 'Definido por ' + _esc((pm && pm.por) || 'el Administrador') + (pm && pm.actualizado_en ? ' · ' + _haceCuanto(pm.actualizado_en) : '')
+    : 'Todavía sin orden definido';
+  var cuerpo = lista.length ? lista.map(function(it, i) { return _filaPrioHtml(it.nuevo ? 0 : i + 1, it, true); }).join('')
+    : '<div style="padding:14px;text-align:center;color:var(--text-muted);font-size:13px;">No tiene equipos a cargo — no le aparece nada.</div>';
+  var ov = document.getElementById('prio-vercomo');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'prio-vercomo'; document.body.appendChild(ov); }
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(4,10,24,.7);display:flex;align-items:center;justify-content:center;padding:10px;';
+  ov.onclick = function(e) { if (e.target === ov) ov.style.display = 'none'; };
+  ov.innerHTML =
+    '<div style="width:100%;max-width:520px;max-height:92vh;overflow-y:auto;background:var(--bg);border-radius:18px;padding:12px 4px 14px;box-shadow:0 20px 60px rgba(0,0,0,.45);">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:0 12px 6px;">' +
+        '<span style="font-size:12px;font-weight:800;color:var(--text-muted);">👁 Así lo ve ' + _esc(_nombreTecnicoPorCod(cod) || cod) + ' al abrir Servicio</span>' +
+        '<button type="button" onclick="document.getElementById(\'prio-vercomo\').style.display=\'none\'" style="background:none;border:none;font-size:20px;color:var(--text-muted);cursor:pointer;">✕</button>' +
+      '</div>' +
+      '<div style="margin:0 8px;background:var(--panel-dark);border:1px solid var(--border-glow);border-left:4px solid #ef4444;border-radius:14px;padding:9px 12px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+          '<span style="font-size:11px;font-weight:800;color:#ef4444;text-transform:uppercase;letter-spacing:.5px;">🔥 Tu orden de hoy</span>' +
+          '<span style="font-size:11px;color:var(--text-muted);text-align:right;">' + sub + '</span></div>' +
+        '<div style="margin-top:6px;">' + cuerpo + '</div>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted);padding:10px 14px 0;">Tocá cualquiera para abrir el ticket. En su pantalla se ven las primeras 5 (con "Ver todas" abajo).</div>' +
+    '</div>';
+};
+
 window._togglePrioridades = function() {
   try { var a = localStorage.getItem('st_prio_abierta') !== '0'; localStorage.setItem('st_prio_abierta', a ? '0' : '1'); } catch (e) {}
   _renderPrioridades();
