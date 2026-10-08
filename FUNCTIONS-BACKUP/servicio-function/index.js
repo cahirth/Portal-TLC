@@ -1,5 +1,7 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v12 — 2026.10.08 — La etapa "Para instalar" entra en el Cierre de semana
+//   (CIERRE_ETAPAS), igual que en la Carga del equipo.
 // v11 — 2026.10.07 — 🔥 Prioridades: st_guardarPrioridades (el
 //   Administrador ordena la carga de cada técnico, servicio_config/
 //   prioridades/<código>) y aviso al técnico. El Cierre de semana muestra
@@ -1438,6 +1440,7 @@ const CIERRE_ETAPAS = [
   { key: 'reparacion', label: 'Reparación' },
   { key: 'preparacion_control_calidad', label: 'Preparación' },
   { key: 'para_facturar', label: 'Para facturar' },
+  { key: 'para_instalar', label: 'Para instalar' },
 ];
 const CIERRE_ESTADOS = {
   sale: '✅ Sale esta semana / ya salió',
