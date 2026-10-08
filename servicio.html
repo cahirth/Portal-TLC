@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.07.3 (🔥 PRIORIDADES — Cristian: "la idea es que yo maneje y vea lo que quema, y cuando Damián o Juan lo vean sepan exactamente qué hacer cada mañana, y yo me quede tranquilo". Panel nuevo arriba: el Administrador ve "🔥 Prioridades del equipo" (cada persona, su #1 y botón Ordenar → editor con ⤒ ▲ ▼ e indicación corta por equipo; al guardar le llega un aviso); cada técnico ve "🔥 Tu orden de hoy" con su lista numerada y tus indicaciones. Las tarjetas (Kanban y Lista) muestran 🔥1, 🔥2... Se guarda en servicio_config/prioridades (backend servicio v11, st_guardarPrioridades).) -->
 <!-- Portal TLC | servicio.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
 <!-- Portal TLC | servicio.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre. Además, en la Carga por técnico (Administrador) hay un acceso a "📋 Cierres" (cierres.html).) -->
 <!-- Portal TLC | servicio.html | v2026.10.06.7 (Cristian: "¿es posible tener una tilde o dos tildes como WhatsApp?". 1) Las @menciones siguen igual que siempre (se eligen de la lista, nombre completo; un mensaje puede mencionar a varios); si la lista de internos no había cargado al enviar, ahora espera a que cargue (antes salían sin avisar a nadie). 2) Debajo del cuadro de texto se ve "🔔 Se va a avisar a: ..." antes de enviar. 3) Tildes de lectura ✓✓ (gris = avisado, azul = lo leyeron todos) en los mensajes con menciones; tocándolas, detalle por persona. 4) Al abrir la tarjeta se marcan tus menciones como leídas y sus avisos en la campanita. Lógica compartida en menciones.js; backend servicio v9.) -->
@@ -554,6 +555,7 @@ body.tema-claro .det-field-select, body.tema-claro .det-field-input { background
 <!-- CARGA POR TÉCNICO (Administrador: todos · resto: solo su fila) -->
 <div id="st-aviso-fotos" style="display:none;"></div>
 <div id="st-carga-tecnicos" style="display:none;"></div>
+<div id="st-prioridades" style="display:none;"></div>
 
 <!-- FILTROS -->
 <div class="st-filtros">
@@ -1267,6 +1269,7 @@ async function _cargarTickets() {
       fetch(RTDB_URL + '/servicio_tecnico.json?_=' + Date.now(), { cache:'no-store' }).then(function(r){ return r.json(); }),
       _cargarColumnas(),
       _cargarAsignadosPorEtapa(),
+      _cargarPrioridades(),
     ]);
     var data = resultados[0];
     _tickets = data ? Object.values(data) : [];
@@ -1523,6 +1526,7 @@ function _minimoEtapa(carga, etapa) {
 }
 
 function _renderCargaTecnicos() {
+  try { _renderPrioridades(); } catch (ePrio) { console.warn('[prioridades]', ePrio); }
   var el = document.getElementById('st-carga-tecnicos');
   if (!el) return;
   var carga = _cargaPorTecnico();
@@ -1602,6 +1606,233 @@ function _renderCargaTecnicos() {
       '</div>' : '') +
     '</div>';
 }
+
+// ══════════════════════════════════════════════════════════════════
+// 🔥 PRIORIDADES (v2026.10.07.3) — Cristian: "la idea es que yo maneje y
+// vea lo que quema... y cuando Damián o Juan lo vean sepan exactamente
+// qué hacer cada mañana, y yo me quede tranquilo". El Administrador
+// ordena la carga de cada persona (▲▼, al tope, indicación corta por
+// equipo) y cada uno ve arriba "🔥 Tu orden de hoy". Se guarda en
+// servicio_config/prioridades/<código> = { orden:[{id,nota}], actualizado_en, por }.
+// Los equipos asignados después del último orden aparecen al final como
+// "sin ordenar". Las tarjetas muestran 🔥1, 🔥2... con el puesto.
+// ══════════════════════════════════════════════════════════════════
+var _prioridades = {};
+var _rankPrioridad = {}; // id_ticket -> puesto (1, 2, ...)
+var _prioEditando = null; // { cod, items:[{id,nota}] }
+
+async function _cargarPrioridades() {
+  try {
+    var res = await fetch(RTDB_URL + '/servicio_config/prioridades.json?_=' + Date.now(), { cache:'no-store' });
+    var data = res.ok ? await res.json() : null;
+    _prioridades = (data && typeof data === 'object') ? data : {};
+  } catch (e) { _prioridades = {}; }
+}
+
+function _ticketsCargaDe(cod) {
+  return (_tickets || []).filter(function(t) {
+    return t && METRICA_ETAPAS.some(function(e) { return e.key === t.deposito; }) && _codTecnicoTicket(t) === cod;
+  });
+}
+function _etapaLabelCorta(dep) { var e = METRICA_ETAPAS.find(function(x) { return x.key === dep; }); return e ? e.label : dep; }
+
+// Lista de la persona: primero lo ordenado (si sigue a su cargo), después lo nuevo
+function _listaPrioridad(cod) {
+  var carga = _ticketsCargaDe(cod);
+  var porId = {}; carga.forEach(function(t) { porId[t.id_ticket] = t; });
+  var guardado = (_prioridades[cod] && Array.isArray(_prioridades[cod].orden)) ? _prioridades[cod].orden : [];
+  var usados = {}, ordenados = [];
+  guardado.forEach(function(it) {
+    if (it && porId[it.id] && !usados[it.id]) { usados[it.id] = 1; ordenados.push({ t: porId[it.id], nota: it.nota || '' }); }
+  });
+  var PESO = { urgente: 0, alta: 1, media: 2, baja: 3 };
+  var nuevos = carga.filter(function(t) { return !usados[t.id_ticket]; }).sort(function(a, b) {
+    var pa = PESO[a.prioridad] !== undefined ? PESO[a.prioridad] : 2, pb = PESO[b.prioridad] !== undefined ? PESO[b.prioridad] : 2;
+    return pa - pb || String(a.creado_en || '').localeCompare(String(b.creado_en || ''));
+  }).map(function(t) { return { t: t, nota: '', nuevo: true }; });
+  return { ordenados: ordenados, nuevos: nuevos };
+}
+
+function _haceCuanto(iso) {
+  var d = new Date(iso); if (isNaN(d)) return '';
+  var min = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (min < 60) return 'hace ' + Math.max(1, min) + ' min';
+  var h = Math.floor(min / 60); if (h < 24) return 'hace ' + h + ' h';
+  var dd = Math.floor(h / 24); return dd === 1 ? 'ayer' : 'hace ' + dd + ' días';
+}
+
+function _filaPrioHtml(n, item, conAbrir) {
+  var t = item.t;
+  return '<div ' + (conAbrir ? 'onclick="_abrirDetalle(\'' + t.id_ticket + '\')" ' : '') +
+    'style="display:flex;gap:10px;align-items:flex-start;padding:8px 4px;border-top:1px solid var(--border-glow);' + (conAbrir ? 'cursor:pointer;' : '') + '">' +
+    '<span style="flex-shrink:0;min-width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;' +
+      (n && n <= 3 ? 'background:#ef4444;color:#fff;' : 'background:var(--bg);color:var(--text-muted);border:1px solid var(--border-glow);') + '">' + (n || '·') + '</span>' +
+    '<div style="flex:1;min-width:0;">' +
+      '<div style="font-size:13px;font-weight:800;color:var(--text-main);line-height:1.25;">' + (t.prioridad === 'urgente' ? '📌 ' : '') + _esc(_nombreTarjetaTicket(t)) + '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">' + _esc(_etapaLabelCorta(t.deposito)) + (t.equipo_serie ? ' · ' + _esc(t.equipo_serie) : '') + (item.nuevo ? ' · <span style="color:#f59e0b;font-weight:700;">sin ordenar</span>' : '') + '</div>' +
+      (item.nota ? '<div style="font-size:12px;color:#d97706;font-weight:700;margin-top:3px;">👉 ' + _esc(item.nota) + '</div>' : '') +
+    '</div></div>';
+}
+
+function _renderPrioridades() {
+  var el = document.getElementById('st-prioridades');
+  if (!el) return;
+  _rankPrioridad = {};
+  Object.keys(_prioridades || {}).forEach(function(cod) {
+    _listaPrioridad(cod).ordenados.forEach(function(it, i) { _rankPrioridad[it.t.id_ticket] = i + 1; });
+  });
+  var esAdmin = !!(_permisos && _permisos.admin);
+  var miClave = _session ? (_session.tecnico_key || '') : '';
+  var abierto = true;
+  try { abierto = localStorage.getItem('st_prio_abierta') !== '0'; } catch (e) {}
+  var cab = function(titulo, sub) {
+    return '<div onclick="_togglePrioridades()" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;user-select:none;">' +
+      '<span style="font-size:11px;font-weight:800;color:#ef4444;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">' + titulo + '</span>' +
+      '<span style="font-size:11px;color:var(--text-muted);flex:1;text-align:right;">' + sub + '</span>' +
+      '<span style="font-size:12px;color:var(--text-muted);transform:rotate(' + (abierto ? '180' : '0') + 'deg);">▾</span></div>';
+  };
+  var caja = function(inner) {
+    return '<div style="margin:6px 12px 4px;background:var(--panel-dark);border:1px solid var(--border-glow);border-left:4px solid #ef4444;border-radius:14px;padding:9px 12px;">' + inner + '</div>';
+  };
+
+  if (esAdmin) {
+    var carga = _cargaPorTecnico();
+    var personas = carga.personas.filter(function(c) { return carga.conteo[c] && carga.conteo[c].total; });
+    if (!personas.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    var filas = personas.map(function(cod) {
+      var l = _listaPrioridad(cod), p = _prioridades[cod];
+      var primero = l.ordenados[0] || null;
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid var(--border-glow);">' +
+        '<span style="width:8px;height:8px;border-radius:50%;background:' + (TECNICO_COLOR[cod] || '#64748b') + ';flex-shrink:0;"></span>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:13px;font-weight:800;color:var(--text-main);">' + _esc(_nombreCortoTecnico(cod)) + ' <span style="font-weight:600;color:var(--text-muted);font-size:11px;">· ' + (l.ordenados.length + l.nuevos.length) + ' equipos' +
+            (l.nuevos.length && l.ordenados.length ? ' · <span style="color:#f59e0b;">' + l.nuevos.length + ' sin ordenar</span>' : '') + '</span></div>' +
+          '<div style="font-size:11.5px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+            (primero ? '🔥 1. ' + _esc(_nombreTarjetaTicket(primero.t)) : '<span style="color:#f59e0b;">Todavía sin orden</span>') +
+            (p && p.actualizado_en ? ' · ' + _haceCuanto(p.actualizado_en) : '') + '</div>' +
+        '</div>' +
+        '<button type="button" onclick="_abrirEditorPrioridades(\'' + cod + '\')" style="flex-shrink:0;background:#ef4444;color:#fff;border:none;border-radius:9px;padding:7px 11px;font-size:12px;font-weight:800;cursor:pointer;">Ordenar</button>' +
+      '</div>';
+    }).join('');
+    el.style.display = 'block';
+    el.innerHTML = caja(cab('🔥 Prioridades del equipo', 'Vos decidís qué va primero') + (abierto ? '<div style="margin-top:6px;">' + filas + '</div>' : ''));
+    return;
+  }
+
+  // Técnico: su orden de hoy
+  var mia = _listaPrioridad(miClave);
+  var total = mia.ordenados.length + mia.nuevos.length;
+  if (!total) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  var pm = _prioridades[miClave];
+  var sub = mia.ordenados.length
+    ? 'Definido por ' + _esc((pm && pm.por) || 'el Administrador') + (pm && pm.actualizado_en ? ' · ' + _haceCuanto(pm.actualizado_en) : '')
+    : 'Todavía sin orden definido';
+  var verTodos = false;
+  try { verTodos = sessionStorage.getItem('st_prio_todos') === '1'; } catch (e) {}
+  var lista = mia.ordenados.concat(mia.nuevos);
+  var mostrar = verTodos ? lista : lista.slice(0, 5);
+  var cuerpo = mostrar.map(function(it, i) { return _filaPrioHtml(it.nuevo ? 0 : i + 1, it, true); }).join('') +
+    (lista.length > 5 ? '<div onclick="_verTodasPrioridades()" style="text-align:center;font-size:12px;font-weight:800;color:#3a86ff;padding:8px;cursor:pointer;">' + (verTodos ? 'Ver solo las primeras 5' : 'Ver las ' + lista.length) + '</div>' : '');
+  el.style.display = 'block';
+  el.innerHTML = caja(cab('🔥 Tu orden de hoy', sub) + (abierto ? '<div style="margin-top:6px;">' + cuerpo + '</div>' : ''));
+}
+window._togglePrioridades = function() {
+  try { var a = localStorage.getItem('st_prio_abierta') !== '0'; localStorage.setItem('st_prio_abierta', a ? '0' : '1'); } catch (e) {}
+  _renderPrioridades();
+};
+window._verTodasPrioridades = function() {
+  try { sessionStorage.setItem('st_prio_todos', sessionStorage.getItem('st_prio_todos') === '1' ? '0' : '1'); } catch (e) {}
+  _renderPrioridades();
+};
+
+// ── Editor (Administrador) ──────────────────────────────────────────
+window._abrirEditorPrioridades = function(cod) {
+  var l = _listaPrioridad(cod);
+  _prioEditando = { cod: cod, items: l.ordenados.concat(l.nuevos).map(function(it) { return { id: it.t.id_ticket, nota: it.nota || '', nuevo: !!it.nuevo }; }) };
+  var ov = document.getElementById('prio-editor');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'prio-editor';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(4,10,24,.7);display:flex;align-items:center;justify-content:center;padding:10px;';
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+  _renderEditorPrioridades();
+};
+function _renderEditorPrioridades() {
+  var ov = document.getElementById('prio-editor');
+  if (!ov || !_prioEditando) return;
+  var porId = {}; _ticketsCargaDe(_prioEditando.cod).forEach(function(t) { porId[t.id_ticket] = t; });
+  var items = _prioEditando.items.filter(function(it) { return porId[it.id]; });
+  _prioEditando.items = items;
+  var bt = 'background:var(--bg);border:1px solid var(--border-glow);border-radius:8px;width:34px;height:32px;font-size:14px;cursor:pointer;color:var(--text-main);';
+  var filas = items.map(function(it, i) {
+    var t = porId[it.id];
+    return '<div style="padding:9px 2px;border-top:1px solid var(--border-glow);">' +
+      '<div style="display:flex;gap:9px;align-items:flex-start;">' +
+        '<span style="flex-shrink:0;min-width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;' + (i < 3 ? 'background:#ef4444;color:#fff;' : 'background:var(--bg);color:var(--text-muted);border:1px solid var(--border-glow);') + '">' + (i + 1) + '</span>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:13px;font-weight:800;color:var(--text-main);line-height:1.25;">' + (t.prioridad === 'urgente' ? '📌 ' : '') + _esc(_nombreTarjetaTicket(t)) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);">' + _esc(_etapaLabelCorta(t.deposito)) + (t.fecha_vencimiento ? ' · vence ' + _esc(t.fecha_vencimiento) : '') + (it.nuevo ? ' · <span style="color:#f59e0b;font-weight:700;">nuevo</span>' : '') + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:4px;flex-shrink:0;">' +
+          '<button type="button" title="Al tope" onclick="_moverPrioridad(' + i + ',\'tope\')" style="' + bt + '"' + (i === 0 ? ' disabled' : '') + '>⤒</button>' +
+          '<button type="button" title="Subir" onclick="_moverPrioridad(' + i + ',-1)" style="' + bt + '"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
+          '<button type="button" title="Bajar" onclick="_moverPrioridad(' + i + ',1)" style="' + bt + '"' + (i === items.length - 1 ? ' disabled' : '') + '>▼</button>' +
+        '</div>' +
+      '</div>' +
+      '<input type="text" maxlength="120" value="' + _esc(it.nota) + '" placeholder="Indicación (opcional): ej. hoy sí o sí, llamar al cliente…" oninput="_notaPrioridad(' + i + ',this.value)" ' +
+        'style="width:100%;margin-top:6px;padding:7px 9px;border-radius:8px;border:1px solid var(--border-glow);background:var(--bg);color:var(--text-main);font-size:12px;font-family:inherit;box-sizing:border-box;">' +
+    '</div>';
+  }).join('');
+  ov.innerHTML =
+    '<div style="width:100%;max-width:560px;max-height:92vh;display:flex;flex-direction:column;background:var(--panel-dark);border:1px solid var(--border-glow);border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.45);">' +
+      '<div style="padding:14px 16px;border-bottom:1px solid var(--border-glow);display:flex;justify-content:space-between;align-items:center;gap:10px;">' +
+        '<div><div style="font-size:16px;font-weight:900;color:var(--text-main);">🔥 Prioridades de ' + _esc(_nombreTecnicoPorCod(_prioEditando.cod) || _prioEditando.cod) + '</div>' +
+        '<div style="font-size:11.5px;color:var(--text-muted);">Lo de arriba es lo primero que tiene que hacer. Los 3 primeros se marcan en rojo.</div></div>' +
+        '<button type="button" onclick="_cerrarEditorPrioridades()" style="background:none;border:none;font-size:20px;color:var(--text-muted);cursor:pointer;">✕</button>' +
+      '</div>' +
+      '<div style="overflow-y:auto;padding:4px 14px 10px;flex:1;">' + (filas || '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No tiene equipos a cargo.</div>') + '</div>' +
+      '<div style="padding:12px 14px;border-top:1px solid var(--border-glow);display:flex;gap:8px;">' +
+        '<button type="button" onclick="_cerrarEditorPrioridades()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border-glow);background:transparent;color:var(--text-main);font-weight:700;cursor:pointer;font-family:inherit;">Cancelar</button>' +
+        '<button type="button" id="prio-guardar" onclick="_guardarPrioridades()" style="flex:2;padding:11px;border-radius:10px;border:none;background:#ef4444;color:#fff;font-weight:900;cursor:pointer;font-family:inherit;">Guardar y avisarle</button>' +
+      '</div>' +
+    '</div>';
+}
+window._moverPrioridad = function(i, dir) {
+  var it = _prioEditando.items;
+  var x = it.splice(i, 1)[0];
+  var dest = dir === 'tope' ? 0 : Math.max(0, Math.min(it.length, i + dir));
+  it.splice(dest, 0, x);
+  var scroll = document.querySelector('#prio-editor > div > div:nth-child(2)');
+  var y = scroll ? scroll.scrollTop : 0;
+  _renderEditorPrioridades();
+  scroll = document.querySelector('#prio-editor > div > div:nth-child(2)');
+  if (scroll) scroll.scrollTop = y;
+};
+window._notaPrioridad = function(i, v) { if (_prioEditando && _prioEditando.items[i]) _prioEditando.items[i].nota = v; };
+window._cerrarEditorPrioridades = function() {
+  var ov = document.getElementById('prio-editor');
+  if (ov) ov.style.display = 'none';
+  _prioEditando = null;
+};
+window._guardarPrioridades = function() {
+  if (!_prioEditando) return;
+  var btn = document.getElementById('prio-guardar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  var cod = _prioEditando.cod;
+  var orden = _prioEditando.items.map(function(it) { return { id: it.id, nota: String(it.nota || '').trim() }; });
+  fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'st_guardarPrioridades', cod: cod, orden: orden, vendedorRol: (_session && _session.rol) || '', autor_nombre: (_session && _session.name) || '', autor_email: (_session && _session.username) || '' }) })
+  .then(function(r) { return r.json(); })
+  .then(function(r) {
+    if (!r || !r.ok) { alert('No se pudo guardar: ' + ((r && r.error) || 'error')); if (btn) { btn.disabled = false; btn.textContent = 'Guardar y avisarle'; } return; }
+    _prioridades[cod] = r.registro;
+    _cerrarEditorPrioridades();
+    _aplicarFiltros(); // re-pinta panel y los 🔥N de las tarjetas
+  })
+  .catch(function() { alert('Error de conexión'); if (btn) { btn.disabled = false; btn.textContent = 'Guardar y avisarle'; } });
+};
 
 window._toggleCargaTecnicos = function() {
   var abierto = false;
@@ -1700,7 +1931,7 @@ function _renderLista(tickets) {
       return '<div class="lista-ticket" onclick="_abrirDetalle(\'' + t.id_ticket + '\')">'
         + '<span class="lista-col-dot" style="background:' + col.color + '"></span>'
         + '<div class="lista-ticket-main">'
-          + '<div class="lista-ticket-modelo">' + pinHtmlLista + _esc(_nombreTarjetaTicket(t)) + '</div>'
+          + '<div class="lista-ticket-modelo">' + _badgeRankPrio(t) + pinHtmlLista + _esc(_nombreTarjetaTicket(t)) + '</div>'
           + '<div class="lista-ticket-cliente">' + _esc(t.cliente||'—') + (t.equipo_serie ? ' · ' + _esc(t.equipo_serie) : '') + '</div>'
         + '</div>'
         + '<div class="lista-ticket-badges">'
@@ -1802,7 +2033,7 @@ function _renderTarjeta(t) {
     (puedeEditar ? 'draggable="true" ondragstart="_onDragStart(event,\'' + t.id_ticket + '\')" ' : '') +
     'onclick="_abrirDetalle(\'' + t.id_ticket + '\')">' +
     '<div class="st-ticket-top">' +
-      '<div class="st-ticket-modelo">' + pinHtml + _esc(_nombreTarjetaTicket(t)) + '</div>' +
+      '<div class="st-ticket-modelo">' + _badgeRankPrio(t) + pinHtml + _esc(_nombreTarjetaTicket(t)) + '</div>' +
     '</div>' +
     '<div class="st-ticket-cliente">' + _esc(t.cliente || '—') + '</div>' +
     (t.equipo_serie ? '<div class="st-ticket-serie">' + _esc(t.equipo_serie) + '</div>' : '') +
@@ -1813,6 +2044,14 @@ function _renderTarjeta(t) {
       '<span class="avatar-tecnico" style="background:' + tecColor + '20;color:' + tecColor + '">' + tecLabel + '</span>' +
     '</div>' +
   '</div>';
+}
+
+// 🔥N en la tarjeta: puesto en el orden de prioridades de su responsable
+function _badgeRankPrio(t) {
+  var n = _rankPrioridad && _rankPrioridad[t.id_ticket];
+  if (!n) return '';
+  return '<span title="Prioridad ' + n + ' de ' + _esc(_nombreCortoTecnico(_codTecnicoTicket(t))) + '" style="display:inline-block;font-size:10px;font-weight:900;padding:1px 6px;border-radius:8px;margin-right:5px;vertical-align:1px;' +
+    (n <= 3 ? 'background:#ef4444;color:#fff;' : 'background:rgba(239,68,68,.12);color:#ef4444;') + '">🔥' + n + '</span>';
 }
 
 function _estadoLabel(e) {

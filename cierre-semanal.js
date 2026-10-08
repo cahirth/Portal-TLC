@@ -1,3 +1,4 @@
+// Portal TLC | cierre-semanal.js | v2026.10.07.3 (muestra el puesto 🔥N de "Prioridades" en cada equipo)
 // Portal TLC | cierre-semanal.js | v2026.10.06.8
 // CIERRE DE SEMANA — Cristian: "los viernes al mediodía... que les aparezca
 // en el centro de la pantalla un pop-up, difícil de sacar, que tengan que
@@ -187,7 +188,8 @@
         (t.anterior.nota ? ' — “' + esc(t.anterior.nota) + '”' : '') + '</div>';
     }
     return '<div class="cc-tk' + (completo(t.id) ? ' ok' : '') + '" data-id="' + esc(t.id) + '">' +
-      '<div class="cc-tit">' + (t.prioridad === 'alta' || t.prioridad === 'urgente' ? '🔥 ' : '') + esc(t.titulo) + '</div>' + ant +
+      '<div class="cc-tit">' + (t.puesto ? '<span style="background:#ef4444;color:#fff;border-radius:8px;padding:1px 6px;font-size:11px;font-weight:900;margin-right:5px;">🔥' + t.puesto + '</span>' : '') +
+        (t.prioridad === 'urgente' ? '📌 ' : '') + esc(t.titulo) + '</div>' + ant +
       '<div class="cc-ops">' + ESTADOS.map(function (e) {
         var sel = r.estado === e.k;
         return '<button type="button" class="cc-op' + (sel ? ' sel ' + e.k : '') + '" data-estado="' + e.k + '"><span>' + e.e + '</span><span>' + e.t + '</span></button>';
