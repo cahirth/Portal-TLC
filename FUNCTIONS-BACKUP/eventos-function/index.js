@@ -1,4 +1,13 @@
 // Portal TLC | Cloud Function — Eventos: Checklist + Notas + Listado
+// v4 — 2026.10.08 — También tableros de Regulatoria (modulo 'regulatoria'),
+//   para registros y trámites ANMAT: un tablero nuevo arranca con columnas
+//   del trámite (Por iniciar → Armando documentación → Presentado en ANMAT →
+//   Observado / a responder → Aprobado → Por renovar).
+// v3 — 2026.10.08 — Tableros de Comercio Exterior: cada tablero tiene un
+//   "modulo" ('eventos' por defecto, o 'comex'). ev_listarEventos lo
+//   devuelve, ev_crearEvento lo acepta, y la nueva ev_moverModulo
+//   (Administrador) pasa un tablero de Eventos a Comercio Exterior o al
+//   revés, con todo su contenido (es el mismo tablero, no una copia).
 // v2 — 2026.10.06 — Tildes de lectura tipo WhatsApp en los mensajes con
 //   @menciones (con_lectura + lecturas[<email>]); nueva acción
 //   ev_marcarMensajesLeidos. Corrige además el aviso de mención: guardaba
@@ -182,13 +191,14 @@ async function reconstruirResumenEventos() {
   const ids = Object.keys(idsEventos);
   const resumen = {};
   await Promise.all(ids.map(async (id) => {
-    const [nombre, creado_en, logo, tarjetas] = await Promise.all([
+    const [nombre, creado_en, logo, tarjetas, modulo] = await Promise.all([
       fbGet('eventos/' + id + '/nombre'),
       fbGet('eventos/' + id + '/creado_en'),
       fbGet('eventos/' + id + '/logo'),
       fbGet('eventos/' + id + '/tarjetas'),
+      fbGet('eventos/' + id + '/modulo'),
     ]);
-    resumen[id] = { nombre: nombre || 'Sin nombre', creado_en: creado_en || '', cantidadTarjetas: tarjetas ? Object.keys(tarjetas).length : 0, logo: logo || null };
+    resumen[id] = { nombre: nombre || 'Sin nombre', creado_en: creado_en || '', cantidadTarjetas: tarjetas ? Object.keys(tarjetas).length : 0, logo: logo || null, modulo: modulo || 'eventos' };
   }));
   await fbSet('eventos_resumen', resumen);
   return resumen;
@@ -199,7 +209,7 @@ async function ev_listarEventos() {
   if (!resumen) resumen = await reconstruirResumenEventos();
   const lista = Object.keys(resumen).map((id) => {
     const r = resumen[id] || {};
-    return { id, nombre: r.nombre || 'Sin nombre', creado_en: r.creado_en || '', cantidadTarjetas: r.cantidadTarjetas || 0, logo: r.logo || null };
+    return { id, nombre: r.nombre || 'Sin nombre', creado_en: r.creado_en || '', cantidadTarjetas: r.cantidadTarjetas || 0, logo: r.logo || null, modulo: r.modulo || 'eventos' };
   }).sort((a, b) => (a.creado_en || '').localeCompare(b.creado_en || ''));
   return { ok: true, eventos: lista };
 }
@@ -493,6 +503,16 @@ const COLUMNAS_DEFAULT_EVENTO = [
   { id: 'c2', nombre: 'En curso', orden: 1, color: '#f8961e' },
   { id: 'c3', nombre: 'Hecho', orden: 2, color: '#06d6a0' },
 ];
+const COLUMNAS_REGULATORIA = [
+  { id: 'c1', nombre: 'Por iniciar', orden: 0, color: '#64748b' },
+  { id: 'c2', nombre: 'Armando documentación', orden: 1, color: '#3a86ff' },
+  { id: 'c3', nombre: 'Presentado en ANMAT', orden: 2, color: '#8b5cf6' },
+  { id: 'c4', nombre: 'Observado / a responder', orden: 3, color: '#f8961e' },
+  { id: 'c5', nombre: 'Aprobado', orden: 4, color: '#06d6a0' },
+  { id: 'c6', nombre: 'Por renovar', orden: 5, color: '#ef4444' },
+];
+const MODULOS_TABLERO = ['eventos', 'comex', 'regulatoria'];
+function _moduloValido(m) { return MODULOS_TABLERO.includes(m) ? m : 'eventos'; }
 const ADJUNTOS_MAX_BYTES = 10 * 1024 * 1024;
 const ADJUNTOS_TIPOS_PERMITIDOS = {
   'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'text/plain': 'txt',
@@ -567,9 +587,21 @@ async function ev_crearEvento(data) {
   if (!nombre) return { ok: false, error: 'Falta el nombre del evento' };
   const id = 'EV-' + new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, '') + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
   const creadoEn = new Date().toISOString();
-  await fbSet('eventos/' + id, { nombre, creado_en: creadoEn, columnas: COLUMNAS_DEFAULT_EVENTO });
-  await fbSet('eventos_resumen/' + id, { nombre, creado_en: creadoEn, cantidadTarjetas: 0, logo: null });
+  const modulo = _moduloValido(data.modulo);
+  await fbSet('eventos/' + id, { nombre, creado_en: creadoEn, columnas: modulo === 'regulatoria' ? COLUMNAS_REGULATORIA : COLUMNAS_DEFAULT_EVENTO, modulo });
+  await fbSet('eventos_resumen/' + id, { nombre, creado_en: creadoEn, cantidadTarjetas: 0, logo: null, modulo });
   return { ok: true, id };
+}
+
+// Pasa un tablero entre Eventos y Comercio Exterior (mismo tablero, con todo)
+async function ev_moverModulo(data) {
+  if (String(data.vendedorRol || '').trim() !== 'Administrador') return { ok: false, error: 'Solo un Administrador puede mover un tablero.' };
+  const id = String(data.id || '').trim();
+  const modulo = _moduloValido(data.modulo);
+  if (!id || !(await fbGet('eventos/' + id + '/nombre'))) return { ok: false, error: 'Tablero no encontrado' };
+  await fbSet('eventos/' + id + '/modulo', modulo);
+  if (await fbGet('eventos_resumen/' + id)) await fbSet('eventos_resumen/' + id + '/modulo', modulo);
+  return { ok: true, id, modulo };
 }
 
 async function ev_borrarEvento(data) {
@@ -615,8 +647,9 @@ async function ev_duplicarEvento(data) {
   });
   const nombreNuevo = (original.nombre || 'Sin nombre') + ' (copia)';
   const creadoEnNuevo = new Date().toISOString();
-  await fbSet('eventos/' + idNuevo, { nombre: nombreNuevo, creado_en: creadoEnNuevo, columnas, tarjetas: tarjetasNuevas });
-  await fbSet('eventos_resumen/' + idNuevo, { nombre: nombreNuevo, creado_en: creadoEnNuevo, cantidadTarjetas: Object.keys(tarjetasNuevas).length, logo: null });
+  const moduloNuevo = _moduloValido(original.modulo);
+  await fbSet('eventos/' + idNuevo, { nombre: nombreNuevo, creado_en: creadoEnNuevo, columnas, tarjetas: tarjetasNuevas, modulo: moduloNuevo });
+  await fbSet('eventos_resumen/' + idNuevo, { nombre: nombreNuevo, creado_en: creadoEnNuevo, cantidadTarjetas: Object.keys(tarjetasNuevas).length, logo: null, modulo: moduloNuevo });
   return { ok: true, id: idNuevo };
 }
 
@@ -996,7 +1029,7 @@ const ACCIONES = {
   ev_subirLogoEvento, ev_quitarLogoEvento,
   ev_crearColumna, ev_editarColumna, ev_borrarColumna,
   ev_crearTarjeta, ev_editarTarjeta, ev_moverTarjeta, ev_borrarTarjeta, ev_duplicarTarjeta,
-  ev_actualizarGastos, ev_marcarPortada, ev_agregarMensaje, ev_reaccionarMensaje, ev_marcarMensajesLeidos,
+  ev_actualizarGastos, ev_marcarPortada, ev_agregarMensaje, ev_reaccionarMensaje, ev_marcarMensajesLeidos, ev_moverModulo,
   subirAdjunto, eliminarAdjunto,
 };
 
