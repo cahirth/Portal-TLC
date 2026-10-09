@@ -1,5 +1,12 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v14 — 2026.10.08 — Parte del día y Cierres de semana se habilitan con el
+//   tilde "Reportes" de la hoja de permisos (antes: Rol Administrador).
+// v13 — 2026.10.08 — 📊 Parte del día: cada acción de Servicio queda
+//   anotada en actividad/<día>/ (quién, hora, qué, en qué ticket, etapa y
+//   responsable antes/después). Nueva st_parteDelDia (Administrador) arma
+//   el parte: arranque/fin, qué terminó y a dónde, qué le entró, en qué
+//   trabajó, qué no tocó y lo urgente sin tocar.
 // v12 — 2026.10.08 — La etapa "Para instalar" entra en el Cierre de semana
 //   (CIERRE_ETAPAS), igual que en la Carga del equipo.
 // v11 — 2026.10.07 — 🔥 Prioridades: st_guardarPrioridades (el
@@ -1592,7 +1599,7 @@ async function st_guardarCierreSemanal(data) {
 
 // Resumen para administradores (cierres.html)
 async function st_listarCierres(data) {
-  if (String(data.vendedorRol || '').trim() !== 'Administrador') return { ok: false, error: 'Solo un Administrador' };
+  if (!(await _tienePermisoColumna(data, 'Reportes'))) return { ok: false, error: 'Necesitás el permiso "Reportes" (hoja de permisos).' };
   const actual = semanaCierreActual();
   const semana = String(data.semana || '').trim() || actual || CIERRE_INICIO;
   const todas = await db.ref('cierres_semanales').once('value');
@@ -1641,6 +1648,172 @@ async function st_guardarPrioridades(data) {
   return { ok: true, registro };
 }
 
+// ── 📊 Registro de actividad + Parte del día (v13) ────────────────
+// Cristian: "estoy de viaje... quiero saber qué hizo cada uno: arrancó
+// tarde, arrancó temprano, hizo tal cosa, no hizo nada, lo urgente no lo
+// tocó, ¿por qué no lo tocó?... yo lo que quiero es facturar".
+const ACCIONES_REGISTRADAS = {
+  st_crearTicket: 'Creó el ticket', st_duplicarTicket: 'Duplicó el ticket', st_eliminarTicket: 'Eliminó el ticket',
+  st_actualizarDeposito: 'Movió de etapa', st_actualizarCampo: 'Editó', st_actualizarNotas: 'Editó notas',
+  st_agregarNota: 'Agregó una nota', st_agregarFoto: 'Subió una foto', st_eliminarFoto: 'Borró una foto',
+  st_agregarMensaje: 'Escribió un mensaje', st_reaccionarMensaje: 'Reaccionó a un mensaje',
+  st_actualizarEquipoOrden: 'Actualizó un equipo de la orden', st_separarEquipoOrden: 'Separó un equipo',
+  st_dividirOrdenPreparacion: 'Dividió la entrega', st_guardarChecklist: 'Guardó el checklist',
+  registrarChecklistCompletado: 'Completó el checklist', registrarInstalacionPOE8: 'Registró la instalación (POE-8)',
+  st_actualizarGastos: 'Cargó gastos', st_guardarEtiquetasCajas: 'Generó etiquetas', st_guardarCierreSemanal: 'Cerró la semana',
+  subirAdjunto: 'Subió un adjunto',
+};
+const CAMPOS_FOTO_ESTADO = ['deposito', 'tecnico_asignado', 'tecnico_responsable_nombre', 'tipo_orden', 'prioridad', 'estado_progreso'];
+function _diaBA(iso) { return new Date(new Date(iso || Date.now()).getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10); }
+function _codResponsable(t) {
+  if (!t) return '';
+  if (t.tecnico_asignado && t.tecnico_asignado !== 'sin_asignar') return t.tecnico_asignado;
+  if (t.tipo_orden === 'preparacion_equipos' && t.tecnico_responsable_nombre) {
+    const n = _normNombre(t.tecnico_responsable_nombre);
+    return Object.keys(TECNICO_NOMBRE_MAP).find((c) => _normNombre(TECNICO_NOMBRE_MAP[c]) === n) || '';
+  }
+  return '';
+}
+function _fotoEstado(t) {
+  if (!t) return null;
+  const f = {};
+  CAMPOS_FOTO_ESTADO.forEach((k) => { if (t[k] !== undefined) f[k] = t[k]; });
+  f.resp = _codResponsable(t);
+  return f;
+}
+function _codPorEmailONombre(email, nombre) {
+  const e = String(email || '').toLowerCase();
+  let cod = e ? Object.keys(TECNICO_EMAIL_MAP).find((c) => TECNICO_EMAIL_MAP[c] === e) : '';
+  if (!cod && nombre) { const n = _normNombre(nombre); cod = Object.keys(TECNICO_NOMBRE_MAP).find((c) => _normNombre(TECNICO_NOMBRE_MAP[c]) === n); }
+  return cod || '';
+}
+// Se llama desde el punto de entrada, alrededor de cada acción registrada
+async function _registrarActividad(accion, data, antes, resultado) {
+  try {
+    if (!ACCIONES_REGISTRADAS[accion] || !resultado || !resultado.ok) return;
+    const id = String(data.id_ticket || (resultado && resultado.id_ticket) || data.id || '').trim();
+    const email = String(data._actor_email || data.autor_email || data.email || '').trim().toLowerCase();
+    const nombre = String(data._actor_nombre || data.autor_nombre || data.autor || data.nombre || '').trim();
+    const ahora = new Date().toISOString();
+    const reg = { t: ahora, accion, email, nombre, cod: _codPorEmailONombre(email, nombre) };
+    if (id) reg.id = id;
+    if (accion === 'st_actualizarCampo' && data.campo) reg.campo = String(data.campo);
+    if (antes || ['st_actualizarDeposito', 'st_actualizarCampo', 'st_crearTicket', 'st_actualizarEquipoOrden', 'st_dividirOrdenPreparacion'].includes(accion)) {
+      const despues = id ? await fbGet('servicio_tecnico/' + id) : null;
+      if (antes) reg.antes = antes;
+      const fd = _fotoEstado(despues);
+      if (fd) reg.despues = fd;
+    }
+    await db.ref('actividad/' + _diaBA(ahora)).push(reg);
+  } catch (e) { console.warn('No se pudo registrar actividad:', e.message); }
+}
+
+// Permiso por tilde de la hoja (nodo permisos/<email>), igual que permisos.js
+async function _tienePermisoColumna(data, columna) {
+  const email = String(data._actor_email || data.email_usuario || '').trim().toLowerCase();
+  if (!email) return false;
+  const fila = await fbGet('permisos/' + rtdbKeySeguro(email));
+  if (!fila) return false;
+  const v = fila[String(columna).trim().replace(/[.#$[\]/\s]/g, '_')];
+  return v === true || String(v).trim().toUpperCase() === 'TRUE';
+}
+
+// Parte del día (tilde "Reportes")
+async function st_parteDelDia(data) {
+  if (!(await _tienePermisoColumna(data, 'Reportes'))) return { ok: false, error: 'Necesitás el permiso "Reportes" (hoja de permisos).' };
+  const hoy = _diaBA();
+  const dia = /^\d{4}-\d{2}-\d{2}$/.test(String(data.dia || '')) ? String(data.dia) : hoy;
+  const [logRaw, todos, prioridades] = await Promise.all([fbGet('actividad/' + dia), fbGet('servicio_tecnico'), fbGet('servicio_config/prioridades')]);
+  const log = comoArray(logRaw).filter(Boolean).sort((a, b) => String(a.t).localeCompare(String(b.t)));
+  const tickets = todos || {};
+  const titulo = (id) => (tickets[id] ? _tituloTicketCierre(tickets[id]) : id);
+  const etapaLbl = (k) => ({ recepcion: 'Recepción', diagnostico: 'Diagnóstico', presupuesto: 'Presupuesto', reparacion: 'Reparación', preparacion_control_calidad: 'Preparación', para_facturar: 'Para facturar', para_instalar: 'Para instalar', seguimiento: 'Seguimiento', servicio_remoto: 'Servicio remoto', consignacion: 'Consignación', finalizado: 'Finalizado', cancelado: 'Cancelado' })[k] || k || '';
+  const ORDEN_ETAPA = ['recepcion', 'diagnostico', 'presupuesto', 'reparacion', 'preparacion_control_calidad', 'para_instalar', 'para_facturar', 'finalizado'];
+  const personas = {};
+  const P = (cod) => (personas[cod] = personas[cod] || { cod, nombre: TECNICO_NOMBRE_MAP[cod] || cod, acciones: 0, primera: '', ultima: '', salidas: [], entradas: [], trabajo: {}, sin_tocar: [], urgentes_sin_tocar: [], carga_actual: 0 });
+  const tocadosPor = {}; // id -> { cod: true } quién hizo algo hoy en ese ticket
+  const marcarToque = (id, cod) => { if (!id) return; (tocadosPor[id] = tocadosPor[id] || {})[cod || '?'] = true; };
+  const movidoA = { para_facturar: [] };
+
+  // 1) Registro de actividad (desde v13)
+  log.forEach((r) => {
+    const actor = r.cod || _codPorEmailONombre(r.email, r.nombre);
+    marcarToque(r.id, actor);
+    if (actor) {
+      const p = P(actor);
+      p.acciones++;
+      if (!p.primera) p.primera = r.t;
+      p.ultima = r.t;
+      if (r.id) { const w = p.trabajo[r.id] = p.trabajo[r.id] || { id: r.id, titulo: titulo(r.id), cosas: [] }; const txt = ACCIONES_REGISTRADAS[r.accion] + (r.campo ? ' (' + r.campo + ')' : ''); if (!w.cosas.includes(txt)) w.cosas.push(txt); }
+    }
+    const a = r.antes || null, d = r.despues || null;
+    if (a && d && r.id) {
+      const cambioEtapa = a.deposito !== d.deposito, cambioResp = a.resp !== d.resp;
+      if (!cambioEtapa && !cambioResp) return;
+      const mov = { id: r.id, titulo: titulo(r.id), hora: r.t, de: etapaLbl(a.deposito), a: etapaLbl(d.deposito), nuevo_resp: d.resp ? (TECNICO_NOMBRE_MAP[d.resp] || d.resp) : 'Sin asignar', por: r.nombre || r.email || '—',
+        retroceso: ORDEN_ETAPA.indexOf(d.deposito) > -1 && ORDEN_ETAPA.indexOf(a.deposito) > -1 && ORDEN_ETAPA.indexOf(d.deposito) < ORDEN_ETAPA.indexOf(a.deposito) };
+      if (d.deposito === 'para_facturar' && a.deposito !== 'para_facturar') movidoA.para_facturar.push(mov);
+      if (a.resp && (cambioResp || ['finalizado', 'cancelado'].includes(d.deposito))) P(a.resp).salidas.push(mov);
+      else if (a.resp && cambioEtapa) P(a.resp).salidas.push(Object.assign({ sigue_con_el: true }, mov));
+      if (d.resp && cambioResp) P(d.resp).entradas.push(mov);
+    }
+  });
+
+  // 2) Mensajes y notas del día (ya tenían autor y fecha, sirven también para días anteriores)
+  const ETAPAS_CARGA = CIERRE_ETAPAS.map((e) => e.key);
+  Object.keys(tickets).forEach((id) => {
+    const t = tickets[id]; if (!t) return;
+    comoArray(t.mensajes).forEach((m) => {
+      if (!m || !m.fecha || _diaBA(m.fecha) !== dia || !m.autor_email) return;
+      const cod = _codPorEmailONombre(m.autor_email, m.autor_nombre);
+      marcarToque(id, cod); if (!cod) return;
+      const p = P(cod); if (!log.length) { p.acciones++; if (!p.primera || m.fecha < p.primera) p.primera = m.fecha; if (!p.ultima || m.fecha > p.ultima) p.ultima = m.fecha; }
+      const w = p.trabajo[id] = p.trabajo[id] || { id, titulo: titulo(id), cosas: [] }; if (!w.cosas.includes('Escribió un mensaje')) w.cosas.push('Escribió un mensaje');
+    });
+    comoArray(t.notas_comentarios).forEach((n) => {
+      if (!n || !n.fecha || _diaBA(n.fecha) !== dia) return;
+      const cod = _codPorEmailONombre('', n.autor);
+      marcarToque(id, cod); if (!cod) return;
+      const p = P(cod); if (!log.length) { p.acciones++; if (!p.primera || n.fecha < p.primera) p.primera = n.fecha; if (!p.ultima || n.fecha > p.ultima) p.ultima = n.fecha; }
+      const w = p.trabajo[id] = p.trabajo[id] || { id, titulo: titulo(id), cosas: [] }; if (!w.cosas.includes('Agregó una nota')) w.cosas.push('Agregó una nota');
+    });
+  });
+
+  // 3) Carga actual: lo que no se tocó y lo urgente sin tocar
+  const ahoraMs = Date.now();
+  let esperandoFacturar = 0;
+  Object.keys(tickets).forEach((id) => {
+    const t = tickets[id]; if (!t) return;
+    if (t.deposito === 'para_facturar') esperandoFacturar++;
+    if (!ETAPAS_CARGA.includes(t.deposito)) return;
+    const cod = _codResponsable(t); if (!cod) return;
+    const p = P(cod);
+    p.carga_actual++;
+    if (tocadosPor[id] && tocadosPor[id][cod]) return; // el responsable sí lo trabajó hoy
+    const otros = Object.keys(tocadosPor[id] || {}).filter((c) => c !== '?' && c !== cod).map((c) => (TECNICO_NOMBRE_MAP[c] || c).split(' ')[0]);
+    const ult = t.actualizado_en || t.creado_en || '';
+    const dias = ult ? Math.floor((ahoraMs - new Date(ult).getTime()) / 86400000) : null;
+    const orden = prioridades && prioridades[cod] ? comoArray(prioridades[cod].orden) : [];
+    const puesto = orden.findIndex((o) => o && o.id === id) + 1;
+    const item = { id, titulo: _tituloTicketCierre(t), etapa: etapaLbl(t.deposito), dias_quieto: dias, prioridad: t.prioridad || '', puesto: puesto || 0, email: TECNICO_EMAIL_MAP[cod] || '', otros };
+    if (p.entradas.some((e) => e.id === id)) item.llego_hoy = true;
+    p.sin_tocar.push(item);
+    if (t.prioridad === 'urgente' || (puesto && puesto <= 3)) p.urgentes_sin_tocar.push(item);
+  });
+
+  const lista = Object.values(personas).map((p) => {
+    p.trabajo = Object.values(p.trabajo);
+    p.sin_tocar.sort((a, b) => (b.dias_quieto || 0) - (a.dias_quieto || 0));
+    p.urgentes_sin_tocar.sort((a, b) => (a.puesto || 99) - (b.puesto || 99));
+    if (dia === hoy) p.carga_inicio = p.carga_actual + p.salidas.filter((s) => !s.sigue_con_el).length - p.entradas.length;
+    p.email = TECNICO_EMAIL_MAP[p.cod] || '';
+    return p;
+  }).filter((p) => p.acciones || p.carga_actual || p.salidas.length || p.entradas.length);
+  const orden = Object.keys(TECNICO_NOMBRE_MAP);
+  lista.sort((a, b) => orden.indexOf(a.cod) - orden.indexOf(b.cod));
+  return { ok: true, dia, hoy, registro_desde: (await fbGet('actividad_inicio')) || '', personas: lista, para_facturar_hoy: movidoA.para_facturar, esperando_facturar: esperandoFacturar, total_acciones: log.length };
+}
+
 const ACCIONES = {
   marcarNegocioUrgente, marcarTarjetaUrgenteEv, st_crearOrdenPreparacion,
   st_crearTicket, st_duplicarTicket, st_eliminarTicket,
@@ -1653,7 +1826,7 @@ const ACCIONES = {
   st_backupServicio, st_migrarFotosServicio,
   cot_listarMensajes, cot_agregarMensaje, cot_reaccionarMensaje,
   st_marcarMensajesLeidos, cot_marcarMensajesLeidos,
-  st_cierrePendiente, st_guardarCierreSemanal, st_listarCierres, st_guardarPrioridades,
+  st_cierrePendiente, st_guardarCierreSemanal, st_listarCierres, st_guardarPrioridades, st_parteDelDia,
   st_guardarEtiquetasCajas, eliminarVersionPresupuestoTicket, guardarAsignadosEtapa,
 };
 
@@ -1675,7 +1848,16 @@ functions.http('servicio', async (req, res) => {
     const accion = data.accion;
     const handler = ACCIONES[accion];
     if (!handler) { res.status(400).json({ ok: false, error: 'Acción desconocida: ' + accion }); return; }
+    // 📊 Registro de actividad (v13): foto del ticket antes de la acción
+    let antes = null;
+    if (ACCIONES_REGISTRADAS[accion] && data.id_ticket && ['st_actualizarDeposito', 'st_actualizarCampo', 'st_actualizarEquipoOrden', 'st_dividirOrdenPreparacion'].includes(accion)) {
+      try { antes = _fotoEstado(await fbGet('servicio_tecnico/' + String(data.id_ticket).trim())); } catch (eA) {}
+    }
     const resultado = await handler(data);
+    if (ACCIONES_REGISTRADAS[accion]) {
+      await _registrarActividad(accion, data, antes, resultado);
+      if (!(await fbGet('actividad_inicio'))) await fbSet('actividad_inicio', _diaBA());
+    }
     res.status(200).json(resultado);
   } catch (e) {
     console.error('Error en función servicio:', e);
