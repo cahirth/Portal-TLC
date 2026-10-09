@@ -1,4 +1,8 @@
 // Portal TLC | Cloud Function — Eventos: Checklist + Notas + Listado
+// v5 — 2026.10.08 — Comercio Exterior: toda tarjeta nueva de un tablero
+//   Comex arranca con el checklist "Proceso de importación" precargado
+//   (Cristian: "en comex cuando cargo una tarjeta nueva, precargar este
+//   checklist"). Los tableros de Eventos y Regulatoria no cambian.
 // v4 — 2026.10.08 — También tableros de Regulatoria (modulo 'regulatoria'),
 //   para registros y trámites ANMAT: un tablero nuevo arranca con columnas
 //   del trámite (Por iniciar → Armando documentación → Presentado en ANMAT →
@@ -779,17 +783,52 @@ async function ev_borrarColumna(data) {
 
 // ── Tarjetas ─────────────────────────────────────────────────────
 
+// Checklist que se precarga en cada tarjeta nueva de Comercio Exterior.
+const CHECKLIST_COMEX = {
+  titulo: 'Proceso de importación',
+  items: [
+    'Presupuesto de Compra en Cash FLOW',
+    'Aprobación de Cristian o Fernando (con mail o algun registro escrito)',
+    'Envio de Orden de compra al proveedor',
+    'Fecha Estimada de envio',
+    'Pago Anticipado',
+    'Control de Invoice y Packing List.',
+    'Control exacto de productos de invoice con Registros de Anmat',
+    'Estimado de costos de Flete y elegir Courrier o Logistica',
+    'Control de Invoice y Packing List.',
+    'Confirmación del Proveedor del envio',
+    'Chequeo en Cash flow, reservar fondos para la importación',
+    'Pasar toda la documentacion a Despachante',
+    'Recepción y control de Productos',
+    'Generar Etiquetas',
+    'Armar Carpeta para Anmat',
+    'Imputar pagos anticipados al Despacho',
+    'Cargar Despacho y compras a Tactica',
+  ],
+};
+function checklistInicialComex(autorNombre) {
+  const ahora = Date.now();
+  const iso = new Date(ahora).toISOString();
+  return [{
+    id: 'cl' + ahora,
+    titulo: CHECKLIST_COMEX.titulo,
+    items: CHECKLIST_COMEX.items.map((texto, i) => ({ id: 'i' + ahora + '_' + i, texto, hecho: false, creado_por: autorNombre || '', creado_en: iso })),
+  }];
+}
+
 async function ev_crearTarjeta(data) {
   const idEvento = String(data.id_evento || '').trim();
   const titulo = String(data.titulo || '').trim();
   const idColumna = String(data.columna_id || '').trim();
   if (!idEvento || !titulo || !idColumna) return { ok: false, error: 'Faltan datos' };
   const idTarjeta = 'T' + Date.now() + Math.random().toString(36).slice(2, 5);
+  const modulo = _moduloValido(await fbGet('eventos/' + idEvento + '/modulo'));
   const registro = {
     titulo, descripcion: String(data.descripcion || '').trim(), categoria: String(data.categoria || '').trim(),
     responsable_email: String(data.responsable_email || '').trim(), responsable_nombre: String(data.responsable_nombre || '').trim(),
     fecha_limite: String(data.fecha_limite || '').trim(), columna_id: idColumna, orden: Date.now(),
-    checklists: [], notas: notaInicialEvento(), adjuntos: [], mensajes: [],
+    checklists: modulo === 'comex' ? checklistInicialComex(String(data._actor_nombre || data.autor_nombre || '').trim()) : [],
+    notas: notaInicialEvento(), adjuntos: [], mensajes: [],
     creado_en: new Date().toISOString(), actualizado_en: new Date().toISOString(),
   };
   await fbSet('eventos/' + idEvento + '/tarjetas/' + idTarjeta, registro);
