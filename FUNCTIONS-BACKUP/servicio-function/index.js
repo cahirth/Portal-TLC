@@ -1,5 +1,8 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v15 — 2026.10.08 — 💸 Gastos en Ventas: cot_actualizarGastos guarda los
+//   gastos de un negocio en cotizaciones/<id>/gastos (mismo formato que los
+//   de Servicio, se liquidan desde Cuenta Corriente como origen "venta").
 // v14 — 2026.10.08 — Parte del día y Cierres de semana se habilitan con el
 //   tilde "Reportes" de la hoja de permisos (antes: Rol Administrador).
 // v13 — 2026.10.08 — 📊 Parte del día: cada acción de Servicio queda
@@ -723,6 +726,22 @@ async function cot_agregarMensaje(data) {
     await registrarNotificacion(email, 'mencion', texto, id, titulo, autorNombre || autorEmail, 'cotizacion', indiceMensajeNuevo);
   }));
   return { ok: true, mensajes };
+}
+
+async function cot_actualizarGastos(data) {
+  const id = String(data.id_cotizacion || '').trim();
+  const gastos = data.gastos;
+  if (!id) return { ok: false, error: 'Falta id_cotizacion' };
+  if (!Array.isArray(gastos)) return { ok: false, error: 'gastos debe ser un array' };
+  const key = rtdbKeySeguro(id);
+  if (!(await fbGet('cotizaciones/' + key))) return { ok: false, error: 'Negocio no encontrado: ' + id };
+  // Un gasto ya liquidado no se puede cambiar desde acá (lo cuida también la pantalla)
+  const previos = comoArray(await fbGet('cotizaciones/' + key + '/gastos'));
+  const pagadosAntes = previos.filter((g) => g && g.estado === 'PAGADO').length;
+  const pagadosAhora = gastos.filter((g) => g && g.estado === 'PAGADO').length;
+  if (pagadosAhora < pagadosAntes) return { ok: false, error: 'No se puede borrar un gasto ya liquidado.' };
+  await fbSet('cotizaciones/' + key + '/gastos', gastos);
+  return { ok: true };
 }
 
 async function cot_reaccionarMensaje(data) {
@@ -1661,7 +1680,7 @@ const ACCIONES_REGISTRADAS = {
   st_dividirOrdenPreparacion: 'Dividió la entrega', st_guardarChecklist: 'Guardó el checklist',
   registrarChecklistCompletado: 'Completó el checklist', registrarInstalacionPOE8: 'Registró la instalación (POE-8)',
   st_actualizarGastos: 'Cargó gastos', st_guardarEtiquetasCajas: 'Generó etiquetas', st_guardarCierreSemanal: 'Cerró la semana',
-  subirAdjunto: 'Subió un adjunto',
+  subirAdjunto: 'Subió un adjunto', cot_actualizarGastos: 'Cargó gastos (Ventas)',
 };
 const CAMPOS_FOTO_ESTADO = ['deposito', 'tecnico_asignado', 'tecnico_responsable_nombre', 'tipo_orden', 'prioridad', 'estado_progreso'];
 function _diaBA(iso) { return new Date(new Date(iso || Date.now()).getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10); }
@@ -1824,7 +1843,7 @@ const ACCIONES = {
   st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden, registrarInstalacionPOE8,
   subirAdjunto, eliminarAdjunto,
   st_backupServicio, st_migrarFotosServicio,
-  cot_listarMensajes, cot_agregarMensaje, cot_reaccionarMensaje,
+  cot_listarMensajes, cot_agregarMensaje, cot_reaccionarMensaje, cot_actualizarGastos,
   st_marcarMensajesLeidos, cot_marcarMensajesLeidos,
   st_cierrePendiente, st_guardarCierreSemanal, st_listarCierres, st_guardarPrioridades, st_parteDelDia,
   st_guardarEtiquetasCajas, eliminarVersionPresupuestoTicket, guardarAsignadosEtapa,
