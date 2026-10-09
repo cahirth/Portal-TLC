@@ -3,6 +3,7 @@
 //   Comex arranca con el checklist "Proceso de importación" precargado
 //   (Cristian: "en comex cuando cargo una tarjeta nueva, precargar este
 //   checklist"). Los tableros de Eventos y Regulatoria no cambian.
+//   Sin repetidos: "Control de Invoice y Packing List" va una sola vez (16 pasos).
 // v4 — 2026.10.08 — También tableros de Regulatoria (modulo 'regulatoria'),
 //   para registros y trámites ANMAT: un tablero nuevo arranca con columnas
 //   del trámite (Por iniciar → Armando documentación → Presentado en ANMAT →
@@ -795,7 +796,6 @@ const CHECKLIST_COMEX = {
     'Control de Invoice y Packing List.',
     'Control exacto de productos de invoice con Registros de Anmat',
     'Estimado de costos de Flete y elegir Courrier o Logistica',
-    'Control de Invoice y Packing List.',
     'Confirmación del Proveedor del envio',
     'Chequeo en Cash flow, reservar fondos para la importación',
     'Pasar toda la documentacion a Despachante',
