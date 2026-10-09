@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.09.2 (Cristian: acceso rápido "desde Preparación en ST al Negocio". En toda Orden de Preparación (y sus entregas parciales) aparece arriba la franja "💼 Negocio en Ventas — Ver negocio ›" que abre ese negocio en Ventas.) -->
 <!-- Portal TLC | servicio.html | v2026.10.08.8 (BUG: un gasto cargado de noche (después de las 21) quedaba con la fecha de mañana, porque se tomaba la fecha en hora UTC. Ahora usa la fecha local.) -->
 <!-- Portal TLC | servicio.html | v2026.10.08.3 (Cristian: "¿cómo sé qué hizo cada uno en el día?". Acceso a "📊 Parte del día" (parte.html) desde Prioridades del equipo y desde Carga del equipo. Cada acción queda registrada con quién la hizo (version.js agrega el autor a los pedidos; función servicio v13).) -->
 <!-- Portal TLC | servicio.html | v2026.10.08.2 (Cristian: "mostrame cómo lo ven ellos" + "¿se puede clickear en cada uno y que abra el ticket?". En "Ver como" cada equipo se toca y abre el ticket; también el #1 de cada persona en tu panel. En "🔥 Prioridades del equipo", cada persona tiene un botón "👁 Ver como" que muestra exactamente la tarjeta "🔥 Tu orden de hoy" que esa persona ve al abrir Servicio.) -->
@@ -2552,6 +2553,21 @@ function _renderDetalle(t) {
         '</div>' +
       '</div>';
     })() +
+
+    // ACCESO AL NEGOCIO (v2026.10.09.2) — Cristian: "un link o acceso rápido
+    // ... desde Preparación en ST al Negocio". La orden (y sus entregas
+    // parciales) guarda negocio_id: un toque y abre el negocio en Ventas.
+    ((t.tipo_orden === 'preparacion_equipos' && t.negocio_id) ?
+      '<div style="padding:0 16px 10px;">' +
+        '<a href="cotizaciones.html?id=' + encodeURIComponent(t.negocio_id) + '" title="Abrir el negocio en Ventas" ' +
+          'style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;text-decoration:none;' +
+          'background:rgba(58,134,255,.08);border:1px solid rgba(58,134,255,.35);color:var(--text-main);">' +
+          '<span style="font-size:18px;">💼</span>' +
+          '<span style="flex:1;min-width:0;"><span style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#3a86ff;">Negocio en Ventas</span>' +
+          '<span style="display:block;font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(t.cliente || '') + ' <span style="font-family:monospace;font-size:10.5px;color:var(--text-muted);font-weight:600;">' + _esc(t.negocio_id) + '</span></span></span>' +
+          '<span style="font-size:12px;font-weight:800;color:#3a86ff;white-space:nowrap;">Ver negocio ›</span>' +
+        '</a>' +
+      '</div>' : '') +
 
     // ORDEN DE PREPARACIÓN DE EQUIPOS — solo si este ticket es de ese tipo
     (t.tipo_orden === 'preparacion_equipos' ? _renderSeccionOrdenPreparacion(t) : '') +

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.09.2 (Cristian: "un link o acceso rápido para pasar directamente desde una tarjeta en Ventas a su Orden de Preparación y viceversa". Botón "📦 Ver Orden de Preparación ›" arriba de todo en el negocio, junto a Ver presupuesto; abre la orden en Servicio Técnico en la sección de equipos.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.08.8 (💸 GASTOS DEL NEGOCIO — Cristian: "agregá en Ventas los gastos tal cual se ven en Servicio, para que los vendedores carguen sus gastos en cada visita o negocio". Sección nueva "Gastos del negocio / visitas" en el detalle de cada negocio, igual que Servicio: fecha, descripción, importe en USD o AR$ con el TC del día de carga, quién lo cargó, total, y "Liquidado" cuando se paga desde Cuenta Corriente. Se guardan en cotizaciones/<id>/gastos (función servicio, cot_actualizarGastos). No se re-pinta el detalle mientras se edita un gasto.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre.) -->
@@ -3094,6 +3095,13 @@ function _renderDetalle(c) {
                    background:#0f1a30;border:1px solid #1e3050;color:#f1f5f9;font-size:12px;
                    font-weight:600;text-decoration:none;">
             📄 Ver presupuesto
+        </a>` : ''}
+        ${c.orden_preparacion_ticket_id ? `<a href="servicio.html?ticket=${encodeURIComponent(c.orden_preparacion_ticket_id)}&ver=preparacion"
+            title="Abrir la Orden de Preparación en Servicio Técnico"
+            style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;
+                   background:rgba(58,134,255,.12);border:1px solid rgba(58,134,255,.45);color:#5ea1ff;font-size:12px;
+                   font-weight:700;text-decoration:none;">
+            📦 Ver Orden de Preparación <span style="font-family:monospace;font-size:10.5px;opacity:.8;">${_escCot(c.orden_preparacion_ticket_id)}</span> ›
         </a>` : ''}
         ${(c.estado === '90%' || c.estado === 'Ganada') ? `<button onclick="_abrirModalOrdenPreparacion('${id}')"
             style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;
