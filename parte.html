@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<!-- Portal TLC | parte.html | v2026.10.08.6 (Ahora se entra desde Administración → Reportes y se habilita con el tilde "Reportes" de la hoja de permisos, no por Rol.) -->
+<!-- Portal TLC | parte.html | v2026.10.08.3 (NUEVO — Cristian: "estoy de viaje, tuve una reunión, y quiero saber qué hizo cada uno: arrancó tarde, arrancó temprano, hizo tal cosa, no hizo nada, lo urgente no lo tocó, ¿por qué no lo tocó?... yo lo que quiero es facturar". Parte del día para Administradores: arriba lo que pasó a Para facturar y lo urgente sin tocar; por persona, a qué hora arrancó y terminó, qué terminó y a dónde lo mandó, qué le entró, en qué trabajó y qué no tocó (con días quieto). Botón "💬 Preguntar" que escribe en el ticket con @mención. Lee st_parteDelDia de la función servicio v13.) -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parte del día · Portal TLC</title>
+<link rel="manifest" href="manifest.json">
+<script src="version.js"></script>
+<script src="permisos.js"></script>
+<style>
+:root{--bg:#f0f4f8;--panel:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;--blue:#3a86ff;--green:#16a34a;--red:#dc2626;--amber:#d97706}
+body.oscuro{--bg:#080d14;--panel:#0f1a30;--border:#1e3050;--text:#f1f5f9;--muted:#94a3b8}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text)}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--border)}
+.back{width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;border:none;font-size:18px;cursor:pointer;flex-shrink:0}
+h1{font-size:16px;margin:0}.sub{font-size:11px;color:var(--muted)}
+.wrap{max-width:900px;margin:0 auto;padding:12px}
+.dia{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.dia button{width:40px;height:40px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:16px;cursor:pointer}
+.dia .lbl{flex:1;text-align:center;font-weight:900;font-size:15px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px}
+.aviso{background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.35);color:var(--amber);border-radius:12px;padding:9px 12px;font-size:12.5px;font-weight:600;margin-bottom:12px;line-height:1.4}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px 8px;text-align:center}
+.kpi b{display:block;font-size:24px}.kpi span{font-size:11px;color:var(--muted);font-weight:700}
+.sec{font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:16px 2px 8px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:10px}
+.card.rojo{border-left:4px solid var(--red)}.card.verde{border-left:4px solid var(--green)}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;cursor:pointer}
+.ph .n{font-weight:900;font-size:15px}.ph .h{font-size:12px;color:var(--muted);text-align:right}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.chip{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:12px;background:rgba(58,134,255,.1)}
+.chip.r{background:rgba(220,38,38,.12);color:var(--red)}.chip.g{background:rgba(22,163,74,.12);color:var(--green)}
+.det{display:none;margin-top:6px}.card.abierta .det{display:block}
+.st{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin:10px 0 2px}
+.it{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--border);font-size:13px}
+.it .e{flex-shrink:0;width:20px;text-align:center}
+.it .t{font-weight:700;cursor:pointer}.it .x{color:var(--muted);font-size:11.5px;margin-top:1px;line-height:1.35}
+.it .b{margin-left:auto;flex-shrink:0}
+.preg{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 9px;font-size:11.5px;font-weight:800;cursor:pointer;white-space:nowrap}
+.preg.ok{background:var(--green)}
+.vacio{color:var(--muted);font-size:13px;text-align:center;padding:24px}
+.tag{font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;margin-left:4px}
+.tag.r{background:#ef4444;color:#fff}.tag.a{background:rgba(217,119,6,.15);color:var(--amber)}
+</style>
+</head>
+<body>
+<header>
+  <button class="back" onclick="history.length>1?history.back():location.href='servicio.html'">←</button>
+  <div style="flex:1"><h1>📊 Parte del día</h1><div class="sub">Qué hizo cada uno en el Portal</div></div>
+</header>
+<div class="wrap">
+  <div class="dia"><button onclick="moverDia(-1)">◀</button><div class="lbl" id="lbl-dia">…</div><button id="btn-sig" onclick="moverDia(1)">▶</button></div>
+  <div id="contenido"><div class="vacio">Cargando…</div></div>
+</div>
+<script>
+var URL_FN = 'https://us-central1-portal-tlc.cloudfunctions.net/servicio';
+var TZ = 'America/Argentina/Buenos_Aires';
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function sesion(){try{var r=JSON.parse(localStorage.getItem('tlc_session_v1')||'null');return r?(r.account||r):null;}catch(e){return null;}}
+try{ if((localStorage.getItem('tlc_tema')||'dark')!=='light') document.body.classList.add('oscuro'); }catch(e){ document.body.classList.add('oscuro'); }
+var cuenta = sesion(), DIA = '', HOY = '', DATOS = null;
+function hora(iso){ if(!iso) return ''; var d=new Date(iso); return isNaN(d)?'':d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',timeZone:TZ}); }
+function horaMin(iso){ var d=new Date(iso); var p=new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:TZ}).format(d).split(':'); return (+p[0])*60+(+p[1]); }
+function fechaLarga(ymd){ var d=new Date(ymd+'T12:00:00Z'); var t=d.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'}); return t.charAt(0).toUpperCase()+t.slice(1); }
+function sumarDias(ymd,n){ var d=new Date(ymd+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+function abrir(id){ location.href='servicio.html?ticket='+encodeURIComponent(id); }
+function moverDia(n){ if(!DIA) return; var nd=sumarDias(DIA,n); if(HOY && nd>HOY) return; cargar(nd); }
+
+async function cargar(dia){
+  if(!cuenta){ document.getElementById('contenido').innerHTML='<div class="vacio">Iniciá sesión en el Portal.</div>'; return; }
+  document.getElementById('contenido').innerHTML='<div class="vacio">Cargando…</div>';
+  var r;
+  try{ r=await (await fetch(URL_FN,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({accion:'st_parteDelDia',dia:dia||'',vendedorRol:cuenta.rol,email_usuario:cuenta.username})})).json(); }
+  catch(e){ document.getElementById('contenido').innerHTML='<div class="vacio">Error de conexión.</div>'; return; }
+  if(!r||!r.ok){ document.getElementById('contenido').innerHTML='<div class="vacio">'+esc((r&&r.error)||'Error')+'</div>'; return; }
+  DATOS=r; DIA=r.dia; HOY=r.hoy;
+  document.getElementById('lbl-dia').textContent=(r.dia===r.hoy?'Hoy · '+fechaLarga(r.dia).toLowerCase():fechaLarga(r.dia));
+  document.getElementById('btn-sig').style.opacity = r.dia>=r.hoy ? .35 : 1;
+  render(r);
+}
+
+function render(r){
+  var esHoy = r.dia===r.hoy, html='';
+  if(!r.registro_desde || r.dia<r.registro_desde){
+    html+='<div class="aviso">⚠️ El registro completo de acciones arranca el día que se publicó esta versión'+(r.registro_desde?' ('+esc(r.registro_desde)+')':'')+'. Para días anteriores solo se ven mensajes y notas; los movimientos de etapa no.</div>';
+  }
+  var urg=0, quietos=0; r.personas.forEach(function(p){ urg+=p.urgentes_sin_tocar.length; quietos+=p.sin_tocar.length; });
+  html+='<div class="kpis">'+
+    '<div class="kpi"><b style="color:var(--green)">'+r.para_facturar_hoy.length+'</b><span>💰 pasaron a facturar</span></div>'+
+    '<div class="kpi"><b>'+r.esperando_facturar+'</b><span>esperando facturar</span></div>'+
+    '<div class="kpi"><b style="color:var(--red)">'+urg+'</b><span>🚨 urgentes sin tocar</span></div></div>';
+
+  if(r.para_facturar_hoy.length){
+    html+='<div class="sec">💰 Pasaron a Para facturar '+(esHoy?'hoy':'ese día')+'</div><div class="card verde">'+
+      r.para_facturar_hoy.map(function(m){ return '<div class="it" style="border-top:none"><span class="e">✅</span><div><div class="t" onclick="abrir(\''+esc(m.id)+'\')">'+esc(m.titulo)+'</div><div class="x">'+esc(hora(m.hora))+' · desde '+esc(m.de)+' · lo pasó '+esc(m.por)+' · ahora lo tiene '+esc(m.nuevo_resp)+'</div></div></div>'; }).join('')+'</div>';
+  }
+
+  var conUrg = r.personas.filter(function(p){ return p.urgentes_sin_tocar.length; });
+  if(conUrg.length){
+    html+='<div class="sec">🚨 Lo urgente que no se tocó</div><div class="card rojo">'+
+      conUrg.map(function(p){ return p.urgentes_sin_tocar.map(function(it){ return itemQuieto(it,p,true); }).join(''); }).join('')+'</div>';
+  }
+
+  html+='<div class="sec">👥 Por persona</div>';
+  if(!r.personas.length) html+='<div class="vacio">Sin datos para este día.</div>';
+  html+=r.personas.map(function(p){
+    var nada = !p.acciones;
+    var ini = p.primera ? horaMin(p.primera) : null;
+    var tarde = ini!==null && ini > 10*60;
+    var cab = nada ? '<span style="color:var(--red);font-weight:800">Sin actividad en el Portal</span>'
+      : 'Arrancó <b style="color:'+(tarde?'var(--amber)':'inherit')+'">'+esc(hora(p.primera))+'</b> · última '+esc(hora(p.ultima))+' · '+p.acciones+' acc.';
+    var saldo = (esHoy && p.carga_inicio!==undefined) ? '<div class="x" style="font-size:12px;color:var(--muted);margin-top:4px">Empezó el día con <b>'+p.carga_inicio+'</b> → ahora tiene <b>'+p.carga_actual+'</b></div>' : '';
+    var term = p.salidas.filter(function(s){return !s.sigue_con_el;}), avanz = p.salidas.filter(function(s){return s.sigue_con_el;});
+    var chips = '<span class="chip g">✅ '+term.length+' pasó a otro</span>'+(avanz.length?'<span class="chip">⏩ '+avanz.length+' avanzó</span>':'')+
+      '<span class="chip">📥 '+p.entradas.length+' le entraron</span><span class="chip">🔧 trabajó en '+p.trabajo.length+'</span>'+
+      '<span class="chip'+(p.sin_tocar.length?' r':'')+'">😴 '+p.sin_tocar.length+' sin tocar</span>'+(p.urgentes_sin_tocar.length?'<span class="chip r">🚨 '+p.urgentes_sin_tocar.length+' urgentes</span>':'');
+    var det='';
+    if(term.length) det+='<div class="st">✅ Lo pasó a otro / terminó</div>'+term.map(function(m){ return movHtml(m,'✅'); }).join('');
+    if(avanz.length) det+='<div class="st">⏩ Avanzó de etapa (sigue con '+esc(p.nombre.split(' ')[0])+')</div>'+avanz.map(function(m){ return movHtml(m,'⏩'); }).join('');
+    if(p.entradas.length) det+='<div class="st">📥 Le entraron</div>'+p.entradas.map(function(m){ return movHtml(m,'📥',true); }).join('');
+    if(p.trabajo.length) det+='<div class="st">🔧 Trabajó en</div>'+p.trabajo.map(function(w){ return '<div class="it"><span class="e">🔧</span><div><div class="t" onclick="abrir(\''+esc(w.id)+'\')">'+esc(w.titulo)+'</div><div class="x">'+esc(w.cosas.join(' · '))+'</div></div></div>'; }).join('');
+    if(p.sin_tocar.length) det+='<div class="st">😴 No tocó</div>'+p.sin_tocar.map(function(it){ return itemQuieto(it,p,false); }).join('');
+    if(!det) det='<div class="vacio" style="padding:10px">Nada para mostrar.</div>';
+    return '<div class="card'+(nada||p.urgentes_sin_tocar.length?' rojo':'')+'"><div class="ph" onclick="this.parentNode.classList.toggle(\'abierta\')"><span class="n">'+esc(p.nombre)+'</span><span class="h">'+cab+' ▾</span></div>'+saldo+
+      '<div class="chips">'+chips+'</div><div class="det">'+det+'</div></div>';
+  }).join('');
+  document.getElementById('contenido').innerHTML=html;
+}
+function movHtml(m,emo,entrada){
+  return '<div class="it"><span class="e">'+emo+'</span><div><div class="t" onclick="abrir(\''+esc(m.id)+'\')">'+esc(m.titulo)+(m.retroceso?'<span class="tag a">volvió atrás</span>':'')+'</div>'+
+    '<div class="x">'+esc(hora(m.hora))+' · '+esc(m.de)+' → '+esc(m.a)+(entrada?' · se lo pasó '+esc(m.por):' · ahora lo tiene '+esc(m.nuevo_resp)+(m.por?' · lo movió '+esc(m.por):''))+'</div></div></div>';
+}
+function itemQuieto(it,p,conNombre){
+  var info=[esc(it.etapa)];
+  if(it.llego_hoy) info.push('le llegó hoy'); else if(it.dias_quieto!==null && it.dias_quieto!==undefined) info.push(it.dias_quieto===0?'movido hoy por otro':(it.dias_quieto+' día'+(it.dias_quieto===1?'':'s')+' sin novedades'));
+  if(it.otros && it.otros.length) info.push('lo tocó '+esc(it.otros.join(', ')));
+  var tags=(it.puesto?'<span class="tag r">🔥'+it.puesto+'</span>':'')+(it.prioridad==='urgente'?'<span class="tag r">📌 urgente</span>':'');
+  return '<div class="it"><span class="e">'+(it.puesto||it.prioridad==='urgente'?'🚨':'😴')+'</span><div style="flex:1;min-width:0"><div class="t" onclick="abrir(\''+esc(it.id)+'\')">'+(conNombre?esc(p.nombre.split(' ')[0])+' · ':'')+esc(it.titulo)+tags+'</div><div class="x">'+info.join(' · ')+'</div></div>'+
+    (it.email?'<div class="b"><button class="preg" onclick="preguntar(this,\''+esc(it.id)+'\',\''+esc(it.email)+'\',\''+esc(p.nombre)+'\',\''+esc(it.titulo).replace(/'/g,'')+'\')">💬 Preguntar</button></div>':'')+'</div>';
+}
+async function preguntar(btn,id,email,nombre,titulo){
+  var texto = prompt('Mensaje para '+nombre+' en el ticket (le llega el aviso):', '@'+nombre+' ¿cómo viene este equipo? ¿Qué falta para avanzarlo?');
+  if(!texto) return;
+  if(texto.indexOf('@'+nombre)===-1) texto='@'+nombre+' '+texto;
+  btn.disabled=true; btn.textContent='Enviando…';
+  try{
+    var r=await (await fetch(URL_FN,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({accion:'st_agregarMensaje',id_ticket:id,texto:texto,autor_nombre:cuenta.name||'',autor_email:cuenta.username||'',menciones:[email]})})).json();
+    if(!r||!r.ok) throw new Error((r&&r.error)||'error');
+    btn.textContent='✓ Preguntado'; btn.classList.add('ok');
+  }catch(e){ btn.disabled=false; btn.textContent='💬 Preguntar'; alert('No se pudo enviar: '+e.message); }
+}
+(async function(){ if(typeof validarAccesoModulo==='function'){ var ok=await validarAccesoModulo('Reportes'); if(!ok) return; cuenta=sesion(); } cargar(''); })();
+</script>
+</body>
+</html>

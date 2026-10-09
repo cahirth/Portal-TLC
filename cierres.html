@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cierres.html | v2026.10.08.6 (Ahora se entra desde Administración → Reportes y se habilita con el tilde "Reportes" de la hoja de permisos, no por Rol.) -->
 <!-- Portal TLC | cierres.html | v2026.10.06.8 (NUEVO — Cristian: cierre de semana de los viernes. Resumen para Administradores: quién cerró la semana y quién no, qué está trabado, qué espera repuesto o al cliente, y qué "no le corresponde" a quien lo tenía asignado. Lee st_listarCierres de la función servicio v10.) -->
 <html lang="es">
 <head>
@@ -7,6 +8,7 @@
 <title>Cierres de semana · Portal TLC</title>
 <link rel="manifest" href="manifest.json">
 <script src="version.js"></script>
+<script src="permisos.js"></script>
 <style>
 :root{--bg:#f0f4f8;--panel:#ffffff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;--blue:#3a86ff;--green:#16a34a;--red:#dc2626;--amber:#b45309}
 body.oscuro{--bg:#080d14;--panel:#0f1a30;--border:#1e3050;--text:#f1f5f9;--muted:#94a3b8}
@@ -59,10 +61,10 @@ function fechaViernes(s){var d=new Date(s+'T12:00:00Z');return isNaN(d)?s:d.toLo
 function hora(iso){var d=new Date(iso);return isNaN(d)?'':d.toLocaleString('es-AR',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}
 
 async function cargar(semana){
-  if(!cuenta||cuenta.rol!=='Administrador'){document.getElementById('contenido').innerHTML='<div class="vacio">Solo para Administradores.</div>';document.getElementById('sub').textContent='';return;}
+  if(!cuenta){document.getElementById('contenido').innerHTML='<div class="vacio">Iniciá sesión en el Portal.</div>';document.getElementById('sub').textContent='';return;}
   document.getElementById('contenido').innerHTML='<div class="vacio">Cargando…</div>';
   var r;
-  try{ r = await (await fetch(URL_FN,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({accion:'st_listarCierres',semana:semana||'',vendedorRol:cuenta.rol})})).json(); }
+  try{ r = await (await fetch(URL_FN,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({accion:'st_listarCierres',semana:semana||'',vendedorRol:cuenta.rol,email_usuario:cuenta.username})})).json(); }
   catch(e){ document.getElementById('contenido').innerHTML='<div class="vacio">Error de conexión.</div>'; return; }
   if(!r.ok){ document.getElementById('contenido').innerHTML='<div class="vacio">'+esc(r.error||'Error')+'</div>'; return; }
   var sel=document.getElementById('sel-semana');
@@ -96,7 +98,7 @@ function render(r){
   }).join('');
   document.getElementById('contenido').innerHTML=html;
 }
-cargar('');
+(async function(){ if(typeof validarAccesoModulo==='function'){ var ok=await validarAccesoModulo('Reportes'); if(!ok) return; cuenta=sesion(); } cargar(''); })();
 </script>
 </body>
 </html>

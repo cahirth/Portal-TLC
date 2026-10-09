@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.08.3 (Cristian: "¿cómo sé qué hizo cada uno en el día?". Acceso a "📊 Parte del día" (parte.html) desde Prioridades del equipo y desde Carga del equipo. Cada acción queda registrada con quién la hizo (version.js agrega el autor a los pedidos; función servicio v13).) -->
 <!-- Portal TLC | servicio.html | v2026.10.08.2 (Cristian: "mostrame cómo lo ven ellos" + "¿se puede clickear en cada uno y que abra el ticket?". En "Ver como" cada equipo se toca y abre el ticket; también el #1 de cada persona en tu panel. En "🔥 Prioridades del equipo", cada persona tiene un botón "👁 Ver como" que muestra exactamente la tarjeta "🔥 Tu orden de hoy" que esa persona ve al abrir Servicio.) -->
 <!-- Portal TLC | servicio.html | v2026.10.08.1 (Cristian: "agregá PARA INSTALAR también". La etapa Para instalar suma a la Carga del equipo (columna "Inst."), a las Prioridades y al Cierre de semana.) -->
 <!-- Portal TLC | servicio.html | v2026.10.07.4 (Cristian: "cambiar Carga por técnico a Carga del equipo". El panel del Administrador ahora se llama "⚖️ Carga del equipo" (incluye las etapas Diagnóstico, Presupuesto, Reparación, Preparación y Para facturar).) -->
@@ -1572,7 +1573,8 @@ function _renderCargaTecnicos() {
 
   var pie = '';
   if (esAdmin) {
-    pie = '<a href="cierres.html" onclick="event.stopPropagation()" style="color:#3a86ff;text-decoration:none;font-weight:800;">📋 Cierres de semana</a> · ' +
+    pie = '<a href="parte.html" onclick="event.stopPropagation()" style="color:#3a86ff;text-decoration:none;font-weight:800;">📊 Parte del día</a> · ' +
+          '<a href="cierres.html" onclick="event.stopPropagation()" style="color:#3a86ff;text-decoration:none;font-weight:800;">📋 Cierres de semana</a> · ' +
           (carga.sinAsignar ? '<span style="color:#f59e0b;">⚠ ' + carga.sinAsignar + ' sin asignar</span> · ' : '') +
           '<span style="color:#06d6a0;">■</span> menos carga en la etapa';
   }
@@ -1720,7 +1722,7 @@ function _renderPrioridades() {
       '</div>';
     }).join('');
     el.style.display = 'block';
-    el.innerHTML = caja(cab('🔥 Prioridades del equipo', 'Vos decidís qué va primero') + (abierto ? '<div style="margin-top:6px;">' + filas + '</div>' : ''));
+    el.innerHTML = caja(cab('🔥 Prioridades del equipo', '<a href="parte.html" onclick="event.stopPropagation()" style="color:#3a86ff;font-weight:800;text-decoration:none;">📊 Parte del día</a> · Vos decidís qué va primero') + (abierto ? '<div style="margin-top:6px;">' + filas + '</div>' : ''));
     return;
   }
 

@@ -1,4 +1,8 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.10.08.7 (Regulatoria abre su tablero Kanban de trámites ANMAT (eventos.html?modulo=regulatoria), con el tilde "Regulatoria" de la hoja.) -->
+<!-- Portal TLC | index.html | v2026.10.08.6 (Cristian: "adentro de Administración: Reportes → Parte del Día, semana, mes, KPIs (a desarrollar); Comercio Exterior → el tablero de Comex; seguimos con los permisos desde Excel en Reportes y Comercio Exterior". Reportes ahora abre un submenú (Parte del día, Semana = Cierres, Mes y KPIs próximamente) con el tilde "Reportes"; se quitan los dos ítems sueltos de la versión anterior. Comercio Exterior abre el tablero con el tilde "Comercio Exterior".) -->
+<!-- Portal TLC | index.html | v2026.10.08.5 (🌐 Comercio Exterior: el menú ahora abre su tablero Kanban (eventos.html?modulo=comex) en vez de la pantalla vacía; usa el permiso "Comercio Exterior" de la hoja.) -->
+<!-- Portal TLC | index.html | v2026.10.08.4 (Cristian: "¿adentro de qué menú lo vas a poner? ¿En Administración?". Dos ítems nuevos en Administración: "📊 Parte del día" (parte.html) y "📋 Cierres de semana" (cierres.html). Solo habilitados para Rol Administrador; al resto les aparecen grises con candado, igual que los demás módulos.) -->
 <!-- Portal TLC | index.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
 <!-- Portal TLC | index.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre.) -->
 <!-- Portal TLC | index.html | v2026.10.04.9 (Fase 5a: las reacciones desde la campanita a mensajes de Cotizaciones también van a la función servicio.) -->
@@ -716,24 +720,53 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
                     <div class="item-text-box"><h3>Cuenta Corriente</h3><p>Rendición de gastos y liquidaciones</p></div>
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
-                <div class="menu-item-row" id="menu-reportes" onclick="abrirModuloConPermiso('view-placeholder', 'Reportes', 'Resúmenes y análisis', 'reportes')">
+                <div class="menu-item-row" id="menu-reportes" onclick="abrirModuloConPermiso('view-reportes-menu', 'Reportes', 'Parte del día, semana, mes y KPIs', 'reportes')">
                     <div class="item-logo-container" style="background:rgba(248,150,30,0.15); border:1px solid rgba(248,150,30,0.4); color:#f8961e;"><i class="fa-solid fa-chart-bar"></i></div>
-                    <div class="item-text-box"><h3>Reportes</h3><p>Resúmenes y análisis</p></div>
+                    <div class="item-text-box"><h3>Reportes</h3><p>Parte del día, semana, mes y KPIs</p></div>
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
-                <div class="menu-item-row" id="menu-regulatoria" onclick="abrirProximamenteConPermiso('📋 Regulatoria — próximamente', 'regulatoria')">
+                <div class="menu-item-row" id="menu-regulatoria" onclick="abrirUrlConPermiso('eventos.html?modulo=regulatoria', 'Regulatoria', 'regulatoria')">
                     <div class="item-logo-container" style="background:rgba(248,150,30,0.15); border:1px solid rgba(248,150,30,0.35);">
                         <i class="fa-solid fa-file-shield" style="color:#f8961e; font-size:20px;"></i>
                     </div>
                     <div class="item-text-box"><h3>Regulatoria</h3><p>Registros y renovaciones ANMAT</p></div>
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
-                <div class="menu-item-row" id="menu-comex" onclick="abrirModuloConPermiso('view-comex-menu', 'Comercio Exterior', 'Logística', 'comex')">
+                <div class="menu-item-row" id="menu-comex" onclick="abrirUrlConPermiso('eventos.html?modulo=comex', 'Comercio Exterior', 'comex')">
                     <div class="item-logo-container" style="overflow:hidden; padding:0;">
                         <img src="https://lh3.googleusercontent.com/d/1jQH8p95CDIasQdtU-A7wN2r8h4jkA1L-" style="width:48px; height:48px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-ship\'></i>'; this.parentElement.classList.add('logo-comex');">
                     </div>
                     <div class="item-text-box"><h3>Comercio Exterior</h3><p>Importaciones y Aduana</p></div>
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= REPORTES (v2026.10.08.6) ================= -->
+        <!-- Cristian: "adentro de Administración → Reportes: Parte del Día,
+             semana, mes, KPIs (a desarrollar)". Se habilita con el tilde
+             "Reportes" de la hoja de permisos. -->
+        <div class="app-view" id="view-reportes-menu">
+            <div class="menu-list-stack">
+                <div class="menu-item-row" onclick="window.location.href='parte.html'">
+                    <div class="item-logo-container" style="background:rgba(58,134,255,0.15); border:1px solid rgba(58,134,255,0.4); color:#3a86ff;"><i class="fa-solid fa-chart-line"></i></div>
+                    <div class="item-text-box"><h3>Parte del día</h3><p>Qué hizo cada uno, qué pasó a facturar, lo urgente sin tocar</p></div>
+                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
+                <div class="menu-item-row" onclick="window.location.href='cierres.html'">
+                    <div class="item-logo-container" style="background:rgba(239,68,68,0.13); border:1px solid rgba(239,68,68,0.4); color:#ef4444;"><i class="fa-solid fa-clipboard-check"></i></div>
+                    <div class="item-text-box"><h3>Semana</h3><p>Cierres de semana de los viernes</p></div>
+                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
+                <div class="menu-item-row" onclick="mostrarToast('📅 Resumen del mes — próximamente')" style="opacity:.55;">
+                    <div class="item-logo-container" style="background:rgba(6,214,160,0.13); border:1px solid rgba(6,214,160,0.4); color:#06d6a0;"><i class="fa-solid fa-calendar"></i></div>
+                    <div class="item-text-box"><h3>Mes</h3><p>Resumen del mes — próximamente</p></div>
+                    <i class="fa-solid fa-hourglass-half menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
+                <div class="menu-item-row" onclick="mostrarToast('🎯 KPIs — a desarrollar')" style="opacity:.55;">
+                    <div class="item-logo-container" style="background:rgba(248,150,30,0.15); border:1px solid rgba(248,150,30,0.4); color:#f8961e;"><i class="fa-solid fa-bullseye"></i></div>
+                    <div class="item-text-box"><h3>KPIs</h3><p>Indicadores del equipo — a desarrollar</p></div>
+                    <i class="fa-solid fa-hourglass-half menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
             </div>
         </div>
@@ -1155,7 +1188,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
         <div class="nav-link" id="nav-btn-servicio" onclick="openModule('view-servicio-menu', 'Servicio Técnico', 'Laboratorio')">
             <i class="fa-solid fa-microscope"></i><span>Servicio</span>
         </div>
-        <div class="nav-link" id="nav-btn-comex" onclick="openModule('view-comex-menu', 'Comercio Exterior', 'Logística')">
+        <div class="nav-link" id="nav-btn-comex" onclick="abrirUrlConPermiso('eventos.html?modulo=comex', 'Comercio Exterior', 'comex')">
             <i class="fa-solid fa-ship"></i><span>Comex</span>
         </div>
         <div class="nav-link" id="nav-btn-admin" onclick="openModule('view-admin-menu', 'Administración', 'Gestión interna')">

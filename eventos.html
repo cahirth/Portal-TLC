@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.08.7 (📋 Regulatoria — Cristian: "agregá un tablero en Regulatoria como el de eventos, para la programación de los registros médicos ante ANMAT, pendientes y estado de los trámites". Con ?modulo=regulatoria muestra los tableros de Regulatoria (permiso "Regulatoria"). Un tablero nuevo de Regulatoria arranca con columnas de trámite ANMAT. El menú ⋯ ahora ofrece pasar el tablero a cualquiera de los otros dos módulos.) -->
+<!-- Portal TLC | eventos.html | v2026.10.08.5 (🌐 Comercio Exterior — Cristian: "Verónica hizo un evento de Comex, que es todo un tablero, lo quiero pasar al menú Comercio Exterior... que aparezca un tablero Kanban". Este módulo ahora sirve para los dos: con ?modulo=comex muestra solo los tableros de Comercio Exterior (título, permiso "Comercio Exterior", crear tablero). En el menú ⋯ de cada tablero (Administrador): "🌐 Pasar a Comercio Exterior" / "📅 Pasar a Eventos" — mueve el tablero completo, no lo copia. Backend eventosChecklist v3 (ev_moverModulo).) -->
 <!-- Portal TLC | eventos.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
 <!-- Portal TLC | eventos.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre.) -->
 <!-- Portal TLC | eventos.html | v2026.10.06.7 (Mismo cambio que servicio.html v2026.10.06.7: las menciones se resaltan en azul (acá antes no se resaltaban); "🔔 Se va a avisar a: ..." debajo del cuadro antes de enviar; tildes de lectura ✓✓ (gris = avisado, azul = lo leyeron todos) con detalle por persona; al abrir la tarjeta se marcan tus menciones como leídas y sus avisos en la campanita. Lógica compartida en menciones.js; backend eventosChecklist v2 (ev_marcarMensajesLeidos).) -->
@@ -552,6 +554,7 @@ body.tema-claro .ev-mencion-sug { background:#ffffff; }
           <button id="ev-menu-logo-evento" onclick="document.getElementById('ev-menu-evento-dropdown').classList.remove('abierto'); document.getElementById('ev-input-logo-evento').click();" style="display:none;">🖼️ Agregar logo al evento</button>
           <button id="ev-menu-quitar-logo-evento" onclick="_quitarLogoEventoJs()" style="display:none;">🚫 Quitar logo del evento</button>
           <button id="ev-menu-duplicar-evento" onclick="_duplicarEventoActual()" style="display:none;">📋 Duplicar evento</button>
+          <div id="ev-menu-mover-wrap"></div>
           <button id="ev-menu-borrar-evento" class="rojo" onclick="_confirmarBorrarEvento()" style="display:none;">🗑️ Borrar evento</button>
         </div>
         <input type="file" id="ev-input-logo-evento" accept=".png,.jpg,.jpeg,.webp,.svg" style="display:none;" onchange="_subirLogoEventoJs(event)">
@@ -658,6 +661,41 @@ var SESSION_KEY = 'tlc_session_v1';
 var TEMA_KEY = 'tlc_tema';
 var _session = null;
 var EVENTOS = [];
+var EVENTOS_TODOS = [];
+// 🌐 Comercio Exterior (v2026.10.08.5) — Cristian: "Verónica hizo un evento
+// de Comex, que es todo un tablero, lo quiero pasar al menú Comercio
+// Exterior". Este mismo módulo muestra los tableros de Eventos o los de
+// Comercio Exterior según ?modulo=comex (cada tablero guarda su "modulo").
+// v2026.10.08.7: también 📋 Regulatoria (registros y trámites ANMAT).
+var MODULOS_EV = {
+  eventos:     { titulo:'Gestión Eventos / Congresos', sub:'TLC Planner', doc:'Eventos / Congresos', icono:'📅', permiso:'Eventos', nombre:'Eventos',
+                 vacio:'Todavía no hay eventos cargados', crear:'+ Crear evento', crearOpc:'➕ Crear nuevo evento...', prompt:'Nombre del evento o congreso (ej. "Faco Extrema 2026"):' },
+  comex:       { titulo:'Comercio Exterior', sub:'Importaciones y Aduana', doc:'Comercio Exterior', icono:'🌐', permiso:'Comercio Exterior', nombre:'Comercio Exterior',
+                 vacio:'Todavía no hay tableros de Comercio Exterior', crear:'+ Crear tablero', crearOpc:'➕ Crear nuevo tablero...', prompt:'Nombre del tablero de Comercio Exterior (ej. "Importaciones 2026"):' },
+  regulatoria: { titulo:'Regulatoria', sub:'Registros y trámites ANMAT', doc:'Regulatoria', icono:'📋', permiso:'Regulatoria', nombre:'Regulatoria',
+                 vacio:'Todavía no hay tableros de Regulatoria', crear:'+ Crear tablero', crearOpc:'➕ Crear nuevo tablero...', prompt:'Nombre del tablero (ej. "Registros ANMAT 2026"):' },
+};
+var _modParam = new URLSearchParams(window.location.search).get('modulo');
+var MODULO_EV = MODULOS_EV[_modParam] ? _modParam : 'eventos';
+function _cfgEv() { return MODULOS_EV[MODULO_EV] || MODULOS_EV.eventos; }
+function _esComexEv() { return MODULO_EV === 'comex'; }
+function _claveUltimoEv() { return 'ev_ultimo_evento_id' + (MODULO_EV === 'eventos' ? '' : '_' + MODULO_EV); }
+function _textosModuloEv() {
+  var c = _cfgEv();
+  document.title = c.doc + ' — Portal TLC';
+  var t = document.getElementById('ev-hdr-titulo');
+  if (t && (!EVENTO_ACTUAL)) t.textContent = c.titulo;
+  var sub = document.getElementById('ev-hdr-sub');
+  if (sub && !EVENTO_ACTUAL) sub.textContent = c.sub;
+  // Botones "Pasar a …" hacia los otros módulos (solo Administrador)
+  var cont = document.getElementById('ev-menu-mover-wrap');
+  if (cont) cont.innerHTML = (_session && _session.rol === 'Administrador' && EVENTO_ACTUAL) ? Object.keys(MODULOS_EV).filter(function(k){ return k !== MODULO_EV; }).map(function(k) {
+    return '<button onclick="_moverTableroDeModulo(\'' + k + '\')">' + MODULOS_EV[k].icono + ' Pasar a ' + MODULOS_EV[k].nombre + '</button>';
+  }).join('') : '';
+}
+function _filtrarEventosModulo() {
+  EVENTOS = EVENTOS_TODOS.filter(function(e) { return (e.modulo || 'eventos') === MODULO_EV; });
+}
 var EVENTO_ACTUAL = null; // objeto completo con columnas + tarjetas
 var TARJETA_ACTUAL_ID = null;
 var _internosCacheEv = null;
@@ -703,7 +741,8 @@ function _volverEventos() {
 }
 
 (async function() {
-  var acceso = typeof validarAccesoModulo === 'function' ? await validarAccesoModulo('Eventos') : true;
+  _textosModuloEv();
+  var acceso = typeof validarAccesoModulo === 'function' ? await validarAccesoModulo(_cfgEv().permiso) : true;
   if (!acceso) return;
   var ok = await _cargarSesion();
   if (!ok) return;
@@ -724,7 +763,7 @@ function _volverEventos() {
   var idCacheDirecto = null;
   if (!idUrl) {
     try {
-      var idGuardadoTemprano = localStorage.getItem('ev_ultimo_evento_id');
+      var idGuardadoTemprano = localStorage.getItem(_claveUltimoEv());
       if (idGuardadoTemprano && localStorage.getItem('ev_cache_' + idGuardadoTemprano)) idCacheDirecto = idGuardadoTemprano;
     } catch(eLsTemprano) {}
   }
@@ -759,7 +798,7 @@ function _volverEventos() {
   var idParaAbrir = idUrl;
   if (!idParaAbrir) {
     var idGuardado = null;
-    try { idGuardado = localStorage.getItem('ev_ultimo_evento_id'); } catch(eLs) {}
+    try { idGuardado = localStorage.getItem(_claveUltimoEv()); } catch(eLs) {}
     if (idGuardado && EVENTOS.some(function(e){ return e.id === idGuardado; })) idParaAbrir = idGuardado;
     else if (EVENTOS.length) idParaAbrir = EVENTOS[0].id;
   }
@@ -786,9 +825,9 @@ function _volverEventos() {
     document.getElementById('ev-vista-tablero').style.display = 'block';
     document.getElementById('ev-board').innerHTML =
       '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);">' +
-        '<div style="font-size:15px;font-weight:700;margin-bottom:10px;color:var(--text-main);">Todavía no hay eventos cargados</div>' +
-        '<div style="font-size:12.5px;margin-bottom:16px;">Creá el primero para arrancar.</div>' +
-        (_session.rol === 'Administrador' ? '<button class="ev-btn-primario" style="width:auto;padding:9px 20px;" onclick="_abrirModalNuevoEvento(this)">+ Crear evento</button>' : '') +
+        '<div style="font-size:15px;font-weight:700;margin-bottom:10px;color:var(--text-main);">' + _cfgEv().vacio + '</div>' +
+        '<div style="font-size:12.5px;margin-bottom:16px;">' + (MODULO_EV === 'eventos' ? 'Creá el primero para arrancar.' : 'Creá uno nuevo, o pasá uno que ya exista en Eventos: abrilo, tocá ⋯ y elegí "' + _cfgEv().icono + ' Pasar a ' + _cfgEv().nombre + '".') + '</div>' +
+        (_session.rol === 'Administrador' ? '<button class="ev-btn-primario" style="width:auto;padding:9px 20px;" onclick="_abrirModalNuevoEvento(this)">' + _cfgEv().crear + '</button>' : '') +
       '</div>';
   }
   _cargarNotificaciones(true);
@@ -796,6 +835,23 @@ function _volverEventos() {
 })();
 
 function _esAdministradorEv() { return _session && _session.rol === 'Administrador'; }
+
+// Pasa el tablero abierto entre Eventos y Comercio Exterior (mismo tablero, con todo)
+function _moverTableroDeModulo(destino) {
+  var dd = document.getElementById('ev-menu-evento-dropdown'); if (dd) dd.classList.remove('abierto');
+  if (!EVENTO_ACTUAL || !MODULOS_EV[destino] || destino === MODULO_EV) return;
+  var nombreDestino = MODULOS_EV[destino].nombre;
+  if (!confirm('¿Pasar "' + EVENTO_ACTUAL.nombre + '" a ' + nombreDestino + '?\n\nSe mueve el tablero completo (tarjetas, checklists, mensajes y adjuntos). Deja de verse acá y aparece en ' + nombreDestino + '.')) return;
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ accion:'ev_moverModulo', id: EVENTO_ACTUAL.id, modulo: destino, vendedorRol: _session.rol }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r) {
+      if (!r.ok) { alert('No se pudo mover: ' + (r.error || 'error')); return; }
+      try { localStorage.removeItem('ev_cache_' + EVENTO_ACTUAL.id); localStorage.removeItem(_claveUltimoEv()); } catch(e) {}
+      window.location.href = 'eventos.html?' + (destino === 'eventos' ? '' : 'modulo=' + destino + '&') + 'id=' + encodeURIComponent(EVENTO_ACTUAL.id);
+    })
+    .catch(function(){ alert('Error de conexión'); });
+}
 
 // ══════════════════════════════════════════════════════════════════
 // EVENTOS — listar / crear / abrir
@@ -807,9 +863,10 @@ async function _cargarEventos() {
     var resp = await fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_listarEventos' }) });
     var r = await resp.json();
     if (r.ok && Array.isArray(r.eventos)) {
-      EVENTOS = r.eventos;
+      EVENTOS_TODOS = r.eventos;
+      _filtrarEventosModulo();
     } else {
-      EVENTOS = [];
+      EVENTOS = []; EVENTOS_TODOS = [];
       _errorCargaEventos = true;
     }
   } catch(e) {
@@ -819,10 +876,10 @@ async function _cargarEventos() {
 }
 
 function _abrirModalNuevoEvento(btn) {
-  var nombre = prompt('Nombre del evento o congreso (ej. "Faco Extrema 2026"):');
+  var nombre = prompt(_cfgEv().prompt);
   if (!nombre || !nombre.trim()) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Creando...'; }
-  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_crearEvento', nombre: nombre.trim(), vendedorRol: _session.rol }) })
+  fetch(EVENTOS_CHECKLIST_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'ev_crearEvento', nombre: nombre.trim(), vendedorRol: _session.rol, modulo: MODULO_EV }) })
     .then(function(r){ return r.json(); })
     .then(function(r) {
       if (!r.ok) { alert('Error al crear: ' + (r.error||'desconocido')); if (btn) { btn.disabled = false; btn.textContent = '+ Crear evento'; } return; }
@@ -963,6 +1020,20 @@ function _borrarEventoActual() {
 // instantáneo desde caché como en la actualización silenciosa cuando
 // llega la respuesta real del backend.
 function _aplicarEventoActualEv(id, tarjetaId) {
+  // Si se abrió por link un tablero del otro módulo, la pantalla se adapta a él
+  var moduloTablero = MODULOS_EV[EVENTO_ACTUAL.modulo] ? EVENTO_ACTUAL.modulo : 'eventos';
+  if (moduloTablero !== MODULO_EV) {
+    var vinoPorLink = new URLSearchParams(window.location.search).get('id') === id;
+    if (!vinoPorLink) {
+      // Era el "último abierto" guardado, pero ese tablero ahora es del otro
+      // módulo (lo pasaron): se olvida y se abre uno de este módulo.
+      try { localStorage.removeItem(_claveUltimoEv()); } catch (eLs) {}
+      window.location.reload();
+      return;
+    }
+    MODULO_EV = moduloTablero; _filtrarEventosModulo();
+  }
+  _textosModuloEv();
   document.getElementById('ev-hdr-titulo').textContent = EVENTO_ACTUAL.nombre;
   document.getElementById('ev-hdr-sub').textContent = EVENTO_ACTUAL.tarjetas.length + ' tarjetas';
   _actualizarLogoHeaderEv();
@@ -1030,7 +1101,7 @@ async function _abrirEvento(id, tarjetaId) {
   if (cacheado) {
     // Pintado instantáneo desde lo último guardado — sin spinner.
     EVENTO_ACTUAL = cacheado;
-    try { localStorage.setItem('ev_ultimo_evento_id', id); } catch(eLs) {}
+    try { localStorage.setItem(_claveUltimoEv(), id); } catch(eLs) {}
     _aplicarEventoActualEv(id, tarjetaId);
   } else {
     // Primera vez que se abre este evento en este navegador — no hay
@@ -1073,7 +1144,7 @@ async function _abrirEvento(id, tarjetaId) {
       }
       EVENTO_ACTUAL = r.evento;
       try {
-        localStorage.setItem('ev_ultimo_evento_id', id);
+        localStorage.setItem(_claveUltimoEv(), id);
         localStorage.setItem('ev_cache_' + id, JSON.stringify(r.evento));
       } catch(eLs) {}
       // Repinta siempre, tanto si fue la primera carga (sacando el
@@ -1102,14 +1173,16 @@ async function _abrirEvento(id, tarjetaId) {
 
 function _renderSelectEventos() {
   var opciones = EVENTOS.map(function(e) {
-    return '<option value="' + e.id + '"' + (EVENTO_ACTUAL && EVENTO_ACTUAL.id === e.id ? ' selected' : '') + '>📅 ' + _esc(e.nombre) + '</option>';
+    return '<option value="' + e.id + '"' + (EVENTO_ACTUAL && EVENTO_ACTUAL.id === e.id ? ' selected' : '') + '>' + (_cfgEv().icono + ' ') + _esc(e.nombre) + '</option>';
   }).join('');
+  // Si el tablero abierto no está en la lista (ej. se abrió por link), igual se muestra
+  if (EVENTO_ACTUAL && !EVENTOS.some(function(e){ return e.id === EVENTO_ACTUAL.id; })) opciones = '<option value="' + EVENTO_ACTUAL.id + '" selected>' + (_cfgEv().icono + ' ') + _esc(EVENTO_ACTUAL.nombre || '') + '</option>' + opciones;
   // "+ Crear nuevo evento" al final del desplegable — mismo patrón que
   // el selector de pipelines en cotizaciones.html. Solo Administrador
   // puede crear eventos (ya lo valida el backend), así que este ítem
   // se agrega igual para todos pero, si alguien sin permiso lo elige,
   // el backend lo va a rechazar con el aviso correspondiente.
-  opciones += '<option value="__crear__">➕ Crear nuevo evento...</option>';
+  opciones += '<option value="__crear__">' + _cfgEv().crearOpc + '</option>';
   document.getElementById('ev-select-evento').innerHTML = opciones;
 }
 function _cambiarEventoDesdeSelect(id) {
