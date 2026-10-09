@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.10.08.8 (💼 Gastos de Ventas: los gastos que los vendedores cargan en cada negocio aparecen como grupo "VENTA" (Negocio + cliente) y se editan, borran y liquidan igual que los de Servicio y Eventos. Lee el origen "ventas" de cc_gastosOrigenes (función cuentaCorriente v4).) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.05.4 (Cristian: "una referencia chiquita del tipo de cambio de ese día en cada renglón, solo para referencia". Debajo del importe de cada gasto: "TC 1.500 · ≈ US$ 100,00" (o el equivalente en pesos si el gasto es en dólares), con el dólar del día de carga; si el gasto es viejo y no lo tiene, el de hoy marcado "(hoy)". No cambia ningún cálculo.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.05.3 (BUG REAL — Cristian: "subo 150 mil pesos y aparece 147.500, cambia el importe". Los gastos en pesos se guardan en USD + el TC del día de carga (tc_al_cargar), y Servicio/Eventos lo respetan, pero Cuenta Corriente convertía con el dólar de HOY. Ahora usa el TC guardado de cada gasto para mostrar, editar y liquidar; los gastos nuevos (tarjetas y generales) guardan su TC, y los generales en pesos se convierten igual que el resto (antes se guardaban sin convertir).) -->
@@ -143,7 +144,7 @@ const DATA = { usuario_seleccionado: '', saldo_inicial: { monto_ars:0, monto_usd
 const state = JSON.parse(JSON.stringify(DATA));
 const selected = new Set(); let selInitial = false;
 
-const $=id=>document.getElementById(id), money=(n,c)=>c==="USD"?"U$S "+Number(n||0).toLocaleString("es-AR",{maximumFractionDigits:2}):"$ "+Number(n||0).toLocaleString("es-AR",{maximumFractionDigits:0}), fmt=d=>{if(!d)return"—";let[a,b,c]=d.split("-");return`${c}/${b}/${a}`}, esc=s=>{let d=document.createElement("div");d.textContent=String(s??"");return d.innerHTML}, today=()=>new Date().toISOString().slice(0,10);
+const $=id=>document.getElementById(id), money=(n,c)=>c==="USD"?"U$S "+Number(n||0).toLocaleString("es-AR",{maximumFractionDigits:2}):"$ "+Number(n||0).toLocaleString("es-AR",{maximumFractionDigits:0}), fmt=d=>{if(!d)return"—";let[a,b,c]=d.split("-");return`${c}/${b}/${a}`}, esc=s=>{let d=document.createElement("div");d.textContent=String(s??"");return d.innerHTML}, today=()=>(()=>{var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
 
 // Convierte el importe interno (siempre en USD) a la moneda en la que
 // se cargó cada gasto (mismo criterio que servicio.html/eventos.html).
@@ -161,6 +162,7 @@ function _parseItemId(id) {
   const partes = id.split(':');
   if (partes[0] === 'servicio') return { origen_tipo:'servicio', id_ticket:partes[1], gasto_index:parseInt(partes[2],10) };
   if (partes[0] === 'evento') return { origen_tipo:'evento', id_evento:partes[1], id_tarjeta:partes[2], gasto_index:parseInt(partes[3],10) };
+  if (partes[0] === 'venta') return { origen_tipo:'venta', id_cot:partes[1], gasto_index:parseInt(partes[2],10) };
   return { origen_tipo:'general', id_gasto:partes[1] };
 }
 
@@ -170,7 +172,15 @@ function totals(){let ars=0,usd=0;visible().forEach(g=>g.items.forEach(i=>{if(i.
 function selTotals(){let ars=0,usd=0;visible().forEach(g=>g.items.forEach(i=>{if(!selected.has(i.id)||i.estado!=="PENDIENTE")return;i.moneda==="USD"?usd+=i.monto:ars+=i.monto}));if(selInitial){ars+=Number($("partArs").value||0);usd+=Number($("partUsd").value||0)}return{ars,usd}}
 
 function renderSummary(){let t=totals(),s=selTotals();$("saldoArs").textContent=money(t.ars,"ARS");$("saldoUsd").textContent=money(t.usd,"USD");let txt=(s.ars?money(s.ars,"ARS"):"")+(s.usd?(s.ars?" · ":"")+money(s.usd,"USD"):"");$("selTotal").textContent=txt||"$ 0";$("liquidar").disabled=!(s.ars||s.usd)||!CURRENT.esAdmin;$("liquidar").textContent=(s.ars||s.usd)?`Liquidar Selección (${txt})`:"Liquidar Selección ($ 0)"}
-function icon(t){return t==="SERVICE"?"🛠️":t==="EVENTO"?"🎪":"📌"}
+function icon(t){return t==="SERVICE"?"🛠️":t==="EVENTO"?"🎪":t==="VENTA"?"💼":"📌"}
+// v2026.10.08.8 — a qué función y con qué datos se reescribe el array de
+// gastos de una tarjeta de origen (Servicio, Eventos o Ventas).
+function _ccPedidoGastos(tipo, info, gastos) {
+  if (tipo === 'venta') return { url: SERVICIO_URL_CC, body: { accion: 'cot_actualizarGastos', id_cotizacion: info.id_cot, gastos: gastos } };
+  if (tipo === 'servicio') return { url: SERVICIO_URL_CC, body: { accion: 'st_actualizarGastos', id_ticket: info.id_ticket, gastos: gastos } };
+  return { url: EVENTOS_URL_CC, body: { accion: 'ev_actualizarGastos', id_evento: info.id_evento, id_tarjeta: info.id_tarjeta, gastos: gastos } };
+}
+function _ccTarjetaIdDe(info) { return info.origen_tipo === 'servicio' ? info.id_ticket : info.origen_tipo === 'venta' ? info.id_cot : info.id_tarjeta; }
 function sub(g){let ars=0,usd=0;g.items.forEach(i=>{if(i.estado!=="PENDIENTE")return;i.moneda==="USD"?usd+=i.monto:ars+=i.monto});return{ars,usd}}
 let _editandoItemId = null; // id del gasto que esta en modo edicion ahora mismo (o null)
 
@@ -253,17 +263,14 @@ window.eliminarItem = async function(id) {
         body: JSON.stringify({ accion:'eliminarGastoGeneral', id: info.id_gasto, solicitante_nombre: CURRENT.nombre, solicitante_es_admin: CURRENT.esAdmin === true }) });
       rr = await r.json();
     } else {
-      const tarjetaId = info.origen_tipo === 'servicio' ? info.id_ticket : info.id_tarjeta;
+      const tarjetaId = _ccTarjetaIdDe(info);
       const gastosCompletos = (_origenGastosCompletos[tarjetaId] || []).slice();
       const original = gastosCompletos[info.gasto_index];
       if (!original) { toast('No se encontró el gasto en el origen — probá recargar.'); return; }
       if (original.estado === 'PAGADO') { toast('Ese gasto ya fue liquidado: primero hay que deshacer la liquidación.'); return; }
       gastosCompletos.splice(info.gasto_index, 1);
-      const accion = info.origen_tipo === 'servicio' ? 'st_actualizarGastos' : 'ev_actualizarGastos';
-      const payload = info.origen_tipo === 'servicio'
-        ? { accion, id_ticket: info.id_ticket, gastos: gastosCompletos }
-        : { accion, id_evento: info.id_evento, id_tarjeta: info.id_tarjeta, gastos: gastosCompletos };
-      const r = await fetch(info.origen_tipo === 'servicio' ? SERVICIO_URL_CC : EVENTOS_URL_CC, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+      const ped = _ccPedidoGastos(info.origen_tipo, info, gastosCompletos);
+      const r = await fetch(ped.url, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(ped.body) });
       rr = await r.json();
     }
     if (!rr.ok) { toast('No se pudo eliminar: ' + (rr.error || '')); return; }
@@ -320,7 +327,7 @@ window.guardarEdicionItem = async function(id) {
       const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payloadGeneral) });
       rr = await r.json();
     } else {
-      const tarjetaId = info.origen_tipo === 'servicio' ? info.id_ticket : info.id_tarjeta;
+      const tarjetaId = _ccTarjetaIdDe(info);
       const gastosCompletos = _origenGastosCompletos[tarjetaId] || [];
       const item = gastosCompletos[info.gasto_index];
       if (!item) { toast('No se encontro el gasto en el origen - proba recargar.'); return; }
@@ -329,11 +336,8 @@ window.guardarEdicionItem = async function(id) {
       // cual — no hace falta una acción de backend aparte para
       // reasignar, alcanza con tocar el campo antes de mandarlo.
       if (nuevoBeneficiario) { item.a_favor_de = nuevoBeneficiario; if (!item.creado_por) item.creado_por = nuevoBeneficiario; }
-      const accion = info.origen_tipo === 'servicio' ? 'st_actualizarGastos' : 'ev_actualizarGastos';
-      const payload = info.origen_tipo === 'servicio'
-        ? { accion, id_ticket: info.id_ticket, gastos: gastosCompletos }
-        : { accion, id_evento: info.id_evento, id_tarjeta: info.id_tarjeta, gastos: gastosCompletos };
-      const r = await fetch(info.origen_tipo === 'servicio' ? SERVICIO_URL_CC : EVENTOS_URL_CC, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+      const ped = _ccPedidoGastos(info.origen_tipo, info, gastosCompletos);
+      const r = await fetch(ped.url, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(ped.body) });
       rr = await r.json();
     }
     if (!rr.ok) { toast('Error al guardar: ' + (rr.error||'')); return; }
@@ -402,16 +406,14 @@ window.addExpense = async function(id) {
       const rr = await r.json();
       if (!rr.ok) { toast('Error: ' + (rr.error||'')); return; }
     } else {
-      const ruta = info.tipo === 'servicio' ? ('servicio_tecnico/'+info.id_ticket+'/gastos') : ('eventos/'+info.id_evento+'/tarjetas/'+info.id_tarjeta+'/gastos');
       const gastosCompletos = _origenGastosCompletos[id] || [];
       // El importe que tipeó el usuario está en SU moneda elegida — si
       // es ARS, hay que guardarlo como equivalente en USD (mismo
       // criterio interno que ya usan servicio.html/eventos.html).
       const importeAGuardar = (moneda === 'ARS' && TC_OFICIAL_CC) ? (a / TC_OFICIAL_CC) : a;
       gastosCompletos.push({ fecha, descripcion:c, importe:importeAGuardar, moneda, creado_por:CURRENT.nombre, creado_en:new Date().toISOString(), a_favor_de: ben, estado:'PENDIENTE', tc_al_cargar: TC_OFICIAL_CC || null });
-      const accion = info.tipo === 'servicio' ? 'st_actualizarGastos' : 'ev_actualizarGastos';
-      const payload = info.tipo === 'servicio' ? { accion, id_ticket: info.id_ticket, gastos: gastosCompletos } : { accion, id_evento: info.id_evento, id_tarjeta: info.id_tarjeta, gastos: gastosCompletos };
-      const r = await fetch(info.tipo === 'servicio' ? SERVICIO_URL_CC : EVENTOS_URL_CC, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(payload) });
+      const ped = _ccPedidoGastos(info.tipo, info, gastosCompletos);
+      const r = await fetch(ped.url, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(ped.body) });
       const rr = await r.json();
       if (!rr.ok) { toast('Error: ' + (rr.error||'')); return; }
     }
@@ -770,6 +772,35 @@ async function cargarTodo() {
     return grupos;
   }
 
+  // 💼 Gastos de Ventas (v2026.10.08.8): los negocios con gastos cargados
+  async function cargarVentas() {
+    const grupos = [];
+    try {
+      const dataV = (await pedidoOrigenes).ventas;
+      Object.keys(dataV || {}).forEach(function(key) {
+        const v = dataV[key];
+        if (!v) return;
+        const gastosCompletos = Array.isArray(v.gastos) ? v.gastos : (v.gastos ? Object.values(v.gastos) : []);
+        const pendientes = [];
+        gastosCompletos.forEach(function(g, idx) {
+          if (_esPendienteParaBeneficiario(g, beneficiarioNombre)) {
+            pendientes.push({
+              id: 'venta:' + key + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
+              moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD', g.tc_al_cargar),
+              tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por || '', estado: 'PENDIENTE',
+            });
+          }
+        });
+        if (pendientes.length) {
+          grupos.push({ tarjeta_id: key, tipo_origen: 'VENTA', titulo_origen: 'Negocio ' + (v.id_cot || key) + (v.cliente ? ' — ' + v.cliente : ''), items: pendientes });
+          _origenInfoLocal[key] = { tipo: 'venta', id_cot: key };
+          _origenGastosCompletosLocal[key] = gastosCompletos;
+        }
+      });
+    } catch(e) { console.warn('Error cargando gastos de Ventas:', e); }
+    return grupos;
+  }
+
   async function cargarGenerales() {
     try {
       const rGen = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({
@@ -817,11 +848,11 @@ async function cargarTodo() {
     } catch(e) { return []; }
   }
 
-  const [gruposSt, gruposEv, gruposGen, saldoInicial, liquidaciones] = await Promise.all([
-    cargarServicio(), cargarEventos(), cargarGenerales(), cargarSaldoInicial(), cargarLiquidaciones(),
+  const [gruposSt, gruposEv, gruposGen, saldoInicial, liquidaciones, gruposVen] = await Promise.all([
+    cargarServicio(), cargarEventos(), cargarGenerales(), cargarSaldoInicial(), cargarLiquidaciones(), cargarVentas(),
   ]);
 
-  const grupos = [].concat(gruposSt, gruposEv, gruposGen);
+  const grupos = [].concat(gruposSt, gruposEv, gruposVen, gruposGen);
   // Siempre mostramos GENERAL como grupo disponible para cargar, tenga
   // o no gastos pendientes ahora mismo.
   if (!grupos.some(function(g){ return g.tarjeta_id === 'GENERAL'; })) {

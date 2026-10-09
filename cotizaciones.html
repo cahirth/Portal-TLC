@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.08.8 (💸 GASTOS DEL NEGOCIO — Cristian: "agregá en Ventas los gastos tal cual se ven en Servicio, para que los vendedores carguen sus gastos en cada visita o negocio". Sección nueva "Gastos del negocio / visitas" en el detalle de cada negocio, igual que Servicio: fecha, descripción, importe en USD o AR$ con el TC del día de carga, quién lo cargó, total, y "Liquidado" cuando se paga desde Cuenta Corriente. Se guardan en cotizaciones/<id>/gastos (función servicio, cot_actualizarGastos). No se re-pinta el detalle mientras se edita un gasto.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.06.7 (Mismo cambio que servicio.html v2026.10.06.7: "🔔 Se va a avisar a: ..." debajo del cuadro antes de enviar; tildes de lectura ✓✓ (gris = avisado, azul = lo leyeron todos) con detalle por persona; al abrir el negocio se marcan tus menciones como leídas y sus avisos en la campanita. Lógica compartida en menciones.js; backend servicio v9 (cot_marcarMensajesLeidos).) -->
@@ -303,6 +304,30 @@
 
         /* HISTORIAL */
         .historial-wrap { padding:0 16px 100px; }
+        /* 💸 Gastos del negocio (v2026.10.08.8) */
+        .gc-card{background:#0f1b2e;border:1px solid #1e3050;border-radius:10px;padding:10px;margin-top:8px;color:#f1f5f9}
+        .gc-meta{font-size:10px;color:#94a3b8;margin-bottom:5px}
+        .gc-pagado{font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;background:rgba(6,214,160,.15);color:#06d6a0;margin-left:6px}
+        .gc-sub{font-size:11px;color:#94a3b8;margin-top:3px}
+        .gc-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+        .gc-desc{flex:1;background:transparent;border:none;border-bottom:1px solid #1e3050;color:#f1f5f9;font-size:13px;font-weight:600;padding:4px 2px;outline:none;font-family:inherit}
+        .gc-desc:focus{border-color:#3a86ff}
+        .gc-del{background:none;border:none;color:#ef4444;font-size:14px;cursor:pointer;padding:2px 6px}
+        .gc-grid{display:grid;grid-template-columns:1fr 1.6fr;gap:8px}
+        .gc-grid label{font-size:8px;color:#64748b;text-transform:uppercase;font-weight:700;display:block;margin-bottom:3px}
+        .gc-input{width:100%;background:#0a1424;border:1px solid #1e3050;border-radius:7px;color:#f1f5f9;font-size:12px;padding:7px 8px;outline:none;font-family:inherit;box-sizing:border-box}
+        .gc-input:focus{border-color:#3a86ff}
+        .gc-imp{display:flex;align-items:center;gap:5px}.gc-imp input{flex:1;min-width:0}
+        .gc-switch{flex-shrink:0;display:flex;border-radius:20px;overflow:hidden;border:1px solid #1e3050;font-size:10px;font-weight:800;cursor:pointer;user-select:none}
+        .gc-switch span{padding:6px 7px;color:#64748b;background:#0a1424}.gc-switch span.on{background:#3a86ff;color:#fff}
+        .gc-tc{font-size:9px;font-weight:600;color:#64748b}
+        .gc-total{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+        .gc-total-val{font-size:14px;font-weight:800;color:#06d6a0}
+        .gc-add{width:100%;margin-top:10px;padding:9px;border-radius:9px;border:1px dashed #3a86ff;background:rgba(58,134,255,.08);color:#3a86ff;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit}
+        body.tema-claro .gc-card{background:#f8fafc;border-color:#e2e8f0;color:#0f172a}
+        body.tema-claro .gc-desc{color:#0f172a;border-color:#cbd5e1}
+        body.tema-claro .gc-input{background:#fff;border-color:#cbd5e1;color:#0f172a}
+        body.tema-claro .gc-switch{border-color:#cbd5e1}body.tema-claro .gc-switch span{background:#fff}body.tema-claro .gc-switch span.on{background:#3a86ff;color:#fff}
         .sec-titulo { font-size:10px; font-weight:700; color:#3a86ff; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
 
         .btn-ver { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:12px; border-radius:10px; background:#0f1a30; border:1px solid #3a86ff33; color:#3a86ff; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; margin:0 16px; width:calc(100% - 32px); }
@@ -2614,6 +2639,9 @@ function abrirDetalle(idx) {
 // negocio — sin importar dónde esté el foco en ese instante — que es
 // lo que realmente importa proteger.
 function _hayTextoSinGuardarEnDetalle(idNegocio) {
+    // Editando un gasto (el cursor está en un campo de Gastos): no re-pintar
+    const act = document.activeElement;
+    if (act && act.closest && act.closest('#det-gastos-cot')) return true;
     const elNota = document.getElementById('nueva-nota-txt-' + idNegocio);
     if (elNota && elNota.value && elNota.value.trim()) return true;
     const elMensaje = document.getElementById('mensaje-nuevo-txt-cot');
@@ -2823,6 +2851,152 @@ function _renderFotosEquipos(carritoRaw) {
     }).join('');
     return fotos ? `<div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">${fotos}</div>` : '';
 }
+
+// ══════════════════════════════════════════════════════════════════
+// 💸 GASTOS DEL NEGOCIO (v2026.10.08.8) — Cristian: "agregá en Ventas los
+// gastos tal cual se ven en Servicio, para que los vendedores carguen sus
+// gastos en cada visita o negocio". Mismo funcionamiento que Servicio:
+// importe guardado en USD + moneda de la fila + TC del día de carga
+// (tc_al_cargar), quién lo cargó, a favor de quién, y estado
+// PENDIENTE/PAGADO. Se liquidan desde Cuenta Corriente (origen "VENTA").
+// Se guardan en cotizaciones/<id>/gastos (acción cot_actualizarGastos).
+// ══════════════════════════════════════════════════════════════════
+var TC_OFICIAL_COT = null;
+var _monedaTotalGastosCot = 'ARS';
+(async function _cargarTCCot() {
+    try {
+        var resp = await fetch('https://dolarapi.com/v1/dolares/oficial');
+        var data = await resp.json();
+        TC_OFICIAL_COT = parseFloat(data.venta) || null;
+    } catch (e) { TC_OFICIAL_COT = null; }
+    if (typeof cotActual !== 'undefined' && cotActual) _repintarGastosCot(cotActual);
+})();
+function _aMonedaGastoCot(montoUSD, moneda, tcOverride) {
+    var tc = tcOverride || TC_OFICIAL_COT;
+    if (moneda === 'ARS' && tc) return montoUSD * tc;
+    return montoUSD;
+}
+function _fmtMontoCot(n) { return Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+window._parseMontoCot = function(s) {
+    if (!s) return 0;
+    return parseFloat(String(s).trim().replace(/\./g, '').replace(',', '.')) || 0;
+};
+window._fmtMontoCotInput = function(el) { el.value = _fmtMontoCot(_parseMontoCot(el.value)); };
+function _idGastosCot(c) { return String(c.idCot || c.id_cotizacion || c.id || ''); }
+function _escG(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function _fechaHoraG(iso) { var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+function _cotPorIdGastos(id) {
+    if (cotActual && _idGastosCot(cotActual) === id) return cotActual;
+    return (typeof _buscarCotEnMemoria === 'function') ? _buscarCotEnMemoria(id) : null;
+}
+
+function _renderGastosCot(c) {
+    var id = _idGastosCot(c);
+    var soloLectura = (c.estado === 'Perdida');
+    if (c.gastos && !Array.isArray(c.gastos)) c.gastos = Object.values(c.gastos);
+    if (!Array.isArray(c.gastos)) c.gastos = [];
+    c.gastos.sort(function(a, b) { return (a.fecha || '').localeCompare(b.fecha || ''); });
+    var gastos = c.gastos;
+    var totalUSD = gastos.reduce(function(s, g) { return s + (parseFloat(g.importe) || 0); }, 0);
+    var totalMostrado = _aMonedaGastoCot(totalUSD, _monedaTotalGastosCot);
+    var tarjetas = gastos.length ? gastos.map(function(g, i) {
+        var moneda = g.moneda || 'USD';
+        var pagado = g.estado === 'PAGADO';
+        var badge = pagado ? '<span class="gc-pagado">✅ Liquidado</span>' : '';
+        var meta = (g.creado_por || badge) ? '<div class="gc-meta">' + _escG(g.creado_por || '') + (g.creado_en ? ' · ' + _fechaHoraG(g.creado_en) : '') + badge + '</div>' : '';
+        var tc = g.tc_al_cargar || TC_OFICIAL_COT;
+        if (soloLectura || pagado) {
+            var imp = _aMonedaGastoCot(parseFloat(g.importe) || 0, moneda, g.tc_al_cargar);
+            return '<div class="gc-card">' + meta +
+                '<div style="font-size:13px;font-weight:700;">' + _escG(g.descripcion || '—') + '</div>' +
+                '<div class="gc-sub">' + _escG(g.fecha || '—') + ' · ' + (moneda === 'ARS' ? 'AR$ ' : 'USD ') + _fmtMontoCot(imp) + (tc ? ' <span class="gc-tc">· TC $' + tc.toLocaleString('es-AR') + '</span>' : '') + '</div></div>';
+        }
+        var importeMostrado = moneda === 'ARS' ? _aMonedaGastoCot(parseFloat(g.importe) || 0, 'ARS', g.tc_al_cargar) : (g.importe || '');
+        return '<div class="gc-card">' + meta +
+            '<div class="gc-top">' +
+                '<input type="text" class="gc-desc" value="' + _escG(g.descripcion || '') + '" placeholder="Descripción del gasto (ej. nafta visita Dr. Pérez)..." onblur="_editarGastoCot(\'' + id + '\',' + i + ',\'descripcion\',this.value)">' +
+                '<button class="gc-del" title="Eliminar" onclick="_eliminarGastoCot(\'' + id + '\',' + i + ')">✕</button>' +
+            '</div>' +
+            '<div class="gc-grid">' +
+                '<div><label>Fecha</label><input type="date" class="gc-input" value="' + _escG(g.fecha || '') + '" onchange="_editarGastoCot(\'' + id + '\',' + i + ',\'fecha\',this.value)"></div>' +
+                '<div><label>Importe' + (moneda === 'ARS' && !tc ? ' <span style="color:#f8961e;">(cargando TC...)</span>' : '') + '</label>' +
+                    '<div class="gc-imp">' +
+                        '<div class="gc-switch" onclick="_toggleMonedaGastoCot(\'' + id + '\',' + i + ')" title="Cambiar moneda"><span class="' + (moneda !== 'ARS' ? 'on' : '') + '">USD</span><span class="' + (moneda === 'ARS' ? 'on' : '') + '">AR$</span></div>' +
+                        '<input type="text" inputmode="decimal" class="gc-input" value="' + _fmtMontoCot(importeMostrado) + '" placeholder="0,00" onfocus="this.select()" onblur="_fmtMontoCotInput(this); _editarGastoCot(\'' + id + '\',' + i + ',\'importe\',this.value)">' +
+                    '</div>' +
+                    (tc ? '<span class="gc-tc" style="display:block;margin-top:3px;">TC: $' + tc.toLocaleString('es-AR') + '</span>' : '') +
+                '</div>' +
+            '</div></div>';
+    }).join('') : '<div style="color:#64748b;padding:10px 6px;text-align:center;font-size:12px;">Sin gastos cargados en este negocio</div>';
+    return tarjetas +
+        '<div class="gc-total">' +
+            (TC_OFICIAL_COT ? '<span class="gc-tc">TC: $' + TC_OFICIAL_COT.toLocaleString('es-AR') + '</span>' : '') +
+            '<div class="gc-switch" onclick="_toggleMonedaTotalCot(\'' + id + '\')" title="Ver total en otra moneda"><span class="' + (_monedaTotalGastosCot !== 'ARS' ? 'on' : '') + '">USD</span><span class="' + (_monedaTotalGastosCot === 'ARS' ? 'on' : '') + '">AR$</span></div>' +
+            '<span style="font-size:11px;font-weight:700;color:#94a3b8;">Total:</span>' +
+            '<span class="gc-total-val">' + (_monedaTotalGastosCot === 'ARS' ? 'AR$ ' : 'USD ') + _fmtMontoCot(totalMostrado) + '</span>' +
+        '</div>' +
+        (!soloLectura ? '<button class="gc-add" onclick="_agregarGastoCot(\'' + id + '\')">+ Agregar gasto</button>' : '<div style="font-size:10px;color:#64748b;margin-top:6px;text-align:center;">Solo lectura — negocio perdido</div>');
+}
+function _repintarGastosCot(c) {
+    var el = document.getElementById('det-gastos-cot');
+    if (el && c && el.getAttribute('data-id') === _idGastosCot(c)) el.innerHTML = _renderGastosCot(c);
+}
+function _guardarGastosCot(id, gastos) {
+    fetch(SERVICIO_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ accion: 'cot_actualizarGastos', id_cotizacion: id, gastos: gastos }) })
+    .then(function(r) { return r.json(); })
+    .then(function(r) { if (!r.ok) alert('No se pudo guardar el gasto: ' + (r.error || '')); })
+    .catch(function() { alert('Error de conexión al guardar el gasto'); });
+}
+window._agregarGastoCot = function(id) {
+    var c = _cotPorIdGastos(id); if (!c) return;
+    if (!Array.isArray(c.gastos)) c.gastos = c.gastos ? Object.values(c.gastos) : [];
+    var autor = currentUserNombre || 'Desconocido';
+    var _hoyL = new Date(); var _hoyLocal = _hoyL.getFullYear() + '-' + String(_hoyL.getMonth() + 1).padStart(2, '0') + '-' + String(_hoyL.getDate()).padStart(2, '0');
+    c.gastos.push({ fecha: _hoyLocal, descripcion: '', importe: '', moneda: 'ARS', creado_por: autor, creado_en: new Date().toISOString(), a_favor_de: autor, estado: 'PENDIENTE', tc_al_cargar: TC_OFICIAL_COT || null });
+    _repintarGastosCot(c);
+    _guardarGastosCot(id, c.gastos);
+    var inputs = document.querySelectorAll('#det-gastos-cot .gc-desc');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+};
+window._editarGastoCot = function(id, idx, campo, valor) {
+    var c = _cotPorIdGastos(id); if (!c || !Array.isArray(c.gastos)) return;
+    var g = c.gastos[idx]; if (!g) return;
+    if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
+    if (campo === 'importe') {
+        var num = _parseMontoCot(valor);
+        var tc = g.tc_al_cargar || TC_OFICIAL_COT;
+        g.importe = (g.moneda === 'ARS' && tc) ? (num / tc) : num;
+    } else { g[campo] = valor; }
+    var totalUSD = c.gastos.reduce(function(s, gg) { return s + (parseFloat(gg.importe) || 0); }, 0);
+    var el = document.querySelector('#det-gastos-cot .gc-total-val');
+    if (el) el.textContent = (_monedaTotalGastosCot === 'ARS' ? 'AR$ ' : 'USD ') + _fmtMontoCot(_aMonedaGastoCot(totalUSD, _monedaTotalGastosCot));
+    _guardarGastosCot(id, c.gastos);
+};
+window._eliminarGastoCot = function(id, idx) {
+    var c = _cotPorIdGastos(id); if (!c || !Array.isArray(c.gastos)) return;
+    var g = c.gastos[idx];
+    if (g && g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede eliminar.'); return; }
+    if (g && (g.descripcion || g.importe) && !confirm('¿Eliminar el gasto "' + (g.descripcion || 'sin descripción') + '"?')) return;
+    c.gastos.splice(idx, 1);
+    _repintarGastosCot(c);
+    _guardarGastosCot(id, c.gastos);
+};
+window._toggleMonedaGastoCot = function(id, idx) {
+    var c = _cotPorIdGastos(id); if (!c || !Array.isArray(c.gastos) || !c.gastos[idx]) return;
+    var g = c.gastos[idx];
+    if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
+    if (g.moneda !== 'ARS' && !(g.tc_al_cargar || TC_OFICIAL_COT)) { alert('El tipo de cambio todavía no cargó — esperá unos segundos.'); return; }
+    g.moneda = (g.moneda === 'ARS') ? 'USD' : 'ARS';
+    _repintarGastosCot(c);
+    _guardarGastosCot(id, c.gastos);
+};
+window._toggleMonedaTotalCot = function(id) {
+    var c = _cotPorIdGastos(id); if (!c) return;
+    if (_monedaTotalGastosCot !== 'ARS' && !TC_OFICIAL_COT) { alert('El tipo de cambio todavía no cargó — esperá unos segundos.'); return; }
+    _monedaTotalGastosCot = (_monedaTotalGastosCot === 'ARS') ? 'USD' : 'ARS';
+    _repintarGastosCot(c);
+};
 
 function _renderDetalle(c) {
     const id      = c.idCot || c.id_cotizacion || String(c.id || '') || '—';
@@ -3130,6 +3304,12 @@ function _renderDetalle(c) {
     html += `<div style="padding:0 16px 12px;">
         <div class="sec-titulo">📎 Adjuntos</div>
         <div id="det-adjuntos-card-${id}"></div>
+    </div>`;
+
+    // ── 💸 GASTOS DEL NEGOCIO (v2026.10.08.8) — igual que en Servicio ──
+    html += `<div style="padding:0 16px 12px;">
+        <div class="sec-titulo">💸 Gastos del negocio / visitas</div>
+        <div id="det-gastos-cot" data-id="${id}">${_renderGastosCot(c)}</div>
     </div>`;
 
     // ── VERSIONES DE PRESUPUESTO ──────────────────────────────────

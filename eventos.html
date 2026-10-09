@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.08.8 (BUG: gastos y fechas de "hoy" cargados de noche quedaban con la fecha de mañana (se tomaba en hora UTC). Ahora usan la fecha local.) -->
 <!-- Portal TLC | eventos.html | v2026.10.08.7 (📋 Regulatoria — Cristian: "agregá un tablero en Regulatoria como el de eventos, para la programación de los registros médicos ante ANMAT, pendientes y estado de los trámites". Con ?modulo=regulatoria muestra los tableros de Regulatoria (permiso "Regulatoria"). Un tablero nuevo de Regulatoria arranca con columnas de trámite ANMAT. El menú ⋯ ahora ofrece pasar el tablero a cualquiera de los otros dos módulos.) -->
 <!-- Portal TLC | eventos.html | v2026.10.08.5 (🌐 Comercio Exterior — Cristian: "Verónica hizo un evento de Comex, que es todo un tablero, lo quiero pasar al menú Comercio Exterior... que aparezca un tablero Kanban". Este módulo ahora sirve para los dos: con ?modulo=comex muestra solo los tableros de Comercio Exterior (título, permiso "Comercio Exterior", crear tablero). En el menú ⋯ de cada tablero (Administrador): "🌐 Pasar a Comercio Exterior" / "📅 Pasar a Eventos" — mueve el tablero completo, no lo copia. Backend eventosChecklist v3 (ev_moverModulo).) -->
 <!-- Portal TLC | eventos.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
@@ -1286,7 +1287,7 @@ function _progresoAgregado(t) {
   checklists.forEach(function(g) { (g.items||[]).forEach(function(i){ total++; if (i.hecho) hechos++; }); });
   return { total: total, hechos: hechos, pct: total ? Math.round(hechos/total*100) : 0 };
 }
-function _hoyISOev() { return new Date().toISOString().slice(0,10); }
+function _hoyISOev() { return (function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})(); } // fecha local (antes UTC: de noche daba la de mañana)
 
 function _textoBusquedaTarjetaEv(t) {
   var checklistTxt = (t.checklists||[]).map(function(g) { return g.titulo + ' ' + (g.items||[]).map(function(i){return i.texto;}).join(' '); }).join(' ');
@@ -2620,7 +2621,7 @@ window._agregarGastoEv = function() {
   var t = _tarjetaActual();
   if (!t) return;
   if (!Array.isArray(t.gastos)) t.gastos = t.gastos ? Object.values(t.gastos) : [];
-  var hoy = new Date().toISOString().split('T')[0];
+  var hoy = (function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})(); // fecha local
   var autor = (_session && (_session.name || _session.username)) || 'Desconocido';
   // a_favor_de/estado — mismo criterio que servicio.html: quién debe
   // cobrar el gasto (por default, quien lo cargó) y si ya se liquidó.
