@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.09.1 (BUG Cristian: "Comercio exterior no abre en celular, cargando y empieza a parpadear la pantalla". La caché local guardaba el tablero de Comex como si fuera de Eventos (de antes de pasarlo) y la página se recargaba sin fin. Ahora la caché de otro módulo se ignora, solo el servidor decide si recargar, y nunca recarga 2 veces seguidas.) -->
 <!-- Portal TLC | eventos.html | v2026.10.08.8 (BUG: gastos y fechas de "hoy" cargados de noche quedaban con la fecha de mañana (se tomaba en hora UTC). Ahora usan la fecha local.) -->
 <!-- Portal TLC | eventos.html | v2026.10.08.7 (📋 Regulatoria — Cristian: "agregá un tablero en Regulatoria como el de eventos, para la programación de los registros médicos ante ANMAT, pendientes y estado de los trámites". Con ?modulo=regulatoria muestra los tableros de Regulatoria (permiso "Regulatoria"). Un tablero nuevo de Regulatoria arranca con columnas de trámite ANMAT. El menú ⋯ ahora ofrece pasar el tablero a cualquiera de los otros dos módulos.) -->
 <!-- Portal TLC | eventos.html | v2026.10.08.5 (🌐 Comercio Exterior — Cristian: "Verónica hizo un evento de Comex, que es todo un tablero, lo quiero pasar al menú Comercio Exterior... que aparezca un tablero Kanban". Este módulo ahora sirve para los dos: con ?modulo=comex muestra solo los tableros de Comercio Exterior (título, permiso "Comercio Exterior", crear tablero). En el menú ⋯ de cada tablero (Administrador): "🌐 Pasar a Comercio Exterior" / "📅 Pasar a Eventos" — mueve el tablero completo, no lo copia. Backend eventosChecklist v3 (ev_moverModulo).) -->
@@ -1020,18 +1021,28 @@ function _borrarEventoActual() {
 // separado de _abrirEvento para poder reusarlo tanto en el pintado
 // instantáneo desde caché como en la actualización silenciosa cuando
 // llega la respuesta real del backend.
-function _aplicarEventoActualEv(id, tarjetaId) {
+function _aplicarEventoActualEv(id, tarjetaId, desdeServidor) {
   // Si se abrió por link un tablero del otro módulo, la pantalla se adapta a él
   var moduloTablero = MODULOS_EV[EVENTO_ACTUAL.modulo] ? EVENTO_ACTUAL.modulo : 'eventos';
   if (moduloTablero !== MODULO_EV) {
     var vinoPorLink = new URLSearchParams(window.location.search).get('id') === id;
-    if (!vinoPorLink) {
+    // v2026.10.09.1 — BUG Cristian: "Comercio exterior no abre en celular,
+    // cargando y empieza a parpadear la pantalla". La caché local del
+    // celular tenía el tablero de Comex guardado de cuando todavía era de
+    // Eventos: se pintaba desde caché, parecía "de otro módulo" y la
+    // página se recargaba... y volvía a abrir el mismo desde la misma
+    // caché vieja: recarga infinita. Ahora solo se recarga si lo dice el
+    // servidor (dato fresco), y nunca dos veces seguidas.
+    var recargoRecien = false;
+    try { recargoRecien = (Date.now() - (+sessionStorage.getItem('ev_recarga_modulo') || 0)) < 20000; } catch (eSs) {}
+    if (!vinoPorLink && desdeServidor && !recargoRecien) {
       // Era el "último abierto" guardado, pero ese tablero ahora es del otro
       // módulo (lo pasaron): se olvida y se abre uno de este módulo.
-      try { localStorage.removeItem(_claveUltimoEv()); } catch (eLs) {}
+      try { localStorage.removeItem(_claveUltimoEv()); sessionStorage.setItem('ev_recarga_modulo', String(Date.now())); } catch (eLs) {}
       window.location.reload();
       return;
     }
+    if (!desdeServidor) return; // dato de caché dudoso: se espera la respuesta del servidor
     MODULO_EV = moduloTablero; _filtrarEventosModulo();
   }
   _textosModuloEv();
@@ -1099,6 +1110,10 @@ async function _abrirEvento(id, tarjetaId) {
     if (crudo) cacheado = JSON.parse(crudo);
   } catch(eCache) { cacheado = null; }
 
+  // Caché de un tablero que figura en OTRO módulo (ej. se pasó de Eventos
+  // a Comercio Exterior desde otro dispositivo): no se usa, se espera el
+  // dato real del servidor.
+  if (cacheado && (MODULOS_EV[cacheado.modulo] ? cacheado.modulo : 'eventos') !== MODULO_EV) cacheado = null;
   if (cacheado) {
     // Pintado instantáneo desde lo último guardado — sin spinner.
     EVENTO_ACTUAL = cacheado;
@@ -1151,7 +1166,7 @@ async function _abrirEvento(id, tarjetaId) {
       // Repinta siempre, tanto si fue la primera carga (sacando el
       // spinner) como si fue una actualización silenciosa sobre lo
       // que ya se veía desde caché.
-      _aplicarEventoActualEv(id, tarjetaId);
+      _aplicarEventoActualEv(id, tarjetaId, true);
     });
 
   if (!cacheado) {
