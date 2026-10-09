@@ -1,4 +1,8 @@
 // Portal TLC | Cloud Function — Cuenta Corriente y Rendición de Gastos
+// v4 — 2026.10.08 — 💸 Gastos de Ventas: cc_gastosOrigenes también devuelve
+//   los gastos de los negocios (cotizaciones/<id>/gastos, origen "venta"), y
+//   crearLiquidacion / revertirLiquidacion los marcan y desmarcan igual que
+//   los de Servicio y Eventos.
 // v3 — 2026.10.05 — Los gastos en pesos se liquidan con el TC del día en que se
 //   cargaron (tc_al_cargar), no con el de hoy. Gastos generales guardan su TC.
 // v2 — 2026.10.05 — eliminarGastoGeneral (borrar un gasto pendiente).
@@ -68,7 +72,7 @@ async function obtenerTCOficial() {
 // gastos COMPLETO (el frontend lo necesita para editar/agregar sin pisar
 // los de otros) y solo los datos que muestra Cuenta Corriente.
 async function cc_gastosOrigenes() {
-  const [st, ev] = await Promise.all([fbGet('servicio_tecnico'), fbGet('eventos')]);
+  const [st, ev, cots] = await Promise.all([fbGet('servicio_tecnico'), fbGet('eventos'), fbGet('cotizaciones')]);
   const servicio = {};
   Object.keys(st || {}).forEach((id) => {
     const t = st[id];
@@ -91,7 +95,17 @@ async function cc_gastosOrigenes() {
     });
     if (Object.keys(tarjetas).length) eventos[idEvento] = { nombre: e.nombre || '', tarjetas };
   });
-  return { ok: true, servicio, eventos };
+  // v4: gastos de los negocios de Ventas
+  const ventas = {};
+  Object.keys(cots || {}).forEach((key) => {
+    const c = cots[key];
+    if (!c || !c.gastos) return;
+    const gastos = comoArray(c.gastos);
+    if (!gastos.length) return;
+    const cliente = c.razonSocial || (c.empresa && c.empresa.razonSocial) || (c.cliente && c.cliente.nombre) || c.nombreMedico || '';
+    ventas[key] = { id_cot: c.idCot || c.id_cotizacion || key, cliente, vendedor: c.vendedor || '', gastos };
+  });
+  return { ok: true, servicio, eventos, ventas };
 }
 
 // ── Gastos generales ────────────────────────────────────────────────
@@ -205,6 +219,7 @@ async function listarLiquidaciones(data) {
 function rutaGastosOrigen(item) {
   if (item.origen_tipo === 'servicio') return 'servicio_tecnico/' + String(item.id_ticket || '').trim() + '/gastos';
   if (item.origen_tipo === 'evento') return 'eventos/' + String(item.id_evento || '').trim() + '/tarjetas/' + String(item.id_tarjeta || '').trim() + '/gastos';
+  if (item.origen_tipo === 'venta') return 'cotizaciones/' + rtdbKeySeguro(String(item.id_cot || '').trim()) + '/gastos';
   return null;
 }
 
@@ -280,6 +295,7 @@ async function crearLiquidacion(data) {
     detalleItems.push({
       concepto: g.descripcion || '', fecha: g.fecha || '', moneda, monto, cargado_por: g.creado_por || '', origen_tipo: item.origen_tipo,
       origen_id: item.origen_tipo === 'servicio' ? String(item.id_ticket || '')
+        : item.origen_tipo === 'venta' ? String(item.id_cot || '')
         : item.origen_tipo === 'evento' ? (String(item.id_evento || '') + '/' + String(item.id_tarjeta || ''))
         : String(item.id_gasto || ''),
       origen_label: String(item.origen_label || '').trim(),
@@ -334,9 +350,10 @@ async function revertirLiquidacion(data) {
   const generales = [];
   const noEncontrados = [];
   for (const item of detalleItems) {
-    if (item.origen_tipo === 'servicio' || item.origen_tipo === 'evento') {
+    if (item.origen_tipo === 'servicio' || item.origen_tipo === 'evento' || item.origen_tipo === 'venta') {
       let ruta;
       if (item.origen_tipo === 'servicio') ruta = 'servicio_tecnico/' + String(item.origen_id || '').trim() + '/gastos';
+      else if (item.origen_tipo === 'venta') ruta = 'cotizaciones/' + rtdbKeySeguro(String(item.origen_id || '').trim()) + '/gastos';
       else { const p = String(item.origen_id || '').split('/'); ruta = 'eventos/' + p[0] + '/tarjetas/' + p[1] + '/gastos'; }
       necesarios[ruta] = (necesarios[ruta] || 0) + 1;
     } else if (item.origen_tipo === 'general') {
