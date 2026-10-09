@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | etiqueta-despacho.html | v2026.10.09.3 (Pedido de Lourdes vía Cristian: (1) REMITENTE con razón social, CUIT 30-71488078-7, Pasaje del Carmen 716 CABA y contacto Lourdes Dávalos cel 11 6955-8531. (2) DESTINATARIO ordenado: Nombre/Razón social · CUIT · Dirección · Localidad – Provincia – CP · Contacto y celular. Se completa solo desde la Empresa/Negocio vinculado y se puede corregir en el panel "Datos del destinatario" antes de imprimir (queda recordado para esa orden y esa empresa). (3) El contenido ya no es un packing list que se corta: una descripción (ej. "Lupas VOLK V20LC") y la cantidad total de ítems de la caja.) -->
 <!-- Portal TLC | etiqueta-despacho.html | v2026.08.27.2 (Rediseño de los Carteles de Frágil (v2026.08.27.1) — ahora traen los 3 íconos de manipulación completos y bien grandes (🍸 FRÁGIL, ⬆⬆ ESTE LADO ARRIBA, ☔ MANTENER SECO — los mismos símbolos ya usados en el header de la etiqueta principal, acá mucho más grandes), en fila, más el logo de TLC arriba a la izquierda. Reemplaza el diseño anterior (solo un símbolo de copa + subtexto). Pedido por Cristian con captura de referencia: "en los carteles de Fragil, agregar grande todos esto de la imagen 1 y colocar el logo de TLC arriba a la izquierda". Confirmado con test: cada cartel trae los 3 íconos+textos completos y el logo real de TLC.) -->
 <!-- Portal TLC | etiqueta-despacho.html | v2026.08.27.1 (3 pedidos de Cristian: (1) Selector de tamaño 100×150mm (térmica, default) / A4 — mismo diseño exacto, escalado x2 con transform:scale dentro de una hoja A4 normal para quien no tiene impresora térmica. (2) Campo "N° de Remito" OBLIGATORIO en el toolbar — se completa a mano, bloquea la impresión (de etiquetas y de carteles de frágil) hasta cargarlo, y se refleja en vivo en el pie de cada etiqueta ya renderizada. (3) Nuevo botón "⚠️ Imprimir Carteles de Frágil (A4)" — genera 4 carteles por caja (uno por lado), en A4 apaisado, con el símbolo de frágil bien grande, para pegar en los costados de la caja — no reemplazan la etiqueta de destinatario, son avisos de manipulación aparte. El @page real (tamaño de hoja al imprimir) ahora se inyecta dinámicamente por JS según el modo elegido, ya que @page no admite selectores por clase CSS. Pedido: "las etiquetas necesito elegir el tamaño 100 x 100 o A4" (aclarado después: es 100x150, el actual) "Agregar un campo en la etiqueta que sea obligatorio completar el numero de remito manualmente" / "dame la opción para que se pueda elegir tamaño a cuatro. Y también quiero que me agregues carteles de frágil en a cuatro apaisado, para pegar también por todos lados de la caja". Confirmado con 5 tests: sin remito no imprime nada y avisa; cargar el remito se refleja en vivo en las etiquetas ya pintadas; imprime con 100x150 por defecto; cambiar a A4 usa el @page correcto; los carteles de frágil generan 4 por caja en A4 apaisado.) -->
 <!-- Portal TLC | etiqueta-despacho.html | v2026.08.10.1 (Página nueva — imprime una etiqueta térmica de 100×150mm por cada caja asignada en el modal "Asignación de Cajas" de servicio.html. Diseño calcado del archivo de referencia etiqueta-despacho-100x150.html que armó Cristian (header con logo + íconos de manipulación, indicador CAJA X DE N, bloque Destinatario/Remitente, packing list de esa caja, footer con N° de orden + QR de verificación). Lee ?ticket=ID, trae el ticket completo de Firebase (servicio_tecnico/{id}) y usa t.etiquetas_cajas (guardado por st_guardarEtiquetasCajas, ver FotoMap.gs v171). Cada etiqueta es su propia página física — @page:100mm×150mm, page-break-after:always entre cajas, un solo click en "Imprimir todas las etiquetas" manda todo el lote a la impresora térmica de una vez. Parte del circuito "Etiquetas de Despacho" pedido por Cristian.) -->
@@ -93,6 +94,22 @@
   .packing-table .qty { width:12mm; text-align:center; }
   .packing-table .serial { width:27mm; font-weight:900; }
 
+  .recipient-lines { display:flex; flex-direction:column; gap:.9mm; }
+  .recipient-line { font-size:3.8mm; font-weight:800; line-height:1.13; text-transform:uppercase; overflow-wrap:anywhere; }
+  .recipient-line .rl-k { color:var(--muted); font-size:2.4mm; font-weight:900; letter-spacing:.3px; margin-right:1mm; }
+  .recipient-line.vacio { color:#b91c1c; }
+  .content-box { min-height:24mm; display:flex; align-items:stretch; border:1px solid var(--line-strong); border-radius:2mm; overflow:hidden; background:var(--white); }
+  .content-desc { flex:1; min-width:0; padding:2mm 2.7mm; display:flex; flex-direction:column; justify-content:center; }
+  .content-desc .cd-txt { font-size:6mm; font-weight:900; line-height:1.1; text-transform:uppercase; overflow-wrap:anywhere; margin-top:.8mm; }
+  .content-qty { flex:0 0 26mm; background:var(--ink); color:var(--white); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:1.5mm; }
+  .content-qty b { font-size:11mm; font-weight:900; line-height:1; }
+  .content-qty span { font-size:2.3mm; font-weight:900; letter-spacing:.4px; margin-top:.8mm; }
+  .dest-form { display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+  .dest-form label { display:block; font-size:10px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+  .dest-form input { width:100%; padding:8px 10px; border:1px solid var(--line-strong); border-radius:7px; font-size:12.5px; font-weight:700; }
+  .dest-form input.falta { border-color:#f59e0b; background:#fffbeb; }
+  .dest-form .full { grid-column:1 / -1; }
+  @media (max-width:560px) { .dest-form { grid-template-columns:1fr; } }
   .label-footer { min-height:17mm; margin-top:auto; padding-top:2mm; display:flex; align-items:center; justify-content:space-between; gap:3mm; border-top:2px solid var(--ink); }
   .verification-copy { min-width:0; flex:1 1 auto; }
   .verification-title { margin-bottom:1mm; font-size:8px; font-weight:900; letter-spacing:.45px; text-transform:uppercase; }
@@ -184,6 +201,17 @@
       <div id="remito-error" style="display:none;color:#dc2626;font-size:11px;font-weight:700;margin-top:4px;">Completá el número de remito antes de imprimir.</div>
     </div>
   </div>
+  <div class="dest-form" id="dest-form">
+    <div class="full" style="font-size:11px;font-weight:900;color:var(--ink);">📦 Datos del destinatario <span style="font-weight:600;color:var(--muted);">— se completan solos desde la Empresa; corregí lo que haga falta (queda guardado)</span></div>
+    <div class="full"><label>Nombre / Razón social</label><input id="d-nombre" oninput="_cambioDest()"></div>
+    <div><label>CUIT</label><input id="d-cuit" oninput="_cambioDest()" placeholder="30-00000000-0"></div>
+    <div><label>Dirección</label><input id="d-direccion" oninput="_cambioDest()" placeholder="Calle y número, piso, depto"></div>
+    <div class="full"><label>Localidad – Provincia – CP</label><input id="d-localidad" oninput="_cambioDest()" placeholder="Ej: Rosario – Santa Fe – 2000"></div>
+    <div><label>Contacto (quien recibe)</label><input id="d-contacto" oninput="_cambioDest()"></div>
+    <div><label>Celular</label><input id="d-celular" oninput="_cambioDest()"></div>
+    <div><label>Transporte / Expreso</label><input id="d-transporte" oninput="_cambioDest()" placeholder="Ej: Vía Cargo"></div>
+    <div><label>Contenido (descripción)</label><input id="d-contenido" oninput="_cambioDest()" placeholder="Automático — ej: Lupas VOLK V20LC"></div>
+  </div>
   <div class="toolbar-botones" style="margin-top:14px;">
     <button class="btn-accion btn-volver" type="button" onclick="window._volverEtiquetas()">&#8592; Volver</button>
     <button class="btn-accion btn-pdf" type="button" onclick="_imprimirEtiquetas()">🖨 Imprimir todas las etiquetas</button>
@@ -209,6 +237,16 @@ var _remitoActual = '';
 var _tamanoActual = '100x150'; // '100x150' | 'a4'
 var _ticketActual = null;
 var _cantCajasActual = 0;
+var REMITENTE = {
+  razon: 'Tecnología Láser Corneal S.R.L.',
+  cuit: '30-71488078-7',
+  direccion: 'Pasaje del Carmen 716, CABA',
+  contacto: 'Lourdes Dávalos',
+  celular: '11 6955-8531',
+};
+var _dest = { nombre:'', cuit:'', direccion:'', localidad:'', contacto:'', celular:'', transporte:'', contenido:'' };
+var _empresaIdActual = '';
+var CAMPOS_DEST = ['nombre','cuit','direccion','localidad','contacto','celular','transporte','contenido'];
 
 // El @page real (tamaño de hoja al imprimir) se inyecta acá — no
 // puede ser una regla CSS fija en el <style>, porque @page no admite
@@ -349,6 +387,23 @@ function mostrarError(titulo, mensaje, conReintento) {
     (conReintento ? '<button class="btn-reintentar" onclick="location.reload()">Reintentar</button>' : '');
 }
 
+// Nombre corto de un ítem: lo que va antes de " — " (la descripción larga
+// del catálogo no entra en la etiqueta).
+function nombreCorto(item) {
+  var d = String(item.descripcion || item.sku || '').split(/\s+[—–-]\s+/)[0].trim();
+  return d || 'Equipo';
+}
+function cantidadItems(items) {
+  return (items || []).reduce(function(s, it) { return s + (parseInt(it.cantidad, 10) || 1); }, 0);
+}
+function contenidoAuto(items) {
+  var nombres = [];
+  (items || []).forEach(function(it) { var n = nombreCorto(it); if (nombres.indexOf(n) === -1) nombres.push(n); });
+  if (!nombres.length) return '—';
+  if (nombres.length <= 2) return nombres.join(' + ');
+  return nombres.slice(0, 2).join(' + ') + ' y ' + (nombres.length - 2) + ' más';
+}
+
 function renderItems(items) {
   return (items || []).map(function(item) {
     return '<tr>' +
@@ -365,12 +420,12 @@ function renderItems(items) {
 // lote entero a la impresora térmica de una vez, una hoja física de
 // 100×150mm por caja.
 function renderEtiquetaCaja(t, caja, totalCajas, urlQr) {
-  var destinatario = {
-    nombre: t.cliente || '—',
-    direccion: t.domicilio_envio || t.domicilio || 'Sin cargar',
-    telefono: t.telefono || '—',
-    transporte: t.etiquetas_transporte || 'Sin especificar',
+  var d = _dest;
+  var linea = function(k, v) {
+    return '<div class="recipient-line' + (v ? '' : ' vacio') + '">' + (k ? '<span class="rl-k">' + k + '</span>' : '') + esc(v || 'Falta completar') + '</div>';
   };
+  var contacto = [d.contacto, d.celular ? 'Cel ' + d.celular : ''].filter(Boolean).join(' · ');
+  var totalItems = cantidadItems(caja.items);
   return '' +
     '<div class="label-shell">' +
       '<main class="shipping-label" aria-label="Etiqueta térmica de despacho">' +
@@ -387,25 +442,26 @@ function renderEtiquetaCaja(t, caja, totalCajas, urlQr) {
 
         '<section class="recipient-block block">' +
           '<div class="recipient-heading"><strong>DESTINATARIO</strong><span>SHIP TO</span></div>' +
-          '<div class="recipient-name">' + esc(destinatario.nombre) + '</div>' +
-          '<div class="recipient-address">' + esc(destinatario.direccion) + '</div>' +
-          '<div class="recipient-details">' +
-            '<div><span class="detail-label">Teléfono</span><span class="detail-value">' + esc(destinatario.telefono) + '</span></div>' +
-            '<div><span class="detail-label">Transporte / Expreso</span><span class="detail-value">' + esc(destinatario.transporte) + '</span></div>' +
+          '<div class="recipient-name">' + esc(d.nombre || '—') + '</div>' +
+          '<div class="recipient-lines">' +
+            linea('CUIT', d.cuit) +
+            linea('', d.direccion) +
+            linea('', d.localidad) +
+            linea('Recibe', contacto) +
+            (d.transporte ? linea('Transporte', d.transporte) : '') +
           '</div>' +
         '</section>' +
 
         '<section class="sender-block block">' +
           '<div class="sender-title"><div class="section-kicker">Remitente<br>From</div></div>' +
-          '<div class="sender-copy"><strong>TECNOLOGÍA LÁSER CORNEAL S.R.L.</strong><br>Pasaje del Carmen 716 LOCAL PB CABA</div>' +
+          '<div class="sender-copy"><strong>' + esc(REMITENTE.razon.toUpperCase()) + '</strong><br>CUIT ' + esc(REMITENTE.cuit) + '<br>' +
+            esc(REMITENTE.direccion) + '<br>' + esc(REMITENTE.contacto) + ' · Cel ' + esc(REMITENTE.celular) + '</div>' +
         '</section>' +
 
-        '<section class="packing-section">' +
-          '<div class="packing-title"><div class="section-kicker">Contenido de esta caja · Packing list sin precios</div></div>' +
-          '<table class="packing-table">' +
-            '<thead><tr><th class="qty">Cant.</th><th>Equipo / Descripción</th><th class="serial">N° de Serie</th></tr></thead>' +
-            '<tbody>' + renderItems(caja.items) + '</tbody>' +
-          '</table>' +
+        '<section class="content-box">' +
+          '<div class="content-desc"><div class="section-kicker">Contenido de esta caja</div>' +
+            '<div class="cd-txt">' + esc(d.contenido || contenidoAuto(caja.items)) + '</div></div>' +
+          '<div class="content-qty"><b>' + totalItems + '</b><span>' + (totalItems === 1 ? 'ÍTEM' : 'ÍTEMS') + '</span></div>' +
         '</section>' +
 
         '<footer class="label-footer">' +
@@ -419,6 +475,81 @@ function renderEtiquetaCaja(t, caja, totalCajas, urlQr) {
         '</footer>' +
       '</main>' +
     '</div>';
+}
+
+var _urlQrActual = '';
+function _repintarEtiquetas() {
+  var t = _ticketActual; if (!t) return;
+  var cajas = Array.isArray(t.etiquetas_cajas) ? t.etiquetas_cajas : [];
+  document.getElementById('labels-root').innerHTML = cajas.map(function(caja) {
+    return renderEtiquetaCaja(t, caja, cajas.length, _urlQrActual);
+  }).join('');
+}
+
+// ── Datos del destinatario ──────────────────────────────────────
+// Se arman desde la Empresa vinculada al negocio (CUIT, domicilio de
+// envío), el negocio (contacto) y la orden. Lo que se corrija a mano
+// queda guardado en este navegador para esta orden y para la empresa
+// (así la próxima orden del mismo cliente ya trae Localidad/CP).
+function _claveDestTicket() { return 'tlc_etq_dest_' + (_ID_TICKET || ''); }
+function _claveDestEmpresa() { return _empresaIdActual ? 'tlc_etq_dest_emp_' + _empresaIdActual : ''; }
+function _leerLS(k) { try { return k ? JSON.parse(localStorage.getItem(k) || 'null') : null; } catch (e) { return null; } }
+function _guardarDest() {
+  try {
+    localStorage.setItem(_claveDestTicket(), JSON.stringify(_dest));
+    var ke = _claveDestEmpresa();
+    if (ke) { var c = Object.assign({}, _dest); delete c.contenido; localStorage.setItem(ke, JSON.stringify(c)); }
+  } catch (e) {}
+}
+function _pintarFormDest() {
+  CAMPOS_DEST.forEach(function(k) {
+    var el = document.getElementById('d-' + k); if (!el) return;
+    el.value = _dest[k] || '';
+    el.classList.toggle('falta', !_dest[k] && k !== 'transporte' && k !== 'contenido');
+  });
+}
+var _timerDest = null;
+window._cambioDest = function() {
+  CAMPOS_DEST.forEach(function(k) {
+    var el = document.getElementById('d-' + k); if (!el) return;
+    _dest[k] = el.value.trim();
+    el.classList.toggle('falta', !_dest[k] && k !== 'transporte' && k !== 'contenido');
+  });
+  clearTimeout(_timerDest);
+  _timerDest = setTimeout(function() { _guardarDest(); _repintarEtiquetas(); }, 250);
+};
+function _getJSON(path) {
+  return fetch(FIREBASE_DB_URL + '/' + path + '.json?_=' + Date.now(), { cache:'no-store' })
+    .then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; });
+}
+function _rtdbKey(id) {
+  var c = String(id || '').trim().replace(/[.#$[\]\/]/g, '_').replace(/[\s+]/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '');
+  return c.length > 200 ? c.substring(0, 200) : c;
+}
+async function _armarDestinatario(t) {
+  var neg = t.negocio_id ? await _getJSON('cotizaciones/' + encodeURIComponent(_rtdbKey(t.negocio_id))) : null;
+  _empresaIdActual = (neg && neg.empresaId) ? String(neg.empresaId) : '';
+  var emp = _empresaIdActual ? await _getJSON('empresas/' + encodeURIComponent(_empresaIdActual)) : null;
+  var contactoNeg = (neg && neg.contacto) || {};
+  var auto = {
+    nombre: (emp && emp.razonSocial) || (neg && (neg.razonSocial || (neg.empresa && neg.empresa.razonSocial))) || t.cliente || '',
+    cuit: (emp && emp.cuit) || (neg && neg.cuit) || '',
+    direccion: t.domicilio_envio || (emp && (emp.domicilioEnvio || emp.domicilioComercial || emp.domicilio)) || t.domicilio || '',
+    localidad: '',
+    contacto: contactoNeg.nombre || (neg && neg.nombreMedico) || t.nombre_medico || '',
+    celular: contactoNeg.telefono || (neg && neg.telefono) || t.telefono || '',
+    transporte: t.etiquetas_transporte || '',
+    contenido: '',
+  };
+  // Prioridad: lo corregido para ESTA orden > lo corregido para la empresa > automático
+  var deEmpresa = _leerLS(_claveDestEmpresa()) || {};
+  var deTicket = _leerLS(_claveDestTicket()) || {};
+  CAMPOS_DEST.forEach(function(k) {
+    _dest[k] = (deTicket[k] != null && deTicket[k] !== '') ? deTicket[k]
+             : (deEmpresa[k] != null && deEmpresa[k] !== '' && k !== 'contenido') ? deEmpresa[k]
+             : auto[k];
+  });
+  _pintarFormDest();
 }
 
 function renderTodasLasEtiquetas(t) {
@@ -435,9 +566,8 @@ function renderTodasLasEtiquetas(t) {
   var urlTicket = 'https://ir.tlcsrl.com.ar/servicio.html?ticket=' + encodeURIComponent(t.id_ticket);
   var urlQr = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(urlTicket);
 
-  document.getElementById('labels-root').innerHTML = cajas.map(function(caja) {
-    return renderEtiquetaCaja(t, caja, cajas.length, urlQr);
-  }).join('');
+  _urlQrActual = urlQr;
+  _repintarEtiquetas();
 
   document.title = 'Etiquetas de Despacho — ' + (t.id_ticket || '') + ' (' + cajas.length + ')';
   document.getElementById('toolbar-cantidad').textContent = cajas.length;
@@ -453,7 +583,7 @@ function cargarTicket(id) {
     .then(function(t) {
       if (!t) { mostrarError('No encontramos esa orden', 'No hay ningún ticket con el ID “' + id + '”.', false); return; }
       if (!t.id_ticket) t.id_ticket = id;
-      renderTodasLasEtiquetas(t);
+      return _armarDestinatario(t).catch(function(e) { console.warn('destinatario:', e); }).then(function() { renderTodasLasEtiquetas(t); });
     })
     .catch(function() {
       mostrarError('Error de conexión', 'No se pudo conectar con Firebase. Revisá la conexión a internet y volvé a intentar.', true);
