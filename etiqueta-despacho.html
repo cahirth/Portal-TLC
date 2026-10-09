@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | etiqueta-despacho.html | v2026.10.09.5 (Pedido de Lourdes, con su imagen de referencia: Destinatario queda igual. Remitente con recuadro y letra del mismo tamaño que el Destinatario (presentación equilibrada, fácil de leer). Se elimina la sección "Contenido de esta caja" y su campo en el panel.) -->
 <!-- Portal TLC | etiqueta-despacho.html | v2026.10.09.3 (Pedido de Lourdes vía Cristian: (1) REMITENTE con razón social, CUIT 30-71488078-7, Pasaje del Carmen 716 CABA y contacto Lourdes Dávalos cel 11 6955-8531. (2) DESTINATARIO ordenado: Nombre/Razón social · CUIT · Dirección · Localidad – Provincia – CP · Contacto y celular. Se completa solo desde la Empresa/Negocio vinculado y se puede corregir en el panel "Datos del destinatario" antes de imprimir (queda recordado para esa orden y esa empresa). (3) El contenido ya no es un packing list que se corta: una descripción (ej. "Lupas VOLK V20LC") y la cantidad total de ítems de la caja.) -->
 <!-- Portal TLC | etiqueta-despacho.html | v2026.08.27.2 (Rediseño de los Carteles de Frágil (v2026.08.27.1) — ahora traen los 3 íconos de manipulación completos y bien grandes (🍸 FRÁGIL, ⬆⬆ ESTE LADO ARRIBA, ☔ MANTENER SECO — los mismos símbolos ya usados en el header de la etiqueta principal, acá mucho más grandes), en fila, más el logo de TLC arriba a la izquierda. Reemplaza el diseño anterior (solo un símbolo de copa + subtexto). Pedido por Cristian con captura de referencia: "en los carteles de Fragil, agregar grande todos esto de la imagen 1 y colocar el logo de TLC arriba a la izquierda". Confirmado con test: cada cartel trae los 3 íconos+textos completos y el logo real de TLC.) -->
 <!-- Portal TLC | etiqueta-despacho.html | v2026.08.27.1 (3 pedidos de Cristian: (1) Selector de tamaño 100×150mm (térmica, default) / A4 — mismo diseño exacto, escalado x2 con transform:scale dentro de una hoja A4 normal para quien no tiene impresora térmica. (2) Campo "N° de Remito" OBLIGATORIO en el toolbar — se completa a mano, bloquea la impresión (de etiquetas y de carteles de frágil) hasta cargarlo, y se refleja en vivo en el pie de cada etiqueta ya renderizada. (3) Nuevo botón "⚠️ Imprimir Carteles de Frágil (A4)" — genera 4 carteles por caja (uno por lado), en A4 apaisado, con el símbolo de frágil bien grande, para pegar en los costados de la caja — no reemplazan la etiqueta de destinatario, son avisos de manipulación aparte. El @page real (tamaño de hoja al imprimir) ahora se inyecta dinámicamente por JS según el modo elegido, ya que @page no admite selectores por clase CSS. Pedido: "las etiquetas necesito elegir el tamaño 100 x 100 o A4" (aclarado después: es 100x150, el actual) "Agregar un campo en la etiqueta que sea obligatorio completar el numero de remito manualmente" / "dame la opción para que se pueda elegir tamaño a cuatro. Y también quiero que me agregues carteles de frágil en a cuatro apaisado, para pegar también por todos lados de la caja". Confirmado con 5 tests: sin remito no imprime nada y avisa; cargar el remito se refleja en vivo en las etiquetas ya pintadas; imprime con 100x150 por defecto; cambiar a A4 usa el @page correcto; los carteles de frágil generan 4 por caja en A4 apaisado.) -->
@@ -69,6 +70,11 @@
   .block { border:1px solid var(--line-strong); border-radius:2mm; background:var(--surface); }
   .section-kicker { font-size:7.7px; font-weight:900; letter-spacing:.8px; line-height:1; text-transform:uppercase; color:var(--muted); }
 
+  .remitente-block { min-height:0; margin-top:2.5mm; }
+  .remitente-block .recipient-heading { flex-direction:column; align-items:flex-start; gap:.2mm; }
+  .remitente-block .recipient-heading strong { color:var(--muted); }
+  .remitente-block .recipient-name { font-size:4.4mm; }
+  .remitente-block .recipient-line { text-transform:none; font-weight:600; font-size:3.9mm; }
   .recipient-block { min-height:39mm; padding:2.7mm 3mm 2.5mm; display:flex; flex-direction:column; justify-content:flex-start; }
   .recipient-heading { display:flex; align-items:baseline; justify-content:space-between; gap:2mm; margin-bottom:1.8mm; }
   .recipient-heading strong { color:var(--ink); font-size:11px; font-weight:900; letter-spacing:.4px; }
@@ -209,8 +215,7 @@
     <div class="full"><label>Localidad – Provincia – CP</label><input id="d-localidad" oninput="_cambioDest()" placeholder="Ej: Rosario – Santa Fe – 2000"></div>
     <div><label>Contacto (quien recibe)</label><input id="d-contacto" oninput="_cambioDest()"></div>
     <div><label>Celular</label><input id="d-celular" oninput="_cambioDest()"></div>
-    <div><label>Transporte / Expreso</label><input id="d-transporte" oninput="_cambioDest()" placeholder="Ej: Vía Cargo"></div>
-    <div><label>Contenido (descripción)</label><input id="d-contenido" oninput="_cambioDest()" placeholder="Automático — ej: Lupas VOLK V20LC"></div>
+    <div class="full"><label>Transporte / Expreso</label><input id="d-transporte" oninput="_cambioDest()" placeholder="Ej: Vía Cargo"></div>
   </div>
   <div class="toolbar-botones" style="margin-top:14px;">
     <button class="btn-accion btn-volver" type="button" onclick="window._volverEtiquetas()">&#8592; Volver</button>
@@ -452,16 +457,14 @@ function renderEtiquetaCaja(t, caja, totalCajas, urlQr) {
           '</div>' +
         '</section>' +
 
-        '<section class="sender-block block">' +
-          '<div class="sender-title"><div class="section-kicker">Remitente<br>From</div></div>' +
-          '<div class="sender-copy"><strong>' + esc(REMITENTE.razon.toUpperCase()) + '</strong><br>CUIT ' + esc(REMITENTE.cuit) + '<br>' +
-            esc(REMITENTE.direccion) + '<br>' + esc(REMITENTE.contacto) + ' · Cel ' + esc(REMITENTE.celular) + '</div>' +
-        '</section>' +
-
-        '<section class="content-box">' +
-          '<div class="content-desc"><div class="section-kicker">Contenido de esta caja</div>' +
-            '<div class="cd-txt">' + esc(d.contenido || contenidoAuto(caja.items)) + '</div></div>' +
-          '<div class="content-qty"><b>' + totalItems + '</b><span>' + (totalItems === 1 ? 'ÍTEM' : 'ÍTEMS') + '</span></div>' +
+        '<section class="recipient-block block remitente-block">' +
+          '<div class="recipient-heading"><strong>REMITENTE</strong><span>FROM</span></div>' +
+          '<div class="recipient-name">' + esc(REMITENTE.razon) + '</div>' +
+          '<div class="recipient-lines">' +
+            '<div class="recipient-line">CUIT ' + esc(REMITENTE.cuit) + '</div>' +
+            '<div class="recipient-line">' + esc(REMITENTE.direccion) + '</div>' +
+            '<div class="recipient-line">' + esc(REMITENTE.contacto) + ' · Cel ' + esc(REMITENTE.celular) + '</div>' +
+          '</div>' +
         '</section>' +
 
         '<footer class="label-footer">' +
