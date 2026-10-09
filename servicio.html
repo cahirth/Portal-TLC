@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.09.6 (Campanita: los avisos de la Agenda (invitaciones, cambios, cancelaciones) abren el evento en calendario.html.) -->
 <!-- Portal TLC | servicio.html | v2026.10.09.2 (Cristian: acceso rápido "desde Preparación en ST al Negocio". En toda Orden de Preparación (y sus entregas parciales) aparece arriba la franja "💼 Negocio en Ventas — Ver negocio ›" que abre ese negocio en Ventas.) -->
 <!-- Portal TLC | servicio.html | v2026.10.08.8 (BUG: un gasto cargado de noche (después de las 21) quedaba con la fecha de mañana, porque se tomaba la fecha en hora UTC. Ahora usa la fecha local.) -->
 <!-- Portal TLC | servicio.html | v2026.10.08.3 (Cristian: "¿cómo sé qué hizo cada uno en el día?". Acceso a "📊 Parte del día" (parte.html) desde Prioridades del equipo y desde Carga del equipo. Cada acción queda registrada con quién la hizo (version.js agrega el autor a los pedidos; función servicio v13).) -->
@@ -4395,6 +4396,7 @@ window._clickNotificacion = function(ev, idNoti, ticketId, origen, tarjetaId) {
   document.getElementById('campana-panel').style.display = 'none';
   if (!ticketId) return;
 
+  if (origen === 'agenda') { window.location.href = 'calendario.html?evento=' + encodeURIComponent(ticketId); return; }
   if (origen === 'cotizacion') {
     window.location.href = 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(ticketId);
     return;

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.09.6 (Campanita: los avisos de la Agenda (invitaciones, cambios, cancelaciones) abren el evento en calendario.html.) -->
 <!-- Portal TLC | eventos.html | v2026.10.09.1 (BUG Cristian: "Comercio exterior no abre en celular, cargando y empieza a parpadear la pantalla". La caché local guardaba el tablero de Comex como si fuera de Eventos (de antes de pasarlo) y la página se recargaba sin fin. Ahora la caché de otro módulo se ignora, solo el servidor decide si recargar, y nunca recarga 2 veces seguidas.) -->
 <!-- Portal TLC | eventos.html | v2026.10.08.8 (BUG: gastos y fechas de "hoy" cargados de noche quedaban con la fecha de mañana (se tomaba en hora UTC). Ahora usan la fecha local.) -->
 <!-- Portal TLC | eventos.html | v2026.10.08.7 (📋 Regulatoria — Cristian: "agregá un tablero en Regulatoria como el de eventos, para la programación de los registros médicos ante ANMAT, pendientes y estado de los trámites". Con ?modulo=regulatoria muestra los tableros de Regulatoria (permiso "Regulatoria"). Un tablero nuevo de Regulatoria arranca con columnas de trámite ANMAT. El menú ⋯ ahora ofrece pasar el tablero a cualquiera de los otros dos módulos.) -->
@@ -3214,6 +3215,7 @@ window._clickNotificacionEv = function(ev, idNoti, ticketId, origen, tarjetaId) 
     .then(function(){ _cargarNotificaciones(true); });
   document.getElementById('campana-panel').classList.remove('open');
   if (!ticketId) return;
+  if (origen === 'agenda') { window.location.href = 'calendario.html?evento=' + encodeURIComponent(ticketId); return; }
   if (origen === 'cotizacion') { window.location.href = 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(ticketId); return; }
   if (origen === 'evento') { _abrirEvento(ticketId, tarjetaId); return; }
   window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(ticketId);

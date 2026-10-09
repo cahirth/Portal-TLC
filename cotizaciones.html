@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.09.6 (Campanita: los avisos de la Agenda (invitaciones, cambios, cancelaciones) abren el evento en calendario.html.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.09.2 (Cristian: "un link o acceso rápido para pasar directamente desde una tarjeta en Ventas a su Orden de Preparación y viceversa". Botón "📦 Ver Orden de Preparación ›" arriba de todo en el negocio, junto a Ver presupuesto; abre la orden en Servicio Técnico en la sección de equipos.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.08.8 (💸 GASTOS DEL NEGOCIO — Cristian: "agregá en Ventas los gastos tal cual se ven en Servicio, para que los vendedores carguen sus gastos en cada visita o negocio". Sección nueva "Gastos del negocio / visitas" en el detalle de cada negocio, igual que Servicio: fecha, descripción, importe en USD o AR$ con el TC del día de carga, quién lo cargó, total, y "Liquidado" cuando se paga desde Cuenta Corriente. Se guardan en cotizaciones/<id>/gastos (función servicio, cot_actualizarGastos). No se re-pinta el detalle mientras se edita un gasto.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.07.2 (Cristian: "un contador rojito con números en el ícono de la PWA instalada, como WhatsApp". La campanita ahora también pone la cantidad de avisos sin leer en el ícono de la app instalada (tlcIconoApp, en version.js).) -->
@@ -1959,6 +1960,7 @@ window._clickNotificacionCot = function(ev, idNoti, idOrigen, origen, tarjetaId)
     document.getElementById('campana-panel').style.display = 'none';
     if (!idOrigen) return;
 
+    if (origen === 'agenda') { window.location.href = 'calendario.html?evento=' + encodeURIComponent(idOrigen); return; }
     if (origen === 'servicio') {
         window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(idOrigen);
         return;

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.10.09.6 (📅 Agenda en el menú principal (calendario.html, Agenda centralizada Etapa 1). Se habilita con el tilde "Agenda" o "Agenda Equipo" de la hoja de permisos, o Rol Administrador. La campanita abre los avisos de agenda en el calendario.) -->
 <!-- Portal TLC | index.html | v2026.10.08.7 (Regulatoria abre su tablero Kanban de trámites ANMAT (eventos.html?modulo=regulatoria), con el tilde "Regulatoria" de la hoja.) -->
 <!-- Portal TLC | index.html | v2026.10.08.6 (Cristian: "adentro de Administración: Reportes → Parte del Día, semana, mes, KPIs (a desarrollar); Comercio Exterior → el tablero de Comex; seguimos con los permisos desde Excel en Reportes y Comercio Exterior". Reportes ahora abre un submenú (Parte del día, Semana = Cierres, Mes y KPIs próximamente) con el tilde "Reportes"; se quitan los dos ítems sueltos de la versión anterior. Comercio Exterior abre el tablero con el tilde "Comercio Exterior".) -->
 <!-- Portal TLC | index.html | v2026.10.08.5 (🌐 Comercio Exterior: el menú ahora abre su tablero Kanban (eventos.html?modulo=comex) en vez de la pantalla vacía; usa el permiso "Comercio Exterior" de la hoja.) -->
@@ -532,6 +533,13 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
                         <img src="https://lh3.googleusercontent.com/d/1HdFljwTWje8_7Yv3Muc2soSbZjKXy8_N" style="width:48px; height:48px; object-fit:cover; border-radius:12px;" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-microscope\'></i>'; this.parentElement.classList.add('logo-servicio');">
                     </div>
                     <div class="item-text-box"><h3>Servicio Técnico</h3><p>Ingresos, Checklists y Reparaciones</p></div>
+                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
+                <div class="menu-item-row" id="menu-agenda" onclick="abrirUrlConPermiso('calendario.html', 'Agenda', 'agenda')">
+                    <div class="item-logo-container" style="background:rgba(234,88,12,0.15); border:1px solid rgba(234,88,12,0.4);">
+                        <i class="fa-solid fa-calendar-days" style="color:#ea580c; font-size:20px;"></i>
+                    </div>
+                    <div class="item-text-box"><h3>Agenda</h3><p>Visitas, servicios y eventos del equipo</p></div>
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
                 <div class="menu-item-row" id="menu-admin" onclick="abrirModuloConPermiso('view-admin-menu', 'Administración', 'Gestión interna', 'admin')">
@@ -1377,7 +1385,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
     // Placeholder de arranque (mientras carga el Sheet) — el valor real y
     // definitivo de verComisiones viene SIEMPRE de la columna "Comisiones"
     // en cargarPermisosUsuario(), independiente del rol.
-    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, tareas: true, empresas: true, eventos: true, verComisiones: false, rol: 'Administrador' };
+    let userPermisos = { ventas: true, servicio: true, comex: true, admin: true, tareas: true, empresas: true, eventos: true, agenda: true, verComisiones: false, rol: 'Administrador' };
 
     // Mismo criterio EXACTO que _rtdbKeySeguro()/_rtdbHeaderSeguro()
     // del lado del backend (FotoMap.gs) — ver permisos.js v2026.08.30.1
@@ -1438,13 +1446,14 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
                     eventos:       bool('Eventos'),
                     regulatoria:   bool('Regulatoria'),
                     reportes:      bool('Reportes'),
+                    agenda:        bool('Agenda') || bool('Agenda Equipo') || String(fila[_headerSeguroIdx('Rol')] || '').trim().toLowerCase() === 'administrador',
                     verComisiones: bool('Comisiones'), // solo su propia columna — "Ver Comisiones" es otro permiso (v2026.10.03.9)
                 };
                 // Rol al día en la sesión (ver permisos.js v2026.10.03.8)
                 _actualizarRolEnSesionIdx(fila[_headerSeguroIdx('Rol')], fila[_headerSeguroIdx('Nombre Vendedor')]);
             } else {
                 // Email no encontrado → acceso mínimo
-                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, empresas: false, eventos: false, regulatoria: false, reportes: false, verComisiones: false };
+                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, empresas: false, eventos: false, regulatoria: false, reportes: false, agenda: false, verComisiones: false };
             }
         } catch(e) {
             console.warn('Error cargando permisos:', e);
@@ -1465,6 +1474,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
             { id: 'menu-eventos',  permiso: userPermisos.eventos },
             { id: 'menu-regulatoria', permiso: userPermisos.regulatoria },
             { id: 'menu-reportes',    permiso: userPermisos.reportes },
+            { id: 'menu-agenda',      permiso: userPermisos.agenda },
             { id: 'menu-item-comisiones', permiso: userPermisos.verComisiones },
         ];
         secciones.forEach(({ id, permiso }) => {
@@ -2470,6 +2480,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
       }
       document.getElementById('campana-panel').style.display = 'none';
       if (!idOrigen) return;
+      if (origen === 'agenda') { window.location.href = 'calendario.html?evento=' + encodeURIComponent(idOrigen); return; }
       var destino = origen === 'cotizacion'
         ? 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(idOrigen)
         : origen === 'evento'
