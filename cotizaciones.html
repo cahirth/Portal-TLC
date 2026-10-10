@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.10.2 (Agenda Etapa 2: en cada negocio, franja "📅 Próxima visita" (fecha, hora, quién, 📌/✓✓ Visto) y botón "📅 Agendar" que abre la Agenda con cliente, título, vendedor y el vínculo al negocio precargados; al guardar vuelve al negocio. Usa agenda-vinculo.js y la función agenda v4.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.09.6 (Campanita: los avisos de la Agenda (invitaciones, cambios, cancelaciones) abren el evento en calendario.html.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.09.2 (Cristian: "un link o acceso rápido para pasar directamente desde una tarjeta en Ventas a su Orden de Preparación y viceversa". Botón "📦 Ver Orden de Preparación ›" arriba de todo en el negocio, junto a Ver presupuesto; abre la orden en Servicio Técnico en la sección de equipos.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.08.8 (💸 GASTOS DEL NEGOCIO — Cristian: "agregá en Ventas los gastos tal cual se ven en Servicio, para que los vendedores carguen sus gastos en cada visita o negocio". Sección nueva "Gastos del negocio / visitas" en el detalle de cada negocio, igual que Servicio: fecha, descripción, importe en USD o AR$ con el TC del día de carga, quién lo cargó, total, y "Liquidado" cuando se paga desde Cuenta Corriente. Se guardan en cotizaciones/<id>/gastos (función servicio, cot_actualizarGastos). No se re-pinta el detalle mientras se edita un gasto.) -->
@@ -3001,6 +3002,21 @@ window._toggleMonedaTotalCot = function(id) {
     _repintarGastosCot(c);
 };
 
+// 📅 Agenda Etapa 2 (v2026.10.10.2): franja de próxima visita + botón Agendar del negocio
+function _pintarAgendaCot(c) {
+    if (!window.TLCAgendaVinculo || !c) return;
+    const id = String(c.idCot || c.id_cotizacion || c.id || '');
+    if (!id) return;
+    const cliente = c.razonSocial || c.empresa?.razonSocial || c.cliente?.nombre || c.nombreMedico || '';
+    const vend = (listaVendedores || []).find(v => v.nombre && c.vendedor && v.nombre.toLowerCase() === String(c.vendedor).toLowerCase());
+    const equipo = (Array.isArray(c.carrito) && c.carrito[0] && c.carrito[0].nombre) ? String(c.carrito[0].nombre).split(' — ')[0] : '';
+    TLCAgendaVinculo.pintar('det-agenda-cot', {
+        entidad: 'cotizaciones', id: id, etiqueta: 'Negocio ' + id,
+        titulo: 'Visita' + (cliente ? ' – ' + cliente : '') + (equipo ? ' (' + equipo + ')' : ''),
+        cliente: cliente, tipo: 'ventas', personas: vend && vend.email ? [vend.email] : [],
+        notas: 'Negocio N° ' + id, volver: 'cotizaciones.html?id=' + encodeURIComponent(id),
+    });
+}
 function _renderDetalle(c) {
     const id      = c.idCot || c.id_cotizacion || String(c.id || '') || '—';
     const cliente = c.razonSocial || c.empresa?.razonSocial || c.cliente?.nombre || c.nombreMedico || '—';
@@ -3111,6 +3127,7 @@ function _renderDetalle(c) {
                    font-weight:700;cursor:pointer;">
             📦 Enviar Orden de Preparación
         </button>` : ''}
+        <div id="det-agenda-cot" style="margin-top:10px;"></div>
     </div>`;
 
     // ── GRID INFO ─────────────────────────────────────────────────
@@ -3434,6 +3451,7 @@ function _renderDetalle(c) {
     html += `</div>`;
 
     document.getElementById('det-body').innerHTML = html;
+    try { _pintarAgendaCot(c); } catch (eAg) { console.warn('agenda:', eAg); }
 
     if (c.progreso_st && c.progreso_st.total && c.orden_preparacion_ticket_id) {
         _cargarDetalleEquiposST(c.orden_preparacion_ticket_id, id);
@@ -5165,5 +5183,6 @@ window._confirmarOrdenPreparacion = async function() {
 <script>window.DICTADO_CAMPOS = [{ textarea: 'mensaje-nuevo-txt-cot', enviar: 'btn-enviar-mensaje-cot' }];</script>
 <script src="dictado.js"></script>
 <script src="menciones.js"></script>
+<script src="agenda-vinculo.js"></script>
 </body>
 </html>

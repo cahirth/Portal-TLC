@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | calendario.html | v2026.10.10.2 (Etapa 2: "📅 Agendar" desde un ticket o un negocio abre esto con título, cliente, tipo, persona responsable y el vínculo precargados (?nuevo=1&personas=...&volver=...). Al guardar vuelve solo al ticket/negocio, donde aparece la franja "Próxima visita". Si no se agendó nada, "← Volver" regresa sin guardar.) -->
 <!-- Portal TLC | calendario.html | v2026.10.10.1 (Cristian: "en cel no hay vista semana?" — vista nueva "3 días" (hoy y los 2 siguientes en columnas con horario, como Google Calendar en el celular). En el celular: Lista · 3 días · Día · Mes; en PC también aparece.) -->
 <!-- Portal TLC | calendario.html | v2026.10.09.8 (Cristian: "Juan dice Confirmado pero no sé si él lo confirmó". Ahora cada persona muestra 📌 Asignado (lo agendó un coordinador, es firme), ✅ Aceptó (aceptó una invitación), ⏳ Sin responder o 🚫 Rechazó — y al lado ✓✓ Visto con fecha y hora (azul) o ✓ Sin ver (gris), como las tildes de WhatsApp. Se marca visto al abrir el evento; si se reprograma vuelve a "sin ver". Función agenda v3.) -->
 <!-- Portal TLC | calendario.html | v2026.10.09.7 (Estado nuevo "🔔 Solo aviso / recordatorio": se ve en el calendario (borde, sin relleno) y nunca bloquea — para cumpleaños, recordatorios y vencimientos. La lista de personas muestra solo a quienes tienen Agenda, Agenda Equipo o Rol Administrador. Función agenda v2.) -->
@@ -211,6 +212,9 @@ var cal = null;
 var ultimoRango = null;
 var EVENTO_FIJO = null;   // evento abierto por link (?evento=), aunque quede fuera del rango visible
 var NUEVO_PENDIENTE = null;
+var VOLVER_A = '';       // después de agendar desde un ticket/negocio, volver ahí
+// Solo se vuelve a páginas del propio Portal (nada de links externos)
+function _volverSeguro(u){ u=String(u||''); return /^(servicio|cotizaciones)\.html\?[\w=&%.\-]+$/.test(u)?u:''; }
 var PENDIENTES = [];     // mis invitaciones sin responder (cualquier fecha) // ?nuevo=1 desde ticket/negocio: se abre al terminar la primera carga
 
 async function api(datos){
@@ -438,7 +442,8 @@ function togglePersona(el){
 }
 function abrirNuevo(pre){
   pre=pre||{};
-  form={ id:'', personas: pre.personas || [YO.email], referencia: pre.referencia||null };
+  form={ id:'', personas: (pre.personas || [YO.email]).slice(), referencia: pre.referencia||null };
+  if(!YO.equipo && form.personas.indexOf(YO.email)<0) form.personas.unshift(YO.email); // sin Agenda Equipo uno siempre participa
   document.getElementById('f-titulo-modal').textContent='Nuevo evento';
   var f=pre.fecha||hoyBA();
   document.getElementById('f-titulo').value=pre.titulo||'';
@@ -533,6 +538,7 @@ async function guardar(forzar){
     if(r.ok){
       EVENTOS[r.id]=r.evento; refrescarEventos(); cerrar('m-form');
       toast((form.id?'✅ Guardado':'✅ Agendado')+' · '+mayus(cuando(r.evento))+(r.no_laborables&&r.no_laborables.length?' (día no laborable)':''),4000);
+      if(VOLVER_A&&!form.id&&form.referencia){ var v=VOLVER_A; VOLVER_A=''; setTimeout(function(){ location.href=v; },900); return; }
       if(cal&&!form.id) cal.gotoDate(r.evento.fecha);
       return;
     }
@@ -563,7 +569,10 @@ async function guardar(forzar){
   }
   // Agendar desde un ticket o un negocio (Etapa 2): calendario.html?nuevo=1&ref_entidad=...&ref_id=...&titulo=...&cliente=...
   if(q.get('nuevo')==='1'){
+    var _pers=(q.get('personas')||'').split(',').map(function(x){return x.trim().toLowerCase();}).filter(Boolean);
+    VOLVER_A=_volverSeguro(q.get('volver'));
     NUEVO_PENDIENTE={ titulo:q.get('titulo')||'', cliente:q.get('cliente')||'', tipo:q.get('tipo')||(q.get('ref_entidad')==='cotizaciones'?'ventas':'servicio'),
+      personas: _pers.length?_pers:null, notas:q.get('notas')||'',
       referencia: q.get('ref_id')?{ entidad:q.get('ref_entidad')||'', id:q.get('ref_id'), etiqueta:q.get('ref_etiqueta')||q.get('ref_id') }:null };
     history.replaceState(null,'','calendario.html');
   }

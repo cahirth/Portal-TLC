@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.10.2 (Agenda Etapa 2 — Cristian: "quiero hacer la 1 y 2, es lo que más necesito". En cada ticket / Orden de Preparación: franja "📅 Próxima visita" (fecha, hora, quién, 📌 Asignado y ✓✓ Visto / ✓ Sin ver, +N más) y botón "📅 Agendar" que abre la Agenda con cliente, título, técnico responsable y el vínculo precargados; al guardar vuelve al ticket. En las tarjetas del tablero, 📅 con la fecha de la próxima visita. Usa agenda-vinculo.js y la función agenda v4.) -->
 <!-- Portal TLC | servicio.html | v2026.10.09.6 (Campanita: los avisos de la Agenda (invitaciones, cambios, cancelaciones) abren el evento en calendario.html.) -->
 <!-- Portal TLC | servicio.html | v2026.10.09.2 (Cristian: acceso rápido "desde Preparación en ST al Negocio". En toda Orden de Preparación (y sus entregas parciales) aparece arriba la franja "💼 Negocio en Ventas — Ver negocio ›" que abre ese negocio en Ventas.) -->
 <!-- Portal TLC | servicio.html | v2026.10.08.8 (BUG: un gasto cargado de noche (después de las 21) quedaba con la fecha de mañana, porque se tomaba la fecha en hora UTC. Ahora usa la fecha local.) -->
@@ -1290,12 +1291,42 @@ async function _cargarTickets() {
     _setVista(_vistaActual, true);
     _aplicarFiltros();
     _abrirTicketDesdeUrlSiCorresponde();
+    _cargarVisitasAgenda();
   } catch(e) {
     console.error('Error cargando tickets ST:', e);
     loading.innerHTML = '<span style="color:#ef4444">Error cargando datos. Reintentá.</span>';
   }
 }
 window._recargarTickets = _cargarTickets;
+
+// ── 📅 Agenda Etapa 2 (v2026.10.10.2) ─────────────────────────────
+var _EMAIL_POR_TECNICO = {
+  cristian_hirth:'cristian@tlcsrl.com.ar', fernando_del_campo:'fernando@tlcsrl.com.ar', juan_garro:'juan@tlcsrl.com.ar',
+  damian_sosa:'damian@tlcsrl.com.ar', veronica_ribaita:'veronica@tlcsrl.com.ar', lourdes_davalos:'lourdes@tlcsrl.com.ar', lucio_raineri:'lucio@tlcsrl.com.ar',
+};
+var _visitasAgenda = {}; // id_ticket -> próxima visita (para el 📅 de las tarjetas)
+function _cargarVisitasAgenda() {
+  if (!window.TLCAgendaVinculo) return;
+  TLCAgendaVinculo.mapaVisitas('servicio_tecnico').then(function(m) {
+    _visitasAgenda = m || {};
+    if (Object.keys(_visitasAgenda).length) { try { _aplicarFiltros(); } catch (e) {} }
+  });
+}
+function _pintarAgendaTicket(t) {
+  if (!window.TLCAgendaVinculo || !t || !t.id_ticket) return;
+  var esPrep = t.tipo_orden === 'preparacion_equipos';
+  var email = (esPrep && t.tecnico_responsable_email) || _EMAIL_POR_TECNICO[_codTecnicoTicket(t)] || '';
+  var equipo = esPrep ? '' : [t.equipo_marca, t.equipo_modelo].filter(Boolean).join(' ').trim();
+  TLCAgendaVinculo.pintar('det-agenda-ticket', {
+    entidad: 'servicio_tecnico', id: t.id_ticket, etiqueta: (esPrep ? 'Orden de Preparación ' : 'Orden ') + t.id_ticket,
+    titulo: (esPrep ? 'Entrega / instalación' : 'Servicio' + (equipo ? ' ' + equipo : '')) + (t.cliente ? ' – ' + t.cliente : ''),
+    cliente: t.cliente || '', tipo: 'servicio', personas: email ? [email] : [],
+    notas: (esPrep ? 'Orden de Preparación N° ' : 'Orden de Asistencia Técnica N° ') + t.id_ticket,
+    volver: 'servicio.html?ticket=' + encodeURIComponent(t.id_ticket),
+  });
+}
+var _renderDetalleSinAgenda = _renderDetalle;
+_renderDetalle = function(t) { _renderDetalleSinAgenda(t); try { _pintarAgendaTicket(t); } catch (e) { console.warn('agenda:', e); } };
 
 // Si el Portal se abrió con ?ticket=ID en la URL (viene de un link de
 // notificación push, email, o desde otro documento como orden-servicio.html
@@ -1984,6 +2015,7 @@ function _renderLista(tickets) {
         + '<div class="lista-ticket-badges">'
           + '<span class="badge-prio ' + (t.prioridad||'media') + '">' + (t.prioridad||'media') + '</span>'
           + (fechaHtml || '')
+          + (window.TLCAgendaVinculo && _visitasAgenda[t.id_ticket] ? TLCAgendaVinculo.chip(_visitasAgenda[t.id_ticket]) : '')
           + '<span class="avatar-tecnico" style="background:' + tecColor + '20;color:' + tecColor + '">' + tecLabel + '</span>'
         + '</div>'
       + '</div>';
@@ -2088,6 +2120,7 @@ function _renderTarjeta(t) {
       '<span class="badge-prio ' + (t.prioridad||'media') + '">' + (t.prioridad||'media') + '</span>' +
       '<span class="badge-estado ' + (t.estado_progreso||'no_iniciada') + '">' + _estadoLabel(t.estado_progreso) + '</span>' +
       (fechaHtml || '') +
+      (window.TLCAgendaVinculo && _visitasAgenda[t.id_ticket] ? TLCAgendaVinculo.chip(_visitasAgenda[t.id_ticket]) : '') +
       '<span class="avatar-tecnico" style="background:' + tecColor + '20;color:' + tecColor + '">' + tecLabel + '</span>' +
     '</div>' +
   '</div>';
@@ -2569,6 +2602,9 @@ function _renderDetalle(t) {
           '<span style="font-size:12px;font-weight:800;color:#3a86ff;white-space:nowrap;">Ver negocio ›</span>' +
         '</a>' +
       '</div>' : '') +
+
+    // 📅 AGENDA (v2026.10.10.2) — próxima visita + botón Agendar (lo llena _pintarAgendaTicket)
+    '<div style="padding:0 16px;"><div id="det-agenda-ticket" style="margin-bottom:10px;"></div></div>' +
 
     // ORDEN DE PREPARACIÓN DE EQUIPOS — solo si este ticket es de ese tipo
     (t.tipo_orden === 'preparacion_equipos' ? _renderSeccionOrdenPreparacion(t) : '') +
@@ -6268,5 +6304,6 @@ function _iaToggleMic() {
 <script>window.DICTADO_CAMPOS = [{ textarea: 'mensaje-nuevo-txt', enviar: 'btn-enviar-mensaje-st' }];</script>
 <script src="dictado.js"></script>
 <script src="menciones.js"></script>
+<script src="agenda-vinculo.js"></script>
 </body>
 </html>
