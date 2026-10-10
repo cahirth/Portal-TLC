@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | calendario.html | v2026.10.10.4 (Agenda también desde las tarjetas de Eventos / Comex / Regulatoria: el vínculo abre la tarjeta y al guardar vuelve ahí.) -->
 <!-- Portal TLC | calendario.html | v2026.10.10.3 (Cristian: "en este modal que me muestre el calendario al lateral derecho para ver la carga del asignado". Al crear o editar un evento, a la derecha aparece la agenda de ESE día de las personas elegidas, con el evento que estás cargando resaltado ("✏️ Este evento") y se actualiza al cambiar fecha, horario o personas. Tocando o arrastrando en ese calendario se eligen la hora de inicio y fin. En el celular va debajo del formulario.) -->
 <!-- Portal TLC | calendario.html | v2026.10.10.2 (Etapa 2: "📅 Agendar" desde un ticket o un negocio abre esto con título, cliente, tipo, persona responsable y el vínculo precargados (?nuevo=1&personas=...&volver=...). Al guardar vuelve solo al ticket/negocio, donde aparece la franja "Próxima visita". Si no se agendó nada, "← Volver" regresa sin guardar.) -->
 <!-- Portal TLC | calendario.html | v2026.10.10.1 (Cristian: "en cel no hay vista semana?" — vista nueva "3 días" (hoy y los 2 siguientes en columnas con horario, como Google Calendar en el celular). En el celular: Lista · 3 días · Día · Mes; en PC también aparece.) -->
@@ -234,7 +235,7 @@ var EVENTO_FIJO = null;   // evento abierto por link (?evento=), aunque quede fu
 var NUEVO_PENDIENTE = null;
 var VOLVER_A = '';       // después de agendar desde un ticket/negocio, volver ahí
 // Solo se vuelve a páginas del propio Portal (nada de links externos)
-function _volverSeguro(u){ u=String(u||''); return /^(servicio|cotizaciones)\.html\?[\w=&%.\-]+$/.test(u)?u:''; }
+function _volverSeguro(u){ u=String(u||''); return /^(servicio|cotizaciones|eventos)\.html\?[\w=&%.\-]+$/.test(u)?u:''; }
 var PENDIENTES = [];     // mis invitaciones sin responder (cualquier fecha) // ?nuevo=1 desde ticket/negocio: se abre al terminar la primera carga
 
 async function api(datos){
@@ -374,6 +375,7 @@ function linkReferencia(ref){
   if(!ref||!ref.id) return '';
   if(ref.entidad==='servicio_tecnico') return 'servicio.html?ticket='+encodeURIComponent(ref.id);
   if(ref.entidad==='cotizaciones') return 'cotizaciones.html?id='+encodeURIComponent(ref.id);
+  if(ref.entidad==='eventos'){ var pp=String(ref.id).split(':'); return 'eventos.html?id='+encodeURIComponent(pp[0])+(pp[1]?'&tarjeta='+encodeURIComponent(pp[1]):''); }
   return '';
 }
 function verDetalle(id){
@@ -558,7 +560,7 @@ function abrirEditar(id, cambios){
 function pintarRef(){
   var r=form.referencia, c=document.getElementById('campo-ref');
   c.style.display=r&&r.id?'':'none';
-  if(r&&r.id) document.getElementById('f-ref').innerHTML=(r.entidad==='cotizaciones'?'💼 ':'🔧 ')+esc(r.etiqueta||r.id);
+  if(r&&r.id) document.getElementById('f-ref').innerHTML=(r.entidad==='cotizaciones'?'💼 ':r.entidad==='eventos'?'🗂️ ':'🔧 ')+esc(r.etiqueta||r.id);
 }
 function leerForm(){
   var todo=document.getElementById('f-todo').checked, f=document.getElementById('f-fecha').value;

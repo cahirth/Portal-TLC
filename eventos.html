@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.10.4 (Agenda en Eventos, Comercio Exterior y Regulatoria — Cristian: "agregar en evento, que no tiene agenda". En cada tarjeta: franja "📅 Próxima visita" y botón "📅 Agendar" (abre la Agenda con el título, el responsable y el vínculo a la tarjeta; al guardar vuelve a la tarjeta). En el tablero, las tarjetas con algo agendado muestran 📅 con la fecha.) -->
 <!-- Portal TLC | eventos.html | v2026.10.09.6 (Campanita: los avisos de la Agenda (invitaciones, cambios, cancelaciones) abren el evento en calendario.html.) -->
 <!-- Portal TLC | eventos.html | v2026.10.09.1 (BUG Cristian: "Comercio exterior no abre en celular, cargando y empieza a parpadear la pantalla". La caché local guardaba el tablero de Comex como si fuera de Eventos (de antes de pasarlo) y la página se recargaba sin fin. Ahora la caché de otro módulo se ignora, solo el servidor decide si recargar, y nunca recarga 2 veces seguidas.) -->
 <!-- Portal TLC | eventos.html | v2026.10.08.8 (BUG: gastos y fechas de "hoy" cargados de noche quedaban con la fecha de mañana (se tomaba en hora UTC). Ahora usan la fecha local.) -->
@@ -1066,6 +1067,7 @@ function _aplicarEventoActualEv(id, tarjetaId, desdeServidor) {
   _renderSelectEventos();
   _renderFiltrosEv();
   _renderTablero();
+  _cargarVisitasAgendaEv();
   _cambiarVistaEv(VISTA_ACTUAL_EV);
   history.replaceState(null, '', 'eventos.html?id=' + encodeURIComponent(id));
   // BUG REAL — Cristian: "si refresco y vuelvo a abrir la tarjeta no
@@ -1468,7 +1470,33 @@ function _renderCard(t) {
     '</div>' +
     (p.total ? '<div class="ev-card-progreso-wrap"><div class="ev-card-progreso-bar" style="width:' + p.pct + '%;"></div></div>' +
       '<div class="ev-card-progreso-txt">' + p.hechos + '/' + p.total + ' subtareas · ' + p.pct + '%</div>' : '') +
+    (window.TLCAgendaVinculo && EVENTO_ACTUAL && _visitasAgendaEv[EVENTO_ACTUAL.id + ':' + t.id] ? '<div style="margin-top:6px;">' + TLCAgendaVinculo.chip(_visitasAgendaEv[EVENTO_ACTUAL.id + ':' + t.id]) + '</div>' : '') +
   '</div>';
+}
+
+// ── 📅 Agenda (v2026.10.10.4): visitas vinculadas a tarjetas de este tablero ──
+var _visitasAgendaEv = {};
+var _visitasAgendaEvClave = '';
+function _cargarVisitasAgendaEv() {
+  if (!window.TLCAgendaVinculo || !EVENTO_ACTUAL) return;
+  TLCAgendaVinculo.mapaVisitas('eventos').then(function(m) {
+    var nueva = JSON.stringify(m || {});
+    if (nueva === _visitasAgendaEvClave) return;
+    _visitasAgendaEvClave = nueva; _visitasAgendaEv = m || {};
+    try { _renderTablero(); } catch (e) {}
+  });
+}
+function _pintarAgendaTarjetaEv() {
+  var t = (typeof _tarjetaActual === 'function') ? _tarjetaActual() : null;
+  if (!window.TLCAgendaVinculo || !t || !EVENTO_ACTUAL) return;
+  var tipo = MODULO_EV === 'eventos' ? 'evento' : 'interno';
+  TLCAgendaVinculo.pintar('ev-agenda-tarjeta', {
+    entidad: 'eventos', id: EVENTO_ACTUAL.id + ':' + t.id, etiqueta: (t.titulo || 'Tarjeta') + ' (' + (EVENTO_ACTUAL.nombre || '') + ')',
+    titulo: (t.titulo || '') + (EVENTO_ACTUAL.nombre ? ' – ' + EVENTO_ACTUAL.nombre : ''), cliente: '', tipo: tipo,
+    personas: t.responsable_email ? [t.responsable_email] : [],
+    notas: _cfgEv().nombre + ': ' + (EVENTO_ACTUAL.nombre || '') + ' → ' + (t.titulo || ''),
+    volver: 'eventos.html?id=' + encodeURIComponent(EVENTO_ACTUAL.id) + '&tarjeta=' + encodeURIComponent(t.id),
+  });
 }
 
 // Marca (o desmarca) una tarjeta como urgente — mismo patrón que
@@ -1956,7 +1984,9 @@ function _actualizarSelectResponsableEv() {
   sel.innerHTML = '<option value="">Sin asignar</option>' + opcionesResp;
 }
 
-function _renderOverlayTarjeta() {
+// Pinta el modal de la tarjeta y, después, la franja de Agenda (v2026.10.10.4)
+function _renderOverlayTarjeta() { var r = _renderOverlayTarjetaBase.apply(this, arguments); try { _pintarAgendaTarjetaEv(); } catch (e) {} return r; }
+function _renderOverlayTarjetaBase() {
   var t = _tarjetaActual();
   if (!t) return;
   var opcionesCategoria = Object.keys(CATEGORIAS_EV).map(function(c) {
@@ -1996,6 +2026,7 @@ function _renderOverlayTarjeta() {
         '<div class="ev-det-card"><div class="ev-det-card-label">Fecha límite</div><input type="date" id="ev-t-fecha" value="' + (t.fecha_limite||'') + '" onchange="_guardarCampoTarjeta(\'fecha_limite\',this.value)"></div>' +
       '</div>' +
       '<div class="ev-det-card"><div class="ev-det-card-label">Responsable Principal</div><select id="ev-t-resp" onchange="_guardarResponsable(this.value)"><option value="">Sin asignar</option>' + opcionesResp + '</select></div>' +
+      '<div id="ev-agenda-tarjeta" style="margin:10px 0 4px;"></div>' +
 
       '<div class="ev-section-titulo">✅ Checklists</div>' +
       '<button class="ev-btn-crear-checklist" onclick="_crearChecklistGrupoEv(this)">+ Crear nuevo Checklist</button>' +
@@ -3331,5 +3362,6 @@ window._marcarTodasLeidasEv = function(ev) {
 <script>window.DICTADO_CAMPOS = [{ textarea: 'ev-msg-nuevo', enviar: 'ev-btn-enviar-mensaje' }];</script>
 <script src="dictado.js"></script>
 <script src="menciones.js"></script>
+<script src="agenda-vinculo.js"></script>
 </body>
 </html>

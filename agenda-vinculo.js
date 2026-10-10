@@ -1,4 +1,5 @@
-// Portal TLC | agenda-vinculo.js | v2026.10.10.2
+// Portal TLC | agenda-vinculo.js | v2026.10.10.4 (también tarjetas de Eventos / Comex / Regulatoria: "Próximo en agenda")
+// v2026.10.10.2
 // Agenda — Etapa 2 (Cristian: "quiero hacer la 1 y 2, es lo que más necesito").
 // Lo usan servicio.html (tickets y Órdenes de Preparación) y cotizaciones.html
 // (negocios):
@@ -51,18 +52,19 @@
 
   function html(o, r) {
     if (!r || !r.ok) return '';
-    var agendar = r.puede_agendar ? '<a href="' + esc(linkAgendar(o)) + '" style="' + BTN + 'background:#ea580c;color:#fff;border:1px solid #ea580c;">📅 Agendar' + (r.proximas.length ? ' otra' : ' visita') + '</a>' : '';
+    var esTarea = o.entidad === 'eventos';
+    var agendar = r.puede_agendar ? '<a href="' + esc(linkAgendar(o)) + '" style="' + BTN + 'background:#ea580c;color:#fff;border:1px solid #ea580c;">📅 Agendar' + (r.proximas.length ? ' otra' : (esTarea ? '' : ' visita')) + '</a>' : '';
     if (!r.proximas.length) {
       if (!agendar && !r.ultima) return '';
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 12px;border-radius:10px;border:1px dashed rgba(234,88,12,.45);background:rgba(234,88,12,.05);">' +
-        '<span style="font-size:12.5px;font-weight:700;opacity:.85">📅 Sin visita agendada' + (r.ultima ? ' <span style="font-weight:600;opacity:.75">· última: ' + esc(fechaCorta(r.ultima.fecha)) + '</span>' : '') + '</span>' + agendar + '</div>';
+        '<span style="font-size:12.5px;font-weight:700;opacity:.85">' + (esTarea ? '📅 Nada agendado todavía' : '📅 Sin visita agendada') + (r.ultima ? ' <span style="font-weight:600;opacity:.75">· última: ' + esc(fechaCorta(r.ultima.fecha)) + '</span>' : '') + '</span>' + agendar + '</div>';
     }
     var e = r.proximas[0];
     var personas = Object.keys(e.participantes || {}).map(function (k) { return personaHtml(e, e.participantes[k]); }).join(' · ');
     var mas = r.proximas.length > 1 ? ' <span style="font-size:11px;font-weight:800;color:#ea580c">+' + (r.proximas.length - 1) + ' más</span>' : '';
     return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px;border-radius:10px;background:rgba(234,88,12,.08);border:1px solid rgba(234,88,12,.4);">' +
       '<a href="calendario.html?evento=' + encodeURIComponent(e.id) + '" style="flex:1;min-width:200px;text-decoration:none;color:inherit;" title="Abrir en la Agenda">' +
-        '<span style="display:block;font-size:10.5px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;color:#ea580c">📅 Próxima visita' + (e.estado === 'tentativo' ? ' · tentativa' : '') + mas + '</span>' +
+        '<span style="display:block;font-size:10.5px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;color:#ea580c">📅 ' + (esTarea ? 'Próximo en agenda' : 'Próxima visita') + (e.estado === 'tentativo' ? ' · tentativa' : '') + mas + '</span>' +
         '<span style="display:block;font-size:13px;font-weight:800;margin-top:2px">' + esc(cuando(e)) + '</span>' +
         '<span style="display:block;font-size:12px;margin-top:2px">' + personas + '</span>' +
       '</a>' + agendar + '</div>';
