@@ -1,4 +1,8 @@
 // Portal TLC | Cloud Function — Agenda centralizada (calendario.html)
+// v2 — 2026.10.09 — Estado nuevo "aviso" (Solo aviso / recordatorio): se ve en el
+//   calendario pero nunca bloquea (ni choques ni feriados) — cumpleaños,
+//   recordatorios, vencimientos. La lista de personas muestra solo a quienes
+//   tienen Agenda, Agenda Equipo o Rol Administrador (Cristian, 09/10).
 // v1 — 2026.10.09
 //
 // Reemplaza el calendario de Teams/Outlook (Cristian: "cualquier técnico o
@@ -40,7 +44,7 @@ const messaging = admin.messaging();
 const NODO = 'agenda_operativa';
 const IDX = 'agenda_idx';            // agenda_idx/{personaKey}/{eventoId} = { i, f } (solo lo que bloquea)
 const TIPOS = ['servicio', 'ventas', 'evento', 'interno'];
-const ESTADOS = ['confirmado', 'tentativo'];
+const ESTADOS = ['confirmado', 'tentativo', 'aviso'];
 const URL_PORTAL = 'https://ir.tlcsrl.com.ar/';
 const API_FERIADOS = 'https://api.argentinadatos.com/v1/feriados/';
 const FERIADOS_REFRESCO_MS = 7 * 24 * 3600 * 1000;
@@ -94,7 +98,7 @@ async function actorDe(data) {
 async function personasDelEquipo() {
   const permisos = (await fbGet('permisos')) || {};
   return Object.values(permisos)
-    .filter((p) => p && (esVerdadero(p.Internos) || esVerdadero(p.Agenda) || esVerdadero(p.Agenda_Equipo)))
+    .filter((p) => p && (esVerdadero(p.Agenda) || esVerdadero(p.Agenda_Equipo) || normalizar(p.Rol) === 'administrador'))
     .map((p) => ({ nombre: String(p.Nombre_Vendedor || p.Nombre || '').trim(), email: String(p.Email || '').trim().toLowerCase() }))
     .filter((p) => p.nombre && p.email)
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -192,10 +196,11 @@ async function revisar(ev, excluirId, soloEmails) {
   const fer = await feriadosEnRango(ev.fecha, ev.fecha_fin);
   const diasEv = diasEntre(ev.fecha, ev.fecha_fin);
   const enRango = fer.lista.filter((f) => diasEv.includes(f.fecha));
+  const esAviso = ev.estado === 'aviso'; // un recordatorio nunca se frena por feriado
   return {
     conflictos,
-    feriados: enRango.filter(BLOQUEA_FERIADO),
-    no_laborables: enRango.filter((f) => !BLOQUEA_FERIADO(f)),
+    feriados: esAviso ? [] : enRango.filter(BLOQUEA_FERIADO),
+    no_laborables: esAviso ? [] : enRango.filter((f) => !BLOQUEA_FERIADO(f)),
     feriados_sin_verificar: !fer.ok,
   };
 }
