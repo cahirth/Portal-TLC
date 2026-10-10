@@ -1,3 +1,4 @@
+// Portal TLC | tutorial.js | v2026.10.10.9 (Cristian: "tutoriales para gestión de eventos y congresos, también para empresas (módulo completo)" — 7 imágenes de Eventos y 5 de Empresas. Además el botón se esconde solo cuando queda encima de un campo o botón, ej. "Agregar ítem" de una tarjeta abierta en el celular.)
 // Portal TLC | tutorial.js | v2026.10.10.8 (Cristian: "hacé brochures para Cuenta Corriente, completo" — 6 imágenes, set "cuenta-corriente")
 // Portal TLC | tutorial.js | v2026.10.10.7 (Cristian: "podés hacer brochures del módulo Parte del día" — 4 imágenes nuevas, set "parte" para parte.html)
 // Portal TLC | tutorial.js | v2026.10.10.1 (Cristian: "se me ocurre poner los brochure en forma de tutorial en cada modulo y hacer un brochure general para que sepa el equipo como mirar el tutorial")
@@ -15,7 +16,8 @@
     calendario:   { titulo: 'Agenda', slides: ['agenda-1', 'agenda-2', 'agenda-3', 'agenda-4', 'agenda-5', 'agenda-6', 'agenda-7'] },
     servicio:     { titulo: 'Servicio Técnico', slides: ['tildes', 'tu-orden', 'cierre-semana', 'campanita', 'actividad', 'ventas-preparacion', 'etiquetas'] },
     cotizaciones: { titulo: 'Ventas', slides: ['tildes', 'gastos-ventas', 'ventas-preparacion', 'campanita'] },
-    eventos:      { titulo: 'Eventos', slides: ['tildes', 'campanita'] },
+    eventos:      { titulo: 'Eventos y Congresos', slides: ['eventos-1', 'eventos-2', 'eventos-3', 'eventos-4', 'eventos-5', 'eventos-6', 'eventos-7', 'tildes', 'campanita'] },
+    empresas:     { titulo: 'Empresas', slides: ['empresas-1', 'empresas-2', 'empresas-3', 'empresas-4', 'empresas-5'] },
     comex:        { titulo: 'Comercio Exterior', slides: ['comex-tablero', 'comex-checklist', 'tildes', 'campanita'] },
     regulatoria:  { titulo: 'Regulatoria', slides: ['regulatoria', 'tildes', 'campanita'] },
     parte:        { titulo: 'Parte del día', slides: ['parte-del-dia-1', 'parte-del-dia-2', 'parte-del-dia-3', 'parte-del-dia-4'] },
@@ -43,6 +45,7 @@
     '#tlc-tut-btn i{font-style:normal;width:22px;height:22px;border-radius:50%;background:#fff;color:#3a86ff;display:flex;align-items:center;justify-content:center;font-weight:900}' +
     '#tlc-tut-btn b{background:#ef4444;color:#fff;font-size:9px;font-weight:900;padding:1px 6px;border-radius:8px}' +
     '#tlc-tut-btn.mini span{display:none}#tlc-tut-btn.mini{padding:6px}' +
+    '#tlc-tut-btn.oculto{opacity:0;pointer-events:none;transform:scale(.6)}' +
     '#tlc-tut{position:fixed;inset:0;z-index:99999;background:rgba(3,7,18,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#fff;touch-action:pan-y;-webkit-user-select:none;user-select:none}' +
     '#tlc-tut .tt-top{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px}' +
     '#tlc-tut .tt-tit{flex:1;font-weight:800;font-size:14px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
@@ -153,6 +156,23 @@
     b.innerHTML = '<i>?</i><span>Tutorial</span>' + (visto ? '' : '<b>NUEVO</b>');
     b.onclick = function () { abrir(clave); };
     document.body.appendChild(b);
+    setInterval(function () { despejar(b); }, 700);
+  }
+  // Si el botón queda encima de un campo o botón de la pantalla (ej. el
+  // "Agregar ítem" de una tarjeta abierta en el celular), se esconde solo
+  // y vuelve a aparecer cuando ese lugar queda libre.
+  var CONTROLES = 'input,textarea,select,button,[contenteditable="true"]';
+  function despejar(b) {
+    if (estado) return;
+    var r = b.getBoundingClientRect(); if (!r.width) return;
+    var pe = b.style.pointerEvents; b.style.pointerEvents = 'none';
+    var tapa = false;
+    [[r.left + r.width / 2, r.top + r.height / 2], [r.left + 6, r.top + 6], [r.right - 6, r.bottom - 6]].forEach(function (p) {
+      var el = document.elementFromPoint(p[0], p[1]);
+      if (el && el !== b && !b.contains(el) && el.closest && el.closest(CONTROLES)) tapa = true;
+    });
+    b.style.pointerEvents = pe;
+    b.classList.toggle('oculto', tapa);
   }
 
   function iniciar() {
