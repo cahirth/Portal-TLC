@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | calendario.html | v2026.10.10.3 (Cristian: "en este modal que me muestre el calendario al lateral derecho para ver la carga del asignado". Al crear o editar un evento, a la derecha aparece la agenda de ESE día de las personas elegidas, con el evento que estás cargando resaltado ("✏️ Este evento") y se actualiza al cambiar fecha, horario o personas. Tocando o arrastrando en ese calendario se eligen la hora de inicio y fin. En el celular va debajo del formulario.) -->
 <!-- Portal TLC | calendario.html | v2026.10.10.2 (Etapa 2: "📅 Agendar" desde un ticket o un negocio abre esto con título, cliente, tipo, persona responsable y el vínculo precargados (?nuevo=1&personas=...&volver=...). Al guardar vuelve solo al ticket/negocio, donde aparece la franja "Próxima visita". Si no se agendó nada, "← Volver" regresa sin guardar.) -->
 <!-- Portal TLC | calendario.html | v2026.10.10.1 (Cristian: "en cel no hay vista semana?" — vista nueva "3 días" (hoy y los 2 siguientes en columnas con horario, como Google Calendar en el celular). En el celular: Lista · 3 días · Día · Mes; en PC también aparece.) -->
 <!-- Portal TLC | calendario.html | v2026.10.09.8 (Cristian: "Juan dice Confirmado pero no sé si él lo confirmó". Ahora cada persona muestra 📌 Asignado (lo agendó un coordinador, es firme), ✅ Aceptó (aceptó una invitación), ⏳ Sin responder o 🚫 Rechazó — y al lado ✓✓ Visto con fecha y hora (azul) o ✓ Sin ver (gris), como las tildes de WhatsApp. Se marca visto al abrir el evento; si se reprograma vuelve a "sin ver". Función agenda v3.) -->
@@ -87,6 +88,16 @@ select.inp,input.inp,textarea.inp{width:100%;padding:9px 10px;border-radius:9px;
 .part{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border);font-size:13px}
 .part:first-child{border-top:none}
 .forz{background:var(--amber-bg);border:1px solid rgba(245,158,11,.35);color:var(--amber);border-radius:10px;padding:8px 10px;font-size:12.5px;margin-top:8px}
+.modal.modal-form{max-width:1060px}
+.f-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:18px;align-items:start}
+.f-der{position:sticky;top:0;background:var(--panel2);border:1px solid var(--border);border-radius:14px;padding:10px}
+.lado-tit{font-size:13px;font-weight:900}
+.lado-sub{font-size:11.5px;color:var(--muted);margin:2px 0 8px;line-height:1.35}
+.lado-ayuda{font-size:10.5px;color:var(--muted);margin-top:6px;text-align:center}
+#f-cal-lado .fc{font-size:11.5px}
+#f-cal-lado .fc-event.ev-borrador{background:repeating-linear-gradient(135deg,rgba(58,134,255,.85) 0 8px,rgba(58,134,255,.65) 8px 16px) !important;border:2px solid #1d4ed8 !important;box-shadow:0 0 0 2px rgba(58,134,255,.25)}
+#f-cal-lado .fc-event.ev-choca{outline:2px solid #dc2626}
+@media(max-width:900px){.f-grid{grid-template-columns:1fr}.f-der{position:static}}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 16px;border-radius:12px;font-size:13px;font-weight:700;z-index:80;box-shadow:0 8px 24px rgba(0,0,0,.35);max-width:92vw;display:none}
 .vacio{color:var(--muted);text-align:center;padding:40px 10px;font-size:14px}
 @media(max-width:640px){
@@ -122,7 +133,8 @@ select.inp,input.inp,textarea.inp{width:100%;padding:9px 10px;border-radius:9px;
 <!-- Detalle -->
 <div class="modal-bg" id="m-det" onclick="if(event.target===this)cerrar('m-det')"><div class="modal" id="det"></div></div>
 <!-- Crear / editar -->
-<div class="modal-bg" id="m-form" onclick="if(event.target===this)cerrar('m-form')"><div class="modal">
+<div class="modal-bg" id="m-form" onclick="if(event.target===this)cerrar('m-form')"><div class="modal modal-form">
+ <div class="f-grid"><div class="f-izq">
   <h2 id="f-titulo-modal">Nuevo evento</h2>
   <div class="campo"><label>Título</label><input class="inp" id="f-titulo" placeholder="Ej: Instalación HVS-1 en Óptica Centro" oninput="programarRevision()"></div>
   <div class="fila2">
@@ -155,6 +167,14 @@ select.inp,input.inp,textarea.inp{width:100%;padding:9px 10px;border-radius:9px;
     <button class="btn prim" id="f-guardar" onclick="guardar(false)">Guardar</button>
     <button class="btn peligro" id="f-forzar" style="display:none" onclick="guardar(true)">⚠️ Agendar igual</button>
   </div>
+ </div>
+ <div class="f-der">
+  <div class="lado-tit" id="lado-tit">📅 Agenda del día</div>
+  <div class="lado-sub" id="lado-sub">Elegí personas y fecha</div>
+  <div id="f-cal-lado"></div>
+  <div class="lado-ayuda">Tocá o arrastrá en el calendario para elegir el horario.</div>
+ </div>
+ </div>
 </div></div>
 
 <div class="toast" id="toast"></div>
@@ -219,6 +239,7 @@ var PENDIENTES = [];     // mis invitaciones sin responder (cualquier fecha) // 
 
 async function api(datos){
   var body = Object.assign({ email_usuario: cuenta && cuenta.username, nombre_usuario: cuenta && cuenta.name }, datos);
+  if(datos && !/^ag_(listar|verificar)$/.test(datos.accion||'') && typeof DIA_CACHE!=='undefined') DIA_CACHE={}; // algo cambió: el lateral vuelve a pedir el día
   var r = await fetch(AGENDA_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(body) });
   return r.json();
 }
@@ -420,6 +441,61 @@ function pintarInvitaciones(){
 }
 function verInvitaciones(){ var p=pendientesMias(); if(!p.length) return; EVENTO_FIJO=p[0]; if(!EVENTOS[p[0].id]) EVENTOS[p[0].id]=p[0]; if(cal) cal.gotoDate(p[0].fecha); verDetalle(p[0].id); }
 
+// ── Calendario lateral del formulario: agenda del día de las personas elegidas ──
+var calLado=null, DIA_CACHE={}, _ladoN=0;
+function nombreCorto(email){ var p=PERSONAS.find(function(x){return x.email===email;}); return String((p&&p.nombre)||(email===YO.email?YO.nombre:email)).split(' ')[0]; }
+async function eventosDelDia(fecha){
+  var c=DIA_CACHE[fecha]; if(c&&Date.now()-c.t<20000) return c.ev;
+  var r=await api({ accion:'ag_listar', desde:fecha, hasta:fecha });
+  var ev=(r&&r.ok&&r.eventos)||[]; DIA_CACHE[fecha]={ t:Date.now(), ev:ev }; return ev;
+}
+function iniciarCalLado(){
+  if(calLado) return;
+  calLado=new FullCalendar.Calendar(document.getElementById('f-cal-lado'),{
+    locale:'es', initialView:'timeGridDay', headerToolbar:false, dayHeaders:false, height:esCel()?420:560, allDayText:'Día',
+    slotMinTime:'07:00:00', slotMaxTime:'21:00:00', scrollTime:'08:00:00', slotDuration:'00:30:00', nowIndicator:true,
+    eventTimeFormat:{ hour:'2-digit', minute:'2-digit', hour12:false }, slotLabelFormat:{ hour:'2-digit', minute:'2-digit', hour12:false },
+    selectable:true, selectMirror:true, editable:false, longPressDelay:300, events:[],
+    select:function(s){
+      calLado.unselect(); if(s.allDay) return;
+      var a=partesFecha(s.start), b=partesFecha(s.end);
+      document.getElementById('f-todo').checked=false; ajustarTodoDia();
+      document.getElementById('f-fecha').value=a.f; document.getElementById('f-fecha-fin').value=b.f;
+      document.getElementById('f-hi').value=a.h; document.getElementById('f-hf').value=b.h;
+      programarRevision(); actualizarLado();
+    },
+  });
+}
+async function actualizarLado(){
+  var n=++_ladoN, fecha=document.getElementById('f-fecha').value;
+  if(!fecha||!document.getElementById('m-form').classList.contains('abierto')) return;
+  iniciarCalLado(); calLado.render(); calLado.gotoDate(fecha);
+  var quienes=form.personas.slice();
+  document.getElementById('lado-tit').textContent='📅 '+mayus(fechaLarga(fecha));
+  document.getElementById('lado-sub').textContent=quienes.length?'Agenda de: '+quienes.map(nombreCorto).join(', '):'Elegí personas para ver su agenda';
+  var lista=[];
+  try{ lista=await eventosDelDia(fecha); }catch(e){}
+  if(n!==_ladoN) return;
+  var d=leerForm(), borradorIni=d.todo_el_dia?null:Date.parse(fecha+'T'+d.hora_inicio+':00-03:00'), borradorFin=d.todo_el_dia?null:Date.parse((d.fecha_fin||fecha)+'T'+d.hora_fin+':00-03:00');
+  var evs=lista.filter(function(e){
+    if(e.id===form.id||e.estado==='cancelado') return false;
+    return quienes.some(function(em){ var p=e.participantes&&e.participantes[claveEmail(em)]; return p&&p.respuesta!=='rechazado'; });
+  }).map(function(e){
+    var o=aEventoFC(e); o.editable=false;
+    var de=quienes.filter(function(em){ var p=e.participantes[claveEmail(em)]; return p&&p.respuesta!=='rechazado'; }).map(nombreCorto);
+    o.title=(e.estado==='aviso'?'🔔 ':(TIPOS[e.tipo]||TIPOS.interno).ic+' ')+e.titulo+' · '+de.join(', ');
+    var bloquea=e.estado==='confirmado';
+    if(bloquea&&borradorIni&&e.ts_inicio<borradorFin&&e.ts_fin>borradorIni&&d.estado==='confirmado') o.classNames=(o.classNames||[]).concat('ev-choca');
+    return o;
+  });
+  FERIADOS.filter(function(f){return f.fecha===fecha;}).forEach(function(f){ evs.push({ start:f.fecha, end:sumarDias(f.fecha,1), allDay:true, display:'background', title:f.nombre, classNames:[(f.tipo==='inamovible'||f.tipo==='trasladable')?'feriado':'no-laborable'] }); });
+  var titulo='✏️ '+(d.titulo||'Este evento');
+  if(d.todo_el_dia) evs.push({ start:fecha, end:sumarDias(d.fecha_fin||fecha,1), allDay:true, title:titulo, classNames:['ev-borrador'], textColor:'#fff' });
+  else if(borradorIni&&borradorFin>borradorIni) evs.push({ start:new Date(borradorIni), end:new Date(borradorFin), title:titulo, classNames:['ev-borrador'], textColor:'#fff' });
+  calLado.removeAllEventSources(); calLado.addEventSource(evs);
+  if(!d.todo_el_dia&&d.hora_inicio) calLado.scrollToTime(String(Math.max(7,(+d.hora_inicio.slice(0,2))-1)).padStart(2,'0')+':00:00');
+}
+
 // ── Formulario ────────────────────────────────────────────
 var form={ id:'', personas:[], referencia:null };
 function ajustarTodoDia(){ var t=document.getElementById('f-todo').checked; document.querySelectorAll('.f-hora').forEach(function(e){e.style.display=t?'none':'';}); }
@@ -496,7 +572,7 @@ function leerForm(){
 }
 function limpiarRevision(){ var r=document.getElementById('f-revision'); r.className='revision'; r.innerHTML=''; document.getElementById('campo-motivo').style.display='none'; document.getElementById('f-forzar').style.display='none'; document.getElementById('f-motivo').value=''; }
 var _revT=null, _revN=0;
-function programarRevision(){ clearTimeout(_revT); _revT=setTimeout(revisarAhora,450); }
+function programarRevision(){ clearTimeout(_revT); _revT=setTimeout(revisarAhora,450); clearTimeout(programarRevision._l); programarRevision._l=setTimeout(actualizarLado,250); }
 async function revisarAhora(){
   var d=leerForm(); if(!d.fecha||(!d.todo_el_dia&&(!d.hora_inicio||!d.hora_fin))) return;
   var n=++_revN;
