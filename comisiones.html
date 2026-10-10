@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | comisiones.html | v2026.10.10.10 (📚 Tutorial: botón ❔ Tutorial con las 2 imágenes de Comisiones; la primera vez se abre solo.) -->
 <!-- Portal TLC | comisiones.html | v2026.09.30.12 (Cristian: "ahora sí abre, lo único que es lento en cargar". (1) El cálculo (Cloud Function internos → calcularComisiones) se pide en paralelo con la validación del permiso, en vez de uno después del otro; no se muestra nada hasta confirmar el acceso. (2) Se pinta al instante el último resultado guardado en este navegador para ese mismo usuario y rango de fechas, y se actualiza solo atrás ("Actualizando..."). (3) Guardar o restaurar una comisión ya no vacía la pantalla ni cierra los vendedores desplegados. Si se cambia el rango mientras carga, gana el pedido más nuevo.) -->
 <!-- Portal TLC | comisiones.html | v2026.09.29.2 (MUERTE A APPS SCRIPT — Cristian: "vamos función por función" — ahora sí. guardarComisionManual (cargar/borrar el override manual de una comisión) también migró a INTERNOS_URL, la misma Cloud Function. Este archivo queda 100% migrado, sus 3 acciones fuera de Apps Script. Confirmado con 3 tests nuevos: carga el override, lo borra mandando vacío, y rechaza un negocio inexistente o un valor no numérico.) -->
 <!-- Portal TLC | comisiones.html | v2026.09.29.1 (MUERTE A APPS SCRIPT — Cristian: "vayamos de a poco... función por función". calcularComisiones ahora va a INTERNOS_URL (misma Cloud Function ya desplegada para listarInternos, extendida con esta acción — no necesitaba ninguna decisión nueva sobre Sheets: usa permisos y precios, ya sincronizados a Firebase por los botones que Cristian ya usa, más cotizaciones nativo). guardarComisionManual queda sin tocar en Apps Script a propósito, para la próxima función. Confirmado con 4 tests: interno cobra 1% fijo, externo cobra por % de equipo (un equipo sin % cargado no rompe nada), comision_override pisa el cálculo automático, y el filtro de fechas funciona.) -->
@@ -23,6 +24,7 @@
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="tutorial.js"></script>
 <script src="permisos.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">

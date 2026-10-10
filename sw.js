@@ -1,4 +1,4 @@
-// Portal TLC | sw.js | v28
+// Portal TLC | sw.js | v29
 // v15: Firebase Cloud Messaging — recepción de push en segundo plano.
 //      importScripts de firebase-app + firebase-messaging (compat, es
 //      lo único que funciona dentro de un Service Worker clásico sin
@@ -126,6 +126,7 @@ self.addEventListener('notificationclick', function(event) {
 //      en los dos casos, la nueva siempre devuelve una Response real.
 //      CACHE_NAME bumpeado — fuerza la limpieza de la caché vieja en
 //      todos los dispositivos.
+// v29 (2026.10.10): tutoriales de Servicio, Negocios, Catálogo y Comisiones. CACHE_NAME bumpeado.
 // v28 (2026.10.10): tutoriales de Eventos y Empresas (imágenes nuevas). CACHE_NAME bumpeado.
 // v27 (2026.10.10): tutorial de Cuenta Corriente (imágenes nuevas). CACHE_NAME bumpeado.
 // v26 (2026.10.10): tutorial del Parte del día (imágenes nuevas). CACHE_NAME bumpeado.
@@ -143,7 +144,7 @@ self.addEventListener('notificationclick', function(event) {
 //      cierre-semanal.js (modal de cierre de semana de los viernes) y
 //      cierres.html (resumen de cierres para Administradores) — agregados
 //      a HTML_LOCAL (red primero). CACHE_NAME bumpeado.
-const CACHE_NAME = 'portal-tlc-v28';
+const CACHE_NAME = 'portal-tlc-v29';
 
 const HTML_LOCAL = [
     './',

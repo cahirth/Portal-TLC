@@ -1,3 +1,4 @@
+// Portal TLC | tutorial.js | v2026.10.10.10 (Cristian: "el de servicio completo" + "Catálogo de Productos, Negocios y Comisiones" — 8 imágenes nuevas de Servicio, 6 de Negocios, 3 del Catálogo y 2 de Comisiones)
 // Portal TLC | tutorial.js | v2026.10.10.9 (Cristian: "tutoriales para gestión de eventos y congresos, también para empresas (módulo completo)" — 7 imágenes de Eventos y 5 de Empresas. Además el botón se esconde solo cuando queda encima de un campo o botón, ej. "Agregar ítem" de una tarjeta abierta en el celular.)
 // Portal TLC | tutorial.js | v2026.10.10.8 (Cristian: "hacé brochures para Cuenta Corriente, completo" — 6 imágenes, set "cuenta-corriente")
 // Portal TLC | tutorial.js | v2026.10.10.7 (Cristian: "podés hacer brochures del módulo Parte del día" — 4 imágenes nuevas, set "parte" para parte.html)
@@ -14,8 +15,10 @@
   var SETS = {
     index:        { titulo: 'Cómo ver los tutoriales', slides: ['general-1', 'general-2'] },
     calendario:   { titulo: 'Agenda', slides: ['agenda-1', 'agenda-2', 'agenda-3', 'agenda-4', 'agenda-5', 'agenda-6', 'agenda-7'] },
-    servicio:     { titulo: 'Servicio Técnico', slides: ['tildes', 'tu-orden', 'cierre-semana', 'campanita', 'actividad', 'ventas-preparacion', 'etiquetas'] },
-    cotizaciones: { titulo: 'Ventas', slides: ['tildes', 'gastos-ventas', 'ventas-preparacion', 'campanita'] },
+    servicio:     { titulo: 'Servicio Técnico', slides: ['servicio-1', 'servicio-2', 'servicio-3', 'servicio-4', 'servicio-5', 'servicio-6', 'servicio-7', 'servicio-8', 'tu-orden', 'tildes', 'campanita', 'ventas-preparacion', 'etiquetas', 'cierre-semana', 'actividad'] },
+    cotizaciones: { titulo: 'Negocios', slides: ['negocios-1', 'negocios-2', 'negocios-3', 'negocios-4', 'negocios-5', 'negocios-6', 'gastos-ventas', 'ventas-preparacion', 'tildes', 'campanita'] },
+    'selector-dispositivos': { titulo: 'Catálogo de Productos', slides: ['catalogo-1', 'catalogo-2', 'catalogo-3'] },
+    comisiones:   { titulo: 'Comisiones', slides: ['comisiones-1', 'comisiones-2'] },
     eventos:      { titulo: 'Eventos y Congresos', slides: ['eventos-1', 'eventos-2', 'eventos-3', 'eventos-4', 'eventos-5', 'eventos-6', 'eventos-7', 'tildes', 'campanita'] },
     empresas:     { titulo: 'Empresas', slides: ['empresas-1', 'empresas-2', 'empresas-3', 'empresas-4', 'empresas-5'] },
     comex:        { titulo: 'Comercio Exterior', slides: ['comex-tablero', 'comex-checklist', 'tildes', 'campanita'] },
