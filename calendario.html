@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | calendario.html | v2026.10.09.7 (Estado nuevo "🔔 Solo aviso / recordatorio": se ve en el calendario (borde, sin relleno) y nunca bloquea — para cumpleaños, recordatorios y vencimientos. La lista de personas muestra solo a quienes tienen Agenda, Agenda Equipo o Rol Administrador. Función agenda v2.) -->
 <!-- Portal TLC | calendario.html | v2026.10.09.6 (NUEVO — Agenda centralizada, Etapa 1. Reemplaza el calendario de Teams/Outlook: cualquiera con el tilde "Agenda" ve su agenda al entrar, sin cuentas externas. Mes / Semana / Día / Lista (Lista por defecto en el celular), "Mis eventos" / "Todo el equipo" / por persona / por tipo. Choques de horario y feriados (API ArgentinaDatos) controlados en el servidor: se frena con el detalle exacto y "Agendar igual" con motivo para Administrador / "Agenda Equipo". Invitaciones: quien no tiene "Agenda Equipo" invita y el invitado acepta o rechaza. Todo pasa por la Cloud Function "agenda" v1.) -->
 <html lang="es">
 <head>
@@ -47,6 +48,8 @@ select.inp,input.inp,textarea.inp{width:100%;padding:9px 10px;border-radius:9px;
 .fc .fc-list-day-cushion{background:var(--panel2)}
 .fc-event{cursor:pointer}
 .fc-event.ev-tentativo{opacity:.75;border-style:dashed !important;border-width:2px !important}
+.fc-event.ev-aviso{background:transparent !important;border-width:2px !important}
+.fc-event.ev-aviso .fc-event-main,.fc-event.ev-aviso .fc-event-title,.fc-event.ev-aviso .fc-event-time{color:var(--text) !important}
 .fc-event.ev-pendiente{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.25) 0 6px,transparent 6px 12px) !important}
 .fc-event.ev-forzado .fc-event-title::before{content:'⚠️ '}
 .fc .fc-bg-event.feriado{background:rgba(148,163,184,.28);opacity:1}
@@ -124,7 +127,7 @@ select.inp,input.inp,textarea.inp{width:100%;padding:9px 10px;border-radius:9px;
       <option value="servicio">🔧 Servicio técnico</option><option value="ventas">💼 Ventas / visita</option>
       <option value="evento">🎪 Evento / congreso</option><option value="interno">🏢 Interno</option></select></div>
     <div class="campo"><label>Estado</label><select class="inp" id="f-estado" onchange="programarRevision()">
-      <option value="confirmado">Confirmado</option><option value="tentativo">Tentativo (no bloquea)</option></select></div>
+      <option value="confirmado">Confirmado</option><option value="tentativo">Tentativo (no bloquea)</option><option value="aviso">🔔 Solo aviso / recordatorio</option></select></div>
   </div>
   <div class="campo" style="display:flex;gap:16px;flex-wrap:wrap">
     <label class="check" style="text-transform:none;font-size:13px;color:var(--text);letter-spacing:0"><input type="checkbox" id="f-todo" onchange="ajustarTodoDia();programarRevision()"> Todo el día</label>
@@ -228,9 +231,9 @@ function pasaFiltro(ev){
 // ── FullCalendar ──────────────────────────────────────────
 function aEventoFC(ev){
   var t=TIPOS[ev.tipo]||TIPOS.interno, mia=miParticipacion(ev);
-  var cls=[]; if(ev.estado==='tentativo')cls.push('ev-tentativo'); if(mia&&mia.respuesta==='pendiente')cls.push('ev-pendiente'); if(ev.forzado)cls.push('ev-forzado');
+  var cls=[]; if(ev.estado==='tentativo')cls.push('ev-tentativo'); if(ev.estado==='aviso')cls.push('ev-aviso'); if(mia&&mia.respuesta==='pendiente')cls.push('ev-pendiente'); if(ev.forzado)cls.push('ev-forzado');
   var nombres=Object.values(ev.participantes||{}).filter(function(p){return p.respuesta!=='rechazado';}).map(function(p){return String(p.nombre||'').split(' ')[0];});
-  var titulo=t.ic+' '+ev.titulo+(quien==='todos'&&nombres.length?' · '+nombres.join(', '):'')+(mia&&mia.respuesta==='pendiente'?' (invitación)':'');
+  var titulo=(ev.estado==='aviso'?'🔔 ':t.ic+' ')+ev.titulo+(quien==='todos'&&nombres.length?' · '+nombres.join(', '):'')+(mia&&mia.respuesta==='pendiente'?' (invitación)':'');
   var o={ id:ev.id, title:titulo, backgroundColor:t.c, borderColor:t.c, textColor:'#fff', classNames:cls, editable:puedeEditar(ev), extendedProps:{ ag:ev } };
   if(ev.todo_el_dia){ o.allDay=true; o.start=ev.fecha; o.end=sumarDias(ev.fecha_fin||ev.fecha,1); }
   else { o.start=new Date(ev.ts_inicio); o.end=new Date(ev.ts_fin); }
@@ -337,7 +340,7 @@ function verDetalle(id){
   var parts=Object.values(ev.participantes||{}).sort(function(a,b){return (a.rol==='organizador'?0:1)-(b.rol==='organizador'?0:1);});
   var link=linkReferencia(ev.referencia);
   var h='<h2>'+t.ic+' '+esc(ev.titulo)+'</h2>'+
-    '<div style="margin-bottom:8px"><span class="tag" style="background:'+t.c+'">'+t.n+'</span> '+(ev.estado==='tentativo'?'<span class="tag" style="background:#64748b">Tentativo</span> ':'')+(ev.estado==='cancelado'?'<span class="tag" style="background:#dc2626">Cancelado</span>':'')+'</div>'+
+    '<div style="margin-bottom:8px"><span class="tag" style="background:'+t.c+'">'+t.n+'</span> '+(ev.estado==='tentativo'?'<span class="tag" style="background:#64748b">Tentativo</span> ':'')+(ev.estado==='aviso'?'<span class="tag" style="background:#64748b">🔔 Recordatorio · no bloquea</span> ':'')+(ev.estado==='cancelado'?'<span class="tag" style="background:#dc2626">Cancelado</span>':'')+'</div>'+
     '<div class="det-linea"><span class="ic">🕘</span><span>'+esc(mayus(cuando(ev)))+'</span></div>'+
     (ev.cliente?'<div class="det-linea"><span class="ic">🏢</span><span>'+esc(ev.cliente)+'</span></div>':'')+
     (link?'<div class="det-linea"><span class="ic">🔗</span><a href="'+link+'" style="color:var(--blue);font-weight:700">'+esc(ev.referencia.etiqueta||ev.referencia.id)+' ›</a></div>':'')+
@@ -437,7 +440,7 @@ function abrirEditar(id, cambios){
   document.getElementById('f-titulo-modal').textContent='Editar evento';
   document.getElementById('f-titulo').value=e.titulo||'';
   document.getElementById('f-tipo').value=e.tipo||'interno';
-  document.getElementById('f-estado').value=e.estado==='tentativo'?'tentativo':'confirmado';
+  document.getElementById('f-estado').value=(e.estado==='tentativo'||e.estado==='aviso')?e.estado:'confirmado';
   document.getElementById('f-todo').checked=!!e.todo_el_dia;
   document.getElementById('f-fecha').value=e.fecha;
   document.getElementById('f-fecha-fin').value=e.fecha_fin||e.fecha;
@@ -494,6 +497,7 @@ function mostrarRevision(r, soloAviso){
   if(inv.length) ojo+=(ojo?'<br>':'')+'📨 Se va a invitar a: <b>'+inv.map(function(p){return esc(p.nombre);}).join(', ')+'</b> (tienen que aceptar).';
   if(r.feriados_sin_verificar) ojo+=(ojo?'<br>':'')+'⚠️ No se pudieron verificar los feriados.';
   if(ojo){ el.className='revision ojo'; el.innerHTML=ojo; }
+  else if(document.getElementById('f-estado').value==='aviso'){ el.className='revision bien'; el.innerHTML='🔔 Recordatorio: se ve en el calendario pero no bloquea a nadie.'; }
   else if(soloAviso){ el.className='revision bien'; el.innerHTML='✓ Horario libre'; }
 }
 async function guardar(forzar){
