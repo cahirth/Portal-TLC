@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | calendario.html | v2026.10.09.8 (Cristian: "Juan dice Confirmado pero no sé si él lo confirmó". Ahora cada persona muestra 📌 Asignado (lo agendó un coordinador, es firme), ✅ Aceptó (aceptó una invitación), ⏳ Sin responder o 🚫 Rechazó — y al lado ✓✓ Visto con fecha y hora (azul) o ✓ Sin ver (gris), como las tildes de WhatsApp. Se marca visto al abrir el evento; si se reprograma vuelve a "sin ver". Función agenda v3.) -->
 <!-- Portal TLC | calendario.html | v2026.10.09.7 (Estado nuevo "🔔 Solo aviso / recordatorio": se ve en el calendario (borde, sin relleno) y nunca bloquea — para cumpleaños, recordatorios y vencimientos. La lista de personas muestra solo a quienes tienen Agenda, Agenda Equipo o Rol Administrador. Función agenda v2.) -->
 <!-- Portal TLC | calendario.html | v2026.10.09.6 (NUEVO — Agenda centralizada, Etapa 1. Reemplaza el calendario de Teams/Outlook: cualquiera con el tilde "Agenda" ve su agenda al entrar, sin cuentas externas. Mes / Semana / Día / Lista (Lista por defecto en el celular), "Mis eventos" / "Todo el equipo" / por persona / por tipo. Choques de horario y feriados (API ArgentinaDatos) controlados en el servidor: se frena con el detalle exacto y "Agendar igual" con motivo para Administrador / "Agenda Equipo". Invitaciones: quien no tiene "Agenda Equipo" invita y el invitado acepta o rechaza. Todo pasa por la Cloud Function "agenda" v1.) -->
 <html lang="es">
@@ -160,7 +161,21 @@ select.inp,input.inp,textarea.inp{width:100%;padding:9px 10px;border-radius:9px;
 'use strict';
 var AGENDA_URL = 'https://us-central1-portal-tlc.cloudfunctions.net/agenda';
 var TIPOS = { servicio:{ n:'Servicio técnico', ic:'🔧', c:'#ea580c' }, ventas:{ n:'Ventas', ic:'💼', c:'#3a86ff' }, evento:{ n:'Evento', ic:'🎪', c:'#16a34a' }, interno:{ n:'Interno', ic:'🏢', c:'#8b5cf6' } };
-var RESP = { aceptado:'✅ Confirmado', pendiente:'⏳ Sin responder', rechazado:'🚫 Rechazó' };
+var RESP = { aceptado:'✅ Aceptó', pendiente:'⏳ Sin responder', rechazado:'🚫 Rechazó' };
+function fechaHoraCorta(iso){ var d=new Date(iso); return isNaN(d)?'':d.toLocaleString('es-AR',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'America/Argentina/Buenos_Aires'}); }
+function estadoPersona(ev,p){
+  var creador=ev.creado_por&&ev.creado_por.email===p.email;
+  var r;
+  if(p.respuesta==='pendiente') r='<span style="color:var(--amber)">⏳ Sin responder</span>';
+  else if(p.respuesta==='rechazado') r='<span style="color:var(--red)">🚫 Rechazó</span>';
+  else if(creador) r='<span style="color:var(--muted)">Organiza</span>';
+  else if(p.respondido_en) r='<span style="color:var(--green)">✅ Aceptó</span>';
+  else r='<span title="Lo agendó un coordinador: es firme, no hace falta que acepte">📌 Asignado</span>';
+  var v='';
+  if(!creador) v = p.visto_en ? '<span style="color:#3a86ff;font-weight:800;margin-left:8px" title="Lo abrió">✓✓ Visto '+esc(fechaHoraCorta(p.visto_en))+'</span>'
+                              : '<span style="color:#94a3b8;font-weight:800;margin-left:8px" title="Todavía no lo abrió">✓ Sin ver</span>';
+  return r+v;
+}
 
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function sesion(){try{var r=JSON.parse(localStorage.getItem('tlc_session_v1')||'null');return r?(r.account||r):null;}catch(e){return null;}}
@@ -346,7 +361,7 @@ function verDetalle(id){
     (link?'<div class="det-linea"><span class="ic">🔗</span><a href="'+link+'" style="color:var(--blue);font-weight:700">'+esc(ev.referencia.etiqueta||ev.referencia.id)+' ›</a></div>':'')+
     (ev.notas?'<div class="det-linea"><span class="ic">📝</span><span style="white-space:pre-line">'+esc(ev.notas)+'</span></div>':'')+
     '<div style="margin-top:12px;font-size:10.5px;font-weight:800;color:var(--muted);letter-spacing:.4px">PERSONAS</div>'+
-    '<div>'+parts.map(function(p){return '<div class="part"><span>'+esc(p.nombre)+(p.rol==='organizador'?' <small style="color:var(--muted)">(organiza)</small>':'')+'</span><span style="font-weight:700;white-space:nowrap">'+(RESP[p.respuesta]||'')+'</span></div>'+(p.motivo_rechazo?'<div style="font-size:12px;color:var(--muted);margin:-3px 0 4px">“'+esc(p.motivo_rechazo)+'”</div>':'');}).join('')+'</div>'+
+    '<div>'+parts.map(function(p){return '<div class="part"><span>'+esc(p.nombre)+'</span><span style="font-weight:700;text-align:right">'+estadoPersona(ev,p)+'</span></div>'+(p.motivo_rechazo?'<div style="font-size:12px;color:var(--muted);margin:-3px 0 4px">“'+esc(p.motivo_rechazo)+'”</div>':'');}).join('')+'</div>'+
     (ev.forzado?'<div class="forz">⚠️ Agendado igual por <b>'+esc(ev.forzado.por)+'</b>: “'+esc(ev.forzado.motivo)+'”</div>':'')+
     (ev.cancelado?'<div class="forz">❌ Cancelado por '+esc(ev.cancelado.por)+(ev.cancelado.motivo?': “'+esc(ev.cancelado.motivo)+'”':'')+'</div>':'')+
     '<div style="font-size:11px;color:var(--muted);margin-top:10px">Creado por '+esc((ev.creado_por||{}).nombre||'—')+'</div>'+
@@ -362,6 +377,11 @@ function verDetalle(id){
   h+='<button class="btn" onclick="cerrar(\'m-det\')">Cerrar</button></div>';
   document.getElementById('det').innerHTML=h;
   abrir('m-det');
+  // Abrirlo cuenta como "visto" (una sola vez por persona)
+  if(mia&&!mia.visto_en&&ev.estado!=='cancelado'){
+    mia.visto_en=new Date().toISOString();
+    api({ accion:'ag_marcarVisto', id:ev.id }).then(function(r){ if(r&&r.visto_en&&EVENTOS[ev.id]){ var m=miParticipacion(EVENTOS[ev.id]); if(m) m.visto_en=r.visto_en; } }).catch(function(){ mia.visto_en=''; });
+  }
 }
 async function responder(id,resp,forzar){
   var motivoEl=document.getElementById('det-motivo'), wrap=document.getElementById('det-motivo-wrap');
