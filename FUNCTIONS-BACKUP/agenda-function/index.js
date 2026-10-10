@@ -1,4 +1,8 @@
 // Portal TLC | Cloud Function — Agenda centralizada (calendario.html)
+// v4 — 2026.10.10 — Etapa 2: ag_porReferencia (visitas de un ticket o negocio,
+//   para la franja "📅 Próxima visita") y ag_referenciasConVisita (qué tickets
+//   tienen visita agendada, para el 📅 de las tarjetas). Las puede pedir
+//   cualquier usuario cargado en la hoja de permisos (solo lectura).
 // v3 — 2026.10.09 — "Visto" por persona (✓✓ como WhatsApp): se marca cuando la
 //   persona abre el evento (ag_marcarVisto); si se reprograma, vuelve a "sin ver".
 //   Asignación directa queda registrada (asignado_por) para mostrar "📌 Asignado"
@@ -97,7 +101,7 @@ async function actorDe(data) {
   const equipo = admin_ || esVerdadero(fila.Agenda_Equipo);
   const agenda = equipo || esVerdadero(fila.Agenda);
   const nombre = String(fila.Nombre_Vendedor || fila.Nombre || nombreEnviado || email).trim();
-  return { email, nombre, agenda, equipo, admin: admin_ };
+  return { email, nombre, agenda, equipo, admin: admin_, existe: Object.keys(fila).length > 0 };
 }
 async function personasDelEquipo() {
   const permisos = (await fbGet('permisos')) || {};
@@ -537,13 +541,55 @@ async function ag_marcarVisto(data) {
   });
 }
 
+// ── Etapa 2: visitas vinculadas a un ticket / negocio ───────────
+function resumenEvento(id, e) {
+  const parts = {};
+  Object.keys(e.participantes || {}).forEach((k) => {
+    const p = e.participantes[k];
+    parts[k] = { email: p.email, nombre: p.nombre, respuesta: p.respuesta, visto_en: p.visto_en || '', asignado_por: p.asignado_por || '', respondido_en: p.respondido_en || '' };
+  });
+  return { id, titulo: e.titulo, tipo: e.tipo, estado: e.estado, fecha: e.fecha, fecha_fin: e.fecha_fin, hora_inicio: e.hora_inicio, hora_fin: e.hora_fin, todo_el_dia: !!e.todo_el_dia,
+    ts_inicio: e.ts_inicio, ts_fin: e.ts_fin, creado_por: e.creado_por || null, participantes: parts };
+}
+async function ag_porReferencia(data) {
+  const actor = await actorDe(data);
+  if (!actor.existe) return { ok: false, sin_permiso: true, error: 'Sin acceso' };
+  const entidad = String(data.entidad || ''), ref = String(data.id || '').trim();
+  if (!entidad || !ref) return { ok: false, error: 'Faltan datos' };
+  const todos = (await fbGet(NODO)) || {};
+  const ahora = Date.now();
+  const lista = Object.keys(todos).map((id) => ({ id, e: todos[id] }))
+    .filter((x) => x.e && x.e.estado !== 'cancelado' && x.e.referencia && x.e.referencia.entidad === entidad && String(x.e.referencia.id) === ref);
+  const proximas = lista.filter((x) => x.e.ts_fin > ahora).sort((a, b) => a.e.ts_inicio - b.e.ts_inicio).map((x) => resumenEvento(x.id, x.e));
+  const pasadas = lista.filter((x) => x.e.ts_fin <= ahora).sort((a, b) => b.e.ts_inicio - a.e.ts_inicio);
+  return { ok: true, proximas, pasadas: pasadas.length, ultima: pasadas.length ? resumenEvento(pasadas[0].id, pasadas[0].e) : null, puede_agendar: actor.agenda };
+}
+// Para las tarjetas: { refId: { n, fecha, hora_inicio, todo_el_dia } } con la próxima visita de cada uno
+async function ag_referenciasConVisita(data) {
+  const actor = await actorDe(data);
+  if (!actor.existe) return { ok: false, sin_permiso: true, error: 'Sin acceso' };
+  const entidad = String(data.entidad || '');
+  const todos = (await fbGet(NODO)) || {};
+  const ahora = Date.now();
+  const mapa = {};
+  Object.keys(todos).forEach((id) => {
+    const e = todos[id];
+    if (!e || e.estado === 'cancelado' || e.estado === 'aviso' || !e.referencia || e.referencia.entidad !== entidad || !(e.ts_fin > ahora)) return;
+    const k = String(e.referencia.id);
+    const m = mapa[k];
+    if (!m) mapa[k] = { n: 1, id, fecha: e.fecha, hora_inicio: e.hora_inicio || '', todo_el_dia: !!e.todo_el_dia, ts: e.ts_inicio };
+    else { m.n++; if (e.ts_inicio < m.ts) Object.assign(m, { id, fecha: e.fecha, hora_inicio: e.hora_inicio || '', todo_el_dia: !!e.todo_el_dia, ts: e.ts_inicio }); }
+  });
+  return { ok: true, visitas: mapa };
+}
+
 async function ag_feriados(data) {
   const anio = /^\d{4}$/.test(String(data.anio || '')) ? String(data.anio) : diaBA().slice(0, 4);
   const r = await feriadosDelAnio(anio);
   return { ok: r.ok, anio, feriados: r.lista };
 }
 
-const ACCIONES = { ag_listar, ag_verificar, ag_crear, ag_editar, ag_cancelar, ag_responder, ag_marcarVisto, ag_feriados };
+const ACCIONES = { ag_listar, ag_verificar, ag_crear, ag_editar, ag_cancelar, ag_responder, ag_marcarVisto, ag_porReferencia, ag_referenciasConVisita, ag_feriados };
 
 functions.http('agenda', async (req, res) => {
   res.set('Access-Control-Allow-Origin', 'https://ir.tlcsrl.com.ar');
