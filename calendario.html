@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | calendario.html | v2026.10.10.5 (Cristian: "en el calendario derecho que se pueda mover verticalmente o cambiar el horario con el mouse". El bloque "✏️ Este evento" del calendario lateral ahora se arrastra para moverlo y se estira desde el borde de abajo para cambiar la duración; Desde/Hasta se actualizan solos y se vuelve a revisar si choca.) -->
 <!-- Portal TLC | calendario.html | v2026.10.10.4 (Agenda también desde las tarjetas de Eventos / Comex / Regulatoria: el vínculo abre la tarjeta y al guardar vuelve ahí.) -->
 <!-- Portal TLC | calendario.html | v2026.10.10.3 (Cristian: "en este modal que me muestre el calendario al lateral derecho para ver la carga del asignado". Al crear o editar un evento, a la derecha aparece la agenda de ESE día de las personas elegidas, con el evento que estás cargando resaltado ("✏️ Este evento") y se actualiza al cambiar fecha, horario o personas. Tocando o arrastrando en ese calendario se eligen la hora de inicio y fin. En el celular va debajo del formulario.) -->
 <!-- Portal TLC | calendario.html | v2026.10.10.2 (Etapa 2: "📅 Agendar" desde un ticket o un negocio abre esto con título, cliente, tipo, persona responsable y el vínculo precargados (?nuevo=1&personas=...&volver=...). Al guardar vuelve solo al ticket/negocio, donde aparece la franja "Próxima visita". Si no se agendó nada, "← Volver" regresa sin guardar.) -->
@@ -97,6 +98,8 @@ select.inp,input.inp,textarea.inp{width:100%;padding:9px 10px;border-radius:9px;
 .lado-ayuda{font-size:10.5px;color:var(--muted);margin-top:6px;text-align:center}
 #f-cal-lado .fc{font-size:11.5px}
 #f-cal-lado .fc-event.ev-borrador{background:repeating-linear-gradient(135deg,rgba(58,134,255,.85) 0 8px,rgba(58,134,255,.65) 8px 16px) !important;border:2px solid #1d4ed8 !important;box-shadow:0 0 0 2px rgba(58,134,255,.25)}
+#f-cal-lado .fc-event.ev-borrador{cursor:grab}
+#f-cal-lado .fc-event.ev-borrador .fc-event-resizer-end{height:10px;bottom:-3px;cursor:ns-resize;background:rgba(255,255,255,.35);border-radius:0 0 6px 6px}
 #f-cal-lado .fc-event.ev-choca{outline:2px solid #dc2626}
 @media(max-width:900px){.f-grid{grid-template-columns:1fr}.f-der{position:static}}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 16px;border-radius:12px;font-size:13px;font-weight:700;z-index:80;box-shadow:0 8px 24px rgba(0,0,0,.35);max-width:92vw;display:none}
@@ -173,7 +176,7 @@ select.inp,input.inp,textarea.inp{width:100%;padding:9px 10px;border-radius:9px;
   <div class="lado-tit" id="lado-tit">📅 Agenda del día</div>
   <div class="lado-sub" id="lado-sub">Elegí personas y fecha</div>
   <div id="f-cal-lado"></div>
-  <div class="lado-ayuda">Tocá o arrastrá en el calendario para elegir el horario.</div>
+  <div class="lado-ayuda">Arrastrá <b>✏️ Este evento</b> para moverlo o estiralo desde abajo para cambiar la duración. También podés marcar un hueco libre.</div>
  </div>
  </div>
 </div></div>
@@ -457,7 +460,9 @@ function iniciarCalLado(){
     locale:'es', initialView:'timeGridDay', headerToolbar:false, dayHeaders:false, height:esCel()?420:560, allDayText:'Día',
     slotMinTime:'07:00:00', slotMaxTime:'21:00:00', scrollTime:'08:00:00', slotDuration:'00:30:00', nowIndicator:true,
     eventTimeFormat:{ hour:'2-digit', minute:'2-digit', hour12:false }, slotLabelFormat:{ hour:'2-digit', minute:'2-digit', hour12:false },
-    selectable:true, selectMirror:true, editable:false, longPressDelay:300, events:[],
+    selectable:true, selectMirror:true, editable:false, longPressDelay:300, events:[], snapDuration:'00:15:00',
+    eventDrop:function(i){ moverBorrador(i); },
+    eventResize:function(i){ moverBorrador(i); },
     select:function(s){
       calLado.unselect(); if(s.allDay) return;
       var a=partesFecha(s.start), b=partesFecha(s.end);
@@ -467,6 +472,15 @@ function iniciarCalLado(){
       programarRevision(); actualizarLado();
     },
   });
+}
+// El bloque "Este evento" se mueve / estira con el mouse (o el dedo) → actualiza Desde/Hasta
+function moverBorrador(i){
+  if(!i.event.classNames||i.event.classNames.indexOf('ev-borrador')<0){ i.revert(); return; }
+  var a=partesFecha(i.event.start), b=partesFecha(i.event.end||new Date(i.event.start.getTime()+3600000));
+  document.getElementById('f-fecha').value=a.f;
+  if(!document.getElementById('f-varios').checked||b.f===a.f) document.getElementById('f-fecha-fin').value=b.f;
+  document.getElementById('f-hi').value=a.h; document.getElementById('f-hf').value=b.h;
+  programarRevision();
 }
 async function actualizarLado(){
   var n=++_ladoN, fecha=document.getElementById('f-fecha').value;
@@ -493,7 +507,7 @@ async function actualizarLado(){
   FERIADOS.filter(function(f){return f.fecha===fecha;}).forEach(function(f){ evs.push({ start:f.fecha, end:sumarDias(f.fecha,1), allDay:true, display:'background', title:f.nombre, classNames:[(f.tipo==='inamovible'||f.tipo==='trasladable')?'feriado':'no-laborable'] }); });
   var titulo='✏️ '+(d.titulo||'Este evento');
   if(d.todo_el_dia) evs.push({ start:fecha, end:sumarDias(d.fecha_fin||fecha,1), allDay:true, title:titulo, classNames:['ev-borrador'], textColor:'#fff' });
-  else if(borradorIni&&borradorFin>borradorIni) evs.push({ start:new Date(borradorIni), end:new Date(borradorFin), title:titulo, classNames:['ev-borrador'], textColor:'#fff' });
+  else if(borradorIni&&borradorFin>borradorIni) evs.push({ start:new Date(borradorIni), end:new Date(borradorFin), title:titulo, classNames:['ev-borrador'], textColor:'#fff', editable:true, startEditable:true, durationEditable:true });
   calLado.removeAllEventSources(); calLado.addEventSource(evs);
   if(!d.todo_el_dia&&d.hora_inicio) calLado.scrollToTime(String(Math.max(7,(+d.hora_inicio.slice(0,2))-1)).padStart(2,'0')+':00:00');
 }
