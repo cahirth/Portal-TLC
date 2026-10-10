@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | calendario.html | v2026.10.10.1 (Cristian: "en cel no hay vista semana?" — vista nueva "3 días" (hoy y los 2 siguientes en columnas con horario, como Google Calendar en el celular). En el celular: Lista · 3 días · Día · Mes; en PC también aparece.) -->
 <!-- Portal TLC | calendario.html | v2026.10.09.8 (Cristian: "Juan dice Confirmado pero no sé si él lo confirmó". Ahora cada persona muestra 📌 Asignado (lo agendó un coordinador, es firme), ✅ Aceptó (aceptó una invitación), ⏳ Sin responder o 🚫 Rechazó — y al lado ✓✓ Visto con fecha y hora (azul) o ✓ Sin ver (gris), como las tildes de WhatsApp. Se marca visto al abrir el evento; si se reprograma vuelve a "sin ver". Función agenda v3.) -->
 <!-- Portal TLC | calendario.html | v2026.10.09.7 (Estado nuevo "🔔 Solo aviso / recordatorio": se ve en el calendario (borde, sin relleno) y nunca bloquea — para cumpleaños, recordatorios y vencimientos. La lista de personas muestra solo a quienes tienen Agenda, Agenda Equipo o Rol Administrador. Función agenda v2.) -->
 <!-- Portal TLC | calendario.html | v2026.10.09.6 (NUEVO — Agenda centralizada, Etapa 1. Reemplaza el calendario de Teams/Outlook: cualquiera con el tilde "Agenda" ve su agenda al entrar, sin cuentas externas. Mes / Semana / Día / Lista (Lista por defecto en el celular), "Mis eventos" / "Todo el equipo" / por persona / por tipo. Choques de horario y feriados (API ArgentinaDatos) controlados en el servidor: se frena con el detalle exacto y "Agendar igual" con motivo para Administrador / "Agenda Equipo". Invitaciones: quien no tiene "Agenda Equipo" invita y el invitado acepta o rechaza. Todo pasa por la Cloud Function "agenda" v1.) -->
@@ -291,7 +292,8 @@ function iniciarCalendario(fechaInicial){
     locale:'es', firstDay:1, height:'auto', nowIndicator:true, navLinks:true,
     initialView: lsGet('ag_vista', esCel()?'listWeek':'timeGridWeek'),
     initialDate: fechaInicial||undefined,
-    headerToolbar: esCel()? { left:'prev,next today', center:'', right:'listWeek,timeGridDay,dayGridMonth' } : { left:'prev,next today', center:'title', right:'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
+    headerToolbar: esCel()? { left:'prev,next today', center:'', right:'listWeek,timeGrid3,timeGridDay,dayGridMonth' } : { left:'prev,next today', center:'title', right:'dayGridMonth,timeGridWeek,timeGrid3,timeGridDay,listWeek' },
+    views:{ timeGrid3:{ type:'timeGrid', duration:{ days:3 }, buttonText:'3 días' } },
     footerToolbar: esCel()? { center:'title' } : false,
     buttonText:{ today:'Hoy', month:'Mes', week:'Semana', day:'Día', list:'Lista' },
     slotMinTime:'07:00:00', slotMaxTime:'21:00:00', scrollTime:'08:00:00', slotDuration:'00:30:00', allDayText:'Día',
