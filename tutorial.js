@@ -1,3 +1,4 @@
+// Portal TLC | tutorial.js | v2026.10.10.7 (Cristian: "podés hacer brochures del módulo Parte del día" — 4 imágenes nuevas, set "parte" para parte.html)
 // Portal TLC | tutorial.js | v2026.10.10.1 (Cristian: "se me ocurre poner los brochure en forma de tutorial en cada modulo y hacer un brochure general para que sepa el equipo como mirar el tutorial")
 // Botón flotante "❔ Tutorial" (abajo a la izquierda) + carrusel a pantalla completa con
 // las imágenes de los brochures (carpeta tutoriales/). Se elige el set solo según la
@@ -15,7 +16,8 @@
     cotizaciones: { titulo: 'Ventas', slides: ['tildes', 'gastos-ventas', 'ventas-preparacion', 'campanita'] },
     eventos:      { titulo: 'Eventos', slides: ['tildes', 'campanita'] },
     comex:        { titulo: 'Comercio Exterior', slides: ['comex-tablero', 'comex-checklist', 'tildes', 'campanita'] },
-    regulatoria:  { titulo: 'Regulatoria', slides: ['regulatoria', 'tildes', 'campanita'] }
+    regulatoria:  { titulo: 'Regulatoria', slides: ['regulatoria', 'tildes', 'campanita'] },
+    parte:        { titulo: 'Parte del día', slides: ['parte-del-dia-1', 'parte-del-dia-2', 'parte-del-dia-3', 'parte-del-dia-4'] }
   };
   var CARPETA = 'tutoriales/';
   // La URL se lee al cargar: algunos módulos la limpian después (history.replaceState).
