@@ -8,7 +8,7 @@
 //
 // Al subir un cambio: actualizar SOLO esta línea. El console.log y el
 // texto visible en el menú de avatar de cada módulo lo leen de acá.
-const PORTAL_TLC_VERSION = "2026.10.10.5";
+const PORTAL_TLC_VERSION = "2026.10.10.6";
 
 // Contador rojo en el ícono de la app instalada (v2026.10.07.2) —
 // Cristian: "un contador rojito con números en el ícono de la PWA
