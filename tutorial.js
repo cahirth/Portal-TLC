@@ -1,3 +1,4 @@
+// Portal TLC | tutorial.js | v2026.10.10.8 (Cristian: "hacé brochures para Cuenta Corriente, completo" — 6 imágenes, set "cuenta-corriente")
 // Portal TLC | tutorial.js | v2026.10.10.7 (Cristian: "podés hacer brochures del módulo Parte del día" — 4 imágenes nuevas, set "parte" para parte.html)
 // Portal TLC | tutorial.js | v2026.10.10.1 (Cristian: "se me ocurre poner los brochure en forma de tutorial en cada modulo y hacer un brochure general para que sepa el equipo como mirar el tutorial")
 // Botón flotante "❔ Tutorial" (abajo a la izquierda) + carrusel a pantalla completa con
@@ -17,7 +18,8 @@
     eventos:      { titulo: 'Eventos', slides: ['tildes', 'campanita'] },
     comex:        { titulo: 'Comercio Exterior', slides: ['comex-tablero', 'comex-checklist', 'tildes', 'campanita'] },
     regulatoria:  { titulo: 'Regulatoria', slides: ['regulatoria', 'tildes', 'campanita'] },
-    parte:        { titulo: 'Parte del día', slides: ['parte-del-dia-1', 'parte-del-dia-2', 'parte-del-dia-3', 'parte-del-dia-4'] }
+    parte:        { titulo: 'Parte del día', slides: ['parte-del-dia-1', 'parte-del-dia-2', 'parte-del-dia-3', 'parte-del-dia-4'] },
+    'cuenta-corriente': { titulo: 'Cuenta Corriente', slides: ['cuenta-corriente-1', 'cuenta-corriente-2', 'cuenta-corriente-3', 'cuenta-corriente-4', 'cuenta-corriente-5', 'cuenta-corriente-6'] }
   };
   var CARPETA = 'tutoriales/';
   // La URL se lee al cargar: algunos módulos la limpian después (history.replaceState).
