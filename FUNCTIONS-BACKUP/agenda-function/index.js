@@ -1,4 +1,8 @@
 // Portal TLC | Cloud Function — Agenda centralizada (calendario.html)
+// v3 — 2026.10.09 — "Visto" por persona (✓✓ como WhatsApp): se marca cuando la
+//   persona abre el evento (ag_marcarVisto); si se reprograma, vuelve a "sin ver".
+//   Asignación directa queda registrada (asignado_por) para mostrar "📌 Asignado"
+//   en vez de "Confirmado" — Cristian: "dice confirmado pero no sé si él lo confirmó".
 // v2 — 2026.10.09 — Estado nuevo "aviso" (Solo aviso / recordatorio): se ve en el
 //   calendario pero nunca bloquea (ni choques ni feriados) — cumpleaños,
 //   recordatorios, vencimientos. La lista de personas muestra solo a quienes
@@ -302,6 +306,10 @@ function armarParticipantes(entrada, actor, previos, creadorEmail) {
     res[k] = { email: p.email, nombre: p.nombre || (prev && prev.nombre) || p.email, rol: esOrg ? 'organizador' : 'invitado', respuesta };
     if (prev && prev.respondido_en) res[k].respondido_en = prev.respondido_en;
     if (prev && prev.motivo_rechazo) res[k].motivo_rechazo = prev.motivo_rechazo;
+    if (prev && prev.visto_en) res[k].visto_en = prev.visto_en;
+    if (prev && prev.asignado_por) res[k].asignado_por = prev.asignado_por;
+    if (!prev && respuesta === 'aceptado' && p.email !== actor.email) res[k].asignado_por = actor.nombre; // asignación directa
+    if (!prev && p.email === actor.email) res[k].visto_en = new Date().toISOString();                     // el que lo carga ya lo vio
   });
   return res;
 }
@@ -423,6 +431,11 @@ async function ag_editar(data) {
     }
     ev.actualizado_en = new Date().toISOString();
     ev.actualizado_por = { email: actor.email, nombre: actor.nombre };
+    // Si cambió el horario, los demás tienen que volver a verlo
+    if (antes.ts_inicio !== ev.ts_inicio || antes.ts_fin !== ev.ts_fin) {
+      ev.participantes = JSON.parse(JSON.stringify(ev.participantes));
+      Object.keys(ev.participantes).forEach((k) => { if (ev.participantes[k].email !== actor.email) delete ev.participantes[k].visto_en; });
+    }
     const rev = await revisar(ev, id);
     if (hayBloqueo(rev)) {
       const motivo = String(data.motivo_forzar || '').trim();
@@ -485,6 +498,7 @@ async function ag_responder(data) {
     const ev = JSON.parse(JSON.stringify(antes));
     ev.participantes[k].respuesta = respuesta;
     ev.participantes[k].respondido_en = new Date().toISOString();
+    if (!ev.participantes[k].visto_en) ev.participantes[k].visto_en = ev.participantes[k].respondido_en;
     const motivo = String(data.motivo || '').trim();
     if (respuesta === 'rechazado') { if (motivo) ev.participantes[k].motivo_rechazo = motivo; else delete ev.participantes[k].motivo_rechazo; }
     if (respuesta === 'aceptado') {
@@ -507,13 +521,29 @@ async function ag_responder(data) {
   });
 }
 
+// La persona abrió el evento: queda "✓✓ Visto" con fecha y hora
+async function ag_marcarVisto(data) {
+  const actor = await actorDe(data);
+  if (!actor.email) return { ok: false, error: 'Sin sesión' };
+  const id = rtdbKeySeguro(data.id);
+  const k = claveEmail(actor.email);
+  return conCandado(async () => {
+    const p = await fbGet(NODO + '/' + id + '/participantes/' + k);
+    if (!p) return { ok: true, no_participa: true };
+    if (p.visto_en) return { ok: true, visto_en: p.visto_en };
+    const ahora = new Date().toISOString();
+    await fbUpdate({ [NODO + '/' + id + '/participantes/' + k + '/visto_en']: ahora });
+    return { ok: true, visto_en: ahora };
+  });
+}
+
 async function ag_feriados(data) {
   const anio = /^\d{4}$/.test(String(data.anio || '')) ? String(data.anio) : diaBA().slice(0, 4);
   const r = await feriadosDelAnio(anio);
   return { ok: r.ok, anio, feriados: r.lista };
 }
 
-const ACCIONES = { ag_listar, ag_verificar, ag_crear, ag_editar, ag_cancelar, ag_responder, ag_feriados };
+const ACCIONES = { ag_listar, ag_verificar, ag_crear, ag_editar, ag_cancelar, ag_responder, ag_marcarVisto, ag_feriados };
 
 functions.http('agenda', async (req, res) => {
   res.set('Access-Control-Allow-Origin', 'https://ir.tlcsrl.com.ar');
