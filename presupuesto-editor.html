@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | presupuesto-editor.html | v2026.10.14.1 (💳 TLC CUOTAS A MEDIDA — Cristian: "en presupuesto editor, estoy queriendo hacer un presupuesto con adelanto y 10 cuotas, ¿cómo podemos flexibilizar el dropdown?". Nueva opción en Forma de pago: "TLC cuotas a medida (anticipo + N cuotas)". Mismo cálculo que TLC 6/12 (anticipo en % o USD + saldo en cuotas fijas iguales, sin recargo), pero además se elige la cantidad de cuotas (1 a 36). Se guarda como "TLC 10 cuotas" en el presupuesto y se restaura al volver a editar.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.06.5 (Cristian: "al pasar de 50% a AR$, redondealo". Con el ítem en AR$, pasar el descuento de % a monto fijo redondea a pesos enteros (600.000 en vez de 599.999,4).) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.06.4 (Cristian: "si todos los ítems están en USD el total debe estar en dólares, y si todos están en AR$, en AR$, automáticamente". El selector de moneda del total se ajusta solo cuando todos los ítems quedan en la misma moneda; si están mezclados, se respeta la elección manual.) -->
 <!-- Portal TLC | presupuesto-editor.html | v2026.10.06.3 (Cristian: "poné el separador de miles" en el descuento. El campo Descuento se muestra con separador de miles y coma decimal, igual que el precio (600.000 / 12,5), y lee lo tipeado con o sin puntos. Un descuento en % se limita a 0–100.) -->
@@ -299,6 +300,7 @@
             <option value="contado">Contado</option>
             <option value="tlc6">TLC 6 cuotas</option>
             <option value="tlc12">TLC 12 cuotas</option>
+            <option value="tlcx">TLC cuotas a medida (anticipo + N cuotas)</option>
             <option value="leasing36">Leasing 36 meses (AR$)</option>
           </select>
         </div>
@@ -581,9 +583,10 @@ function _restaurarDraftYItemPendiente() {
       // ahora no lo trae". PARAMS_PAGO ya está definido acá arriba
       // (línea ~1190), antes de que se llame a esta función.
       var mp = draft.modalidadPago;
-      if (mp && (mp.tipo === 'tlc6' || mp.tipo === 'tlc12') && PARAMS_PAGO[mp.tipo]) {
+      if (mp && (mp.tipo === 'tlc6' || mp.tipo === 'tlc12' || mp.tipo === 'tlcx') && PARAMS_PAGO[mp.tipo]) {
         if (mp.anticipoPct !== undefined && mp.anticipoPct !== null) PARAMS_PAGO[mp.tipo].anticipoPct = mp.anticipoPct;
         if (mp.anticipoTipo) PARAMS_PAGO[mp.tipo].anticipoTipo = mp.anticipoTipo;
+        if (mp.tipo === 'tlcx' && mp.cuotas) PARAMS_PAGO.tlcx.cuotas = Math.max(1, Math.min(TLCX_MAX_CUOTAS, parseInt(mp.cuotas, 10) || 10));
       }
     }
   } catch (e) { console.warn('Error restaurando borrador:', e); }
@@ -1326,7 +1329,12 @@ var PARAMS_PAGO = {
   // por compatibilidad con lo que ya lee presupuesto.html/RTDB).
   tlc6:  { anticipoPct: 35, anticipoTipo: '%', cuotas: 6 },
   tlc12: { anticipoPct: 50, anticipoTipo: '%', cuotas: 12 },
+  // TLC a medida (v2026.10.14.1): mismo cálculo que TLC 6/12 (anticipo +
+  // saldo en cuotas fijas iguales, sin recargo), pero el vendedor elige
+  // también la CANTIDAD de cuotas (1 a 36) — ej. anticipo + 10 cuotas.
+  tlcx:  { anticipoPct: 30, anticipoTipo: '%', cuotas: 10 },
 };
+var TLCX_MAX_CUOTAS = 36;
 
 // Contado: NO es un % genérico — cada ítem tiene su propio precio de
 // contado ya cargado en el catálogo (columna "Precio CONTADO CNO" en
@@ -1412,9 +1420,17 @@ window._toggleAnticipoTipoTLC = function(clave) {
   } else {
     // Sin ítems cargados todavía no hay base para convertir — recién
     // ahí se usa el default, para no dividir por cero.
-    p.anticipoPct = tipoNuevo === '%' ? (clave === 'tlc6' ? 35 : 50) : 0;
+    p.anticipoPct = tipoNuevo === '%' ? (clave === 'tlc6' ? 35 : clave === 'tlcx' ? 30 : 50) : 0;
   }
   p.anticipoTipo = tipoNuevo;
+  _renderModalidadesPago();
+};
+
+window._actualizarCuotasTLCX = function(valor) {
+  var n = parseInt(valor, 10);
+  if (isNaN(n) || n < 1) n = 1;
+  if (n > TLCX_MAX_CUOTAS) n = TLCX_MAX_CUOTAS;
+  PARAMS_PAGO.tlcx.cuotas = n;
   _renderModalidadesPago();
 };
 
@@ -1523,6 +1539,14 @@ function _renderModalidadesPago() {
           '<span class="' + ((p.anticipoTipo||'%') === 'USD' ? 'activo' : '') + '">USD</span>' +
         '</div>' +
       '</div>' +
+      (clave === 'tlcx'
+        ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
+            '<label style="font-size:10px;color:var(--text-dim);">Cuotas</label>' +
+            '<input type="number" min="1" max="' + TLCX_MAX_CUOTAS + '" step="1" value="' + p.cuotas + '" onchange="_actualizarCuotasTLCX(this.value)" ' +
+              'style="width:56px;padding:3px 4px;border-radius:5px;border:1px solid var(--border-glow);background:var(--panel-darker);color:var(--text-main);font-size:11px;text-align:center;">' +
+            '<span style="font-size:10px;color:var(--text-dim);">(1 a ' + TLCX_MAX_CUOTAS + ')</span>' +
+          '</div>'
+        : '') +
       '<div style="font-size:13px;font-weight:700;">' + fmtTlcRedondeado(anticipoMostrado) + ' + IVA <span style="font-weight:400;color:var(--text-dim);">(' + fmtTlcRedondeado(anticipoSinIvaRedondeado * factorIva) + ' con IVA)</span></div>' +
       '<div style="font-size:10px;color:var(--text-dim);margin-top:6px;">' + r.cuotas + ' cuotas fijas de</div>' +
       '<div style="font-size:13px;font-weight:700;">' + fmtTlcRedondeado(cuotaMostrada) + ' + IVA c/u <span style="font-weight:400;color:var(--text-dim);">(' + fmtTlcRedondeado(cuotaSinIvaRedondeada * factorIva) + ' con IVA)</span></div>' +
@@ -1530,7 +1554,7 @@ function _renderModalidadesPago() {
   };
 
   var formaPagoSel = (document.getElementById('cc-forma-pago') || {}).value || 'contado';
-  var tarjetas = { contado: cardContado, leasing36: cardLeasing, tlc6: cardTLC('tlc6', 'TLC 6 CUOTAS'), tlc12: cardTLC('tlc12', 'TLC 12 CUOTAS') };
+  var tarjetas = { contado: cardContado, leasing36: cardLeasing, tlc6: cardTLC('tlc6', 'TLC 6 CUOTAS'), tlc12: cardTLC('tlc12', 'TLC 12 CUOTAS'), tlcx: cardTLC('tlcx', 'TLC ' + PARAMS_PAGO.tlcx.cuotas + ' CUOTAS (A MEDIDA)') };
   cont.innerHTML = tarjetas[formaPagoSel] || cardContado;
 }
 
@@ -1670,10 +1694,10 @@ function _render() {
 // "el amo es el presupuesto editor, presupuesto debería obedecer".
 function _calcularModalidadPagoParaGuardar() {
   var formaPago = document.getElementById('cc-forma-pago').value;
-  var LABELS = { contado: 'Contado', tlc6: 'TLC 6 cuotas', tlc12: 'TLC 12 cuotas', leasing36: 'Leasing 36 meses (AR$)' };
+  var LABELS = { contado: 'Contado', tlc6: 'TLC 6 cuotas', tlc12: 'TLC 12 cuotas', tlcx: 'TLC ' + PARAMS_PAGO.tlcx.cuotas + ' cuotas', leasing36: 'Leasing 36 meses (AR$)' };
   var base = { tipo: formaPago, label: LABELS[formaPago] || formaPago };
 
-  if (formaPago === 'tlc6' || formaPago === 'tlc12') {
+  if (formaPago === 'tlc6' || formaPago === 'tlc12' || formaPago === 'tlcx') {
     var netoUSD = ITEMS.reduce(function(s, it) { return s + _calcularItem(it).descontado; }, 0);
     var p = PARAMS_PAGO[formaPago];
     var r = _calcularTLC(netoUSD, p);
