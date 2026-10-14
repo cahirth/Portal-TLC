@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | index.html | v2026.10.13.1 (📒 CONTABILIDAD — Cristian: "necesito dentro de Administración un módulo llamado CONTABILIDAD, con un tablero Kanban igual al de COMEX". Nuevo ítem "Contabilidad" en Administración → eventos.html?modulo=contabilidad. Se habilita con la columna nueva "Contabilidad" de la planilla Vendedores (TRUE/FALSE), sincronizada con el botón de siempre.) -->
 <!-- Portal TLC | index.html | v2026.10.10.6 (📚 Tutoriales — Cristian: "poner los brochure en forma de tutorial en cada modulo". Se suma tutorial.js: botón ❔ Tutorial abajo a la izquierda que abre el carrusel de imágenes de este módulo; la primera vez se abre solo.) -->
 <!-- Portal TLC | index.html | v2026.10.09.6 (📅 Agenda en el menú principal (calendario.html, Agenda centralizada Etapa 1). Se habilita con el tilde "Agenda" o "Agenda Equipo" de la hoja de permisos, o Rol Administrador. La campanita abre los avisos de agenda en el calendario.) -->
 <!-- Portal TLC | index.html | v2026.10.08.7 (Regulatoria abre su tablero Kanban de trámites ANMAT (eventos.html?modulo=regulatoria), con el tilde "Regulatoria" de la hoja.) -->
@@ -735,6 +736,13 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
                     <div class="item-text-box"><h3>Reportes</h3><p>Parte del día, semana, mes y KPIs</p></div>
                     <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
                 </div>
+                <div class="menu-item-row" id="menu-contabilidad" onclick="abrirUrlConPermiso('eventos.html?modulo=contabilidad', 'Contabilidad', 'contabilidad')">
+                    <div class="item-logo-container" style="background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.4);">
+                        <i class="fa-solid fa-book" style="color:#8b5cf6; font-size:20px;"></i>
+                    </div>
+                    <div class="item-text-box"><h3>Contabilidad</h3><p>Tablero de tareas contables</p></div>
+                    <i class="fa-solid fa-chevron-right menu-chevron" style="color:var(--text-muted); font-size:11px;"></i>
+                </div>
                 <div class="menu-item-row" id="menu-regulatoria" onclick="abrirUrlConPermiso('eventos.html?modulo=regulatoria', 'Regulatoria', 'regulatoria')">
                     <div class="item-logo-container" style="background:rgba(248,150,30,0.15); border:1px solid rgba(248,150,30,0.35);">
                         <i class="fa-solid fa-file-shield" style="color:#f8961e; font-size:20px;"></i>
@@ -1422,7 +1430,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
             // DIAGNÓSTICO — mismo criterio que ya tenía esta función:
             // avisar por consola de qué columnas no se encontraron,
             // en vez de bloquear en silencio sin ninguna pista.
-            const columnasEsperadas = ['Ventas', 'Servicio Tecnico', 'Comercio Exterior', 'Administracion', 'Tareas', 'Empresas', 'Eventos', 'Regulatoria', 'Reportes', 'Comisiones'];
+            const columnasEsperadas = ['Ventas', 'Servicio Tecnico', 'Comercio Exterior', 'Administracion', 'Tareas', 'Empresas', 'Eventos', 'Regulatoria', 'Contabilidad', 'Reportes', 'Comisiones'];
             if (fila) {
                 columnasEsperadas.forEach(nombre => {
                     if (!(_headerSeguroIdx(nombre) in fila)) console.warn('[index.html] Columna "' + nombre + '" no encontrada en /permisos (Firebase) — el módulo queda bloqueado para todos hasta que se sincronice esa columna.');
@@ -1447,6 +1455,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
                     empresas:      bool('Empresas'),
                     eventos:       bool('Eventos'),
                     regulatoria:   bool('Regulatoria'),
+                    contabilidad:  bool('Contabilidad'),
                     reportes:      bool('Reportes'),
                     agenda:        bool('Agenda') || bool('Agenda Equipo') || String(fila[_headerSeguroIdx('Rol')] || '').trim().toLowerCase() === 'administrador',
                     verComisiones: bool('Comisiones'), // solo su propia columna — "Ver Comisiones" es otro permiso (v2026.10.03.9)
@@ -1455,7 +1464,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
                 _actualizarRolEnSesionIdx(fila[_headerSeguroIdx('Rol')], fila[_headerSeguroIdx('Nombre Vendedor')]);
             } else {
                 // Email no encontrado → acceso mínimo
-                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, empresas: false, eventos: false, regulatoria: false, reportes: false, agenda: false, verComisiones: false };
+                userPermisos = { rol: 'Sin acceso', ventas: false, servicio: false, comex: false, admin: false, tareas: false, empresas: false, eventos: false, regulatoria: false, contabilidad: false, reportes: false, agenda: false, verComisiones: false };
             }
         } catch(e) {
             console.warn('Error cargando permisos:', e);
@@ -1475,6 +1484,7 @@ body.tema-claro .reaccion-picker { background:#ffffff; border-color:#e2e8f0; }
             { id: 'menu-tareas',   permiso: userPermisos.tareas },
             { id: 'menu-eventos',  permiso: userPermisos.eventos },
             { id: 'menu-regulatoria', permiso: userPermisos.regulatoria },
+            { id: 'menu-contabilidad', permiso: userPermisos.contabilidad },
             { id: 'menu-reportes',    permiso: userPermisos.reportes },
             { id: 'menu-agenda',      permiso: userPermisos.agenda },
             { id: 'menu-item-comisiones', permiso: userPermisos.verComisiones },

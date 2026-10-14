@@ -1,3 +1,4 @@
+// Portal TLC | tutorial.js | v2026.10.13.1 (📒 Contabilidad: usa las imágenes del tablero de Eventos, que funciona igual.)
 // Portal TLC | tutorial.js | v2026.10.10.10 (Cristian: "el de servicio completo" + "Catálogo de Productos, Negocios y Comisiones" — 8 imágenes nuevas de Servicio, 6 de Negocios, 3 del Catálogo y 2 de Comisiones)
 // Portal TLC | tutorial.js | v2026.10.10.9 (Cristian: "tutoriales para gestión de eventos y congresos, también para empresas (módulo completo)" — 7 imágenes de Eventos y 5 de Empresas. Además el botón se esconde solo cuando queda encima de un campo o botón, ej. "Agregar ítem" de una tarjeta abierta en el celular.)
 // Portal TLC | tutorial.js | v2026.10.10.8 (Cristian: "hacé brochures para Cuenta Corriente, completo" — 6 imágenes, set "cuenta-corriente")
@@ -23,6 +24,7 @@
     empresas:     { titulo: 'Empresas', slides: ['empresas-1', 'empresas-2', 'empresas-3', 'empresas-4', 'empresas-5'] },
     comex:        { titulo: 'Comercio Exterior', slides: ['comex-tablero', 'comex-checklist', 'tildes', 'campanita'] },
     regulatoria:  { titulo: 'Regulatoria', slides: ['regulatoria', 'tildes', 'campanita'] },
+    contabilidad: { titulo: 'Contabilidad', slides: ['eventos-2', 'eventos-3', 'eventos-4', 'eventos-5', 'eventos-6', 'eventos-7', 'tildes', 'campanita'] },
     parte:        { titulo: 'Parte del día', slides: ['parte-del-dia-1', 'parte-del-dia-2', 'parte-del-dia-3', 'parte-del-dia-4'] },
     'cuenta-corriente': { titulo: 'Cuenta Corriente', slides: ['cuenta-corriente-1', 'cuenta-corriente-2', 'cuenta-corriente-3', 'cuenta-corriente-4', 'cuenta-corriente-5', 'cuenta-corriente-6'] }
   };
@@ -34,7 +36,7 @@
     var p = (location.pathname.split('/').pop() || 'index.html').replace(/\.html$/, '') || 'index';
     if (p === 'eventos') {
       var m = new URLSearchParams(BUSQUEDA).get('modulo');
-      if (m === 'comex' || m === 'regulatoria') return m;
+      if (m === 'comex' || m === 'regulatoria' || m === 'contabilidad') return m;
     }
     return SETS[p] ? p : null;
   }
