@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- Portal TLC | Portal-TLC-Tutoriales.html | ARCHIVO GENERADO por tools/generar_guia_tutoriales.py — no editar a mano. huella:fd96972edfcc1bce -->
+<!-- Portal TLC | Portal-TLC-Tutoriales.html | ARCHIVO GENERADO por tools/generar_guia_tutoriales.py — no editar a mano. huella:e3b9e452ea087d22 -->
+<!-- Portal TLC | tutoriales.html | v2026.10.15.3 (Cristian: "hacé el índice más ancho", "ver versión más nueva, sacalo, siempre será la más nueva", "scroll solo para el índice que se seleccionó, no quiero que scrolleen todo el manual". Ahora se ve UN capítulo por vez: el que se elige en el índice. Anterior/siguiente se mueven dentro del capítulo y al final ofrece el capítulo siguiente. Índice de 400 px.) -->
 <!-- Portal TLC | tutoriales.html | v2026.10.15.2 (📚 Manual de tutoriales: índice por módulo con subíndices numerados (1.1, 1.2…) que llevan directo a cada imagen. Cristian: "me gusta más un índice para el manual con subíndices, navegables hasta las imágenes". En la PC el índice queda fijo a la izquierda y marca dónde estás; en el celular está arriba y el botón "☰ Índice" vuelve a él. Los títulos salen de TITULOS en tutorial.js.) -->
 <!-- Portal TLC | tutoriales.html | v2026.10.15.1 (NUEVO — 📚 Todos los tutoriales en una sola página. Se arma solo con la lista de tutorial.js (SETS) y las imágenes de tutoriales/, así que cada imagen nueva aparece acá sin tocar nada. El botón "Descargar para enviar" baja tutoriales/Portal-TLC-Tutoriales.html, la misma página con las imágenes adentro (se puede mandar por mail o WhatsApp y abre sin internet); ese archivo lo regenera tools/generar_guia_tutoriales.py, solo y automático con la GitHub Action guia-tutoriales.yml cada vez que cambian las imágenes o tutorial.js.) -->
 <html lang="es">
@@ -14,7 +15,7 @@
 html{scroll-behavior:smooth}
 body{background:radial-gradient(120% 50% at 50% 0%,#1d3a6b 0%,var(--bg2) 40%,var(--bg) 100%) fixed;background-color:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
 a{color:inherit}
-header{max-width:1240px;margin:0 auto;padding:22px 16px 18px}
+header{max-width:1360px;margin:0 auto;padding:22px 16px 18px}
 .arriba{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
 .arriba a{text-decoration:none;font-size:13px;font-weight:800;border-radius:10px;padding:8px 13px;border:1px solid var(--line);background:var(--card);color:var(--tx)}
 .arriba a.dl{margin-left:auto;background:var(--ac);border-color:var(--ac);color:#fff}
@@ -23,7 +24,14 @@ h1{font-size:clamp(30px,6vw,44px);font-weight:900;line-height:1.05;margin:10px 0
 h1 em{font-style:normal;color:var(--ac2)}
 .lead{color:var(--sub);max-width:680px}
 
-.libro{max-width:1240px;margin:0 auto;padding:0 16px 80px;display:grid;grid-template-columns:310px minmax(0,1fr);gap:28px;align-items:start}
+.libro{max-width:1360px;margin:0 auto;padding:0 16px 80px;display:grid;grid-template-columns:400px minmax(0,1fr);gap:32px;align-items:start}
+.capitulo{display:none}.capitulo.visible{display:block}
+.cap.actual>a{background:rgba(58,134,255,.14)}
+.fincap{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 6px;max-width:540px}
+.fincap a{flex:1;min-width:200px;text-decoration:none;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px 14px;font-size:13.5px;font-weight:800}
+.fincap a small{display:block;font-size:11px;color:var(--sub);font-weight:700;letter-spacing:.5px;margin-bottom:2px}
+.fincap a.sig{text-align:right;border-color:var(--ac)}
+.fincap a:hover{border-color:var(--ac2)}
 /* Índice */
 #indice{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;background:rgba(15,26,51,.85);border:1px solid var(--line);border-radius:16px;padding:14px 10px 14px 14px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
 #indice h2{font-size:12px;font-weight:900;letter-spacing:2px;color:var(--sub);margin:2px 0 10px}
@@ -152,14 +160,15 @@ window.TUT_OFFLINE = {"sets": {"index": {"titulo": "Cómo ver los tutoriales", "
       if (casa[s]) { c.items.push({ s: s, otro: true }); return; }
       k++;
       var num = (c.num === '★' ? 'N' : c.num) + '.' + k;
-      casa[s] = { ancla: 'l-' + s, num: num, cap: c.t };
+      casa[s] = { ancla: 'l-' + s, num: num, cap: c.t, capId: c.id };
       c.items.push({ s: s, num: num });
-      lams.push({ s: s, num: num, cap: c.t });
+      lams.push({ s: s, num: num, cap: c.t, capId: c.id });
     });
   });
 
   // Índice
   var toc = '', main = '';
+  var capsCon = caps.filter(function (c) { return c.items.length; });
   caps.forEach(function (c) {
     if (!c.items.length) return;
     var propias = c.items.filter(function (x) { return !x.otro; }).length;
@@ -174,19 +183,25 @@ window.TUT_OFFLINE = {"sets": {"index": {"titulo": "Cómo ver los tutoriales", "
       if (x.otro) return;
       var i = lams.findIndex(function (l) { return l.s === x.s; });
       var ant = lams[i - 1], sig = lams[i + 1];
+      if (ant && ant.capId !== c.id) ant = null;   // anterior / siguiente: solo dentro del capítulo
+      if (sig && sig.capId !== c.id) sig = null;
       main += '<article class="lamina" id="l-' + esc(x.s) + '"><h3><span class="n">' + x.num + '</span>' + esc(titulo(x.s)) + '</h3>' +
         '<button type="button" class="img" onclick="abrir(' + i + ')" aria-label="Ver en grande"><img loading="lazy" alt="' + esc(titulo(x.s)) + '" src="' + src(x.s) + '"></button>' +
         '<div class="pasos">' + (ant ? '<a href="#l-' + esc(ant.s) + '">← ' + ant.num + '</a>' : '') + (sig ? '<a href="#l-' + esc(sig.s) + '">' + sig.num + ' →</a>' : '') + '<a class="ix" href="#indice">↑ Índice</a></div></article>';
     });
     var otros = c.items.filter(function (x) { return x.otro; });
     if (otros.length) main += '<div class="tambien">También aplica en este módulo: ' + otros.map(function (x) { var h = casa[x.s]; return '<a href="#' + h.ancla + '">' + h.num + ' ' + esc(titulo(x.s)) + '</a>'; }).join(' · ') + '.</div>';
+    var ic = capsCon.indexOf(c), capAnt = capsCon[ic - 1], capSig = capsCon[ic + 1];
+    main += '<div class="fincap">' +
+      (capAnt ? '<a href="#c-' + esc(capAnt.id) + '"><small>← CAPÍTULO ANTERIOR</small>' + capAnt.ic + ' ' + esc(capAnt.t) + '</a>' : '') +
+      (capSig ? '<a class="sig" href="#c-' + esc(capSig.id) + '"><small>CAPÍTULO SIGUIENTE →</small>' + capSig.ic + ' ' + esc(capSig.t) + '</a>' : '') + '</div>';
     main += '</section>';
   });
   document.getElementById('toc').innerHTML = toc + '<div class="sinres" id="sinres" style="display:none">No hay temas con esa palabra.</div>';
   document.getElementById('main').innerHTML = main || '<div class="vacio">No se pudieron cargar los tutoriales.</div>';
   document.getElementById('lead').textContent = lams.length + ' temas, en ' + caps.filter(function (c) { return c.items.length; }).length + ' capítulos. Elegí un módulo y un tema en el índice: te lleva directo a la imagen. Tocá la imagen para verla en grande.';
   if (OFF) {
-    document.getElementById('arriba').innerHTML = '<a href="https://ir.tlcsrl.com.ar/tutoriales.html">🌐 Ver la versión más nueva</a>';
+    document.getElementById('arriba').style.display = 'none';
     document.getElementById('pie').textContent = 'Portal TLC · ir.tlcsrl.com.ar · Dentro del Portal, cada módulo tiene además su botón de tutorial. Actualizado ' + OFF.fecha + '.';
   }
 
@@ -194,7 +209,7 @@ window.TUT_OFFLINE = {"sets": {"index": {"titulo": "Cómo ver los tutoriales", "
   // capítulo lo abre y muestra sus temas.
   var celu = window.matchMedia('(max-width:860px)');
   document.querySelectorAll('#toc .cap>a').forEach(function (a) {
-    a.addEventListener('click', function (e) { if (!celu.matches) return; e.preventDefault(); a.parentNode.classList.toggle('abierto'); });
+    a.addEventListener('click', function (e) { if (!celu.matches) return; e.preventDefault(); e.stopPropagation(); a.parentNode.classList.toggle('abierto'); mostrar(a.parentNode.getAttribute('data-cap')); });
   });
 
   // Buscar en el índice
@@ -234,7 +249,10 @@ window.TUT_OFFLINE = {"sets": {"index": {"titulo": "Cómo ver los tutoriales", "
   var cur = 0, lb = document.getElementById('lb');
   window.abrir = function (i) { cur = i; pintar(); lb.classList.add('on'); };
   window.cerrar = function () { lb.classList.remove('on'); var l = document.getElementById('l-' + lams[cur].s); if (l) l.scrollIntoView({ block: 'start' }); };
-  window.mover = function (d) { cur = (cur + d + lams.length) % lams.length; pintar(); };
+  window.mover = function (d) {   // dentro del capítulo que se está viendo
+    var cap = lams[cur].capId, del = lams.map(function (l, k) { return l.capId === cap ? k : -1; }).filter(function (k) { return k >= 0; });
+    var p = del.indexOf(cur); cur = del[(p + d + del.length) % del.length]; pintar();
+  };
   function pintar() { var x = lams[cur]; document.getElementById('lbi').src = src(x.s); document.getElementById('lbt').textContent = x.num + ' · ' + titulo(x.s); }
   document.addEventListener('keydown', function (e) {
     if (!lb.classList.contains('on')) return;
@@ -245,8 +263,37 @@ window.TUT_OFFLINE = {"sets": {"index": {"titulo": "Cómo ver los tutoriales", "
   lb.addEventListener('touchend', function (e) { if (x0 == null) return; var dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) mover(dx < 0 ? 1 : -1); x0 = null; });
   lb.addEventListener('click', function (e) { if (e.target === lb) cerrar(); });
 
-  // Si llega con #ancla (ej. un link a un tema), ir ahí cuando ya está dibujado
-  if (location.hash) { var t = document.getElementById(location.hash.slice(1)); if (t) setTimeout(function () { t.scrollIntoView(); }, 50); }
+  // ── Un capítulo por vez ──────────────────────────────────────────
+  // Se ve solo el capítulo elegido en el índice (Cristian: "no quiero que
+  // scrolleen todo el manual"). #c-<módulo> abre el capítulo; #l-<imagen>
+  // abre su capítulo y baja hasta esa imagen.
+  function mostrar(capId) {
+    document.querySelectorAll('.capitulo').forEach(function (sec) { sec.classList.toggle('visible', sec.id === 'c-' + capId); });
+    document.querySelectorAll('#toc .cap').forEach(function (cp) {
+      var es = cp.getAttribute('data-cap') === capId;
+      cp.classList.toggle('actual', es);
+      if (es) cp.classList.add('abierto');
+    });
+  }
+  window.mostrar = mostrar;
+  function ir(id, suave) {
+    var capId = null;
+    if (/^c-/.test(id)) capId = id.slice(2);
+    else if (/^l-/.test(id) && casa[id.slice(2)]) capId = casa[id.slice(2)].capId;
+    if (!capId || !document.getElementById('c-' + capId)) return false;
+    mostrar(capId);
+    var destino = document.getElementById(id);
+    if (destino) setTimeout(function () { destino.scrollIntoView({ block: 'start', behavior: suave ? 'smooth' : 'auto' }); }, 20);
+    return true;
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="#c-"],a[href^="#l-"]');
+    if (!a || e.defaultPrevented) return;
+    var id = a.getAttribute('href').slice(1);
+    if (ir(id, false)) { e.preventDefault(); try { history.replaceState(null, '', '#' + id); } catch (er) {} }
+  });
+  window.addEventListener('hashchange', function () { ir(location.hash.slice(1), false); });
+  if (!(location.hash && ir(location.hash.slice(1), false))) mostrar(capsCon.length ? capsCon[0].id : '');
 })();
 </script>
 </body>
