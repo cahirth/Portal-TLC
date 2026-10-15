@@ -1,4 +1,5 @@
-// Portal TLC | sw.js | v37
+// Portal TLC | sw.js | v38
+// v38: tutoriales.html (todos los tutoriales en una página) en HTML_LOCAL. La versión para descargar (tutoriales/Portal-TLC-Tutoriales.html, 5 MB) va siempre a la red, no se guarda en caché. CACHE_NAME bumpeado.
 // v37: tutorial del Catálogo (imagen nueva de ⬇️ Stock + catalogo-1..3 renovadas). CACHE_NAME bumpeado.
 // v36: tutorial.js con la novedad 📎 adjuntos en mensajes.
 // v15: Firebase Cloud Messaging — recepción de push en segundo plano.
@@ -156,7 +157,7 @@ self.addEventListener('notificationclick', function(event) {
 //      cierre-semanal.js (modal de cierre de semana de los viernes) y
 //      cierres.html (resumen de cierres para Administradores) — agregados
 //      a HTML_LOCAL (red primero). CACHE_NAME bumpeado.
-const CACHE_NAME = 'portal-tlc-v37';
+const CACHE_NAME = 'portal-tlc-v38';
 
 const HTML_LOCAL = [
     './',
@@ -185,6 +186,7 @@ const HTML_LOCAL = [
     './tutorial.js',
     './comprobantes.js',
     './anunciar.html',
+    './tutoriales.html',
     './chat-adjuntos.js',
     './mi-dia.html',
     './cuenta-corriente.html',
@@ -241,7 +243,8 @@ self.addEventListener('fetch', event => {
         url.includes('azure.com') ||
         url.includes('hubapi.com') ||
         url.includes('lh3.googleusercontent.com') ||
-        url.includes('dolarapi.com')
+        url.includes('dolarapi.com') ||
+        url.includes('Portal-TLC-Tutoriales.html')
     ) {
         event.respondWith(fetch(event.request));
         return;

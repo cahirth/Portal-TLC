@@ -1,0 +1,40 @@
+# Portal TLC | guia-tutoriales.yml | v2026.10.15.1
+# Cada vez que cambian las imágenes de tutoriales/, tutorial.js o tutoriales.html,
+# regenera tutoriales/Portal-TLC-Tutoriales.html (la versión para descargar y
+# mandar) y la sube. Si no cambió nada, no hace commit.
+name: Guía de tutoriales
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tutoriales/*.jpg'
+      - 'tutorial.js'
+      - 'tutoriales.html'
+      - 'tools/generar_guia_tutoriales.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: guia-tutoriales
+  cancel-in-progress: false
+jobs:
+  generar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow
+      - run: python tools/generar_guia_tutoriales.py
+      - name: Subir si cambió
+        run: |
+          if git diff --quiet -- tutoriales/Portal-TLC-Tutoriales.html && ! git ls-files --others --exclude-standard | grep -q .; then
+            echo "Sin cambios"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add tutoriales/Portal-TLC-Tutoriales.html
+          git commit -m "Guía de tutoriales actualizada (automático)"
+          git pull --rebase origin main
+          git push origin HEAD:main

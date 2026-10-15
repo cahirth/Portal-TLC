@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<!-- Portal TLC | tutoriales.html | v2026.10.15.1 (NUEVO — 📚 Todos los tutoriales en una sola página. Cristian: "cada módulo tenga su tutorial y además uno general como este, siempre actualizado". Se arma solo con la lista de tutorial.js (SETS) y las imágenes de tutoriales/, así que cada imagen nueva aparece acá sin tocar nada. El botón "Descargar para enviar" baja tutoriales/Portal-TLC-Tutoriales.html, la misma página con las imágenes adentro (se puede mandar por mail o WhatsApp y abre sin internet); ese archivo lo regenera tools/generar_guia_tutoriales.py, solo y automático con la GitHub Action guia-tutoriales.yml cada vez que cambian las imágenes o tutorial.js.) -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tutoriales · Portal TLC</title>
+<link rel="manifest" href="manifest.json">
+<!--OFFLINE-QUITAR--><script src="version.js"></script><script src="tutorial.js"></script><!--/OFFLINE-QUITAR-->
+<style>
+:root{--bg:#070d1c;--bg2:#0b1630;--card:#111d3a;--line:#22315a;--tx:#e8eefb;--sub:#9fb6dc;--ac:#3a86ff;--ac2:#5ea1ff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(120% 60% at 50% 0%,#1d3a6b 0%,var(--bg2) 45%,var(--bg) 100%) fixed;background-color:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+header{max-width:1180px;margin:0 auto;padding:22px 16px 12px}
+.arriba{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.arriba a{text-decoration:none;font-size:13px;font-weight:800;border-radius:10px;padding:8px 13px;border:1px solid var(--line);background:var(--card);color:var(--tx)}
+.arriba a.dl{margin-left:auto;background:var(--ac);border-color:var(--ac);color:#fff}
+.kick{font-size:12px;font-weight:800;letter-spacing:2.5px;color:var(--sub)}
+h1{font-size:clamp(30px,6vw,46px);font-weight:900;line-height:1.05;margin:10px 0 8px}
+h1 em{font-style:normal;color:var(--ac2)}
+.lead{color:var(--sub);max-width:660px}
+nav{position:sticky;top:0;z-index:5;background:rgba(7,13,28,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+nav div{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+nav div::-webkit-scrollbar{display:none}
+nav a{flex-shrink:0;text-decoration:none;color:var(--tx);font-size:13px;font-weight:700;padding:6px 11px;border-radius:20px;border:1px solid var(--line);background:var(--card);white-space:nowrap}
+nav a:hover{border-color:var(--ac)}
+nav a b{color:var(--sub);font-weight:600;margin-left:4px}
+main{max-width:1180px;margin:0 auto;padding:8px 16px 60px}
+section{padding-top:28px;scroll-margin-top:56px}
+section h2{font-size:21px;font-weight:900;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+section h2 small{font-size:13px;color:var(--sub);font-weight:600}
+.nota{font-size:13px;color:var(--sub);margin-top:3px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:12px}
+.grid button{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:0;overflow:hidden;cursor:zoom-in;aspect-ratio:4/5;transition:transform .15s,border-color .15s}
+.grid button:hover{transform:translateY(-3px);border-color:var(--ac)}
+.grid img{width:100%;height:100%;display:block;object-fit:cover}
+#lb{position:fixed;inset:0;background:rgba(3,6,14,.95);z-index:20;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;padding:12px}
+#lb.on{display:flex}
+#lb img{max-width:100%;max-height:calc(100vh - 90px);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#lb .bar{display:flex;align-items:center;gap:12px;color:var(--sub);font-size:13px;font-weight:700;text-align:center}
+#lb button{border:1px solid var(--line);background:var(--card);color:var(--tx);border-radius:10px;font-size:18px;width:44px;height:40px;cursor:pointer;flex-shrink:0}
+#lb .x{position:absolute;top:12px;right:12px}
+footer{text-align:center;color:var(--sub);font-size:12.5px;padding:0 16px 36px}
+.vacio{color:var(--sub);padding:40px 0;text-align:center}
+@media print{nav,#lb,.arriba{display:none!important}body{background:#fff;color:#000}.grid{grid-template-columns:repeat(3,1fr)}.grid button{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header>
+  <div class="arriba" id="arriba"><a href="index.html">← Portal</a><a class="dl" href="tutoriales/Portal-TLC-Tutoriales.html" download="Portal-TLC-Tutoriales.html">⬇️ Descargar para enviar</a></div>
+  <div class="kick">PORTAL TLC · TUTORIALES</div>
+  <h1>Todos los tutoriales,<br><em>en un solo lugar</em></h1>
+  <p class="lead" id="lead">Ordenados por módulo. Tocá una imagen para verla en grande y pasá con las flechas (o deslizando en el celular).</p>
+</header>
+<nav><div id="nav"></div></nav>
+<main id="main"><div class="vacio">Cargando…</div></main>
+<footer id="pie">Portal TLC · ir.tlcsrl.com.ar · Dentro del Portal, cada módulo tiene su botón de tutorial.</footer>
+<div id="lb"><button class="x" onclick="cerrar()" aria-label="Cerrar">✕</button><img id="lbi" alt=""><div class="bar"><button onclick="mover(-1)" aria-label="Anterior">‹</button><span id="lbt"></span><button onclick="mover(1)" aria-label="Siguiente">›</button></div></div>
+<script>
+// Versión descargable: el generador pone acá window.TUT_OFFLINE = { sets, imgs, fecha }
+/*OFFLINE-DATOS*/
+(function () {
+  var OFF = window.TUT_OFFLINE || null;
+  var SETS = OFF ? OFF.sets : ((window.TLCTutorial && TLCTutorial.SETS) || {});
+  function src(n) { return OFF ? OFF.imgs[n] : 'tutoriales/' + n + '.jpg'; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  // Orden y nombre de cada módulo en esta página. Un módulo nuevo en tutorial.js
+  // que no esté acá aparece igual, al final, con su título.
+  var MODULOS = [
+    ['index', '💡', 'Cómo ver los tutoriales'],
+    ['servicio', '🔧', 'Servicio Técnico'],
+    ['cotizaciones', '💼', 'Ventas · Negocios'],
+    ['selector-dispositivos', '📒', 'Ventas · Catálogo de Productos'],
+    ['comisiones', '💰', 'Ventas · Comisiones'],
+    ['eventos', '🎪', 'Eventos y Congresos'],
+    ['comex', '🚢', 'Comercio Exterior'],
+    ['regulatoria', '📋', 'Regulatoria'],
+    ['contabilidad', '📒', 'Contabilidad'],
+    ['empresas', '🏢', 'Empresas'],
+    ['calendario', '📅', 'Agenda'],
+    ['parte', '📝', 'Parte del día'],
+    ['cuenta-corriente', '💳', 'Cuenta Corriente']
+  ];
+  var conocidos = MODULOS.map(function (m) { return m[0]; });
+  Object.keys(SETS).forEach(function (k) { if (conocidos.indexOf(k) === -1) MODULOS.push([k, '📘', SETS[k].titulo]); });
+  MODULOS = MODULOS.filter(function (m) { return SETS[m[0]]; });
+
+  // Novedades (imágenes nov-*) primero; después cada módulo con sus imágenes.
+  // Una imagen que está en varios módulos (ej. tildes, campanita) se muestra
+  // una sola vez, en el primero; los demás dicen "También usa imágenes de…".
+  var vistas = {}, secciones = [], nov = [];
+  MODULOS.forEach(function (m) { SETS[m[0]].slides.forEach(function (s) { if (/^nov-/.test(s) && nov.indexOf(s) === -1) nov.push(s); }); });
+  nov.forEach(function (s) { vistas[s] = 'Novedades'; });
+  secciones.push({ id: 'novedades', ic: '🆕', t: 'Novedades', own: nov, shared: [] });
+  MODULOS.forEach(function (m) {
+    var own = [], shared = [];
+    SETS[m[0]].slides.forEach(function (s) {
+      if (!vistas[s]) { vistas[s] = m[2]; own.push(s); }
+      else if (!/^nov-/.test(s) && shared.indexOf(vistas[s]) === -1 && vistas[s] !== m[2]) shared.push(vistas[s]);
+    });
+    secciones.push({ id: m[0], ic: m[1], t: m[2], own: own, shared: shared });
+  });
+
+  var todas = [], nav = '', html = '';
+  secciones.forEach(function (s) {
+    if (!s.own.length) return;
+    nav += '<a href="#' + esc(s.id) + '">' + s.ic + ' ' + esc(s.t) + '<b>' + s.own.length + '</b></a>';
+    html += '<section id="' + esc(s.id) + '"><h2>' + s.ic + ' ' + esc(s.t) + ' <small>' + s.own.length + (s.own.length === 1 ? ' imagen' : ' imágenes') + '</small></h2>';
+    if (s.shared.length) html += '<div class="nota">También usa imágenes de: ' + esc(s.shared.join(', ')) + '.</div>';
+    html += '<div class="grid">' + s.own.map(function (n) {
+      var i = todas.length; todas.push({ n: n, t: s.t });
+      return '<button type="button" onclick="abrir(' + i + ')"><img loading="lazy" alt="' + esc(s.t) + ' ' + esc(n) + '" src="' + src(n) + '"></button>';
+    }).join('') + '</div></section>';
+  });
+  document.getElementById('nav').innerHTML = nav;
+  document.getElementById('main').innerHTML = html || '<div class="vacio">No se pudieron cargar los tutoriales.</div>';
+  document.getElementById('lead').textContent = todas.length + ' imágenes, ordenadas por módulo. Tocá una para verla en grande y pasá con las flechas (o deslizando en el celular).';
+  if (OFF) {
+    document.getElementById('arriba').innerHTML = '<a href="https://ir.tlcsrl.com.ar/tutoriales.html">🌐 Ver la versión más nueva</a>';
+    document.getElementById('pie').textContent = 'Portal TLC · ir.tlcsrl.com.ar · Dentro del Portal, cada módulo tiene su botón de tutorial. Actualizado ' + OFF.fecha + '.';
+  }
+
+  var cur = 0, lb = document.getElementById('lb');
+  window.abrir = function (i) { cur = i; pintar(); lb.classList.add('on'); };
+  window.cerrar = function () { lb.classList.remove('on'); };
+  window.mover = function (d) { cur = (cur + d + todas.length) % todas.length; pintar(); };
+  function pintar() { var x = todas[cur]; document.getElementById('lbi').src = src(x.n); document.getElementById('lbt').textContent = x.t + ' · ' + (cur + 1) + ' / ' + todas.length; }
+  document.addEventListener('keydown', function (e) {
+    if (!lb.classList.contains('on')) return;
+    if (e.key === 'Escape') cerrar(); if (e.key === 'ArrowRight') mover(1); if (e.key === 'ArrowLeft') mover(-1);
+  });
+  var x0 = null;
+  lb.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+  lb.addEventListener('touchend', function (e) { if (x0 == null) return; var dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) mover(dx < 0 ? 1 : -1); x0 = null; });
+  lb.addEventListener('click', function (e) { if (e.target === lb) cerrar(); });
+})();
+</script>
+</body>
+</html>
