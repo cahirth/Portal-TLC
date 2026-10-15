@@ -1,3 +1,4 @@
+// Portal TLC | tutorial.js | v2026.10.15.5 (Catálogo: imagen nueva 'catalogo-stock' — cómo filtrar, ordenar y bajar el stock a Excel con ⬇️ Stock. catalogo-1 corregida: categorías reales y botones Nombre / Precio / Stock.)
 // Portal TLC | tutorial.js | v2026.10.15.4 (📎 Novedad: adjuntos en mensajes internos — imagen nov-adjuntos en Servicio, Ventas, Eventos, Comex, Regulatoria y Contabilidad.)
 // Portal TLC | tutorial.js | v2026.10.15.3 (📣 Novedades: imágenes nuevas (comprobantes, ítems nuevos en la Orden, Contabilidad). Si se suman imágenes a un tutorial ya visto, se abre en la primera nueva. ?tutorial=<imagen> abre directo esa imagen — lo usan los avisos de novedades.)
 // Portal TLC | tutorial.js | v2026.10.13.1 (📒 Contabilidad: usa las imágenes del tablero de Eventos, que funciona igual.)
@@ -20,7 +21,7 @@
     calendario:   { titulo: 'Agenda', slides: ['agenda-1', 'agenda-2', 'agenda-3', 'agenda-4', 'agenda-5', 'agenda-6', 'agenda-7'] },
     servicio:     { titulo: 'Servicio Técnico', slides: ['servicio-1', 'servicio-2', 'servicio-3', 'servicio-4', 'servicio-5', 'servicio-6', 'servicio-7', 'servicio-8', 'nov-adjuntos', 'nov-orden-items', 'nov-comprobantes', 'tu-orden', 'tildes', 'campanita', 'ventas-preparacion', 'etiquetas', 'cierre-semana', 'actividad'] },
     cotizaciones: { titulo: 'Negocios', slides: ['negocios-1', 'negocios-2', 'negocios-3', 'negocios-4', 'negocios-5', 'negocios-6', 'nov-adjuntos', 'nov-orden-items', 'nov-comprobantes', 'gastos-ventas', 'ventas-preparacion', 'tildes', 'campanita'] },
-    'selector-dispositivos': { titulo: 'Catálogo de Productos', slides: ['catalogo-1', 'catalogo-2', 'catalogo-3'] },
+    'selector-dispositivos': { titulo: 'Catálogo de Productos', slides: ['catalogo-1', 'catalogo-stock', 'catalogo-2', 'catalogo-3'] },
     comisiones:   { titulo: 'Comisiones', slides: ['comisiones-1', 'comisiones-2'] },
     eventos:      { titulo: 'Eventos y Congresos', slides: ['eventos-1', 'eventos-2', 'eventos-3', 'eventos-4', 'eventos-5', 'eventos-6', 'eventos-7', 'nov-adjuntos', 'nov-comprobantes', 'tildes', 'campanita'] },
     empresas:     { titulo: 'Empresas', slides: ['empresas-1', 'empresas-2', 'empresas-3', 'empresas-4', 'empresas-5'] },

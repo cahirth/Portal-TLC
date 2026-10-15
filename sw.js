@@ -1,4 +1,5 @@
-// Portal TLC | sw.js | v36
+// Portal TLC | sw.js | v37
+// v37: tutorial del Catálogo (imagen nueva de ⬇️ Stock + catalogo-1..3 renovadas). CACHE_NAME bumpeado.
 // v36: tutorial.js con la novedad 📎 adjuntos en mensajes.
 // v15: Firebase Cloud Messaging — recepción de push en segundo plano.
 //      importScripts de firebase-app + firebase-messaging (compat, es
@@ -155,7 +156,7 @@ self.addEventListener('notificationclick', function(event) {
 //      cierre-semanal.js (modal de cierre de semana de los viernes) y
 //      cierres.html (resumen de cierres para Administradores) — agregados
 //      a HTML_LOCAL (red primero). CACHE_NAME bumpeado.
-const CACHE_NAME = 'portal-tlc-v36';
+const CACHE_NAME = 'portal-tlc-v37';
 
 const HTML_LOCAL = [
     './',
