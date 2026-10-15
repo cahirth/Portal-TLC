@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.15.3 (📣 Novedades: la campanita muestra la imagen de los avisos de novedad y al tocarlos abre el tutorial justo en esa imagen.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.15.2 (➕ ÍTEMS NUEVOS A LA ORDEN DE PREPARACIÓN — Cristian: "en orden de preparación, tener la posibilidad de agregar algún equipo más, modificando el presupuesto desde ventas — hoy faltaba la mesa de la PS-4 de Fiume y no se puede agregar". Si el negocio ya tiene Orden de Preparación, en vez de "Enviar Orden de Preparación" (que creaba otra) aparece "➕ Pasar ítems nuevos del presupuesto a la Orden": compara la última versión del presupuesto con la orden, muestra qué falta y lo agrega como Pendiente. Lo que sobra no se borra solo. Función servicio v17 (st_sincronizarOrdenPreparacion).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.15.1 (🧾 COMPROBANTES — Cristian: "agregar a los gastos, en los módulos que lo soportan, un botón para enviar las fotos de los tickets" (comprobante de compra). En cada gasto del negocio, botón "📷 Comprobante" y "🧾 Ver comprobante".) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.10.10 (📚 Tutorial completo de Negocios: 6 imágenes nuevas — vive en tutorial.js, este archivo no cambia de código.) -->
@@ -1889,6 +1890,7 @@ function _renderCampanaListaCot() {
             '<div style="flex:1;min-width:0;">' +
                 (n.autor_nombre ? '<div style="font-size:12px;font-weight:700;color:#f1f5f9;">' + _escCot(n.autor_nombre) + '</div>' : '') +
                 '<div class="notif-texto">' + _escCot(n.texto || '') + '</div>' +
+                (n.imagen ? '<img src="' + String(n.imagen).replace(/"/g,'') + '" alt="" loading="lazy" style="display:block;width:100%;max-width:220px;border-radius:8px;margin-top:6px;">' : '') +
                 '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + _escCot(n.ticket_titulo || '') + (n.ticket_titulo ? ' · ' : '') + _tiempoRelativoCampanaCot(n.fecha) +
                   (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : n.reaccion === 'no_ok' ? '👎' : '❤️') + '</span>' : '') +
                 '</div>' +
@@ -1968,6 +1970,7 @@ window._clickNotificacionCot = function(ev, idNoti, idOrigen, origen, tarjetaId)
     if (!idOrigen) return;
 
     if (origen === 'agenda') { window.location.href = 'calendario.html?evento=' + encodeURIComponent(idOrigen); return; }
+    if (origen === 'anuncio') { if (/^[a-z0-9_\-]+\.html(\?.*)?$/i.test(idOrigen)) window.location.href = idOrigen; return; }
     if (origen === 'servicio') {
         window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(idOrigen);
         return;

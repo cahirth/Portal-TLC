@@ -1,4 +1,4 @@
-// Portal TLC | sw.js | v33
+// Portal TLC | sw.js | v34
 // v15: Firebase Cloud Messaging — recepción de push en segundo plano.
 //      importScripts de firebase-app + firebase-messaging (compat, es
 //      lo único que funciona dentro de un Service Worker clásico sin
@@ -28,6 +28,8 @@ _messaging.onBackgroundMessage(function(payload) {
         icon: './icons/icon-512.png',
         badge: './icons/icon-512.png',
         data: { link: link },
+        // 📣 Novedades (v34): los avisos traen la imagen del tutorial (Android/PC la muestran grande)
+        image: (payload.data && payload.data.image) || undefined,
     });
     // Contador rojo en el ícono (v22): suma 1 al último número conocido
     // (lo guarda la campanita al abrir la app, ver tlcIconoApp en version.js).
@@ -126,6 +128,8 @@ self.addEventListener('notificationclick', function(event) {
 //      en los dos casos, la nueva siempre devuelve una Response real.
 //      CACHE_NAME bumpeado — fuerza la limpieza de la caché vieja en
 //      todos los dispositivos.
+// v34 (2026.10.15): 📣 Novedades — anunciar.html a HTML_LOCAL; las notificaciones push
+//      muestran la imagen del aviso (data.image). CACHE_NAME bumpeado.
 // v33 (2026.10.15): ítems nuevos del presupuesto a la Orden de Preparación. CACHE_NAME bumpeado.
 // v32 (2026.10.15): comprobantes.js (foto del comprobante de cada gasto) agregado a
 //      HTML_LOCAL. CACHE_NAME bumpeado.
@@ -149,7 +153,7 @@ self.addEventListener('notificationclick', function(event) {
 //      cierre-semanal.js (modal de cierre de semana de los viernes) y
 //      cierres.html (resumen de cierres para Administradores) — agregados
 //      a HTML_LOCAL (red primero). CACHE_NAME bumpeado.
-const CACHE_NAME = 'portal-tlc-v33';
+const CACHE_NAME = 'portal-tlc-v34';
 
 const HTML_LOCAL = [
     './',
@@ -177,6 +181,7 @@ const HTML_LOCAL = [
     './agenda-vinculo.js',
     './tutorial.js',
     './comprobantes.js',
+    './anunciar.html',
     './mi-dia.html',
     './cuenta-corriente.html',
     './eventos.html',

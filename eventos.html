@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.15.3 (📣 Novedades: la campanita muestra la imagen de los avisos de novedad y al tocarlos abre el tutorial justo en esa imagen.) -->
 <!-- Portal TLC | eventos.html | v2026.10.15.1 (🧾 COMPROBANTES — Cristian: "agregar a los gastos, en los módulos que lo soportan, un botón para enviar las fotos de los tickets" (comprobante de compra). En cada gasto de las tarjetas (Eventos, Comex, Regulatoria, Contabilidad), botón "📷 Comprobante" y "🧾 Ver comprobante".) -->
 <!-- Portal TLC | eventos.html | v2026.10.13.1 (📒 CONTABILIDAD — Cristian: "necesito dentro de Administración un módulo llamado CONTABILIDAD, con un tablero Kanban igual al de COMEX". Con ?modulo=contabilidad muestra solo los tableros de Contabilidad (permiso "Contabilidad" de la planilla), igual que Comex: crear tablero, columnas, tarjetas, checklists, adjuntos, gastos, agenda. El menú ⋯ del Administrador suma "📒 Pasar a Contabilidad". Backend eventosChecklist v6.) -->
 <!-- Portal TLC | eventos.html | v2026.10.10.9 (📚 Tutorial de Eventos y Congresos: 7 imágenes nuevas en el botón ❔ Tutorial — vive en tutorial.js, este archivo no cambia de código.) -->
@@ -3254,6 +3255,7 @@ async function _cargarNotificaciones(silencioso) {
             '<div style="flex:1;min-width:0;">' +
               (n.autor_nombre ? '<div style="font-size:12px;font-weight:700;color:var(--text-main);">' + _esc(n.autor_nombre) + '</div>' : '') +
               '<div class="notif-texto">' + _esc(n.texto || '') + '</div>' +
+              (n.imagen ? '<img src="' + String(n.imagen).replace(/"/g,'') + '" alt="" loading="lazy" style="display:block;width:100%;max-width:220px;border-radius:8px;margin-top:6px;">' : '') +
               '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">' + _esc(n.ticket_titulo || '') +
                 (n.reaccion ? '<span class="notif-reaccion-guardada">' + (n.reaccion === 'ok' ? '👍' : n.reaccion === 'no_ok' ? '👎' : '❤️') + '</span>' : '') +
               '</div>' +
@@ -3285,6 +3287,7 @@ window._clickNotificacionEv = function(ev, idNoti, ticketId, origen, tarjetaId) 
   document.getElementById('campana-panel').classList.remove('open');
   if (!ticketId) return;
   if (origen === 'agenda') { window.location.href = 'calendario.html?evento=' + encodeURIComponent(ticketId); return; }
+  if (origen === 'anuncio') { if (/^[a-z0-9_\-]+\.html(\?.*)?$/i.test(ticketId)) window.location.href = ticketId; return; }
   if (origen === 'cotizacion') { window.location.href = 'https://cahirth.github.io/Portal-TLC/cotizaciones.html?id=' + encodeURIComponent(ticketId); return; }
   if (origen === 'evento') { _abrirEvento(ticketId, tarjetaId); return; }
   window.location.href = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(ticketId);

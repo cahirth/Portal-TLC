@@ -1,5 +1,7 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v18 — 2026.10.15 — 📣 anunciarNovedad: aviso con imagen a todo el equipo
+//   (campanita + push con imagen + mail). Solo Administrador.
 // v17 — 2026.10.15 — 🔄 st_sincronizarOrdenPreparacion: los ítems nuevos del
 //   presupuesto (Ventas) se agregan a la Orden de Preparación ya creada.
 // v16 — 2026.10.15 — 🧾 Comprobantes de gastos: subirComprobanteGasto /
@@ -966,6 +968,75 @@ async function st_sincronizarOrdenPreparacion(data) {
     }
   } catch (eAviso) { console.warn('No se pudo avisar al responsable:', eAviso.message); }
   return { ok: true, id_ticket: idTicket, agregar, sobran, aplicado: true, equipos: comoArray(actualizado.equipos) };
+}
+
+// ── 📣 Anunciar novedades — v18 — 2026.10.15 ────────────────────────
+// Cristian: "cada vez que hacemos un tutorial nuevo, pushearlo al usuario...
+// mandarle un mensaje a todos, pero ese mensaje tiene que tener la imagen".
+// Solo un Administrador. Le llega a todos los Internos (o a los que elija):
+// campanita, push con la imagen y mail con la imagen. Al tocarlo se abre el
+// módulo justo en esa imagen del tutorial (?tutorial=<imagen>).
+const PORTAL_BASE = 'https://ir.tlcsrl.com.ar/';
+function _esVerdaderoPerm(v) { const t = String(v == null ? '' : v).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase(); return v === true || t === 'true' || t === 'verdadero' || t === 'si' || t === '1'; }
+async function anunciarNovedad(data) {
+  const solicitante = String(data._actor_email || data.email_usuario || '').trim().toLowerCase();
+  const titulo = String(data.titulo || '').trim().slice(0, 120);
+  const texto = String(data.texto || '').trim().slice(0, 600);
+  const imagen = String(data.imagen || '').trim();
+  const link = String(data.link || '').trim();
+  const canales = data.canales || {};
+  if (!solicitante) return { ok: false, error: 'Falta la sesión' };
+  const permisos = (await fbGet('permisos')) || {};
+  const yo = permisos[rtdbKeySeguro(solicitante)];
+  if (!yo || String(yo.Rol || '').trim().toLowerCase() !== 'administrador') return { ok: false, error: 'Solo un Administrador puede mandar novedades' };
+  if (!titulo) return { ok: false, error: 'Falta el título' };
+  if (imagen && !/^tutoriales\/[a-z0-9_\-]+\.jpg$/i.test(imagen)) return { ok: false, error: 'Imagen inválida' };
+  if (link && !/^[a-z0-9_\-]+\.html(\?[^\s"'<>]*)?$/i.test(link)) return { ok: false, error: 'Link inválido' };
+  if (!canales.campanita && !canales.push && !canales.mail) return { ok: false, error: 'Elegí al menos un canal' };
+
+  let destinatarios = Object.values(permisos).filter((p) => p && _esVerdaderoPerm(p.Internos) && String(p.Email || '').includes('@'))
+    .map((p) => ({ email: String(p.Email).trim().toLowerCase(), nombre: String(p.Nombre_Vendedor || p.Nombre || '').trim() }));
+  if (Array.isArray(data.solo_emails) && data.solo_emails.length) {
+    const elegidos = data.solo_emails.map((e) => String(e || '').trim().toLowerCase());
+    destinatarios = destinatarios.filter((d) => elegidos.includes(d.email));
+  }
+  const vistos = {}; destinatarios = destinatarios.filter((d) => (vistos[d.email] ? false : (vistos[d.email] = true)));
+  if (!destinatarios.length) return { ok: false, error: 'No hay destinatarios' };
+  if (data.simular === true) return { ok: true, destinatarios: destinatarios.map((d) => d.nombre || d.email) };
+
+  const urlImagen = imagen ? PORTAL_BASE + imagen : '';
+  const urlLink = PORTAL_BASE + (link || 'index.html');
+  const autor = String(yo.Nombre_Vendedor || yo.Nombre || solicitante).trim();
+  const idAnuncio = 'AN-' + Date.now();
+  let push = 0, mails = 0;
+  await Promise.all(destinatarios.map(async (d) => {
+    if (canales.campanita) {
+      const idNoti = Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      await fbSet('notificaciones/' + rtdbKeySeguro(d.email) + '/' + idNoti, {
+        tipo: 'anuncio', origen: 'anuncio', texto: '📣 ' + titulo + (texto ? ' — ' + texto : ''), ticket_id: link || 'index.html', ticket_titulo: 'Novedad del Portal',
+        autor_nombre: autor, imagen: urlImagen, fecha: new Date().toISOString(), leido: false,
+      });
+    }
+    if (canales.push) {
+      const tokens = await obtenerTokensPush(d.email);
+      await Promise.all(tokens.map(async (tok) => {
+        try { await messaging.send({ token: tok, data: { title: '📣 ' + titulo, body: texto || 'Tocá para verlo', link: urlLink, image: urlImagen } }); push++; } catch (e) { console.warn('Push falló:', e.message); }
+      }));
+    }
+    if (canales.mail) {
+      await enviarEmailBrevo(d.email, d.nombre, '📣 Novedad en el Portal TLC: ' + titulo,
+        '<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;color:#0f172a;">' +
+          '<h2 style="color:#1a4b8c;margin:0 0 6px;">📣 ' + escHtml(titulo) + '</h2>' +
+          (texto ? '<p style="font-size:15px;line-height:1.45;margin:0 0 14px;">' + escHtml(texto) + '</p>' : '') +
+          (urlImagen ? '<a href="' + urlLink + '"><img src="' + urlImagen + '" alt="' + escHtml(titulo) + '" style="width:100%;max-width:480px;border-radius:12px;display:block;margin:0 auto 16px;"></a>' : '') +
+          '<a href="' + urlLink + '" style="display:inline-block;padding:11px 22px;background:#3a86ff;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">Verlo en el Portal</a>' +
+          '<p style="font-size:11px;color:#94a3b8;margin-top:18px;">Lo mandó ' + escHtml(autor) + ' desde el Portal TLC.</p>' +
+        '</div>');
+      mails++;
+    }
+  }));
+  await fbSet('anuncios/' + idAnuncio, { titulo, texto, imagen, link, canales, autor, fecha: new Date().toISOString(), destinatarios: destinatarios.map((d) => d.email) });
+  return { ok: true, id: idAnuncio, enviados: destinatarios.length, push, mails };
 }
 
 async function marcarNegocioUrgente(data) {
@@ -1954,7 +2025,7 @@ const ACCIONES = {
   st_separarEquipoOrden, st_actualizarEquipoOrden, st_dividirOrdenPreparacion, st_quitarGarantiasOrden, st_recalcularProgresosOrdenes,
   st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden, registrarInstalacionPOE8,
   subirAdjunto, eliminarAdjunto, subirComprobanteGasto, borrarComprobanteGasto,
-  st_sincronizarOrdenPreparacion,
+  st_sincronizarOrdenPreparacion, anunciarNovedad,
   st_backupServicio, st_migrarFotosServicio,
   cot_listarMensajes, cot_agregarMensaje, cot_reaccionarMensaje, cot_actualizarGastos,
   st_marcarMensajesLeidos, cot_marcarMensajesLeidos,
