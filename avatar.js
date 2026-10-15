@@ -1,3 +1,4 @@
+// Portal TLC | avatar.js | v5 (2026.10.15) | 📚 "Manual de tutoriales" en el menú del avatar (Cristian: "subilo al avatar del index.html") — abre tutoriales.html. Como el avatar es el mismo en todo el Portal, aparece en todos los módulos.
 // Portal TLC | avatar.js | v4 (2026.09.04) | Avatar único, fuente de verdad de TODO el Portal.
 // ══════════════════════════════════════════════════════════════════
 // v4 — Cristian, con captura: "mejor, pero revisa en todos los modulos
@@ -272,6 +273,7 @@
           '</div>' +
           (hayPush ? '<button class="tlc-avatar-menu-item" id="tlc-avatar-btn-push"><span id="tlc-avatar-push-txt">🔔 Activar notificaciones</span></button>' : '') +
           (hayInstalar ? '<button class="tlc-avatar-menu-item" id="tlc-avatar-btn-instalar">📲 Cómo instalar la app</button>' : '') +
+          '<a class="tlc-avatar-menu-item" href="tutoriales.html">📚 Manual de tutoriales</a>' +
           '<a class="tlc-avatar-menu-item" href="index.html">🏠 Volver al inicio</a>' +
           '<button class="tlc-avatar-menu-item tlc-avatar-menu-item-logout" id="tlc-avatar-cerrar-sesion">🚪 Cerrar sesión</button>' +
         '</div>' +
