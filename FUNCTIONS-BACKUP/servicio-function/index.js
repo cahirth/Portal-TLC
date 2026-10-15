@@ -1,5 +1,7 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v17 — 2026.10.15 — 🔄 st_sincronizarOrdenPreparacion: los ítems nuevos del
+//   presupuesto (Ventas) se agregan a la Orden de Preparación ya creada.
 // v16 — 2026.10.15 — 🧾 Comprobantes de gastos: subirComprobanteGasto /
 //   borrarComprobanteGasto (Storage, carpeta comprobantes/). Lo usan Servicio,
 //   Ventas, Eventos/Comex/Contabilidad y Cuenta Corriente.
@@ -887,6 +889,85 @@ async function st_crearOrdenPreparacion(data) {
 // Acciones compartidas con Mi Día
 // ══════════════════════════════════════════════════════════════════
 
+// ── 🔄 Ítems nuevos del presupuesto → Orden de Preparación — v17 ──────
+// Cristian: "en orden de preparación, tener la posibilidad de agregar algún
+// equipo más, modificando el presupuesto desde ventas, hoy me pasó que
+// faltaba la mesa de la PS-4 de Fiume y no se puede agregar la mesa ni
+// ningún ítem". Compara el carrito ACTUAL del negocio (la última versión
+// del presupuesto) con todos los equipos de la orden (incluidas las
+// entregas parciales) y agrega a la orden original los que faltan, como
+// "Pendiente". Lo que ya no está en el presupuesto NO se borra solo: se
+// avisa para que lo saquen a mano si corresponde.
+// simular: true → solo devuelve la diferencia, sin tocar nada.
+function _claveItemOP(n) { return String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+async function st_sincronizarOrdenPreparacion(data) {
+  let idNegocio = String(data.id_negocio || '').trim();
+  let idTicket = String(data.id_ticket || '').trim();
+  const simular = data.simular === true;
+  const autor = String(data._actor_nombre || data.autor_nombre || '').trim() || 'Portal TLC';
+  let ticket = idTicket ? await fbGet('servicio_tecnico/' + idTicket) : null;
+  if (ticket && ticket.orden_padre) { idTicket = ticket.orden_padre; ticket = await fbGet('servicio_tecnico/' + idTicket); }
+  if (ticket && !idNegocio) idNegocio = String(ticket.negocio_id || '');
+  if (!idNegocio) return { ok: false, error: 'Esta orden no está vinculada a un negocio de Ventas' };
+  const negocio = await fbGet('cotizaciones/' + rtdbKeySeguro(idNegocio));
+  if (!negocio) return { ok: false, error: 'Negocio no encontrado' };
+  if (!ticket) {
+    idTicket = String(negocio.orden_preparacion_ticket_id || '');
+    ticket = idTicket ? await fbGet('servicio_tecnico/' + idTicket) : null;
+    if (ticket && ticket.orden_padre) { idTicket = ticket.orden_padre; ticket = await fbGet('servicio_tecnico/' + idTicket); }
+  }
+  if (!ticket || ticket.tipo_orden !== 'preparacion_equipos') return { ok: false, error: 'El negocio todavía no tiene Orden de Preparación' };
+
+  // Lo que pide el presupuesto (sin garantías), por nombre
+  const pedido = {};
+  comoArray(negocio.carrito).forEach((it) => {
+    if (!it || esItemGarantia(it)) return;
+    const k = _claveItemOP(it.nombre);
+    if (!k) return;
+    if (!pedido[k]) pedido[k] = { nombre: it.nombre || '', cantidad: 0 };
+    pedido[k].cantidad += Math.max(1, parseInt(it.cantidad, 10) || 1);
+  });
+  // Lo que ya tiene la orden (toda la familia de entregas)
+  const familia = await familiaOrdenPrep(ticket);
+  const hay = {}, nombreDe = {};
+  familia.forEach((t) => comoArray(t.equipos).forEach((eq) => {
+    if (!eq) return;
+    const k = _claveItemOP(eq.descripcion || eq.sku);
+    hay[k] = (hay[k] || 0) + 1;
+    if (!nombreDe[k]) nombreDe[k] = eq.descripcion || eq.sku || '';
+  }));
+  const agregar = [], sobran = [];
+  Object.keys(pedido).forEach((k) => { const falta = pedido[k].cantidad - (hay[k] || 0); if (falta > 0) agregar.push({ nombre: pedido[k].nombre, cantidad: falta }); });
+  Object.keys(hay).forEach((k) => { const extra = hay[k] - (pedido[k] ? pedido[k].cantidad : 0); if (extra > 0) sobran.push({ nombre: nombreDe[k], cantidad: extra }); });
+  if (simular || !agregar.length) return { ok: true, id_ticket: idTicket, agregar, sobran, aplicado: false };
+
+  const ahora = new Date().toISOString();
+  const nuevos = [];
+  agregar.forEach((a) => { for (let i = 0; i < a.cantidad; i++) nuevos.push({ cantidad: 1, sku: nombreBaseEquipo(a.nombre), descripcion: a.nombre, nro_serie: '', calidad_verificada: false, estado: 'Pendiente', agregado_en: ahora, agregado_por: autor }); });
+  const resumen = agregar.map((a) => a.cantidad + '× ' + a.nombre).join(', ');
+  const actualizado = await runTransaccionTicket(idTicket, (t) => {
+    t.equipos = comoArray(t.equipos).concat(nuevos);
+    t.etiquetas_cajas = null; t.etiquetas_generadas_en = null;
+    const mensajes = comoArray(t.mensajes);
+    mensajes.push({ texto: '➕ ' + autor + ' agregó desde el presupuesto del negocio ' + idNegocio + ': ' + resumen + '.', autor_nombre: 'Portal TLC (automático)', fecha: ahora });
+    t.mensajes = mensajes;
+    t.actualizado_en = ahora;
+    return t;
+  });
+  if (!actualizado) return { ok: false, error: 'No se pudo actualizar la orden' };
+  await actualizarProgresoSTEnNegocio(actualizado);
+  try {
+    const email = String(actualizado.tecnico_responsable_email || '').trim();
+    if (email) {
+      const link = 'https://cahirth.github.io/Portal-TLC/servicio.html?ticket=' + encodeURIComponent(idTicket);
+      await registrarNotificacion(email, 'etapa', 'Se agregaron ítems a la Orden de Preparación: ' + resumen, idTicket, actualizado.cliente || idTicket, autor, 'servicio');
+      const tokens = await obtenerTokensPush(email);
+      await Promise.all(tokens.map((tok) => enviarPush(tok, '➕ Ítems nuevos en la Orden de Preparación', (actualizado.cliente || idTicket) + ' — ' + resumen, link)));
+    }
+  } catch (eAviso) { console.warn('No se pudo avisar al responsable:', eAviso.message); }
+  return { ok: true, id_ticket: idTicket, agregar, sobran, aplicado: true, equipos: comoArray(actualizado.equipos) };
+}
+
 async function marcarNegocioUrgente(data) {
   const idCot = String(data.idCot || '').trim();
   if (!idCot) return { ok: false, error: 'Falta idCot' };
@@ -1711,7 +1792,7 @@ const ACCIONES_REGISTRADAS = {
   st_dividirOrdenPreparacion: 'Dividió la entrega', st_guardarChecklist: 'Guardó el checklist',
   registrarChecklistCompletado: 'Completó el checklist', registrarInstalacionPOE8: 'Registró la instalación (POE-8)',
   st_actualizarGastos: 'Cargó gastos', st_guardarEtiquetasCajas: 'Generó etiquetas', st_guardarCierreSemanal: 'Cerró la semana',
-  subirAdjunto: 'Subió un adjunto', cot_actualizarGastos: 'Cargó gastos (Ventas)', subirComprobanteGasto: 'Subió un comprobante de gasto',
+  subirAdjunto: 'Subió un adjunto', cot_actualizarGastos: 'Cargó gastos (Ventas)', subirComprobanteGasto: 'Subió un comprobante de gasto', st_sincronizarOrdenPreparacion: 'Agregó ítems del presupuesto a la orden',
 };
 const CAMPOS_FOTO_ESTADO = ['deposito', 'tecnico_asignado', 'tecnico_responsable_nombre', 'tipo_orden', 'prioridad', 'estado_progreso'];
 function _diaBA(iso) { return new Date(new Date(iso || Date.now()).getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10); }
@@ -1873,6 +1954,7 @@ const ACCIONES = {
   st_separarEquipoOrden, st_actualizarEquipoOrden, st_dividirOrdenPreparacion, st_quitarGarantiasOrden, st_recalcularProgresosOrdenes,
   st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden, registrarInstalacionPOE8,
   subirAdjunto, eliminarAdjunto, subirComprobanteGasto, borrarComprobanteGasto,
+  st_sincronizarOrdenPreparacion,
   st_backupServicio, st_migrarFotosServicio,
   cot_listarMensajes, cot_agregarMensaje, cot_reaccionarMensaje, cot_actualizarGastos,
   st_marcarMensajesLeidos, cot_marcarMensajesLeidos,

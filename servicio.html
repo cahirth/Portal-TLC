@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.15.2 (➕ ÍTEMS NUEVOS A LA ORDEN DE PREPARACIÓN — Cristian: "en orden de preparación, tener la posibilidad de agregar algún equipo más, modificando el presupuesto desde ventas — hoy faltaba la mesa de la PS-4 de Fiume y no se puede agregar". En la Orden de Preparación (si viene de un negocio): botón "➕ Traer ítems nuevos del presupuesto" — agrega como Pendiente lo que se sumó al presupuesto en Ventas después de crear la orden. Función servicio v17.) -->
 <!-- Portal TLC | servicio.html | v2026.10.15.1 (🧾 COMPROBANTES — Cristian: "agregar a los gastos, en los módulos que lo soportan, un botón para enviar las fotos de los tickets" (comprobante de compra). En cada gasto del ticket, botón "📷 Comprobante" para sacar la foto del ticket de compra (o subir imagen/PDF) y "🧾 Ver comprobante" para abrirlo. Queda guardado en el gasto (g.comprobante) y se ve también en Cuenta Corriente.) -->
 <!-- Portal TLC | servicio.html | v2026.10.10.10 (📚 Tutorial completo de Servicio Técnico: 8 imágenes nuevas (etapas, requisitos por paso, el ticket por dentro, Orden de Preparación, Prioridades) — vive en tutorial.js, este archivo no cambia de código.) -->
 <!-- Portal TLC | servicio.html | v2026.10.10.6 (📚 Tutoriales — Cristian: "poner los brochure en forma de tutorial en cada modulo". Se suma tutorial.js: botón ❔ Tutorial abajo a la izquierda que abre el carrusel de imágenes de este módulo; la primera vez se abre solo.) -->
@@ -3164,6 +3165,9 @@ function _renderSeccionOrdenPreparacion(t) {
     (t.deposito === 'preparacion_control_calidad' ?
       '<div style="margin-bottom:10px;"><button type="button" id="btn-generar-etiquetas-' + t.id_ticket + '" class="op-btn" style="width:100%;background:#8b5cf6;color:#fff;border-color:#8b5cf6;" onclick="_abrirModalEtiquetasCajas(\'' + t.id_ticket + '\', this)">🏷️ Generar Etiquetas de Despacho</button></div>'
       : '') +
+    (t.negocio_id ?
+      '<div style="margin-bottom:10px;"><button type="button" class="op-btn" style="width:100%;" title="Si en Ventas cambiaron el presupuesto (por ej. agregaron una mesa), lo nuevo se suma a esta orden" onclick="_sincronizarOrdenPrepSt(\'' + t.id_ticket + '\', this)">➕ Traer ítems nuevos del presupuesto</button></div>'
+      : '') +
     ((t.deposito === 'preparacion_control_calidad' && !t.orden_padre && equipos.length >= 2) ?
       '<div style="margin-bottom:10px;"><button type="button" class="op-btn" style="width:100%;" onclick="_abrirModalDividirEntrega(\'' + t.id_ticket + '\')">✂️ Dividir entrega (envío parcial)</button></div>'
       : '') +
@@ -3356,6 +3360,45 @@ window._confirmarDividirEntrega = function(idTicket) {
       });
     })
     .catch(function() { alert('Error de conexión al dividir la entrega.'); if (btn) { btn.disabled = false; btn.textContent = 'Crear entrega'; } });
+};
+
+
+// ➕ Ítems nuevos del presupuesto → Orden de Preparación (v2026.10.15.2).
+// Primero pregunta a la función qué falta (simular), muestra la lista y, si
+// confirman, los agrega a la orden como "Pendiente". No borra nada.
+function _textoSincronizarOP(r) {
+  var lista = function(a) { return a.map(function(x) { return '  • ' + x.cantidad + '× ' + x.nombre; }).join('\n'); };
+  if (!r.agregar.length) {
+    return 'La Orden de Preparación ' + r.id_ticket + ' ya tiene todo lo del presupuesto. ✅' +
+      (r.sobran.length ? '\n\nOjo: en la orden hay ítems que ya no están en el presupuesto (no se borran solos):\n' + lista(r.sobran) : '');
+  }
+  return 'Se van a agregar a la Orden de Preparación ' + r.id_ticket + ' (como "Pendiente"):\n' + lista(r.agregar) +
+    (r.sobran.length ? '\n\nEn la orden hay ítems que ya no están en el presupuesto — no se borran, sacalos a mano si corresponde:\n' + lista(r.sobran) : '') +
+    '\n\n¿Confirmás?';
+}
+function _sincronizarOrdenPrep(datos, alTerminar) {
+  var pedir = function(extra) {
+    return fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(Object.assign({ accion:'st_sincronizarOrdenPreparacion' }, datos, extra)) }).then(function(r) { return r.json(); });
+  };
+  pedir({ simular: true }).then(function(r) {
+    if (!r || !r.ok) { alert('No se pudo revisar la orden: ' + ((r && r.error) || '')); return; }
+    if (!r.agregar.length) { alert(_textoSincronizarOP(r)); return; }
+    if (!confirm(_textoSincronizarOP(r))) return;
+    return pedir({ simular: false }).then(function(r2) {
+      if (!r2 || !r2.ok) { alert('No se pudo actualizar la orden: ' + ((r2 && r2.error) || '')); return; }
+      if (alTerminar) alTerminar(r2);
+    });
+  }).catch(function() { alert('Error de conexión con la Orden de Preparación.'); });
+}
+window._sincronizarOrdenPrepSt = function(idTicket, btn) {
+  if (btn) { if (btn.disabled) return; btn.disabled = true; setTimeout(function() { btn.disabled = false; }, 1500); }
+  _sincronizarOrdenPrep({ id_ticket: idTicket }, function(r) {
+    _toastServicio('➕ Se agregaron ' + r.agregar.reduce(function(s, a) { return s + a.cantidad; }, 0) + ' ítem(s) a la orden ' + r.id_ticket);
+    _refrescarTicketsPuntuales([r.id_ticket]).then(function() {
+      var t = _tickets.find(function(x) { return x.id_ticket === r.id_ticket; });
+      if (t && _ticketActual && (_ticketActual.id_ticket === r.id_ticket || _ticketActual.orden_padre === r.id_ticket)) { if (_ticketActual.id_ticket === r.id_ticket) _ticketActual = t; _renderDetalle(_ticketActual); }
+    });
+  });
 };
 
 window._actualizarFilaOrden = function(idTicket, indice, campo, valor) {
