@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cuenta-corriente.html | v2026.10.15.1 (🧾 COMPROBANTES — Cristian: "un botón para enviar las fotos de los tickets" (comprobante de compra). En cada gasto pendiente: "🧾 Ver comprobante" si ya lo tiene, o "📷 Comprobante" para cargarlo desde acá. Se guarda en el gasto real de su origen (ticket, tarjeta, negocio o gasto general — función cuentaCorriente v5).) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.10.8 (📚 Tutorial: botón ❔ Tutorial con las 6 imágenes de Cuenta Corriente; la primera vez se abre solo.) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.08.8 (💼 Gastos de Ventas: los gastos que los vendedores cargan en cada negocio aparecen como grupo "VENTA" (Negocio + cliente) y se editan, borran y liquidan igual que los de Servicio y Eventos. Lee el origen "ventas" de cc_gastosOrigenes (función cuentaCorriente v4).) -->
 <!-- Portal TLC | cuenta-corriente.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre.) -->
@@ -58,6 +59,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Cuenta Corriente y Rendición de Gastos — TLC</title>
 <script src="version.js"></script>
+<script src="comprobantes.js"></script>
 <script src="tutorial.js"></script>
 <script src="cierre-semanal.js"></script>
 <script src="permisos.js"></script>
@@ -182,6 +184,45 @@ function _ccPedidoGastos(tipo, info, gastos) {
   if (tipo === 'servicio') return { url: SERVICIO_URL_CC, body: { accion: 'st_actualizarGastos', id_ticket: info.id_ticket, gastos: gastos } };
   return { url: EVENTOS_URL_CC, body: { accion: 'ev_actualizarGastos', id_evento: info.id_evento, id_tarjeta: info.id_tarjeta, gastos: gastos } };
 }
+// 🧾 Comprobante de compra (v2026.10.15.1, ver comprobantes.js) — se guarda en el
+// gasto real de su origen (ticket, tarjeta, negocio o gasto general).
+function _ccContextoComprobante(info) {
+  if (info.origen_tipo === 'servicio') return { modulo: 'servicio', idRegistro: info.id_ticket };
+  if (info.origen_tipo === 'venta') return { modulo: 'ventas', idRegistro: info.id_cot };
+  if (info.origen_tipo === 'evento') return { modulo: 'eventos', idRegistro: info.id_evento + '_' + info.id_tarjeta };
+  return { modulo: 'general', idRegistro: info.id_gasto };
+}
+async function _ccGuardarComprobante(id, comp) {
+  const info = _parseItemId(id);
+  let r;
+  if (info.origen_tipo === 'general') {
+    r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ accion:'editarGastoGeneral', id: info.id_gasto, comprobante: comp }) });
+  } else {
+    const gastosCompletos = _origenGastosCompletos[_ccTarjetaIdDe(info)] || [];
+    const item = gastosCompletos[info.gasto_index];
+    if (!item) { toast('No se encontró el gasto en el origen — probá recargar.'); return false; }
+    if (comp) item.comprobante = comp; else delete item.comprobante;
+    const ped = _ccPedidoGastos(info.origen_tipo, info, gastosCompletos);
+    r = await fetch(ped.url, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(ped.body) });
+  }
+  const rr = await r.json();
+  if (!rr.ok) { toast('Error al guardar: ' + (rr.error || '')); return false; }
+  return true;
+}
+window.ccSubirComprobante = async function(id) {
+  if (typeof _ccPuedeEscribir === 'function' && !_ccPuedeEscribir()) return;
+  const comp = await TLCComprobante.subir(_ccContextoComprobante(_parseItemId(id)));
+  if (!comp) return;
+  if (await _ccGuardarComprobante(id, comp)) { toast('Comprobante cargado'); await cargarTodo(); }
+};
+window.ccQuitarComprobante = async function(id) {
+  if (typeof _ccPuedeEscribir === 'function' && !_ccPuedeEscribir()) return;
+  let item = null;
+  (state.grupos_gastos || []).forEach(g => (g.items || []).forEach(x => { if (x.id === id) item = x; }));
+  if (!item || !item.comprobante || !confirm('¿Quitar el comprobante de este gasto?')) return;
+  const viejo = item.comprobante;
+  if (await _ccGuardarComprobante(id, null)) { TLCComprobante.borrarArchivo(viejo); toast('Comprobante quitado'); await cargarTodo(); }
+};
 function _ccTarjetaIdDe(info) { return info.origen_tipo === 'servicio' ? info.id_ticket : info.origen_tipo === 'venta' ? info.id_cot : info.id_tarjeta; }
 function sub(g){let ars=0,usd=0;g.items.forEach(i=>{if(i.estado!=="PENDIENTE")return;i.moneda==="USD"?usd+=i.monto:ars+=i.monto});return{ars,usd}}
 let _editandoItemId = null; // id del gasto que esta en modo edicion ahora mismo (o null)
@@ -201,7 +242,7 @@ function _refTC(i){
 
 function row(i){
   if (i.id === _editandoItemId) return editRow(i);
-  return `<div class="row"><input type="checkbox" ${i.estado==="PAGADO"?"disabled":""} ${selected.has(i.id)?"checked":""} onchange="toggleItem('${i.id}',this.checked)"><div class="date">${fmt(i.fecha)}</div><div class="concept-wrap"><div class="concept">${esc(i.concepto)}</div><div class="audit">Cargado por: ${esc(i.cargado_por)}</div></div><div class="amount">${money(i.monto,i.moneda)}${_refTC(i)}</div><div class="tools">${i.estado==="PAGADO"?'<span class="audit">Sin comprobante</span>':`<button class="edit-link" onclick="editarItemClick('${i.id}')" title="Editar">\u270e Editar</button>`}</div></div>`;
+  return `<div class="row"><input type="checkbox" ${i.estado==="PAGADO"?"disabled":""} ${selected.has(i.id)?"checked":""} onchange="toggleItem('${i.id}',this.checked)"><div class="date">${fmt(i.fecha)}</div><div class="concept-wrap"><div class="concept">${esc(i.concepto)}</div><div class="audit">Cargado por: ${esc(i.cargado_por)}</div>${window.TLCComprobante?TLCComprobante.html(i,{editable:i.estado!=="PAGADO",subir:"ccSubirComprobante('"+i.id+"')",quitar:"ccQuitarComprobante('"+i.id+"')"}):""}</div><div class="amount">${money(i.monto,i.moneda)}${_refTC(i)}</div><div class="tools">${i.estado==="PAGADO"?'<span class="audit">Sin comprobante</span>':`<button class="edit-link" onclick="editarItemClick('${i.id}')" title="Editar">\u270e Editar</button>`}</div></div>`;
 }
 
 // Fila en modo edicion - mismos campos que "+ Cargar gasto", con
@@ -435,7 +476,7 @@ $("saldoCheck").addEventListener("change",e=>{selInitial=e.target.checked;$("par
 function renderHistory(){if(!state.liquidaciones.length){$("history").innerHTML=`<div class="card history-item" style="cursor:default"><div><strong>Todavía no hay liquidaciones registradas.</strong><br><small>Los pagos confirmados aparecerán acá.</small></div></div>`;return}$("history").innerHTML=state.liquidaciones.map(p=>{let a=(p.monto_ars?money(p.monto_ars,"ARS"):"")+(p.monto_usd?(p.monto_ars?" · ":"")+money(p.monto_usd,"USD"):"");return`<div class="card history-item" onclick="openPaymentDetail('${p.id}')"><div><strong>${esc(p.medio)} · ${esc(p.beneficiario_nombre)}</strong><br><small>${fmt(p.fecha)}${p.referencia?" · Ref. "+esc(p.referencia):""}</small><div class="history-open">Ver detalle →</div></div><strong>${a}</strong><span class="badge paid">PAGADO</span></div>`}).join("")}
 let _detailLiquidacionId = null; // liquidación actualmente mostrada en el modal de detalle — la que "Deshacer" revierte
 
-function openPaymentDetail(id){let p=state.liquidaciones.find(x=>x.id===id);if(!p)return;_detailLiquidacionId=id;let total=(p.monto_ars?money(p.monto_ars,"ARS"):"")+(p.monto_usd?(p.monto_ars?" · ":"")+money(p.monto_usd,"USD"):"");let items=(p.detalle_items||[]).map(i=>`<div class="detail-item"><div><strong>${esc(i.concepto)}</strong><small>${i.origen_label?esc(i.origen_label)+" · ":""}${fmt(i.fecha)}${i.cargado_por?" · Cargado por: "+esc(i.cargado_por):""}</small></div><strong>${money(i.monto,i.moneda)}</strong></div>`).join("");if(p.saldo_inicial_detalle){let si=p.saldo_inicial_detalle;if(si.ars)items+=`<div class="detail-item"><div><strong>Saldo inicial histórico</strong><small>Compensación / liquidación parcial</small></div><strong>${money(si.ars,"ARS")}</strong></div>`;if(si.usd)items+=`<div class="detail-item"><div><strong>Saldo inicial histórico</strong><small>Compensación / liquidación parcial</small></div><strong>${money(si.usd,"USD")}</strong></div>`}$("detailTitle").textContent=p.medio==="Compensación con saldo a favor"?"Detalle de compensación":"Detalle de liquidación";$("detailBody").innerHTML=`<div class="detail-grid"><div class="detail-box"><span>Beneficiario</span><strong>${esc(p.beneficiario_nombre)}</strong></div><div class="detail-box"><span>Fecha</span><strong>${fmt(p.fecha)}</strong></div><div class="detail-box"><span>Medio</span><strong>${esc(p.medio)}</strong></div><div class="detail-box"><span>Total</span><strong>${total||"—"}</strong></div>${p.referencia?`<div class="detail-box" style="grid-column:1/-1"><span>Referencia</span><strong>${esc(p.referencia)}</strong></div>`:""}</div><div class="eyebrow" style="margin:4px 0 7px">DETALLE PAGADO</div><div class="detail-items">${items||'<div class="detail-item"><span>Sin detalle disponible</span></div>'}</div>`;
+function openPaymentDetail(id){let p=state.liquidaciones.find(x=>x.id===id);if(!p)return;_detailLiquidacionId=id;let total=(p.monto_ars?money(p.monto_ars,"ARS"):"")+(p.monto_usd?(p.monto_ars?" · ":"")+money(p.monto_usd,"USD"):"");let items=(p.detalle_items||[]).map(i=>`<div class="detail-item"><div><strong>${esc(i.concepto)}</strong><small>${i.origen_label?esc(i.origen_label)+" · ":""}${fmt(i.fecha)}${i.cargado_por?" · Cargado por: "+esc(i.cargado_por):""}</small>${i.comprobante_url?`<a href="${esc(i.comprobante_url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:3px;font-size:11px;font-weight:700;color:#059669;text-decoration:none">🧾 Ver comprobante</a>`:""}</div><strong>${money(i.monto,i.moneda)}</strong></div>`).join("");if(p.saldo_inicial_detalle){let si=p.saldo_inicial_detalle;if(si.ars)items+=`<div class="detail-item"><div><strong>Saldo inicial histórico</strong><small>Compensación / liquidación parcial</small></div><strong>${money(si.ars,"ARS")}</strong></div>`;if(si.usd)items+=`<div class="detail-item"><div><strong>Saldo inicial histórico</strong><small>Compensación / liquidación parcial</small></div><strong>${money(si.usd,"USD")}</strong></div>`}$("detailTitle").textContent=p.medio==="Compensación con saldo a favor"?"Detalle de compensación":"Detalle de liquidación";$("detailBody").innerHTML=`<div class="detail-grid"><div class="detail-box"><span>Beneficiario</span><strong>${esc(p.beneficiario_nombre)}</strong></div><div class="detail-box"><span>Fecha</span><strong>${fmt(p.fecha)}</strong></div><div class="detail-box"><span>Medio</span><strong>${esc(p.medio)}</strong></div><div class="detail-box"><span>Total</span><strong>${total||"—"}</strong></div>${p.referencia?`<div class="detail-box" style="grid-column:1/-1"><span>Referencia</span><strong>${esc(p.referencia)}</strong></div>`:""}</div><div class="eyebrow" style="margin:4px 0 7px">DETALLE PAGADO</div><div class="detail-items">${items||'<div class="detail-item"><span>Sin detalle disponible</span></div>'}</div>`;
   // Deshacer — solo para usuarios Internos (mismo permiso que
   // liquidar). Pedido por Cristian tras probar "Compensación con
   // saldo a favor" sin respaldo real: "podes dejarme volver a que ese
@@ -714,7 +755,7 @@ async function cargarTodo() {
             pendientes.push({
               id: 'servicio:' + id + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
               moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD', g.tc_al_cargar),
-              tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por || '', estado: 'PENDIENTE',
+              tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por || '', estado: 'PENDIENTE', comprobante: g.comprobante || null,
             });
           }
         });
@@ -759,7 +800,7 @@ async function cargarTodo() {
               pendientes.push({
                 id: 'evento:' + idEvento + ':' + tarjetaId + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
                 moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD', g.tc_al_cargar),
-                tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por || '', estado: 'PENDIENTE',
+                tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por || '', estado: 'PENDIENTE', comprobante: g.comprobante || null,
               });
             }
           });
@@ -789,7 +830,7 @@ async function cargarTodo() {
             pendientes.push({
               id: 'venta:' + key + ':' + idx, fecha: g.fecha || '', concepto: g.descripcion || '',
               moneda: g.moneda || 'USD', monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD', g.tc_al_cargar),
-              tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por || '', estado: 'PENDIENTE',
+              tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por || '', estado: 'PENDIENTE', comprobante: g.comprobante || null,
             });
           }
         });
@@ -816,7 +857,7 @@ async function cargarTodo() {
           tarjeta_id: 'GENERAL', tipo_origen: 'GENERAL', titulo_origen: 'Gastos generales / directos',
           items: rrGen.gastos.map(function(g) {
             return { id: 'general:' + g.id, fecha: g.fecha||'', concepto: g.descripcion||'', moneda: g.moneda||'USD',
-              monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD', g.tc_al_cargar), tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por||'', estado:'PENDIENTE' };
+              monto: _aMoneda(parseFloat(g.importe)||0, g.moneda||'USD', g.tc_al_cargar), tc_al_cargar: g.tc_al_cargar || null, cargado_por: g.creado_por||'', estado:'PENDIENTE', comprobante: g.comprobante || null };
           }),
         }];
       }

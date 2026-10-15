@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.15.1 (🧾 COMPROBANTES — Cristian: "agregar a los gastos, en los módulos que lo soportan, un botón para enviar las fotos de los tickets" (comprobante de compra). En cada gasto de las tarjetas (Eventos, Comex, Regulatoria, Contabilidad), botón "📷 Comprobante" y "🧾 Ver comprobante".) -->
 <!-- Portal TLC | eventos.html | v2026.10.13.1 (📒 CONTABILIDAD — Cristian: "necesito dentro de Administración un módulo llamado CONTABILIDAD, con un tablero Kanban igual al de COMEX". Con ?modulo=contabilidad muestra solo los tableros de Contabilidad (permiso "Contabilidad" de la planilla), igual que Comex: crear tablero, columnas, tarjetas, checklists, adjuntos, gastos, agenda. El menú ⋯ del Administrador suma "📒 Pasar a Contabilidad". Backend eventosChecklist v6.) -->
 <!-- Portal TLC | eventos.html | v2026.10.10.9 (📚 Tutorial de Eventos y Congresos: 7 imágenes nuevas en el botón ❔ Tutorial — vive en tutorial.js, este archivo no cambia de código.) -->
 <!-- Portal TLC | eventos.html | v2026.10.10.6 (📚 Tutoriales — Cristian: "poner los brochure en forma de tutorial en cada modulo". Se suma tutorial.js: botón ❔ Tutorial abajo a la izquierda que abre el carrusel de imágenes de este módulo; la primera vez se abre solo.) -->
@@ -86,6 +87,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Eventos / Congresos — Portal TLC</title>
 <script src="version.js"></script>
+<script src="comprobantes.js"></script>
 <script src="tutorial.js"></script>
 <script src="cierre-semanal.js"></script>
 <script src="avatar.js?v=4"></script>
@@ -2606,6 +2608,7 @@ function _renderGastosEv(t) {
         '<div style="font-size:11px;color:var(--text-muted);">' + _esc(g.fecha || '—') + ' · ' + (moneda === 'ARS' ? 'AR$ ' : 'USD ') + importeMostrado.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) +
           (tcDeEsteGastoEv ? ' <span class="ev-gastos-tc-label" title="Tipo de cambio usado en la conversión de este gasto">· TC $' + tcDeEsteGastoEv.toLocaleString('es-AR') + '</span>' : '') +
         '</div>' +
+        (window.TLCComprobante ? TLCComprobante.html(g, { editable: false }) : '') +
       '</div>';
     }
     var tcParaLabelEv = g.tc_al_cargar || TC_OFICIAL_EV;
@@ -2633,6 +2636,7 @@ function _renderGastosEv(t) {
           (tcParaLabelEv ? '<span class="ev-gastos-tc-label" style="display:block;margin-top:3px;" title="' + (g.tc_al_cargar ? 'Tipo de cambio del día en que se cargó este gasto (queda fijo)' : 'Tipo de cambio vigente hoy — este gasto todavía no tiene uno propio guardado') + '">TC: $' + tcParaLabelEv.toLocaleString('es-AR') + '</span>' : '') +
         '</div>' +
       '</div>' +
+      (window.TLCComprobante ? TLCComprobante.html(g, { editable: true, subir: '_subirComprobanteGastoEv(' + i + ')', quitar: '_quitarComprobanteGastoEv(' + i + ')' }) : '') +
     '</div>';
   }).join('') : '<div style="color:var(--text-muted);padding:10px 6px;text-align:center;font-size:12px;">Sin gastos registrados</div>';
 
@@ -2725,6 +2729,33 @@ window._eliminarGastoEv = function(idx) {
   var cont = document.getElementById('ev-gastos-cont');
   if (cont) cont.innerHTML = _renderGastosEv(t);
   _guardarGastosEv(t);
+};
+
+// 🧾 Comprobante de compra de cada gasto (v2026.10.15.1, ver comprobantes.js)
+window._subirComprobanteGastoEv = function(idx) {
+  var t = _tarjetaActual();
+  var g = t && Array.isArray(t.gastos) ? t.gastos[idx] : null;
+  if (!g) return;
+  if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
+  TLCComprobante.subir({ modulo: 'eventos', idRegistro: EVENTO_ACTUAL.id + '_' + t.id }).then(function(c) {
+    if (!c) return;
+    g.comprobante = c;
+    _guardarGastosEv(t);
+    var cont = document.getElementById('ev-gastos-cont');
+    if (cont && _tarjetaActual() === t) cont.innerHTML = _renderGastosEv(t);
+  });
+};
+window._quitarComprobanteGastoEv = function(idx) {
+  var t = _tarjetaActual();
+  var g = t && Array.isArray(t.gastos) ? t.gastos[idx] : null;
+  if (!g || !g.comprobante) return;
+  if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
+  if (!confirm('¿Quitar el comprobante de este gasto?')) return;
+  var c = g.comprobante; delete g.comprobante;
+  _guardarGastosEv(t);
+  TLCComprobante.borrarArchivo(c);
+  var cont = document.getElementById('ev-gastos-cont');
+  if (cont) cont.innerHTML = _renderGastosEv(t);
 };
 
 function _guardarGastosEv(t) {

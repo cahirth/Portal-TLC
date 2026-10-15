@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.15.1 (🧾 COMPROBANTES — Cristian: "agregar a los gastos, en los módulos que lo soportan, un botón para enviar las fotos de los tickets" (comprobante de compra). En cada gasto del negocio, botón "📷 Comprobante" y "🧾 Ver comprobante".) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.10.10 (📚 Tutorial completo de Negocios: 6 imágenes nuevas — vive en tutorial.js, este archivo no cambia de código.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.10.6 (📚 Tutoriales — Cristian: "poner los brochure en forma de tutorial en cada modulo". Se suma tutorial.js: botón ❔ Tutorial abajo a la izquierda que abre el carrusel de imágenes de este módulo; la primera vez se abre solo.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.10.2 (Agenda Etapa 2: en cada negocio, franja "📅 Próxima visita" (fecha, hora, quién, 📌/✓✓ Visto) y botón "📅 Agendar" que abre la Agenda con cliente, título, vendedor y el vínculo al negocio precargados; al guardar vuelve al negocio. Usa agenda-vinculo.js y la función agenda v4.) -->
@@ -61,6 +62,7 @@
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="comprobantes.js"></script>
 <script src="tutorial.js"></script>
 <script src="cierre-semanal.js"></script>
 <script src="avatar.js?v=4"></script>
@@ -2916,7 +2918,8 @@ function _renderGastosCot(c) {
             var imp = _aMonedaGastoCot(parseFloat(g.importe) || 0, moneda, g.tc_al_cargar);
             return '<div class="gc-card">' + meta +
                 '<div style="font-size:13px;font-weight:700;">' + _escG(g.descripcion || '—') + '</div>' +
-                '<div class="gc-sub">' + _escG(g.fecha || '—') + ' · ' + (moneda === 'ARS' ? 'AR$ ' : 'USD ') + _fmtMontoCot(imp) + (tc ? ' <span class="gc-tc">· TC $' + tc.toLocaleString('es-AR') + '</span>' : '') + '</div></div>';
+                '<div class="gc-sub">' + _escG(g.fecha || '—') + ' · ' + (moneda === 'ARS' ? 'AR$ ' : 'USD ') + _fmtMontoCot(imp) + (tc ? ' <span class="gc-tc">· TC $' + tc.toLocaleString('es-AR') + '</span>' : '') + '</div>' +
+                (window.TLCComprobante ? TLCComprobante.html(g, { editable: false }) : '') + '</div>';
         }
         var importeMostrado = moneda === 'ARS' ? _aMonedaGastoCot(parseFloat(g.importe) || 0, 'ARS', g.tc_al_cargar) : (g.importe || '');
         return '<div class="gc-card">' + meta +
@@ -2933,7 +2936,9 @@ function _renderGastosCot(c) {
                     '</div>' +
                     (tc ? '<span class="gc-tc" style="display:block;margin-top:3px;">TC: $' + tc.toLocaleString('es-AR') + '</span>' : '') +
                 '</div>' +
-            '</div></div>';
+            '</div>' +
+            (window.TLCComprobante ? TLCComprobante.html(g, { editable: true, subir: "_subirComprobanteGastoCot('" + id + "'," + i + ")", quitar: "_quitarComprobanteGastoCot('" + id + "'," + i + ")" }) : '') +
+            '</div>';
     }).join('') : '<div style="color:#64748b;padding:10px 6px;text-align:center;font-size:12px;">Sin gastos cargados en este negocio</div>';
     return tarjetas +
         '<div class="gc-total">' +
@@ -2955,6 +2960,28 @@ function _guardarGastosCot(id, gastos) {
     .then(function(r) { if (!r.ok) alert('No se pudo guardar el gasto: ' + (r.error || '')); })
     .catch(function() { alert('Error de conexión al guardar el gasto'); });
 }
+// 🧾 Comprobante de compra de cada gasto (v2026.10.15.1, ver comprobantes.js)
+window._subirComprobanteGastoCot = function(id, idx) {
+    var c = _cotPorIdGastos(id); var g = c && Array.isArray(c.gastos) ? c.gastos[idx] : null;
+    if (!g) return;
+    if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
+    TLCComprobante.subir({ modulo: 'ventas', idRegistro: id }).then(function(comp) {
+        if (!comp) return;
+        g.comprobante = comp;
+        _guardarGastosCot(id, c.gastos);
+        _repintarGastosCot(c);
+    });
+};
+window._quitarComprobanteGastoCot = function(id, idx) {
+    var c = _cotPorIdGastos(id); var g = c && Array.isArray(c.gastos) ? c.gastos[idx] : null;
+    if (!g || !g.comprobante) return;
+    if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
+    if (!confirm('¿Quitar el comprobante de este gasto?')) return;
+    var comp = g.comprobante; delete g.comprobante;
+    _guardarGastosCot(id, c.gastos);
+    TLCComprobante.borrarArchivo(comp);
+    _repintarGastosCot(c);
+};
 window._agregarGastoCot = function(id) {
     var c = _cotPorIdGastos(id); if (!c) return;
     if (!Array.isArray(c.gastos)) c.gastos = c.gastos ? Object.values(c.gastos) : [];

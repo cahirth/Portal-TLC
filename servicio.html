@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.15.1 (🧾 COMPROBANTES — Cristian: "agregar a los gastos, en los módulos que lo soportan, un botón para enviar las fotos de los tickets" (comprobante de compra). En cada gasto del ticket, botón "📷 Comprobante" para sacar la foto del ticket de compra (o subir imagen/PDF) y "🧾 Ver comprobante" para abrirlo. Queda guardado en el gasto (g.comprobante) y se ve también en Cuenta Corriente.) -->
 <!-- Portal TLC | servicio.html | v2026.10.10.10 (📚 Tutorial completo de Servicio Técnico: 8 imágenes nuevas (etapas, requisitos por paso, el ticket por dentro, Orden de Preparación, Prioridades) — vive en tutorial.js, este archivo no cambia de código.) -->
 <!-- Portal TLC | servicio.html | v2026.10.10.6 (📚 Tutoriales — Cristian: "poner los brochure en forma de tutorial en cada modulo". Se suma tutorial.js: botón ❔ Tutorial abajo a la izquierda que abre el carrusel de imágenes de este módulo; la primera vez se abre solo.) -->
 <!-- Portal TLC | servicio.html | v2026.10.10.2 (Agenda Etapa 2 — Cristian: "quiero hacer la 1 y 2, es lo que más necesito". En cada ticket / Orden de Preparación: franja "📅 Próxima visita" (fecha, hora, quién, 📌 Asignado y ✓✓ Visto / ✓ Sin ver, +N más) y botón "📅 Agendar" que abre la Agenda con cliente, título, técnico responsable y el vínculo precargados; al guardar vuelve al ticket. En las tarjetas del tablero, 📅 con la fecha de la próxima visita. Usa agenda-vinculo.js y la función agenda v4.) -->
@@ -83,6 +84,7 @@
 <html lang="es">
 <head>
 <script src="version.js"></script>
+<script src="comprobantes.js"></script>
 <script src="tutorial.js"></script>
 <script src="cierre-semanal.js"></script>
 <script src="avatar.js?v=4"></script>
@@ -4932,6 +4934,7 @@ function _renderGastos(t) {
         '<div style="font-size:11px;color:var(--text-muted);">' + _esc(g.fecha || '—') + ' · ' + (moneda === 'ARS' ? 'AR$ ' : 'USD ') + importeSoloLectura.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) +
           (tcDeEsteGasto ? ' <span class="gastos-tc-label" title="Tipo de cambio usado en la conversión de este gasto">· TC $' + tcDeEsteGasto.toLocaleString('es-AR') + '</span>' : '') +
         '</div>' +
+        (window.TLCComprobante ? TLCComprobante.html(g, { editable: false }) : '') +
       '</div>';
     }
     var importeMostrado = moneda === 'ARS' ? _aMonedaGastoSt(parseFloat(g.importe)||0, 'ARS', g.tc_al_cargar) : (g.importe||'');
@@ -4955,6 +4958,7 @@ function _renderGastos(t) {
           (tcParaLabel ? '<span class="gastos-tc-label" style="display:block;margin-top:3px;" title="' + (g.tc_al_cargar ? 'Tipo de cambio del día en que se cargó este gasto (queda fijo)' : 'Tipo de cambio vigente hoy — este gasto todavía no tiene uno propio guardado') + '">TC: $' + tcParaLabel.toLocaleString('es-AR') + '</span>' : '') +
         '</div>' +
       '</div>' +
+      (window.TLCComprobante ? TLCComprobante.html(g, { editable: true, subir: "_subirComprobanteGasto('" + t.id_ticket + "'," + i + ")", quitar: "_quitarComprobanteGasto('" + t.id_ticket + "'," + i + ")" }) : '') +
     '</div>';
   }).join('') : '<div style="color:var(--text-muted);padding:10px 6px;text-align:center;font-size:12px;">Sin gastos registrados</div>';
 
@@ -5056,6 +5060,33 @@ window._eliminarGasto = function(id, idx) {
   if (_ticketActual && _ticketActual.id_ticket === id) _ticketActual = t;
   _renderDetalle(t);
   _guardarGastos(id, t.gastos);
+};
+
+// 🧾 Comprobante de compra de cada gasto (v2026.10.15.1, ver comprobantes.js)
+window._subirComprobanteGasto = function(id, idx) {
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  var g = t && Array.isArray(t.gastos) ? t.gastos[idx] : null;
+  if (!g) return;
+  if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
+  TLCComprobante.subir({ modulo: 'servicio', idRegistro: id }).then(function(c) {
+    if (!c) return;
+    g.comprobante = c;
+    _guardarGastos(id, t.gastos);
+    var cont = document.getElementById('det-gastos-card');
+    if (cont && _ticketActual && _ticketActual.id_ticket === id) cont.innerHTML = _renderGastos(t);
+  });
+};
+window._quitarComprobanteGasto = function(id, idx) {
+  var t = _tickets.find(function(x){ return x.id_ticket === id; });
+  var g = t && Array.isArray(t.gastos) ? t.gastos[idx] : null;
+  if (!g || !g.comprobante) return;
+  if (g.estado === 'PAGADO') { alert('Este gasto ya fue liquidado — no se puede modificar.'); return; }
+  if (!confirm('¿Quitar el comprobante de este gasto?')) return;
+  var c = g.comprobante; delete g.comprobante;
+  _guardarGastos(id, t.gastos);
+  TLCComprobante.borrarArchivo(c);
+  var cont = document.getElementById('det-gastos-card');
+  if (cont) cont.innerHTML = _renderGastos(t);
 };
 
 function _guardarGastos(id, gastos) {
