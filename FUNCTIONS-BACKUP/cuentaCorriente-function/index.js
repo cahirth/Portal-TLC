@@ -1,4 +1,6 @@
 // Portal TLC | Cloud Function — Cuenta Corriente y Rendición de Gastos
+// v5 — 2026.10.15 — 🧾 editarGastoGeneral acepta "comprobante" (foto del ticket de compra, link de Storage),
+//   y cada liquidación guarda el link del comprobante de cada gasto pagado (comprobante_url).
 // v4 — 2026.10.08 — 💸 Gastos de Ventas: cc_gastosOrigenes también devuelve
 //   los gastos de los negocios (cotizaciones/<id>/gastos, origen "venta"), y
 //   crearLiquidacion / revertirLiquidacion los marcan y desmarcan igual que
@@ -148,6 +150,13 @@ async function editarGastoGeneral(data) {
   ['fecha', 'descripcion', 'moneda'].forEach((c) => { if (data[c] !== undefined) campos[c] = String(data[c]).trim(); });
   if (data.importe !== undefined) campos.importe = parseFloat(data.importe) || 0;
   if (data.tc_al_cargar !== undefined && !gasto.tc_al_cargar) campos.tc_al_cargar = parseFloat(data.tc_al_cargar) || null;
+  // v5 — 🧾 comprobante de compra (foto/PDF ya subido a Storage por la función servicio)
+  if (data.comprobante !== undefined) {
+    const c = data.comprobante;
+    campos.comprobante = (c && typeof c === 'object' && String(c.url || '').indexOf('https://firebasestorage.googleapis.com/') === 0)
+      ? { url: String(c.url), path: String(c.path || ''), tipo: String(c.tipo || ''), nombre: String(c.nombre || ''), subido_por: String(c.subido_por || ''), fecha: String(c.fecha || '') }
+      : null;
+  }
   if (data.a_favor_de !== undefined && String(data.a_favor_de).trim()) {
     if (data.solicitante_es_interno !== true) return { ok: false, error: 'Solo usuarios Internos pueden reasignar el beneficiario de un gasto.' };
     const nombre = String(data.a_favor_de).trim();
@@ -299,6 +308,7 @@ async function crearLiquidacion(data) {
         : item.origen_tipo === 'evento' ? (String(item.id_evento || '') + '/' + String(item.id_tarjeta || ''))
         : String(item.id_gasto || ''),
       origen_label: String(item.origen_label || '').trim(),
+      comprobante_url: (g.comprobante && g.comprobante.url) ? String(g.comprobante.url) : null,
     });
   }
 
