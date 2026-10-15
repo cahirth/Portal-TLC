@@ -1,39 +1,67 @@
 <!DOCTYPE html>
-<!-- Portal TLC | tutoriales.html | v2026.10.15.1 (NUEVO — 📚 Todos los tutoriales en una sola página. Cristian: "cada módulo tenga su tutorial y además uno general como este, siempre actualizado". Se arma solo con la lista de tutorial.js (SETS) y las imágenes de tutoriales/, así que cada imagen nueva aparece acá sin tocar nada. El botón "Descargar para enviar" baja tutoriales/Portal-TLC-Tutoriales.html, la misma página con las imágenes adentro (se puede mandar por mail o WhatsApp y abre sin internet); ese archivo lo regenera tools/generar_guia_tutoriales.py, solo y automático con la GitHub Action guia-tutoriales.yml cada vez que cambian las imágenes o tutorial.js.) -->
+<!-- Portal TLC | tutoriales.html | v2026.10.15.2 (📚 Manual de tutoriales: índice por módulo con subíndices numerados (1.1, 1.2…) que llevan directo a cada imagen. Cristian: "me gusta más un índice para el manual con subíndices, navegables hasta las imágenes". En la PC el índice queda fijo a la izquierda y marca dónde estás; en el celular está arriba y el botón "☰ Índice" vuelve a él. Los títulos salen de TITULOS en tutorial.js.) -->
+<!-- Portal TLC | tutoriales.html | v2026.10.15.1 (NUEVO — 📚 Todos los tutoriales en una sola página. Se arma solo con la lista de tutorial.js (SETS) y las imágenes de tutoriales/, así que cada imagen nueva aparece acá sin tocar nada. El botón "Descargar para enviar" baja tutoriales/Portal-TLC-Tutoriales.html, la misma página con las imágenes adentro (se puede mandar por mail o WhatsApp y abre sin internet); ese archivo lo regenera tools/generar_guia_tutoriales.py, solo y automático con la GitHub Action guia-tutoriales.yml cada vez que cambian las imágenes o tutorial.js.) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tutoriales · Portal TLC</title>
+<title>Manual de tutoriales · Portal TLC</title>
 <link rel="manifest" href="manifest.json">
 <!--OFFLINE-QUITAR--><script src="version.js"></script><script src="tutorial.js"></script><!--/OFFLINE-QUITAR-->
 <style>
-:root{--bg:#070d1c;--bg2:#0b1630;--card:#111d3a;--line:#22315a;--tx:#e8eefb;--sub:#9fb6dc;--ac:#3a86ff;--ac2:#5ea1ff}
+:root{--bg:#070d1c;--bg2:#0b1630;--card:#0f1a33;--card2:#14224a;--line:#22315a;--tx:#e8eefb;--sub:#9fb6dc;--mut:#6b80a8;--ac:#3a86ff;--ac2:#5ea1ff}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:radial-gradient(120% 60% at 50% 0%,#1d3a6b 0%,var(--bg2) 45%,var(--bg) 100%) fixed;background-color:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
-header{max-width:1180px;margin:0 auto;padding:22px 16px 12px}
+html{scroll-behavior:smooth}
+body{background:radial-gradient(120% 50% at 50% 0%,#1d3a6b 0%,var(--bg2) 40%,var(--bg) 100%) fixed;background-color:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+a{color:inherit}
+header{max-width:1240px;margin:0 auto;padding:22px 16px 18px}
 .arriba{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
 .arriba a{text-decoration:none;font-size:13px;font-weight:800;border-radius:10px;padding:8px 13px;border:1px solid var(--line);background:var(--card);color:var(--tx)}
 .arriba a.dl{margin-left:auto;background:var(--ac);border-color:var(--ac);color:#fff}
 .kick{font-size:12px;font-weight:800;letter-spacing:2.5px;color:var(--sub)}
-h1{font-size:clamp(30px,6vw,46px);font-weight:900;line-height:1.05;margin:10px 0 8px}
+h1{font-size:clamp(30px,6vw,44px);font-weight:900;line-height:1.05;margin:10px 0 8px}
 h1 em{font-style:normal;color:var(--ac2)}
-.lead{color:var(--sub);max-width:660px}
-nav{position:sticky;top:0;z-index:5;background:rgba(7,13,28,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
-nav div{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
-nav div::-webkit-scrollbar{display:none}
-nav a{flex-shrink:0;text-decoration:none;color:var(--tx);font-size:13px;font-weight:700;padding:6px 11px;border-radius:20px;border:1px solid var(--line);background:var(--card);white-space:nowrap}
-nav a:hover{border-color:var(--ac)}
-nav a b{color:var(--sub);font-weight:600;margin-left:4px}
-main{max-width:1180px;margin:0 auto;padding:8px 16px 60px}
-section{padding-top:28px;scroll-margin-top:56px}
-section h2{font-size:21px;font-weight:900;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
-section h2 small{font-size:13px;color:var(--sub);font-weight:600}
-.nota{font-size:13px;color:var(--sub);margin-top:3px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:12px}
-.grid button{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:0;overflow:hidden;cursor:zoom-in;aspect-ratio:4/5;transition:transform .15s,border-color .15s}
-.grid button:hover{transform:translateY(-3px);border-color:var(--ac)}
-.grid img{width:100%;height:100%;display:block;object-fit:cover}
+.lead{color:var(--sub);max-width:680px}
+
+.libro{max-width:1240px;margin:0 auto;padding:0 16px 80px;display:grid;grid-template-columns:310px minmax(0,1fr);gap:28px;align-items:start}
+/* Índice */
+#indice{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;background:rgba(15,26,51,.85);border:1px solid var(--line);border-radius:16px;padding:14px 10px 14px 14px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+#indice h2{font-size:12px;font-weight:900;letter-spacing:2px;color:var(--sub);margin:2px 0 10px}
+#filtro{width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;color:var(--tx);font-size:13px;outline:none;margin-bottom:8px}
+#filtro:focus{border-color:var(--ac)}
+.cap{margin-bottom:4px}
+.cap>a{display:flex;gap:8px;align-items:baseline;text-decoration:none;font-weight:800;font-size:14px;padding:6px 8px;border-radius:8px}
+.cap>a:hover{background:var(--card2)}
+.cap>a .n{color:var(--ac2);min-width:22px}
+.cap>a .c{margin-left:auto;color:var(--mut);font-size:11.5px;font-weight:700}
+.cap ol{list-style:none;margin:0 0 6px 0}
+.cap li a{display:flex;gap:8px;text-decoration:none;font-size:13px;color:var(--sub);padding:4px 8px 4px 10px;border-radius:7px;border-left:2px solid transparent;margin-left:12px}
+.cap li a:hover{background:var(--card2);color:var(--tx)}
+.cap li a .n{color:var(--mut);font-variant-numeric:tabular-nums;min-width:30px;flex-shrink:0}
+.cap li a.otro{font-style:italic}
+.cap li a.otro::after{content:"↗";margin-left:auto;color:var(--mut);font-style:normal}
+.cap li a.activo{color:#fff;background:rgba(58,134,255,.18);border-left-color:var(--ac)}
+.cap.oculto,.cap li.oculto{display:none}
+.sinres{color:var(--mut);font-size:13px;padding:8px}
+
+/* Contenido */
+.capitulo{scroll-margin-top:16px;margin-bottom:12px}
+.capitulo>h2{font-size:26px;font-weight:900;padding:18px 0 4px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:6px}
+.capitulo>h2 .n{color:var(--ac2)}
+.capitulo>h2 small{font-size:13px;color:var(--sub);font-weight:600}
+.lamina{scroll-margin-top:16px;padding:18px 0 10px}
+.lamina h3{font-size:17px;font-weight:800;margin-bottom:10px;display:flex;gap:10px;align-items:baseline}
+.lamina h3 .n{color:var(--ac2);font-variant-numeric:tabular-nums}
+.lamina button.img{display:block;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:0;overflow:hidden;cursor:zoom-in;width:100%;max-width:540px;aspect-ratio:4/5;box-shadow:0 14px 36px rgba(0,0,0,.35)}
+.lamina img{width:100%;height:100%;display:block;object-fit:cover}
+.pasos{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;max-width:540px}
+.pasos a{text-decoration:none;font-size:12px;font-weight:700;color:var(--sub);border:1px solid var(--line);border-radius:8px;padding:5px 10px;background:var(--card)}
+.pasos a:hover{color:#fff;border-color:var(--ac)}
+.pasos a.ix{margin-left:auto}
+.tambien{font-size:13px;color:var(--sub);background:var(--card);border:1px dashed var(--line);border-radius:10px;padding:9px 12px;margin:14px 0 4px;max-width:540px}
+.tambien a{color:var(--ac2);font-weight:700;text-decoration:none}
+
+#btn-indice{display:none;position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:15;border:0;border-radius:22px;background:var(--ac);color:#fff;font:800 13px system-ui,sans-serif;padding:10px 15px;box-shadow:0 8px 22px rgba(58,134,255,.45);text-decoration:none}
 #lb{position:fixed;inset:0;background:rgba(3,6,14,.95);z-index:20;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;padding:12px}
 #lb.on{display:flex}
 #lb img{max-width:100%;max-height:calc(100vh - 90px);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
@@ -42,31 +70,53 @@ section h2 small{font-size:13px;color:var(--sub);font-weight:600}
 #lb .x{position:absolute;top:12px;right:12px}
 footer{text-align:center;color:var(--sub);font-size:12.5px;padding:0 16px 36px}
 .vacio{color:var(--sub);padding:40px 0;text-align:center}
-@media print{nav,#lb,.arriba{display:none!important}body{background:#fff;color:#000}.grid{grid-template-columns:repeat(3,1fr)}.grid button{break-inside:avoid}}
+
+@media (max-width:860px){
+  .libro{grid-template-columns:minmax(0,1fr);gap:8px}
+  #indice{position:static;max-height:none;scroll-margin-top:10px}
+  #btn-indice{display:block}
+  .cap ol{display:none}.cap.abierto ol,#toc.filtrando .cap ol{display:block}
+  .cap>a::after{content:"▸";color:var(--mut);margin-left:8px;transition:transform .15s}.cap.abierto>a::after{transform:rotate(90deg)}
+  .lamina button.img{max-width:none}
+}
+@media print{
+  #btn-indice,#lb,.arriba,.pasos,#filtro{display:none!important}
+  body{background:#fff;color:#000}
+  .libro{display:block}#indice{position:static;max-height:none;border:none;background:none;break-after:page}
+  .cap li a,.cap>a{color:#000}
+  .lamina{break-inside:avoid;break-after:page}
+  .lamina button.img{max-width:15cm;box-shadow:none}
+}
 </style>
 </head>
 <body>
 <header>
   <div class="arriba" id="arriba"><a href="index.html">← Portal</a><a class="dl" href="tutoriales/Portal-TLC-Tutoriales.html" download="Portal-TLC-Tutoriales.html">⬇️ Descargar para enviar</a></div>
-  <div class="kick">PORTAL TLC · TUTORIALES</div>
-  <h1>Todos los tutoriales,<br><em>en un solo lugar</em></h1>
-  <p class="lead" id="lead">Ordenados por módulo. Tocá una imagen para verla en grande y pasá con las flechas (o deslizando en el celular).</p>
+  <div class="kick">PORTAL TLC · MANUAL</div>
+  <h1>Manual de<br><em>tutoriales</em></h1>
+  <p class="lead" id="lead">Elegí un módulo y un tema en el índice: te lleva directo a la imagen. Tocá la imagen para verla en grande.</p>
 </header>
-<nav><div id="nav"></div></nav>
-<main id="main"><div class="vacio">Cargando…</div></main>
-<footer id="pie">Portal TLC · ir.tlcsrl.com.ar · Dentro del Portal, cada módulo tiene su botón de tutorial.</footer>
+<div class="libro">
+  <nav id="indice" aria-label="Índice"><h2>ÍNDICE</h2><input id="filtro" type="search" placeholder="Buscar un tema…" autocomplete="off"><div id="toc"></div></nav>
+  <main id="main"><div class="vacio">Cargando…</div></main>
+</div>
+<a id="btn-indice" href="#indice">☰ Índice</a>
+<footer id="pie">Portal TLC · ir.tlcsrl.com.ar · Dentro del Portal, cada módulo tiene además su botón de tutorial.</footer>
 <div id="lb"><button class="x" onclick="cerrar()" aria-label="Cerrar">✕</button><img id="lbi" alt=""><div class="bar"><button onclick="mover(-1)" aria-label="Anterior">‹</button><span id="lbt"></span><button onclick="mover(1)" aria-label="Siguiente">›</button></div></div>
 <script>
-// Versión descargable: el generador pone acá window.TUT_OFFLINE = { sets, imgs, fecha }
+// Versión descargable: el generador pone acá window.TUT_OFFLINE = { sets, titulos, imgs, fecha }
 /*OFFLINE-DATOS*/
 (function () {
   var OFF = window.TUT_OFFLINE || null;
   var SETS = OFF ? OFF.sets : ((window.TLCTutorial && TLCTutorial.SETS) || {});
+  var TIT = OFF ? (OFF.titulos || {}) : ((window.TLCTutorial && TLCTutorial.TITULOS) || {});
   function src(n) { return OFF ? OFF.imgs[n] : 'tutoriales/' + n + '.jpg'; }
+  function titulo(n) { return TIT[n] || n.replace(/-/g, ' ').replace(/^./, function (c) { return c.toUpperCase(); }); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function sinAcentos(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
 
-  // Orden y nombre de cada módulo en esta página. Un módulo nuevo en tutorial.js
-  // que no esté acá aparece igual, al final, con su título.
+  // Capítulos del manual, en este orden. Un módulo nuevo en tutorial.js que
+  // no esté acá aparece igual, al final, con su título.
   var MODULOS = [
     ['index', '💡', 'Cómo ver los tutoriales'],
     ['servicio', '🔧', 'Servicio Técnico'],
@@ -86,46 +136,106 @@ footer{text-align:center;color:var(--sub);font-size:12.5px;padding:0 16px 36px}
   Object.keys(SETS).forEach(function (k) { if (conocidos.indexOf(k) === -1) MODULOS.push([k, '📘', SETS[k].titulo]); });
   MODULOS = MODULOS.filter(function (m) { return SETS[m[0]]; });
 
-  // Novedades (imágenes nov-*) primero; después cada módulo con sus imágenes.
-  // Una imagen que está en varios módulos (ej. tildes, campanita) se muestra
-  // una sola vez, en el primero; los demás dicen "También usa imágenes de…".
-  var vistas = {}, secciones = [], nov = [];
+  // Capítulos: primero ★ Novedades (imágenes nov-*), después cada módulo numerado.
+  // Cada imagen se muestra UNA vez (en el primer capítulo donde aparece). En los
+  // otros capítulos figura igual en el índice, con ↗, y lleva a donde está.
+  var nov = [];
   MODULOS.forEach(function (m) { SETS[m[0]].slides.forEach(function (s) { if (/^nov-/.test(s) && nov.indexOf(s) === -1) nov.push(s); }); });
-  nov.forEach(function (s) { vistas[s] = 'Novedades'; });
-  secciones.push({ id: 'novedades', ic: '🆕', t: 'Novedades', own: nov, shared: [] });
-  MODULOS.forEach(function (m) {
-    var own = [], shared = [];
-    SETS[m[0]].slides.forEach(function (s) {
-      if (!vistas[s]) { vistas[s] = m[2]; own.push(s); }
-      else if (!/^nov-/.test(s) && shared.indexOf(vistas[s]) === -1 && vistas[s] !== m[2]) shared.push(vistas[s]);
+  var caps = [{ id: 'novedades', num: '★', ic: '🆕', t: 'Novedades', slides: nov }];
+  MODULOS.forEach(function (m, i) { caps.push({ id: m[0], num: String(i + 1), ic: m[1], t: m[2], slides: SETS[m[0]].slides.filter(function (s) { return !/^nov-/.test(s); }) }); });
+
+  var casa = {}, lams = [];       // casa[imagen] = { ancla, num }
+  caps.forEach(function (c) {
+    c.items = [];
+    var k = 0;
+    c.slides.forEach(function (s) {
+      if (casa[s]) { c.items.push({ s: s, otro: true }); return; }
+      k++;
+      var num = (c.num === '★' ? 'N' : c.num) + '.' + k;
+      casa[s] = { ancla: 'l-' + s, num: num, cap: c.t };
+      c.items.push({ s: s, num: num });
+      lams.push({ s: s, num: num, cap: c.t });
     });
-    secciones.push({ id: m[0], ic: m[1], t: m[2], own: own, shared: shared });
   });
 
-  var todas = [], nav = '', html = '';
-  secciones.forEach(function (s) {
-    if (!s.own.length) return;
-    nav += '<a href="#' + esc(s.id) + '">' + s.ic + ' ' + esc(s.t) + '<b>' + s.own.length + '</b></a>';
-    html += '<section id="' + esc(s.id) + '"><h2>' + s.ic + ' ' + esc(s.t) + ' <small>' + s.own.length + (s.own.length === 1 ? ' imagen' : ' imágenes') + '</small></h2>';
-    if (s.shared.length) html += '<div class="nota">También usa imágenes de: ' + esc(s.shared.join(', ')) + '.</div>';
-    html += '<div class="grid">' + s.own.map(function (n) {
-      var i = todas.length; todas.push({ n: n, t: s.t });
-      return '<button type="button" onclick="abrir(' + i + ')"><img loading="lazy" alt="' + esc(s.t) + ' ' + esc(n) + '" src="' + src(n) + '"></button>';
-    }).join('') + '</div></section>';
+  // Índice
+  var toc = '', main = '';
+  caps.forEach(function (c) {
+    if (!c.items.length) return;
+    var propias = c.items.filter(function (x) { return !x.otro; }).length;
+    toc += '<div class="cap" data-cap="' + esc(c.id) + '"><a href="#c-' + esc(c.id) + '"><span class="n">' + c.num + '</span><span>' + c.ic + ' ' + esc(c.t) + '</span><span class="c">' + c.items.length + '</span></a><ol>' +
+      c.items.map(function (x) {
+        var h = casa[x.s];
+        return '<li data-busca="' + esc(sinAcentos(titulo(x.s) + ' ' + c.t)) + '"><a href="#' + h.ancla + '"' + (x.otro ? ' class="otro" title="Está en ' + esc(h.cap) + ' (' + h.num + ')"' : ' data-ancla="' + h.ancla + '"') + '><span class="n">' + (x.otro ? h.num : x.num) + '</span><span>' + esc(titulo(x.s)) + '</span></a></li>';
+      }).join('') + '</ol></div>';
+
+    main += '<section class="capitulo" id="c-' + esc(c.id) + '"><h2><span class="n">' + c.num + '</span>' + c.ic + ' ' + esc(c.t) + ' <small>' + c.items.length + (c.items.length === 1 ? ' tema' : ' temas') + '</small></h2>';
+    c.items.forEach(function (x) {
+      if (x.otro) return;
+      var i = lams.findIndex(function (l) { return l.s === x.s; });
+      var ant = lams[i - 1], sig = lams[i + 1];
+      main += '<article class="lamina" id="l-' + esc(x.s) + '"><h3><span class="n">' + x.num + '</span>' + esc(titulo(x.s)) + '</h3>' +
+        '<button type="button" class="img" onclick="abrir(' + i + ')" aria-label="Ver en grande"><img loading="lazy" alt="' + esc(titulo(x.s)) + '" src="' + src(x.s) + '"></button>' +
+        '<div class="pasos">' + (ant ? '<a href="#l-' + esc(ant.s) + '">← ' + ant.num + '</a>' : '') + (sig ? '<a href="#l-' + esc(sig.s) + '">' + sig.num + ' →</a>' : '') + '<a class="ix" href="#indice">↑ Índice</a></div></article>';
+    });
+    var otros = c.items.filter(function (x) { return x.otro; });
+    if (otros.length) main += '<div class="tambien">También aplica en este módulo: ' + otros.map(function (x) { var h = casa[x.s]; return '<a href="#' + h.ancla + '">' + h.num + ' ' + esc(titulo(x.s)) + '</a>'; }).join(' · ') + '.</div>';
+    main += '</section>';
   });
-  document.getElementById('nav').innerHTML = nav;
-  document.getElementById('main').innerHTML = html || '<div class="vacio">No se pudieron cargar los tutoriales.</div>';
-  document.getElementById('lead').textContent = todas.length + ' imágenes, ordenadas por módulo. Tocá una para verla en grande y pasá con las flechas (o deslizando en el celular).';
+  document.getElementById('toc').innerHTML = toc + '<div class="sinres" id="sinres" style="display:none">No hay temas con esa palabra.</div>';
+  document.getElementById('main').innerHTML = main || '<div class="vacio">No se pudieron cargar los tutoriales.</div>';
+  document.getElementById('lead').textContent = lams.length + ' temas, en ' + caps.filter(function (c) { return c.items.length; }).length + ' capítulos. Elegí un módulo y un tema en el índice: te lleva directo a la imagen. Tocá la imagen para verla en grande.';
   if (OFF) {
     document.getElementById('arriba').innerHTML = '<a href="https://ir.tlcsrl.com.ar/tutoriales.html">🌐 Ver la versión más nueva</a>';
-    document.getElementById('pie').textContent = 'Portal TLC · ir.tlcsrl.com.ar · Dentro del Portal, cada módulo tiene su botón de tutorial. Actualizado ' + OFF.fecha + '.';
+    document.getElementById('pie').textContent = 'Portal TLC · ir.tlcsrl.com.ar · Dentro del Portal, cada módulo tiene además su botón de tutorial. Actualizado ' + OFF.fecha + '.';
   }
 
+  // En el celular el índice arranca con los capítulos cerrados: tocar un
+  // capítulo lo abre y muestra sus temas.
+  var celu = window.matchMedia('(max-width:860px)');
+  document.querySelectorAll('#toc .cap>a').forEach(function (a) {
+    a.addEventListener('click', function (e) { if (!celu.matches) return; e.preventDefault(); a.parentNode.classList.toggle('abierto'); });
+  });
+
+  // Buscar en el índice
+  document.getElementById('filtro').addEventListener('input', function () {
+    var q = sinAcentos(this.value.trim()), hay = 0;
+    document.getElementById('toc').classList.toggle('filtrando', !!q);
+    document.querySelectorAll('#toc .cap').forEach(function (cap) {
+      var vis = 0;
+      cap.querySelectorAll('li').forEach(function (li) { var ok = !q || li.getAttribute('data-busca').indexOf(q) !== -1; li.classList.toggle('oculto', !ok); if (ok) vis++; });
+      cap.classList.toggle('oculto', !vis); hay += vis;
+    });
+    document.getElementById('sinres').style.display = hay ? 'none' : 'block';
+  });
+
+  // Marca en el índice el tema que se está viendo
+  if ('IntersectionObserver' in window) {
+    var links = {};
+    document.querySelectorAll('#toc a[data-ancla]').forEach(function (a) { links[a.getAttribute('data-ancla')] = a; });
+    var actual = null;
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var a = links[e.target.id]; if (!a || a === actual) return;
+        if (actual) actual.classList.remove('activo');
+        actual = a; a.classList.add('activo');
+        var ix = document.getElementById('indice');
+        if (getComputedStyle(ix).position === 'sticky') {
+          var r = a.getBoundingClientRect(), ri = ix.getBoundingClientRect();
+          if (r.top < ri.top + 40 || r.bottom > ri.bottom - 20) ix.scrollTop += r.top - ri.top - ri.height / 3;
+        }
+      });
+    }, { rootMargin: '-35% 0px -55% 0px' });
+    document.querySelectorAll('.lamina').forEach(function (l) { io.observe(l); });
+  }
+
+  // Ver en grande
   var cur = 0, lb = document.getElementById('lb');
   window.abrir = function (i) { cur = i; pintar(); lb.classList.add('on'); };
-  window.cerrar = function () { lb.classList.remove('on'); };
-  window.mover = function (d) { cur = (cur + d + todas.length) % todas.length; pintar(); };
-  function pintar() { var x = todas[cur]; document.getElementById('lbi').src = src(x.n); document.getElementById('lbt').textContent = x.t + ' · ' + (cur + 1) + ' / ' + todas.length; }
+  window.cerrar = function () { lb.classList.remove('on'); var l = document.getElementById('l-' + lams[cur].s); if (l) l.scrollIntoView({ block: 'start' }); };
+  window.mover = function (d) { cur = (cur + d + lams.length) % lams.length; pintar(); };
+  function pintar() { var x = lams[cur]; document.getElementById('lbi').src = src(x.s); document.getElementById('lbt').textContent = x.num + ' · ' + titulo(x.s); }
   document.addEventListener('keydown', function (e) {
     if (!lb.classList.contains('on')) return;
     if (e.key === 'Escape') cerrar(); if (e.key === 'ArrowRight') mover(1); if (e.key === 'ArrowLeft') mover(-1);
@@ -134,6 +244,9 @@ footer{text-align:center;color:var(--sub);font-size:12.5px;padding:0 16px 36px}
   lb.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
   lb.addEventListener('touchend', function (e) { if (x0 == null) return; var dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) mover(dx < 0 ? 1 : -1); x0 = null; });
   lb.addEventListener('click', function (e) { if (e.target === lb) cerrar(); });
+
+  // Si llega con #ancla (ej. un link a un tema), ir ahí cuando ya está dibujado
+  if (location.hash) { var t = document.getElementById(location.hash.slice(1)); if (t) setTimeout(function () { t.scrollIntoView(); }, 50); }
 })();
 </script>
 </body>

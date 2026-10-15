@@ -1,4 +1,5 @@
-# Portal TLC | tools/generar_guia_tutoriales.py | v2026.10.15.1
+# Portal TLC | tools/generar_guia_tutoriales.py | v2026.10.15.2 (incluye TITULOS de tutorial.js para el índice del manual)
+# (v2026.10.15.1: versión inicial)
 # Arma tutoriales/Portal-TLC-Tutoriales.html: la misma página que tutoriales.html
 # pero con TODAS las imágenes adentro (base64, achicadas a 720 px), para mandarla
 # por mail o WhatsApp y abrirla sin internet.
@@ -35,8 +36,18 @@ def sets_de_tutorial_js():
     return sets
 
 
+def titulos_de_tutorial_js():
+    js = leer('tutorial.js')
+    if 'var TITULOS = {' not in js:
+        return {}
+    bloque = js[js.index('var TITULOS = {'):]
+    bloque = bloque[:bloque.index('};')]
+    return {m.group(1): m.group(2).replace("\\'", "'") for m in re.finditer(r"^\s*'([\w-]+)'\s*:\s*'((?:[^'\\]|\\.)*)'", bloque, re.M)}
+
+
 def main():
     sets = sets_de_tutorial_js()
+    titulos = titulos_de_tutorial_js()
     plantilla = leer('tutoriales.html')
     nombres = sorted({s for v in sets.values() for s in v['slides']})
     faltan = [n for n in nombres if not os.path.exists(os.path.join(RAIZ, 'tutoriales', n + '.jpg'))]
@@ -44,7 +55,7 @@ def main():
         sys.exit('Faltan imágenes en tutoriales/: ' + ', '.join(faltan))
 
     h = hashlib.sha256()
-    h.update(json.dumps(sets, sort_keys=True).encode())
+    h.update(json.dumps([sets, titulos], sort_keys=True).encode())
     h.update(plantilla.encode())
     h.update(leer('tools/generar_guia_tutoriales.py').encode())
     for n in nombres:
@@ -64,7 +75,7 @@ def main():
         imgs[n] = 'data:image/jpeg;base64,' + base64.b64encode(b.getvalue()).decode()
 
     fecha = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).strftime('%d/%m/%Y')
-    datos = 'window.TUT_OFFLINE = ' + json.dumps({'sets': sets, 'imgs': imgs, 'fecha': fecha}, ensure_ascii=False) + ';'
+    datos = 'window.TUT_OFFLINE = ' + json.dumps({'sets': sets, 'titulos': titulos, 'imgs': imgs, 'fecha': fecha}, ensure_ascii=False) + ';'
     html = re.sub(r'<!--OFFLINE-QUITAR-->.*?<!--/OFFLINE-QUITAR-->', '', plantilla, flags=re.S)
     html = html.replace('<link rel="manifest" href="manifest.json">\n', '')
     html = html.replace('/*OFFLINE-DATOS*/', datos)

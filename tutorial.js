@@ -1,3 +1,4 @@
+// Portal TLC | tutorial.js | v2026.10.15.6 (TITULOS: el título de cada imagen, para el índice del Manual de tutoriales. También se usa como texto alternativo de la imagen.)
 // Portal TLC | tutorial.js | v2026.10.15.5 (Catálogo: imagen nueva 'catalogo-stock' — cómo filtrar, ordenar y bajar el stock a Excel con ⬇️ Stock. catalogo-1 corregida: categorías reales y botones Nombre / Precio / Stock.)
 // Portal TLC | tutorial.js | v2026.10.15.4 (📎 Novedad: adjuntos en mensajes internos — imagen nov-adjuntos en Servicio, Ventas, Eventos, Comex, Regulatoria y Contabilidad.)
 // Portal TLC | tutorial.js | v2026.10.15.3 (📣 Novedades: imágenes nuevas (comprobantes, ítems nuevos en la Orden, Contabilidad). Si se suman imágenes a un tutorial ya visto, se abre en la primera nueva. ?tutorial=<imagen> abre directo esa imagen — lo usan los avisos de novedades.)
@@ -30,6 +31,76 @@
     contabilidad: { titulo: 'Contabilidad', slides: ['contabilidad-1', 'eventos-2', 'eventos-3', 'eventos-4', 'eventos-5', 'eventos-6', 'eventos-7', 'nov-adjuntos', 'nov-comprobantes', 'tildes', 'campanita'] },
     parte:        { titulo: 'Parte del día', slides: ['parte-del-dia-1', 'parte-del-dia-2', 'parte-del-dia-3', 'parte-del-dia-4'] },
     'cuenta-corriente': { titulo: 'Cuenta Corriente', slides: ['cuenta-corriente-1', 'cuenta-corriente-2', 'cuenta-corriente-3', 'cuenta-corriente-4', 'cuenta-corriente-5', 'cuenta-corriente-6', 'nov-comprobantes'] }
+  };
+  // Título de cada imagen (lo usa el Manual de tutoriales, tutoriales.html, para el índice).
+  // Imagen nueva → sumarle su título acá.
+  var TITULOS = {
+    'actividad': 'Lo que hacés en el Portal, cuenta',
+    'agenda-1': 'La Agenda del equipo, dentro del Portal',
+    'agenda-2': 'Cada campo, para qué sirve',
+    'agenda-3': 'Estado: ¿ocupa el horario?',
+    'agenda-4': 'Personas: directo o invitación',
+    'agenda-5': '¿Se enteró? Lo ves en el evento',
+    'agenda-6': 'Agendá desde donde estás trabajando',
+    'agenda-7': 'Al agendar, ves la carga del día',
+    'campanita': 'La campanita, más clara',
+    'catalogo-1': 'Catálogo de Productos',
+    'catalogo-stock': 'Bajar el stock a Excel',
+    'catalogo-2': 'La ficha técnica',
+    'catalogo-3': 'Mandarla al cliente',
+    'cierre-semana': 'Cierre de semana, viernes 12:00',
+    'comex-tablero': 'Comercio Exterior ya tiene su tablero',
+    'comex-checklist': 'Comex: cada importación con su checklist',
+    'comisiones-1': 'Comisiones: cuánto ganó cada uno',
+    'comisiones-2': 'Cómo se calcula',
+    'contabilidad-1': 'Contabilidad: su propio tablero',
+    'cuenta-corriente-1': 'Cuenta Corriente: tus gastos, en orden',
+    'cuenta-corriente-2': 'De dónde salen los gastos',
+    'cuenta-corriente-3': 'Gastos pendientes, agrupados por origen',
+    'cuenta-corriente-4': 'Editar o eliminar un gasto',
+    'cuenta-corriente-5': 'Liquidar: pagar y registrar',
+    'cuenta-corriente-6': 'Historial y saldo inicial',
+    'empresas-1': 'Empresas: la base de clientes',
+    'empresas-2': 'Nueva empresa o importar de Excel',
+    'empresas-3': 'La ficha y sus contactos',
+    'empresas-4': 'Negocios y tickets desde la ficha',
+    'empresas-5': 'Empresas en todo el Portal',
+    'etiquetas': 'Etiquetas de envío, con todos los datos',
+    'eventos-1': 'Eventos y Congresos: todo en un tablero',
+    'eventos-2': 'El tablero: columnas y tarjetas',
+    'eventos-3': 'Buscar, filtrar y marcar urgente',
+    'eventos-4': 'La tarjeta por dentro',
+    'eventos-5': 'Checklists: las subtareas',
+    'eventos-6': 'Mensajes y notas',
+    'eventos-7': 'Adjuntos, gastos y menú de la tarjeta',
+    'gastos-ventas': 'Gastos en Ventas, como en Servicio',
+    'general-1': 'Cada módulo tiene su tutorial',
+    'general-2': 'Cómo se mira',
+    'negocios-1': 'Negocios: el embudo comercial',
+    'negocios-2': 'Las etapas del negocio',
+    'negocios-3': 'El negocio por dentro',
+    'negocios-4': 'Presupuesto y sus versiones',
+    'negocios-5': 'Seguimiento: notas, mensajes y gastos',
+    'negocios-6': 'Cierre y preparación',
+    'nov-adjuntos': 'Fotos, PDF y Excel en los mensajes',
+    'nov-comprobantes': 'El comprobante, en cada gasto',
+    'nov-orden-items': '¿Faltó algo en la Orden?',
+    'parte-del-dia-1': 'Parte del día: qué hizo cada uno',
+    'parte-del-dia-2': 'Arriba, lo que importa',
+    'parte-del-dia-3': 'Por persona, su día completo',
+    'parte-del-dia-4': 'Preguntar, sin llamar',
+    'regulatoria': 'Regulatoria: trámites ANMAT',
+    'servicio-1': 'Servicio Técnico: cada equipo, un ticket',
+    'servicio-2': 'Las etapas: el recorrido del equipo',
+    'servicio-3': 'Qué pide cada paso',
+    'servicio-4': 'El ticket por dentro',
+    'servicio-5': 'Asignación y trabajo técnico',
+    'servicio-6': 'Notas, adjuntos, gastos y mensajes',
+    'servicio-7': 'Orden de Preparación de equipos',
+    'servicio-8': 'Prioridades y carga del equipo',
+    'tildes': 'Tildes de lectura como en WhatsApp',
+    'tu-orden': 'Tu orden de hoy',
+    'ventas-preparacion': 'Ventas ⇄ Preparación, a un toque'
   };
   var CARPETA = 'tutoriales/';
   // La URL se lee al cargar: algunos módulos la limpian después (history.replaceState).
@@ -86,7 +157,7 @@
     el.innerHTML =
       '<div class="tt-top"><div class="tt-tit">📚 Tutorial · ' + set.titulo + '</div><button class="tt-x" type="button">✕ Cerrar</button></div>' +
       '<div class="tt-pista"><div class="tt-tira">' +
-      set.slides.map(function (s, k) { return '<img alt="Tutorial ' + (k + 1) + ' de ' + n + '" draggable="false" ' + (k === i0 || k === i0 + 1 ? 'src' : 'data-src') + '="' + CARPETA + s + '.jpg">'; }).join('') +
+      set.slides.map(function (s, k) { return '<img alt="' + (TITULOS[s] || ('Tutorial ' + (k + 1) + ' de ' + n)) + '" draggable="false" ' + (k === i0 || k === i0 + 1 ? 'src' : 'data-src') + '="' + CARPETA + s + '.jpg">'; }).join('') +
       '</div></div>' +
       '<button class="tt-fl tt-ant" type="button" aria-label="Anterior">‹</button><button class="tt-fl tt-sig" type="button" aria-label="Siguiente">›</button>' +
       '<div class="tt-dots">' + set.slides.map(function (s, k) { return '<span data-i="' + k + '"></span>'; }).join('') + '</div>' +
@@ -213,6 +284,6 @@
     })();
   }
 
-  window.TLCTutorial = { abrir: abrir, cerrar: cerrar, SETS: SETS };
+  window.TLCTutorial = { abrir: abrir, cerrar: cerrar, SETS: SETS, TITULOS: TITULOS };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();
