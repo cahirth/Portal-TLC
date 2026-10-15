@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | cotizaciones.html | v2026.10.15.4 (📎 ADJUNTOS EN MENSAJES — Cristian: "en los mensajes internos, adjuntar imagen y enviar el mensaje" → "imágenes, pdfs, xls". Botón 📎 al lado del 🎤 en los mensajes internos: foto (cámara o galería), PDF o Excel; en la PC también se puede pegar una captura con Ctrl+V. Se puede mandar con o sin texto. En el chat la foto se ve en miniatura (se abre en grande) y el PDF/Excel como tarjeta para abrir. Ver chat-adjuntos.js; funciones servicio v19 y eventosChecklist v7.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.15.3 (📣 Novedades: la campanita muestra la imagen de los avisos de novedad y al tocarlos abre el tutorial justo en esa imagen.) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.15.2 (➕ ÍTEMS NUEVOS A LA ORDEN DE PREPARACIÓN — Cristian: "en orden de preparación, tener la posibilidad de agregar algún equipo más, modificando el presupuesto desde ventas — hoy faltaba la mesa de la PS-4 de Fiume y no se puede agregar". Si el negocio ya tiene Orden de Preparación, en vez de "Enviar Orden de Preparación" (que creaba otra) aparece "➕ Pasar ítems nuevos del presupuesto a la Orden": compara la última versión del presupuesto con la orden, muestra qué falta y lo agrega como Pendiente. Lo que sobra no se borra solo. Función servicio v17 (st_sincronizarOrdenPreparacion).) -->
 <!-- Portal TLC | cotizaciones.html | v2026.10.15.1 (🧾 COMPROBANTES — Cristian: "agregar a los gastos, en los módulos que lo soportan, un botón para enviar las fotos de los tickets" (comprobante de compra). En cada gasto del negocio, botón "📷 Comprobante" y "🧾 Ver comprobante".) -->
@@ -1280,6 +1281,7 @@ function _construirHtmlListaMensajesCot() {
             '</div>' +
             citaHtml +
             '<div class="msg-texto" style="color:#f1f5f9;white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTextoCot(_escCot(m.texto || '')) + '</div>' +
+            (window.TLCChatAdj ? TLCChatAdj.html(m.adjunto) : '') +
             '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
                 _resumenReaccionesCot(m.reacciones) +
                 '<div style="display:flex;align-items:center;gap:4px;">' +
@@ -1657,7 +1659,8 @@ window._enviarMensajeCot = function() {
     // directo desde cotActual (la cotización abierta en este momento).
     var idParaEnviar = _idCotActual || (typeof cotActual !== 'undefined' && cotActual
         ? String(cotActual.idCot || cotActual.id_cotizacion || cotActual.id || '') : '');
-    if (!texto || !idParaEnviar) return;
+    if (window.TLCChatAdj && TLCChatAdj.subiendo('mensaje-nuevo-txt-cot')) { alert('Esperá a que termine de subir el archivo 📎'); return; }
+    if ((!texto && !(window.TLCChatAdj && TLCChatAdj.pendiente('mensaje-nuevo-txt-cot'))) || !idParaEnviar) return;
     _idCotActual = idParaEnviar;
 
     var cuenta = _leerSesionCompartida();
@@ -5256,6 +5259,7 @@ window._confirmarOrdenPreparacion = async function() {
   </div>
 </div>
 <script>window.DICTADO_CAMPOS = [{ textarea: 'mensaje-nuevo-txt-cot', enviar: 'btn-enviar-mensaje-cot' }];</script>
+<script src="chat-adjuntos.js"></script>
 <script src="dictado.js"></script>
 <script src="menciones.js"></script>
 <script src="agenda-vinculo.js"></script>

@@ -1,5 +1,7 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v19 — 2026.10.15 — 📎 Adjuntos en mensajes (foto, PDF, Excel): subirArchivoMensaje +
+//   st_agregarMensaje / cot_agregarMensaje guardan m.adjunto; aviso con la foto.
 // v18 — 2026.10.15 — 📣 anunciarNovedad: aviso con imagen a todo el equipo
 //   (campanita + push con imagen + mail). Solo Administrador.
 // v17 — 2026.10.15 — 🔄 st_sincronizarOrdenPreparacion: los ítems nuevos del
@@ -184,8 +186,8 @@ async function obtenerTokensPush(email) {
   try { const legado = await fbGet('usuarios/' + key + '/fcm_token'); if (legado && !tokens.includes(legado)) tokens.push(legado); } catch (e) {}
   return tokens;
 }
-async function enviarPush(token, titulo, cuerpo, link) {
-  try { await messaging.send({ token, data: { title: titulo, body: cuerpo, link: link || '' } }); } catch (e) { console.warn('Push falló para un token:', e.message); }
+async function enviarPush(token, titulo, cuerpo, link, imagen) {
+  try { await messaging.send({ token, data: Object.assign({ title: titulo, body: cuerpo, link: link || '' }, imagen ? { image: imagen } : {}) }); } catch (e) { console.warn('Push falló para un token:', e.message); }
 }
 async function enviarEmailBrevo(destinatarioEmail, destinatarioNombre, asunto, htmlBody) {
   const apiKey = process.env.BREVO_API_KEY;
@@ -622,6 +624,21 @@ async function subirComprobanteGasto(data) {
   await bucketAdjuntos.file(ruta).save(buffer, { contentType: tipoMime, resumable: false });
   return { ok: true, path: ruta, url: 'https://firebasestorage.googleapis.com/v0/b/portal-tlc.firebasestorage.app/o/' + encodeURIComponent(ruta) + '?alt=media' };
 }
+const MENSAJE_TIPOS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf',
+  'application/vnd.ms-excel': 'xls', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx' };
+async function subirArchivoMensaje(data) {
+  const modulo = ['servicio', 'ventas', 'eventos'].includes(String(data.modulo || '')) ? String(data.modulo) : 'otros';
+  const tipoMime = String(data.tipoMime || '').trim().toLowerCase();
+  const base64 = String(data.base64 || '');
+  if (!MENSAJE_TIPOS[tipoMime]) return { ok: false, error: 'Solo fotos, PDF o Excel (xls / xlsx).' };
+  if (!base64) return { ok: false, error: 'Falta el archivo' };
+  const buffer = Buffer.from(base64, 'base64');
+  if (buffer.length > ADJUNTOS_MAX_BYTES) return { ok: false, error: 'El archivo pesa más de 10MB.' };
+  const base = String(data.archivo || 'archivo').replace(/\.[a-z0-9]+$/i, '').replace(/[^A-Za-z0-9_\-]+/g, '_').slice(0, 60) || 'archivo';
+  const ruta = 'mensajes/' + modulo + '/' + new Date().toISOString().slice(0, 7) + '/' + Date.now() + '_' + Math.random().toString(36).substring(2, 6) + '_' + base + '.' + MENSAJE_TIPOS[tipoMime];
+  await bucketAdjuntos.file(ruta).save(buffer, { contentType: tipoMime, resumable: false });
+  return { ok: true, path: ruta, tamano: buffer.length, url: 'https://firebasestorage.googleapis.com/v0/b/portal-tlc.firebasestorage.app/o/' + encodeURIComponent(ruta) + '?alt=media' };
+}
 async function borrarComprobanteGasto(data) {
   const ruta = String(data.path || '').trim();
   if (ruta.indexOf('comprobantes/') !== 0 || ruta.indexOf('..') !== -1) return { ok: false, error: 'Ruta inválida' };
@@ -726,11 +743,13 @@ async function cot_listarMensajes(data) {
 async function cot_agregarMensaje(data) {
   const id = String(data.id_cotizacion || '').trim();
   const texto = String(data.texto || '').trim();
+  const adjunto = _adjuntoMensaje(data.adjunto);
+  const textoAviso = _textoAvisoMensaje(texto, adjunto);
   const titulo = String(data.titulo || '').trim();
   const autorNombre = String(data.autor_nombre || '').trim();
   const autorEmail = String(data.autor_email || '').trim();
   const menciones = Array.isArray(data.menciones) ? data.menciones.filter(Boolean) : [];
-  if (!id || !texto) return { ok: false, error: 'Faltan id_cotizacion o texto' };
+  if (!id || (!texto && !adjunto)) return { ok: false, error: 'Faltan id_cotizacion o texto' };
   if (!(await fbGet('cotizaciones/' + rtdbKeySeguro(id)))) return { ok: false, error: 'Negocio no encontrado: ' + id };
   const respuestaA = (data.respuesta_a && typeof data.respuesta_a.indice === 'number')
     ? { indice: data.respuesta_a.indice, autor_nombre: String(data.respuesta_a.autor_nombre || '').trim(), texto_snippet: String(data.respuesta_a.texto_snippet || '').trim() }
@@ -740,6 +759,7 @@ async function cot_agregarMensaje(data) {
     const mensajes = comoArray(actual);
     const nuevo = { texto, autor_nombre: autorNombre, autor_email: autorEmail, menciones, fecha: new Date().toISOString() };
     if (respuestaA) nuevo.respuesta_a = respuestaA;
+    if (adjunto) nuevo.adjunto = adjunto;
     if (_tieneMencionadosAjenos(menciones, autorEmail)) nuevo.con_lectura = true;
     mensajes.push(nuevo);
     indiceMensajeNuevo = mensajes.length - 1;
@@ -753,12 +773,12 @@ async function cot_agregarMensaje(data) {
       '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;">' +
         '<h2 style="color:#1a4b8c;margin-bottom:8px;">Portal TLC</h2>' +
         '<p><strong>' + escHtml(autorNombre || autorEmail) + '</strong> te mencionó en la cotización <strong>' + escHtml(id) + '</strong>' + (titulo ? ' (' + escHtml(titulo) + ')' : '') + ':</p>' +
-        '<div style="background:#f1f5f9;border-left:4px solid #3a86ff;padding:12px 16px;border-radius:8px;margin:16px 0;font-style:italic;color:#0f172a;">' + escHtml(texto) + '</div>' +
+        '<div style="background:#f1f5f9;border-left:4px solid #3a86ff;padding:12px 16px;border-radius:8px;margin:16px 0;font-style:italic;color:#0f172a;">' + escHtml(textoAviso) + '</div>' + _htmlAdjuntoMail(adjunto) +
         '<a href="' + linkCot + '" style="display:inline-block;padding:10px 20px;background:#3a86ff;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">Abrir cotización</a>' +
       '</div>');
     const tokens = await obtenerTokensPush(email);
-    await Promise.all(tokens.map((tok) => enviarPush(tok, 'Te mencionaron en una cotización', (autorNombre || autorEmail) + ': ' + texto, linkCot)));
-    await registrarNotificacion(email, 'mencion', texto, id, titulo, autorNombre || autorEmail, 'cotizacion', indiceMensajeNuevo);
+    await Promise.all(tokens.map((tok) => enviarPush(tok, 'Te mencionaron en una cotización', (autorNombre || autorEmail) + ': ' + textoAviso, linkCot, (adjunto && /^image\//.test(adjunto.tipo)) ? adjunto.url : '')));
+    await registrarNotificacion(email, 'mencion', textoAviso, id, titulo, autorNombre || autorEmail, 'cotizacion', indiceMensajeNuevo);
   }));
   return { ok: true, mensajes };
 }
@@ -1248,13 +1268,34 @@ async function st_eliminarFoto(data) {
   return { ok: true, fotos: comoArray(ticket[campo]) };
 }
 
+// ── 📎 Adjuntos en mensajes internos — v19 (servicio) / v7 (eventos) ──
+// Cristian: "en los mensajes internos, adjuntar imagen" → "imágenes, pdfs, xls".
+// El archivo ya subió a Storage (subirArchivoMensaje, función servicio); acá
+// solo se valida el link y se guarda adentro del mensaje.
+function _adjuntoMensaje(a) {
+  if (!a || typeof a !== 'object') return null;
+  const url = String(a.url || '');
+  if (url.indexOf('https://firebasestorage.googleapis.com/v0/b/portal-tlc.firebasestorage.app/o/mensajes%2F') !== 0) return null;
+  return { url, path: String(a.path || ''), tipo: String(a.tipo || ''), nombre: String(a.nombre || 'archivo').slice(0, 120), tamano: parseInt(a.tamano, 10) || 0 };
+}
+function _textoAvisoMensaje(texto, adjunto) {
+  if (texto) return texto + (adjunto ? ' 📎' : '');
+  return adjunto ? (/^image\//.test(adjunto.tipo) ? '📷 Foto' : '📎 ' + adjunto.nombre) : '';
+}
+function _htmlAdjuntoMail(adjunto) {
+  if (!adjunto) return '';
+  if (/^image\//.test(adjunto.tipo)) return '<img src="' + adjunto.url + '" alt="" style="max-width:100%;border-radius:10px;display:block;margin:0 0 14px;">';
+  return '<p style="margin:0 0 14px;"><a href="' + adjunto.url + '">📎 ' + escHtml(adjunto.nombre) + '</a></p>';
+}
 async function st_agregarMensaje(data) {
   const id = String(data.id_ticket || '').trim();
   const texto = String(data.texto || '').trim();
+  const adjunto = _adjuntoMensaje(data.adjunto);
+  const textoAviso = _textoAvisoMensaje(texto, adjunto);
   const autorNombre = String(data.autor_nombre || '').trim();
   const autorEmail = String(data.autor_email || '').trim();
   const menciones = Array.isArray(data.menciones) ? data.menciones.filter(Boolean) : [];
-  if (!id || !texto) return { ok: false, error: 'Faltan id_ticket o texto' };
+  if (!id || (!texto && !adjunto)) return { ok: false, error: 'Faltan id_ticket o texto' };
   const ticketOriginal = await fbGet('servicio_tecnico/' + id);
   if (!ticketOriginal) return { ok: false, error: 'Ticket no encontrado: ' + id };
   const respuestaA = (data.respuesta_a && typeof data.respuesta_a.indice === 'number')
@@ -1265,6 +1306,7 @@ async function st_agregarMensaje(data) {
     const mensajes = comoArray(t.mensajes);
     const nuevoMensaje = { texto, autor_nombre: autorNombre, autor_email: autorEmail, menciones, fecha: new Date().toISOString() };
     if (respuestaA) nuevoMensaje.respuesta_a = respuestaA;
+    if (adjunto) nuevoMensaje.adjunto = adjunto;
     if (_tieneMencionadosAjenos(menciones, autorEmail)) nuevoMensaje.con_lectura = true;
     mensajes.push(nuevoMensaje);
     indiceMensajeNuevo = mensajes.length - 1;
@@ -1278,12 +1320,12 @@ async function st_agregarMensaje(data) {
       '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;">' +
         '<h2 style="color:#1a4b8c;margin-bottom:8px;">Portal TLC</h2>' +
         '<p><strong>' + escHtml(autorNombre || autorEmail) + '</strong> te mencionó en el ticket <strong>' + escHtml(id) + '</strong> (' + escHtml(ticketOriginal.cliente || '') + ' — ' + escHtml(ticketOriginal.equipo_modelo || '') + '):</p>' +
-        '<div style="background:#f1f5f9;border-left:4px solid #3a86ff;padding:12px 16px;border-radius:8px;margin:16px 0;font-style:italic;color:#0f172a;">' + escHtml(texto) + '</div>' +
+        '<div style="background:#f1f5f9;border-left:4px solid #3a86ff;padding:12px 16px;border-radius:8px;margin:16px 0;font-style:italic;color:#0f172a;">' + escHtml(textoAviso) + '</div>' + _htmlAdjuntoMail(adjunto) +
         '<a href="' + linkTicket + '" style="display:inline-block;padding:10px 20px;background:#3a86ff;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">Abrir ticket</a>' +
       '</div>');
     const tokens = await obtenerTokensPush(email);
-    await Promise.all(tokens.map((tok) => enviarPush(tok, 'Te mencionaron en un ticket', (autorNombre || autorEmail) + ': ' + texto, linkTicket)));
-    await registrarNotificacion(email, 'mencion', texto, id, (ticketOriginal.cliente || '') + (ticketOriginal.equipo_modelo ? ' — ' + ticketOriginal.equipo_modelo : ''), autorNombre || autorEmail, 'servicio', indiceMensajeNuevo);
+    await Promise.all(tokens.map((tok) => enviarPush(tok, 'Te mencionaron en un ticket', (autorNombre || autorEmail) + ': ' + textoAviso, linkTicket, (adjunto && /^image\//.test(adjunto.tipo)) ? adjunto.url : '')));
+    await registrarNotificacion(email, 'mencion', textoAviso, id, (ticketOriginal.cliente || '') + (ticketOriginal.equipo_modelo ? ' — ' + ticketOriginal.equipo_modelo : ''), autorNombre || autorEmail, 'servicio', indiceMensajeNuevo);
   }));
   return { ok: true, mensajes: comoArray(ticket.mensajes) };
 }
@@ -2025,7 +2067,7 @@ const ACCIONES = {
   st_separarEquipoOrden, st_actualizarEquipoOrden, st_dividirOrdenPreparacion, st_quitarGarantiasOrden, st_recalcularProgresosOrdenes,
   st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden, registrarInstalacionPOE8,
   subirAdjunto, eliminarAdjunto, subirComprobanteGasto, borrarComprobanteGasto,
-  st_sincronizarOrdenPreparacion, anunciarNovedad,
+  st_sincronizarOrdenPreparacion, anunciarNovedad, subirArchivoMensaje,
   st_backupServicio, st_migrarFotosServicio,
   cot_listarMensajes, cot_agregarMensaje, cot_reaccionarMensaje, cot_actualizarGastos,
   st_marcarMensajesLeidos, cot_marcarMensajesLeidos,

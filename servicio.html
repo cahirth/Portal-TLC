@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.15.4 (📎 ADJUNTOS EN MENSAJES — Cristian: "en los mensajes internos, adjuntar imagen y enviar el mensaje" → "imágenes, pdfs, xls". Botón 📎 al lado del 🎤 en los mensajes internos: foto (cámara o galería), PDF o Excel; en la PC también se puede pegar una captura con Ctrl+V. Se puede mandar con o sin texto. En el chat la foto se ve en miniatura (se abre en grande) y el PDF/Excel como tarjeta para abrir. Ver chat-adjuntos.js; funciones servicio v19 y eventosChecklist v7.) -->
 <!-- Portal TLC | servicio.html | v2026.10.15.3 (📣 Novedades: la campanita muestra la imagen de los avisos de novedad y al tocarlos abre el tutorial justo en esa imagen.) -->
 <!-- Portal TLC | servicio.html | v2026.10.15.2 (➕ ÍTEMS NUEVOS A LA ORDEN DE PREPARACIÓN — Cristian: "en orden de preparación, tener la posibilidad de agregar algún equipo más, modificando el presupuesto desde ventas — hoy faltaba la mesa de la PS-4 de Fiume y no se puede agregar". En la Orden de Preparación (si viene de un negocio): botón "➕ Traer ítems nuevos del presupuesto" — agrega como Pendiente lo que se sumó al presupuesto en Ventas después de crear la orden. Función servicio v17.) -->
 <!-- Portal TLC | servicio.html | v2026.10.15.1 (🧾 COMPROBANTES — Cristian: "agregar a los gastos, en los módulos que lo soportan, un botón para enviar las fotos de los tickets" (comprobante de compra). En cada gasto del ticket, botón "📷 Comprobante" para sacar la foto del ticket de compra (o subir imagen/PDF) y "🧾 Ver comprobante" para abrirlo. Queda guardado en el gasto (g.comprobante) y se ve también en Cuenta Corriente.) -->
@@ -3690,6 +3691,7 @@ function _construirHtmlListaMensajes(t) {
       '</div>' +
       citaHtml +
       '<div class="msg-texto" id="msg-texto-' + t.id_ticket + '-' + i + '" style="color:var(--text-main);white-space:pre-wrap;word-break:break-word;">' + _resaltarMencionesTexto(_esc(m.texto || '')) + '</div>' +
+      (window.TLCChatAdj ? TLCChatAdj.html(m.adjunto) : '') +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
         _resumenReacciones(m.reacciones) +
         '<div style="display:flex;align-items:center;gap:4px;">' +
@@ -4106,7 +4108,8 @@ window._enviarMensajeTicket = function(idTicket) {
   if (Date.now() - _ultimaMencionElegidaEn < 400) return; // click fantasma justo después de elegir una mención (ver nota en _elegirMencion)
   var ta = document.getElementById('mensaje-nuevo-txt');
   var texto = (ta.value || '').trim();
-  if (!texto) return;
+  if (window.TLCChatAdj && TLCChatAdj.subiendo('mensaje-nuevo-txt')) { alert('Esperá a que termine de subir el archivo 📎'); return; }
+  if (!texto && !(window.TLCChatAdj && TLCChatAdj.pendiente('mensaje-nuevo-txt'))) return;
 
   var autorNombre = (_session && _session.name) || '';
   var autorEmail  = (_session && _session.username) || '';
@@ -6382,6 +6385,7 @@ function _iaToggleMic() {
 
 
 <script>window.DICTADO_CAMPOS = [{ textarea: 'mensaje-nuevo-txt', enviar: 'btn-enviar-mensaje-st' }];</script>
+<script src="chat-adjuntos.js"></script>
 <script src="dictado.js"></script>
 <script src="menciones.js"></script>
 <script src="agenda-vinculo.js"></script>

@@ -1,4 +1,6 @@
 // Portal TLC | Cloud Function — Eventos: Checklist + Notas + Listado
+// v7 — 2026.10.15 — 📎 Adjuntos en mensajes: ev_agregarMensaje guarda m.adjunto (foto, PDF,
+//   Excel ya subido por la función servicio) y el aviso de @mención lleva la foto.
 // v5 — 2026.10.08 — Comercio Exterior: toda tarjeta nueva de un tablero
 //   Comex arranca con el checklist "Proceso de importación" precargado
 //   (Cristian: "en comex cuando cargo una tarjeta nueva, precargar este
@@ -157,12 +159,12 @@ async function obtenerTokensPush(email) {
   return tokens;
 }
 
-async function enviarPush(token, titulo, cuerpo, link) {
+async function enviarPush(token, titulo, cuerpo, link, imagen) {
   // admin.messaging().send() hace todo lo que en Apps Script requería
   // armar el JWT/OAuth2 a mano y pegarle a la API REST de FCM — acá
   // es una sola llamada, el SDK se encarga del resto.
   try {
-    await messaging.send({ token, data: { title: titulo, body: cuerpo, link: link || '' } });
+    await messaging.send({ token, data: Object.assign({ title: titulo, body: cuerpo, link: link || '' }, imagen ? { image: imagen } : {}) });
   } catch (e) {
     console.warn('Push falló para un token:', e.message);
   }
@@ -918,14 +920,35 @@ async function ev_marcarPortada(data) {
   return { ok: true };
 }
 
+// ── 📎 Adjuntos en mensajes internos — v19 (servicio) / v7 (eventos) ──
+// Cristian: "en los mensajes internos, adjuntar imagen" → "imágenes, pdfs, xls".
+// El archivo ya subió a Storage (subirArchivoMensaje, función servicio); acá
+// solo se valida el link y se guarda adentro del mensaje.
+function _adjuntoMensaje(a) {
+  if (!a || typeof a !== 'object') return null;
+  const url = String(a.url || '');
+  if (url.indexOf('https://firebasestorage.googleapis.com/v0/b/portal-tlc.firebasestorage.app/o/mensajes%2F') !== 0) return null;
+  return { url, path: String(a.path || ''), tipo: String(a.tipo || ''), nombre: String(a.nombre || 'archivo').slice(0, 120), tamano: parseInt(a.tamano, 10) || 0 };
+}
+function _textoAvisoMensaje(texto, adjunto) {
+  if (texto) return texto + (adjunto ? ' 📎' : '');
+  return adjunto ? (/^image\//.test(adjunto.tipo) ? '📷 Foto' : '📎 ' + adjunto.nombre) : '';
+}
+function _htmlAdjuntoMail(adjunto) {
+  if (!adjunto) return '';
+  if (/^image\//.test(adjunto.tipo)) return '<img src="' + adjunto.url + '" alt="" style="max-width:100%;border-radius:10px;display:block;margin:0 0 14px;">';
+  return '<p style="margin:0 0 14px;"><a href="' + adjunto.url + '">📎 ' + escHtml(adjunto.nombre) + '</a></p>';
+}
 async function ev_agregarMensaje(data) {
   const idEvento = String(data.id_evento || '').trim();
   const idTarjeta = String(data.id_tarjeta || '').trim();
   const texto = String(data.texto || '').trim();
+  const adjunto = _adjuntoMensaje(data.adjunto);
+  const textoAviso = _textoAvisoMensaje(texto, adjunto);
   const autorNombre = String(data.autor_nombre || '').trim();
   const autorEmail = String(data.autor_email || '').trim();
   const menciones = Array.isArray(data.menciones) ? data.menciones.filter(Boolean) : [];
-  if (!idEvento || !idTarjeta || !texto) return { ok: false, error: 'Faltan datos' };
+  if (!idEvento || !idTarjeta || (!texto && !adjunto)) return { ok: false, error: 'Faltan datos' };
   const ruta = 'eventos/' + idEvento + '/tarjetas/' + idTarjeta;
   const tarjetaOriginal = await fbGet(ruta);
   if (!tarjetaOriginal) return { ok: false, error: 'Tarjeta no encontrada' };
@@ -937,6 +960,7 @@ async function ev_agregarMensaje(data) {
     const mensajes = comoArray(t.mensajes);
     const nuevoMensaje = { texto, autor_nombre: autorNombre, autor_email: autorEmail, menciones, fecha: new Date().toISOString() };
     if (respuestaA) nuevoMensaje.respuesta_a = respuestaA;
+    if (adjunto) nuevoMensaje.adjunto = adjunto;
     if (menciones.some((e) => String(e).trim().toLowerCase() !== autorEmail.toLowerCase())) nuevoMensaje.con_lectura = true;
     mensajes.push(nuevoMensaje);
     indiceMensajeNuevo = mensajes.length - 1;
@@ -947,14 +971,14 @@ async function ev_agregarMensaje(data) {
   const evento = await fbGet('eventos/' + idEvento);
   const linkEvento = 'https://cahirth.github.io/Portal-TLC/eventos.html?id=' + encodeURIComponent(idEvento) + '&tarjeta=' + encodeURIComponent(idTarjeta);
   await Promise.all(menciones.filter((email) => email && email !== autorEmail).map(async (email) => {
-    await registrarNotificacion(email, 'mencion', texto, idEvento, (evento && evento.nombre) || '', autorNombre || autorEmail, 'evento', idTarjeta, indiceMensajeNuevo);
+    await registrarNotificacion(email, 'mencion', textoAviso, idEvento, (evento && evento.nombre) || '', autorNombre || autorEmail, 'evento', idTarjeta, indiceMensajeNuevo);
     const tokens = await obtenerTokensPush(email);
-    await Promise.all(tokens.map((tok) => enviarPush(tok, 'Te mencionaron en una tarjeta', (autorNombre || autorEmail) + ': ' + texto, linkEvento)));
+    await Promise.all(tokens.map((tok) => enviarPush(tok, 'Te mencionaron en una tarjeta', (autorNombre || autorEmail) + ': ' + textoAviso, linkEvento, (adjunto && /^image\//.test(adjunto.tipo)) ? adjunto.url : '')));
     await enviarEmailBrevo(email, '', 'Te mencionaron en "' + (tarjetaOriginal.titulo || '') + '"',
       '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;">' +
         '<h2 style="color:#1a4b8c;margin-bottom:8px;">Portal TLC</h2>' +
         '<p><strong>' + escHtml(autorNombre || autorEmail) + '</strong> te mencionó en <strong>' + escHtml(tarjetaOriginal.titulo || '') + '</strong>' + (evento ? ' (' + escHtml(evento.nombre) + ')' : '') + ':</p>' +
-        '<div style="background:#f1f5f9;border-left:4px solid #3a86ff;padding:12px 16px;border-radius:8px;margin:16px 0;font-style:italic;color:#0f172a;">' + escHtml(texto) + '</div>' +
+        '<div style="background:#f1f5f9;border-left:4px solid #3a86ff;padding:12px 16px;border-radius:8px;margin:16px 0;font-style:italic;color:#0f172a;">' + escHtml(textoAviso) + '</div>' + _htmlAdjuntoMail(adjunto) +
         '<a href="' + linkEvento + '" style="display:inline-block;padding:10px 20px;background:#3a86ff;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">Abrir tarjeta</a>' +
       '</div>');
   }));

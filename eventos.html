@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.15.4 (📎 ADJUNTOS EN MENSAJES — Cristian: "en los mensajes internos, adjuntar imagen y enviar el mensaje" → "imágenes, pdfs, xls". Botón 📎 al lado del 🎤 en los mensajes internos: foto (cámara o galería), PDF o Excel; en la PC también se puede pegar una captura con Ctrl+V. Se puede mandar con o sin texto. En el chat la foto se ve en miniatura (se abre en grande) y el PDF/Excel como tarjeta para abrir. Ver chat-adjuntos.js; funciones servicio v19 y eventosChecklist v7.) -->
 <!-- Portal TLC | eventos.html | v2026.10.15.3 (📣 Novedades: la campanita muestra la imagen de los avisos de novedad y al tocarlos abre el tutorial justo en esa imagen.) -->
 <!-- Portal TLC | eventos.html | v2026.10.15.1 (🧾 COMPROBANTES — Cristian: "agregar a los gastos, en los módulos que lo soportan, un botón para enviar las fotos de los tickets" (comprobante de compra). En cada gasto de las tarjetas (Eventos, Comex, Regulatoria, Contabilidad), botón "📷 Comprobante" y "🧾 Ver comprobante".) -->
 <!-- Portal TLC | eventos.html | v2026.10.13.1 (📒 CONTABILIDAD — Cristian: "necesito dentro de Administración un módulo llamado CONTABILIDAD, con un tablero Kanban igual al de COMEX". Con ?modulo=contabilidad muestra solo los tableros de Contabilidad (permiso "Contabilidad" de la planilla), igual que Comex: crear tablero, columnas, tarjetas, checklists, adjuntos, gastos, agenda. El menú ⋯ del Administrador suma "📒 Pasar a Contabilidad". Backend eventosChecklist v6.) -->
@@ -3020,6 +3021,7 @@ function _construirHtmlListaMensajesEv(t) {
       '</div>' +
       citaHtml +
       '<div class="msg-texto">' + (window.TLCMenciones && _internosCacheEv ? TLCMenciones.resaltar(_esc(m.texto || ''), _internosCacheEv) : _esc(m.texto || '')) + '</div>' +
+      (window.TLCChatAdj ? TLCChatAdj.html(m.adjunto) : '') +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
         _resumenReaccionesEv(m.reacciones) +
         '<div style="display:flex;align-items:center;gap:4px;">' +
@@ -3069,7 +3071,8 @@ function _enviarMensajeEv() {
   if (_enviandoMensajeEv) return; // ya hay un envío en curso, ignora clicks de más
   var input = document.getElementById('ev-msg-nuevo');
   var texto = input.value.trim();
-  if (!texto) return;
+  if (window.TLCChatAdj && TLCChatAdj.subiendo('ev-msg-nuevo')) { alert('Esperá a que termine de subir el archivo 📎'); return; }
+  if (!texto && !(window.TLCChatAdj && TLCChatAdj.pendiente('ev-msg-nuevo'))) return;
   // Si la lista de internos todavía no cargó, se espera antes de enviar
   // (si no, las @menciones salían vacías). Un solo reintento.
   if (!_internosCacheEv && texto.indexOf('@') !== -1 && !window._reintentoInternosEnvioEv) {
@@ -3401,6 +3404,7 @@ window._marcarTodasLeidasEv = function(ev) {
 };
 </script>
 <script>window.DICTADO_CAMPOS = [{ textarea: 'ev-msg-nuevo', enviar: 'ev-btn-enviar-mensaje' }];</script>
+<script src="chat-adjuntos.js"></script>
 <script src="dictado.js"></script>
 <script src="menciones.js"></script>
 <script src="agenda-vinculo.js"></script>
