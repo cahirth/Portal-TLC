@@ -1,3 +1,4 @@
+// Portal TLC | tutorial.js | v2026.10.15.4 (📎 Novedad: adjuntos en mensajes internos — imagen nov-adjuntos en Servicio, Ventas, Eventos, Comex, Regulatoria y Contabilidad.)
 // Portal TLC | tutorial.js | v2026.10.15.3 (📣 Novedades: imágenes nuevas (comprobantes, ítems nuevos en la Orden, Contabilidad). Si se suman imágenes a un tutorial ya visto, se abre en la primera nueva. ?tutorial=<imagen> abre directo esa imagen — lo usan los avisos de novedades.)
 // Portal TLC | tutorial.js | v2026.10.13.1 (📒 Contabilidad: usa las imágenes del tablero de Eventos, que funciona igual.)
 // Portal TLC | tutorial.js | v2026.10.10.10 (Cristian: "el de servicio completo" + "Catálogo de Productos, Negocios y Comisiones" — 8 imágenes nuevas de Servicio, 6 de Negocios, 3 del Catálogo y 2 de Comisiones)
@@ -17,15 +18,15 @@
   var SETS = {
     index:        { titulo: 'Cómo ver los tutoriales', slides: ['general-1', 'general-2'] },
     calendario:   { titulo: 'Agenda', slides: ['agenda-1', 'agenda-2', 'agenda-3', 'agenda-4', 'agenda-5', 'agenda-6', 'agenda-7'] },
-    servicio:     { titulo: 'Servicio Técnico', slides: ['servicio-1', 'servicio-2', 'servicio-3', 'servicio-4', 'servicio-5', 'servicio-6', 'servicio-7', 'servicio-8', 'nov-orden-items', 'nov-comprobantes', 'tu-orden', 'tildes', 'campanita', 'ventas-preparacion', 'etiquetas', 'cierre-semana', 'actividad'] },
-    cotizaciones: { titulo: 'Negocios', slides: ['negocios-1', 'negocios-2', 'negocios-3', 'negocios-4', 'negocios-5', 'negocios-6', 'nov-orden-items', 'nov-comprobantes', 'gastos-ventas', 'ventas-preparacion', 'tildes', 'campanita'] },
+    servicio:     { titulo: 'Servicio Técnico', slides: ['servicio-1', 'servicio-2', 'servicio-3', 'servicio-4', 'servicio-5', 'servicio-6', 'servicio-7', 'servicio-8', 'nov-adjuntos', 'nov-orden-items', 'nov-comprobantes', 'tu-orden', 'tildes', 'campanita', 'ventas-preparacion', 'etiquetas', 'cierre-semana', 'actividad'] },
+    cotizaciones: { titulo: 'Negocios', slides: ['negocios-1', 'negocios-2', 'negocios-3', 'negocios-4', 'negocios-5', 'negocios-6', 'nov-adjuntos', 'nov-orden-items', 'nov-comprobantes', 'gastos-ventas', 'ventas-preparacion', 'tildes', 'campanita'] },
     'selector-dispositivos': { titulo: 'Catálogo de Productos', slides: ['catalogo-1', 'catalogo-2', 'catalogo-3'] },
     comisiones:   { titulo: 'Comisiones', slides: ['comisiones-1', 'comisiones-2'] },
-    eventos:      { titulo: 'Eventos y Congresos', slides: ['eventos-1', 'eventos-2', 'eventos-3', 'eventos-4', 'eventos-5', 'eventos-6', 'eventos-7', 'nov-comprobantes', 'tildes', 'campanita'] },
+    eventos:      { titulo: 'Eventos y Congresos', slides: ['eventos-1', 'eventos-2', 'eventos-3', 'eventos-4', 'eventos-5', 'eventos-6', 'eventos-7', 'nov-adjuntos', 'nov-comprobantes', 'tildes', 'campanita'] },
     empresas:     { titulo: 'Empresas', slides: ['empresas-1', 'empresas-2', 'empresas-3', 'empresas-4', 'empresas-5'] },
-    comex:        { titulo: 'Comercio Exterior', slides: ['comex-tablero', 'comex-checklist', 'nov-comprobantes', 'tildes', 'campanita'] },
-    regulatoria:  { titulo: 'Regulatoria', slides: ['regulatoria', 'nov-comprobantes', 'tildes', 'campanita'] },
-    contabilidad: { titulo: 'Contabilidad', slides: ['contabilidad-1', 'eventos-2', 'eventos-3', 'eventos-4', 'eventos-5', 'eventos-6', 'eventos-7', 'nov-comprobantes', 'tildes', 'campanita'] },
+    comex:        { titulo: 'Comercio Exterior', slides: ['comex-tablero', 'comex-checklist', 'nov-adjuntos', 'nov-comprobantes', 'tildes', 'campanita'] },
+    regulatoria:  { titulo: 'Regulatoria', slides: ['regulatoria', 'nov-adjuntos', 'nov-comprobantes', 'tildes', 'campanita'] },
+    contabilidad: { titulo: 'Contabilidad', slides: ['contabilidad-1', 'eventos-2', 'eventos-3', 'eventos-4', 'eventos-5', 'eventos-6', 'eventos-7', 'nov-adjuntos', 'nov-comprobantes', 'tildes', 'campanita'] },
     parte:        { titulo: 'Parte del día', slides: ['parte-del-dia-1', 'parte-del-dia-2', 'parte-del-dia-3', 'parte-del-dia-4'] },
     'cuenta-corriente': { titulo: 'Cuenta Corriente', slides: ['cuenta-corriente-1', 'cuenta-corriente-2', 'cuenta-corriente-3', 'cuenta-corriente-4', 'cuenta-corriente-5', 'cuenta-corriente-6', 'nov-comprobantes'] }
   };

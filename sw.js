@@ -1,4 +1,5 @@
-// Portal TLC | sw.js | v35
+// Portal TLC | sw.js | v36
+// v36: tutorial.js con la novedad 📎 adjuntos en mensajes.
 // v15: Firebase Cloud Messaging — recepción de push en segundo plano.
 //      importScripts de firebase-app + firebase-messaging (compat, es
 //      lo único que funciona dentro de un Service Worker clásico sin
@@ -154,7 +155,7 @@ self.addEventListener('notificationclick', function(event) {
 //      cierre-semanal.js (modal de cierre de semana de los viernes) y
 //      cierres.html (resumen de cierres para Administradores) — agregados
 //      a HTML_LOCAL (red primero). CACHE_NAME bumpeado.
-const CACHE_NAME = 'portal-tlc-v35';
+const CACHE_NAME = 'portal-tlc-v36';
 
 const HTML_LOCAL = [
     './',
