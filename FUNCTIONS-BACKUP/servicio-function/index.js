@@ -1,5 +1,8 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v16 — 2026.10.15 — 🧾 Comprobantes de gastos: subirComprobanteGasto /
+//   borrarComprobanteGasto (Storage, carpeta comprobantes/). Lo usan Servicio,
+//   Ventas, Eventos/Comex/Contabilidad y Cuenta Corriente.
 // v15 — 2026.10.08 — 💸 Gastos en Ventas: cot_actualizarGastos guarda los
 //   gastos de un negocio en cotizaciones/<id>/gastos (mismo formato que los
 //   de Servicio, se liquidan desde Cuenta Corriente como origen "venta").
@@ -592,6 +595,34 @@ async function subirAdjunto(data) {
   };
   await fbPatch(nodoBase + idRegistro + '/adjuntos', { [adjId]: metadata });
   return { ok: true, adjId, adjunto: metadata };
+}
+// ── 🧾 Comprobantes de gastos — v16 — 2026.10.15 ────────────────────
+// Cristian: "agregar a los gastos, en los módulos que lo soportan, un botón
+// para enviar las fotos de los tickets" (comprobante de compra). Solo sube
+// el archivo a Storage y devuelve el link; cada pantalla lo guarda adentro
+// del gasto (g.comprobante) con su acción de siempre.
+const COMPROBANTE_MODULOS = ['servicio', 'ventas', 'eventos', 'general'];
+const COMPROBANTE_TIPOS = { 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'application/pdf': 'pdf' };
+async function subirComprobanteGasto(data) {
+  const modulo = String(data.modulo || '').trim();
+  const idRegistro = String(data.idRegistro || '').trim().replace(/[^A-Za-z0-9_\-:.]/g, '_');
+  const tipoMime = String(data.tipoMime || '').trim().toLowerCase();
+  const base64 = String(data.base64 || '');
+  if (COMPROBANTE_MODULOS.indexOf(modulo) === -1) return { ok: false, error: 'Módulo inválido: ' + modulo };
+  if (!idRegistro) return { ok: false, error: 'Falta idRegistro' };
+  if (!COMPROBANTE_TIPOS[tipoMime]) return { ok: false, error: 'Solo fotos (JPG, PNG) o PDF.' };
+  if (!base64) return { ok: false, error: 'Falta el archivo' };
+  const buffer = Buffer.from(base64, 'base64');
+  if (buffer.length > ADJUNTOS_MAX_BYTES) return { ok: false, error: 'El archivo pesa más de 10MB.' };
+  const ruta = 'comprobantes/' + modulo + '/' + idRegistro + '/' + Date.now() + '_' + Math.random().toString(36).substring(2, 6) + '.' + COMPROBANTE_TIPOS[tipoMime];
+  await bucketAdjuntos.file(ruta).save(buffer, { contentType: tipoMime, resumable: false });
+  return { ok: true, path: ruta, url: 'https://firebasestorage.googleapis.com/v0/b/portal-tlc.firebasestorage.app/o/' + encodeURIComponent(ruta) + '?alt=media' };
+}
+async function borrarComprobanteGasto(data) {
+  const ruta = String(data.path || '').trim();
+  if (ruta.indexOf('comprobantes/') !== 0 || ruta.indexOf('..') !== -1) return { ok: false, error: 'Ruta inválida' };
+  await bucketAdjuntos.file(ruta).delete().catch((e) => console.warn('borrarComprobanteGasto (no crítico):', e.message));
+  return { ok: true };
 }
 async function eliminarAdjunto(data) {
   const modulo = String(data.modulo || '').trim();
@@ -1680,7 +1711,7 @@ const ACCIONES_REGISTRADAS = {
   st_dividirOrdenPreparacion: 'Dividió la entrega', st_guardarChecklist: 'Guardó el checklist',
   registrarChecklistCompletado: 'Completó el checklist', registrarInstalacionPOE8: 'Registró la instalación (POE-8)',
   st_actualizarGastos: 'Cargó gastos', st_guardarEtiquetasCajas: 'Generó etiquetas', st_guardarCierreSemanal: 'Cerró la semana',
-  subirAdjunto: 'Subió un adjunto', cot_actualizarGastos: 'Cargó gastos (Ventas)',
+  subirAdjunto: 'Subió un adjunto', cot_actualizarGastos: 'Cargó gastos (Ventas)', subirComprobanteGasto: 'Subió un comprobante de gasto',
 };
 const CAMPOS_FOTO_ESTADO = ['deposito', 'tecnico_asignado', 'tecnico_responsable_nombre', 'tipo_orden', 'prioridad', 'estado_progreso'];
 function _diaBA(iso) { return new Date(new Date(iso || Date.now()).getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10); }
@@ -1841,7 +1872,7 @@ const ACCIONES = {
   st_agregarMensaje, st_editarMensaje, st_borrarMensaje, st_reaccionarMensaje,
   st_separarEquipoOrden, st_actualizarEquipoOrden, st_dividirOrdenPreparacion, st_quitarGarantiasOrden, st_recalcularProgresosOrdenes,
   st_guardarChecklist, registrarChecklistCompletado, reabrirChecklistOrden, registrarInstalacionPOE8,
-  subirAdjunto, eliminarAdjunto,
+  subirAdjunto, eliminarAdjunto, subirComprobanteGasto, borrarComprobanteGasto,
   st_backupServicio, st_migrarFotosServicio,
   cot_listarMensajes, cot_agregarMensaje, cot_reaccionarMensaje, cot_actualizarGastos,
   st_marcarMensajesLeidos, cot_marcarMensajesLeidos,
