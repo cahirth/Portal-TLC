@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | servicio.html | v2026.10.15.5 (✎ / ✕ MENSAJES — borrar ya no saca el mensaje de la lista: queda "🚫 Mensaje eliminado" (así no se corren las respuestas ni los tildes de los de abajo) y la función borra la foto/archivo adjunto. Un mensaje que es solo foto se puede editar para sumarle texto. Mismo comportamiento ahora en Ventas y Eventos/Comex/Regulatoria/Contabilidad. Función servicio v20.) -->
 <!-- Portal TLC | servicio.html | v2026.10.15.4 (📎 ADJUNTOS EN MENSAJES — Cristian: "en los mensajes internos, adjuntar imagen y enviar el mensaje" → "imágenes, pdfs, xls". Botón 📎 al lado del 🎤 en los mensajes internos: foto (cámara o galería), PDF o Excel; en la PC también se puede pegar una captura con Ctrl+V. Se puede mandar con o sin texto. En el chat la foto se ve en miniatura (se abre en grande) y el PDF/Excel como tarjeta para abrir. Ver chat-adjuntos.js; funciones servicio v19 y eventosChecklist v7.) -->
 <!-- Portal TLC | servicio.html | v2026.10.15.3 (📣 Novedades: la campanita muestra la imagen de los avisos de novedad y al tocarlos abre el tutorial justo en esa imagen.) -->
 <!-- Portal TLC | servicio.html | v2026.10.15.2 (➕ ÍTEMS NUEVOS A LA ORDEN DE PREPARACIÓN — Cristian: "en orden de preparación, tener la posibilidad de agregar algún equipo más, modificando el presupuesto desde ventas — hoy faltaba la mesa de la PS-4 de Fiume y no se puede agregar". En la Orden de Preparación (si viene de un negocio): botón "➕ Traer ítems nuevos del presupuesto" — agrega como Pendiente lo que se sumó al presupuesto en Ventas después de crear la orden. Función servicio v17.) -->
@@ -3654,7 +3655,7 @@ window._mostrarQuienReacciono = function(ev, emoji, nombresStr) {
 // Slack): nadie edita mensajes ajenos.
 var MSG_VENTANA_EDICION_MS = 2 * 60 * 1000;
 function _puedeEditarMensajePropio(m) {
-  if (!m || !m.fecha) return false;
+  if (!m || !m.fecha || m.borrado) return false;
   var email = (_session && _session.username) || '';
   if (!email || m.autor_email !== email) return false;
   return (Date.now() - new Date(m.fecha).getTime()) < MSG_VENTANA_EDICION_MS;
@@ -3665,6 +3666,14 @@ function _construirHtmlListaMensajes(t) {
   if (!mensajes.length) return '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:16px 0;">Todavía no hay mensajes en este ticket.</div>';
   return mensajes.map(function(m, i) {
     var fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    if (m && m.borrado) {
+      // Borrado: queda su lugar (no se corren las respuestas ni los tildes)
+      return '<div class="msg-fila" tabindex="0" style="padding:8px 10px;border-radius:10px;background:var(--panel-dark);border:1px solid var(--border-glow);margin-bottom:8px;opacity:.75;">' +
+        '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
+          '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
+          '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + '</span>' +
+        '</div><div class="msg-texto" style="font-style:italic;color:var(--text-muted);font-size:12px;">🚫 Mensaje eliminado</div></div>';
+    }
     var puedeEditarMsg = _puedeEditarMensajePropio(m);
     var accionesMsgHtml =
       '<div class="msg-acciones-editar">' +
@@ -3827,7 +3836,7 @@ window._guardarMensajeEditado = function(idTicket, idx, btn) {
   if (!m || !_puedeEditarMensajePropio(m)) { _stMostrarError('Ya pasaron los 2 minutos — este mensaje no se puede editar.'); _renderPanelMensajes(t); return; }
   var ta = document.getElementById('msg-edit-input-' + idTicket + '-' + idx);
   var textoNuevo = (ta ? ta.value : '').trim();
-  if (!textoNuevo) { alert('El mensaje no puede quedar vacío — si querés eliminarlo, usá ✕ Borrar.'); return; }
+  if (!textoNuevo && !m.adjunto) { alert('El mensaje no puede quedar vacío — si querés eliminarlo, usá ✕ Borrar.'); return; }
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Guardando...'; }
   var email = (_session && _session.username) || '';
   fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
@@ -3848,7 +3857,7 @@ window._borrarMensaje = function(idTicket, idx, btn) {
   if (!t || t.id_ticket !== idTicket || !Array.isArray(t.mensajes)) return;
   var m = t.mensajes[idx];
   if (!m || !_puedeEditarMensajePropio(m)) { _stMostrarError('Ya pasaron los 2 minutos — este mensaje no se puede borrar.'); _renderPanelMensajes(t); return; }
-  if (!confirm('¿Borrar este mensaje? No se puede deshacer.')) return;
+  if (!confirm('¿Borrar este mensaje' + (m.adjunto ? ' (y su archivo adjunto)' : '') + '? No se puede deshacer.')) return;
   if (btn) { if (btn.disabled) return; btn.disabled = true; }
   var email = (_session && _session.username) || '';
   fetch(SERVICIO_URL, { method:'POST', headers:{'Content-Type':'text/plain'},

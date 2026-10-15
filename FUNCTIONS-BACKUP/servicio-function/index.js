@@ -1,5 +1,11 @@
 // Portal TLC | Cloud Function — módulo Servicio Técnico (+ 3 acciones
 // compartidas de Mi Día)
+// v20 — 2026.10.15 — ✎ / ✕ Editar o borrar un mensaje propio durante 2 minutos,
+//   ahora también en Ventas (cot_editarMensaje / cot_borrarMensaje). Borrar ya no
+//   saca el mensaje de la lista: queda "🚫 Mensaje eliminado" (así no se corren
+//   las respuestas, los tildes ni los avisos que apuntan a los mensajes de abajo)
+//   y la foto / archivo adjunto se borra de Storage. Un mensaje que es solo una
+//   foto se puede editar para sumarle texto.
 // v19 — 2026.10.15 — 📎 Adjuntos en mensajes (foto, PDF, Excel): subirArchivoMensaje +
 //   st_agregarMensaje / cot_agregarMensaje guardan m.adjunto; aviso con la foto.
 // v18 — 2026.10.15 — 📣 anunciarNovedad: aviso con imagen a todo el equipo
@@ -799,6 +805,41 @@ async function cot_actualizarGastos(data) {
   return { ok: true };
 }
 
+// ✎ / ✕ Mensajes de Ventas: editar o borrar uno propio durante 2 minutos (v20)
+async function cot_editarMensaje(data) {
+  const id = String(data.id_cotizacion || '').trim();
+  const indice = parseInt(data.indice, 10);
+  const texto = String(data.texto || '').trim();
+  const autorEmail = String(data.autor_email || '').trim();
+  if (!id || isNaN(indice)) return { ok: false, error: 'Faltan id_cotizacion o indice' };
+  let errorValidacion = null;
+  const res = await db.ref(_rutaMensajesCot(id)).transaction((actual) => {
+    const mensajes = comoArray(actual);
+    errorValidacion = _editarMensajeEn(mensajes, indice, texto, autorEmail);
+    return errorValidacion ? actual : mensajes;
+  });
+  if (errorValidacion) return { ok: false, error: errorValidacion };
+  if (!res.committed) return { ok: false, error: 'No se pudo guardar — probá de nuevo' };
+  return { ok: true, mensajes: comoArray(res.snapshot.val()) };
+}
+async function cot_borrarMensaje(data) {
+  const id = String(data.id_cotizacion || '').trim();
+  const indice = parseInt(data.indice, 10);
+  const autorEmail = String(data.autor_email || '').trim();
+  if (!id || isNaN(indice)) return { ok: false, error: 'Faltan id_cotizacion o indice' };
+  let errorValidacion = null, pathAdjunto = '';
+  const res = await db.ref(_rutaMensajesCot(id)).transaction((actual) => {
+    const mensajes = comoArray(actual);
+    const r = _borrarMensajeEn(mensajes, indice, autorEmail);
+    errorValidacion = r.error || null; pathAdjunto = r.path || '';
+    return errorValidacion ? actual : mensajes;
+  });
+  if (errorValidacion) return { ok: false, error: errorValidacion };
+  if (!res.committed) return { ok: false, error: 'No se pudo borrar — probá de nuevo' };
+  await _borrarArchivoMensaje(pathAdjunto);
+  return { ok: true, mensajes: comoArray(res.snapshot.val()) };
+}
+
 async function cot_reaccionarMensaje(data) {
   const id = String(data.id_cotizacion || '').trim();
   const indice = parseInt(data.indice, 10);
@@ -1333,12 +1374,37 @@ async function st_agregarMensaje(data) {
 function validarMensajePropioEditable(mensajes, indice, autorEmail) {
   if (!Array.isArray(mensajes) || !mensajes[indice]) return { ok: false, error: 'Mensaje no encontrado' };
   const msg = mensajes[indice];
+  if (msg.borrado) return { ok: false, error: 'Ese mensaje ya fue eliminado' };
   const autorMsg = String(msg.autor_email || '').trim().toLowerCase();
   const autorPedido = String(autorEmail || '').trim().toLowerCase();
   if (!autorPedido || autorMsg !== autorPedido) return { ok: false, error: 'No podés editar o borrar un mensaje de otra persona' };
   const edadMs = Date.now() - new Date(msg.fecha || 0).getTime();
   if (isNaN(edadMs) || edadMs >= ST_MSG_VENTANA_EDICION_MS) return { ok: false, error: 'Ya pasaron los 2 minutos — este mensaje ya no se puede editar ni borrar' };
   return { ok: true };
+}
+// Edita el texto (vacío solo si el mensaje tiene foto / archivo).
+function _editarMensajeEn(mensajes, indice, texto, autorEmail) {
+  const val = validarMensajePropioEditable(mensajes, indice, autorEmail);
+  if (!val.ok) return val.error;
+  if (!texto && !mensajes[indice].adjunto) return 'El mensaje no puede quedar vacío';
+  mensajes[indice].texto = texto;
+  mensajes[indice].editado = true;
+  return null;
+}
+// Borrado "suave": el lugar del mensaje queda (🚫 Mensaje eliminado) para que
+// no se corran los índices de respuestas, tildes de lectura y avisos.
+// Devuelve el path del adjunto a borrar de Storage (o '').
+function _borrarMensajeEn(mensajes, indice, autorEmail) {
+  const val = validarMensajePropioEditable(mensajes, indice, autorEmail);
+  if (!val.ok) return { error: val.error };
+  const m = mensajes[indice];
+  const path = (m.adjunto && m.adjunto.path) || '';
+  mensajes[indice] = { borrado: true, texto: '', autor_nombre: m.autor_nombre || '', autor_email: m.autor_email || '', fecha: m.fecha, borrado_en: new Date().toISOString() };
+  return { path };
+}
+function _borrarArchivoMensaje(path) {
+  if (!path || String(path).indexOf('mensajes/') !== 0 || String(path).indexOf('..') !== -1) return Promise.resolve();
+  return bucketAdjuntos.file(path).delete().catch((e) => console.warn('borrar adjunto de mensaje (no crítico):', e.message));
 }
 
 async function st_editarMensaje(data) {
@@ -1347,15 +1413,12 @@ async function st_editarMensaje(data) {
   const texto = String(data.texto || '').trim();
   const autorEmail = String(data.autor_email || '').trim();
   if (!id || isNaN(indice)) return { ok: false, error: 'Faltan id_ticket o indice' };
-  if (!texto) return { ok: false, error: 'El mensaje no puede quedar vacío' };
   if (!(await fbGet('servicio_tecnico/' + id))) return { ok: false, error: 'Ticket no encontrado: ' + id };
   let errorValidacion = null;
   const ticket = await runTransaccionTicket(id, (t) => {
     const mensajes = comoArray(t.mensajes);
-    const val = validarMensajePropioEditable(mensajes, indice, autorEmail);
-    if (!val.ok) { errorValidacion = val.error; return t; }
-    mensajes[indice].texto = texto;
-    mensajes[indice].editado = true;
+    errorValidacion = _editarMensajeEn(mensajes, indice, texto, autorEmail);
+    if (errorValidacion) return t;
     t.mensajes = mensajes;
     t.actualizado_en = new Date().toISOString();
     return t;
@@ -1370,17 +1433,18 @@ async function st_borrarMensaje(data) {
   const autorEmail = String(data.autor_email || '').trim();
   if (!id || isNaN(indice)) return { ok: false, error: 'Faltan id_ticket o indice' };
   if (!(await fbGet('servicio_tecnico/' + id))) return { ok: false, error: 'Ticket no encontrado: ' + id };
-  let errorValidacion = null;
+  let errorValidacion = null, pathAdjunto = '';
   const ticket = await runTransaccionTicket(id, (t) => {
     const mensajes = comoArray(t.mensajes);
-    const val = validarMensajePropioEditable(mensajes, indice, autorEmail);
-    if (!val.ok) { errorValidacion = val.error; return t; }
-    mensajes.splice(indice, 1);
+    const r = _borrarMensajeEn(mensajes, indice, autorEmail);
+    errorValidacion = r.error || null; pathAdjunto = r.path || '';
+    if (errorValidacion) return t;
     t.mensajes = mensajes;
     t.actualizado_en = new Date().toISOString();
     return t;
   });
   if (errorValidacion) return { ok: false, error: errorValidacion };
+  await _borrarArchivoMensaje(pathAdjunto);
   return { ok: true, mensajes: comoArray(ticket.mensajes) };
 }
 
@@ -2069,7 +2133,7 @@ const ACCIONES = {
   subirAdjunto, eliminarAdjunto, subirComprobanteGasto, borrarComprobanteGasto,
   st_sincronizarOrdenPreparacion, anunciarNovedad, subirArchivoMensaje,
   st_backupServicio, st_migrarFotosServicio,
-  cot_listarMensajes, cot_agregarMensaje, cot_reaccionarMensaje, cot_actualizarGastos,
+  cot_listarMensajes, cot_agregarMensaje, cot_editarMensaje, cot_borrarMensaje, cot_reaccionarMensaje, cot_actualizarGastos,
   st_marcarMensajesLeidos, cot_marcarMensajesLeidos,
   st_cierrePendiente, st_guardarCierreSemanal, st_listarCierres, st_guardarPrioridades, st_parteDelDia,
   st_guardarEtiquetasCajas, eliminarVersionPresupuestoTicket, guardarAsignadosEtapa,

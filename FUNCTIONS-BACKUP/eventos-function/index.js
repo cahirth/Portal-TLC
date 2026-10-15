@@ -1,4 +1,9 @@
 // Portal TLC | Cloud Function — Eventos: Checklist + Notas + Listado
+// v8 — 2026.10.15 — ✎ / ✕ Editar o borrar un mensaje propio durante 2 minutos
+//   (ev_editarMensaje / ev_borrarMensaje), igual que en Servicio. Sirve para
+//   Eventos, Comex, Regulatoria y Contabilidad. Borrar deja "🚫 Mensaje
+//   eliminado" (no se corren respuestas, tildes ni avisos) y borra la foto /
+//   archivo adjunto de Storage.
 // v7 — 2026.10.15 — 📎 Adjuntos en mensajes: ev_agregarMensaje guarda m.adjunto (foto, PDF,
 //   Excel ya subido por la función servicio) y el aviso de @mención lleva la foto.
 // v5 — 2026.10.08 — Comercio Exterior: toda tarjeta nueva de un tablero
@@ -985,6 +990,63 @@ async function ev_agregarMensaje(data) {
   return { ok: true, mensajes: comoArray(tarjeta.mensajes) };
 }
 
+// ✎ / ✕ Editar o borrar un mensaje propio durante 2 minutos (v8)
+const MSG_VENTANA_EDICION_MS = 2 * 60 * 1000;
+function _validarMensajePropio(mensajes, indice, autorEmail) {
+  const msg = mensajes[indice];
+  if (!msg) return 'Mensaje no encontrado';
+  if (msg.borrado) return 'Ese mensaje ya fue eliminado';
+  const autorPedido = String(autorEmail || '').trim().toLowerCase();
+  if (!autorPedido || String(msg.autor_email || '').trim().toLowerCase() !== autorPedido) return 'No podés editar o borrar un mensaje de otra persona';
+  const edadMs = Date.now() - new Date(msg.fecha || 0).getTime();
+  if (isNaN(edadMs) || edadMs >= MSG_VENTANA_EDICION_MS) return 'Ya pasaron los 2 minutos — este mensaje ya no se puede editar ni borrar';
+  return null;
+}
+async function ev_editarMensaje(data) {
+  const idEvento = String(data.id_evento || '').trim();
+  const idTarjeta = String(data.id_tarjeta || '').trim();
+  const indice = parseInt(data.indice, 10);
+  const texto = String(data.texto || '').trim();
+  if (!idEvento || !idTarjeta || isNaN(indice)) return { ok: false, error: 'Faltan datos' };
+  const ruta = 'eventos/' + idEvento + '/tarjetas/' + idTarjeta;
+  if (!(await fbGet(ruta))) return { ok: false, error: 'Tarjeta no encontrada' };
+  let error = null;
+  const tarjeta = await runTransaccionTarjeta(ruta, (t) => {
+    const mensajes = comoArray(t.mensajes);
+    error = _validarMensajePropio(mensajes, indice, data.autor_email);
+    if (!error && !texto && !mensajes[indice].adjunto) error = 'El mensaje no puede quedar vacío';
+    if (error) return t;
+    mensajes[indice].texto = texto;
+    mensajes[indice].editado = true;
+    t.mensajes = mensajes;
+    return t;
+  });
+  if (error) return { ok: false, error };
+  return { ok: true, mensajes: comoArray(tarjeta.mensajes) };
+}
+async function ev_borrarMensaje(data) {
+  const idEvento = String(data.id_evento || '').trim();
+  const idTarjeta = String(data.id_tarjeta || '').trim();
+  const indice = parseInt(data.indice, 10);
+  if (!idEvento || !idTarjeta || isNaN(indice)) return { ok: false, error: 'Faltan datos' };
+  const ruta = 'eventos/' + idEvento + '/tarjetas/' + idTarjeta;
+  if (!(await fbGet(ruta))) return { ok: false, error: 'Tarjeta no encontrada' };
+  let error = null, path = '';
+  const tarjeta = await runTransaccionTarjeta(ruta, (t) => {
+    const mensajes = comoArray(t.mensajes);
+    error = _validarMensajePropio(mensajes, indice, data.autor_email);
+    if (error) return t;
+    const m = mensajes[indice];
+    path = (m.adjunto && m.adjunto.path) || '';
+    mensajes[indice] = { borrado: true, texto: '', autor_nombre: m.autor_nombre || '', autor_email: m.autor_email || '', fecha: m.fecha, borrado_en: new Date().toISOString() };
+    t.mensajes = mensajes;
+    return t;
+  });
+  if (error) return { ok: false, error };
+  if (path && path.indexOf('mensajes/') === 0 && path.indexOf('..') === -1) await storageBorrarArchivo(path).catch((e) => console.warn('borrar adjunto de mensaje (no crítico):', e.message));
+  return { ok: true, mensajes: comoArray(tarjeta.mensajes) };
+}
+
 async function ev_reaccionarMensaje(data) {
   const idEvento = String(data.id_evento || '').trim();
   const idTarjeta = String(data.id_tarjeta || '').trim();
@@ -1092,7 +1154,7 @@ const ACCIONES = {
   ev_subirLogoEvento, ev_quitarLogoEvento,
   ev_crearColumna, ev_editarColumna, ev_borrarColumna,
   ev_crearTarjeta, ev_editarTarjeta, ev_moverTarjeta, ev_borrarTarjeta, ev_duplicarTarjeta,
-  ev_actualizarGastos, ev_marcarPortada, ev_agregarMensaje, ev_reaccionarMensaje, ev_marcarMensajesLeidos, ev_moverModulo,
+  ev_actualizarGastos, ev_marcarPortada, ev_agregarMensaje, ev_editarMensaje, ev_borrarMensaje, ev_reaccionarMensaje, ev_marcarMensajesLeidos, ev_moverModulo,
   subirAdjunto, eliminarAdjunto,
 };
 

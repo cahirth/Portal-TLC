@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | eventos.html | v2026.10.15.5 (✎ / ✕ MENSAJES — Cristian: "lo podés hacer extensivo para todos los módulos con mensajes?". Como en Servicio: durante 2 minutos el autor puede editar o borrar su mensaje (también el que lleva foto) en Eventos, Comex, Regulatoria y Contabilidad. Borrado queda "🚫 Mensaje eliminado". Ver mensajes-editar.js; función eventosChecklist v8.) -->
 <!-- Portal TLC | eventos.html | v2026.10.15.4 (📎 ADJUNTOS EN MENSAJES — Cristian: "en los mensajes internos, adjuntar imagen y enviar el mensaje" → "imágenes, pdfs, xls". Botón 📎 al lado del 🎤 en los mensajes internos: foto (cámara o galería), PDF o Excel; en la PC también se puede pegar una captura con Ctrl+V. Se puede mandar con o sin texto. En el chat la foto se ve en miniatura (se abre en grande) y el PDF/Excel como tarjeta para abrir. Ver chat-adjuntos.js; funciones servicio v19 y eventosChecklist v7.) -->
 <!-- Portal TLC | eventos.html | v2026.10.15.3 (📣 Novedades: la campanita muestra la imagen de los avisos de novedad y al tocarlos abre el tutorial justo en esa imagen.) -->
 <!-- Portal TLC | eventos.html | v2026.10.15.1 (🧾 COMPROBANTES — Cristian: "agregar a los gastos, en los módulos que lo soportan, un botón para enviar las fotos de los tickets" (comprobante de compra). En cada gasto de las tarjetas (Eventos, Comex, Regulatoria, Contabilidad), botón "📷 Comprobante" y "🧾 Ver comprobante".) -->
@@ -1935,10 +1936,30 @@ function _cerrarOverlayTarjeta() {
 // tarjeta está abierta y la pestaña visible, y solo se repinta la lista
 // de mensajes (nunca notas/checklists ni el cuadro de texto).
 var _pollingMensajesEvId = null;
-function _repintarListaMensajesEv(t) {
+function _repintarListaMensajesEv(t, forzar) {
   var el = document.getElementById('ev-msg-lista');
-  if (el && t) el.innerHTML = _construirHtmlListaMensajesEv(t);
+  if (!el || !t) return;
+  if (!forzar && el.querySelector('.tme-edit')) return; // no pisar un mensaje que se está editando
+  el.innerHTML = _construirHtmlListaMensajesEv(t);
 }
+// ✎ / ✕ Editar o borrar un mensaje propio durante 2 minutos (mensajes-editar.js).
+// Cristian: "lo podés hacer extensivo para todos los módulos con mensajes?"
+window._editarMensajeEv = function(i) {
+  var t = _tarjetaActual(); var m = t && Array.isArray(t.mensajes) ? t.mensajes[i] : null;
+  if (!m || !window.TLCMsgEdit) return;
+  TLCMsgEdit.editar(document.getElementById('msg-texto-ev-' + i), m, function(texto) {
+    return TLCMsgEdit.pedir(EVENTOS_CHECKLIST_URL, { accion:'ev_editarMensaje', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, indice:i, texto:texto, autor_email:_session.username })
+      .then(function(ms) { t.mensajes = ms; _repintarListaMensajesEv(t, true); });
+  }, function() { _repintarListaMensajesEv(t, true); });
+};
+window._borrarMensajeEv = function(i) {
+  var t = _tarjetaActual(); var m = t && Array.isArray(t.mensajes) ? t.mensajes[i] : null;
+  if (!m || !window.TLCMsgEdit) return;
+  TLCMsgEdit.confirmarBorrar(m, function() {
+    return TLCMsgEdit.pedir(EVENTOS_CHECKLIST_URL, { accion:'ev_borrarMensaje', id_evento:EVENTO_ACTUAL.id, id_tarjeta:t.id, indice:i, autor_email:_session.username })
+      .then(function(ms) { t.mensajes = ms; _repintarListaMensajesEv(t, true); });
+  });
+};
 function _detenerPollingMensajesEv() {
   if (_pollingMensajesEvId) { clearInterval(_pollingMensajesEvId); _pollingMensajesEvId = null; }
 }
@@ -3004,8 +3025,16 @@ window._irAMensajeOriginalEv = function(indice) {
 function _construirHtmlListaMensajesEv(t) {
   var mensajes = Array.isArray(t.mensajes) ? t.mensajes : [];
   if (!mensajes.length) return '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:16px 0;">Todavía no hay mensajes en esta tarjeta.</div>';
+  var emailYo = (_session && _session.username) || '';
   return mensajes.map(function(m, i) {
     var fecha = m.fecha ? new Date(m.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    if (m && m.borrado) {
+      return '<div class="msg-fila" tabindex="0" style="opacity:.75;">' +
+        '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;">' +
+          '<span style="font-size:11px;font-weight:700;color:var(--text-main);">' + _esc(m.autor_nombre || m.autor_email || '—') + '</span>' +
+          '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + fecha + '</span>' +
+        '</div>' + (window.TLCMsgEdit ? TLCMsgEdit.borradoHtml() : '') + '</div>';
+    }
     var citaHtml = '';
     if (m.respuesta_a && typeof m.respuesta_a.indice === 'number') {
       citaHtml = '<div onclick="_irAMensajeOriginalEv(' + m.respuesta_a.indice + ')" ' +
@@ -3020,11 +3049,12 @@ function _construirHtmlListaMensajesEv(t) {
           (window.TLCMenciones ? TLCMenciones.htmlTildes(m, mensajes, i, _internosCacheEv) : '') + '</span>' +
       '</div>' +
       citaHtml +
-      '<div class="msg-texto">' + (window.TLCMenciones && _internosCacheEv ? TLCMenciones.resaltar(_esc(m.texto || ''), _internosCacheEv) : _esc(m.texto || '')) + '</div>' +
+      '<div class="msg-texto" id="msg-texto-ev-' + i + '">' + (window.TLCMenciones && _internosCacheEv ? TLCMenciones.resaltar(_esc(m.texto || ''), _internosCacheEv) : _esc(m.texto || '')) + (m.editado ? ' <i style="font-size:10px;color:var(--text-muted);">(editado)</i>' : '') + '</div>' +
       (window.TLCChatAdj ? TLCChatAdj.html(m.adjunto) : '') +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:4px;">' +
         _resumenReaccionesEv(m.reacciones) +
         '<div style="display:flex;align-items:center;gap:4px;">' +
+          (window.TLCMsgEdit ? TLCMsgEdit.botones(m, emailYo, '_editarMensajeEv(' + i + ')', '_borrarMensajeEv(' + i + ')') : '') +
           '<button type="button" onclick="_responderMensajeClickEv(' + i + ')" title="Responder" ' +
             'style="background:transparent;border:none;cursor:pointer;font-size:11px;padding:2px 5px;border-radius:5px;color:var(--text-muted);">↩</button>' +
           '<div class="reaccion-trigger-wrap">' +
@@ -3405,6 +3435,7 @@ window._marcarTodasLeidasEv = function(ev) {
 </script>
 <script>window.DICTADO_CAMPOS = [{ textarea: 'ev-msg-nuevo', enviar: 'ev-btn-enviar-mensaje' }];</script>
 <script src="chat-adjuntos.js"></script>
+<script src="mensajes-editar.js"></script>
 <script src="dictado.js"></script>
 <script src="menciones.js"></script>
 <script src="agenda-vinculo.js"></script>

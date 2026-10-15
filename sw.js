@@ -1,4 +1,5 @@
-// Portal TLC | sw.js | v38
+// Portal TLC | sw.js | v39
+// v39: mensajes-editar.js (✎ / ✕ editar o borrar un mensaje propio por 2 min en Ventas y Eventos) en HTML_LOCAL. CACHE_NAME bumpeado.
 // v38: tutoriales.html (todos los tutoriales en una página) en HTML_LOCAL. La versión para descargar (tutoriales/Portal-TLC-Tutoriales.html, 5 MB) va siempre a la red, no se guarda en caché. CACHE_NAME bumpeado.
 // v37: tutorial del Catálogo (imagen nueva de ⬇️ Stock + catalogo-1..3 renovadas). CACHE_NAME bumpeado.
 // v36: tutorial.js con la novedad 📎 adjuntos en mensajes.
@@ -157,7 +158,7 @@ self.addEventListener('notificationclick', function(event) {
 //      cierre-semanal.js (modal de cierre de semana de los viernes) y
 //      cierres.html (resumen de cierres para Administradores) — agregados
 //      a HTML_LOCAL (red primero). CACHE_NAME bumpeado.
-const CACHE_NAME = 'portal-tlc-v38';
+const CACHE_NAME = 'portal-tlc-v39';
 
 const HTML_LOCAL = [
     './',
@@ -187,6 +188,7 @@ const HTML_LOCAL = [
     './comprobantes.js',
     './anunciar.html',
     './tutoriales.html',
+    './mensajes-editar.js',
     './chat-adjuntos.js',
     './mi-dia.html',
     './cuenta-corriente.html',
