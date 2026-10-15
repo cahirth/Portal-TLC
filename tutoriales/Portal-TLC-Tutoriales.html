@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- Portal TLC | Portal-TLC-Tutoriales.html | ARCHIVO GENERADO por tools/generar_guia_tutoriales.py — no editar a mano. huella:b93e17b58d075402 -->
+<!-- Portal TLC | Portal-TLC-Tutoriales.html | ARCHIVO GENERADO por tools/generar_guia_tutoriales.py — no editar a mano. huella:4957e61ae1376e42 -->
+<!-- Portal TLC | tutoriales.html | v2026.10.15.5 (Nuevo orden — Cristian: "Empresas arriba de todo en el punto 2. 3: Ventas, con sangría: Catálogo de productos, Negocios, Comisiones. 4: Servicio Técnico". Ventas es un capítulo con subcapítulos 3.1 / 3.2 / 3.3. Las imágenes compartidas (tildes, campanita, tablero) siguen viviendo en su módulo de origen.) -->
 <!-- Portal TLC | tutoriales.html | v2026.10.15.4 (Cristian: "la imagen de la derecha podría ocupar toda la pantalla al lado del índice?" — la página usa todo el ancho y cada imagen se agranda hasta el alto de la pantalla; al bajar, cada tema se acomoda solo arriba.) -->
 <!-- Portal TLC | tutoriales.html | v2026.10.15.3 (Cristian: "hacé el índice más ancho", "ver versión más nueva, sacalo, siempre será la más nueva", "scroll solo para el índice que se seleccionó, no quiero que scrolleen todo el manual". Ahora se ve UN capítulo por vez: el que se elige en el índice. Anterior/siguiente se mueven dentro del capítulo y al final ofrece el capítulo siguiente. Índice de 400 px.) -->
 <!-- Portal TLC | tutoriales.html | v2026.10.15.2 (📚 Manual de tutoriales: índice por módulo con subíndices numerados (1.1, 1.2…) que llevan directo a cada imagen. Cristian: "me gusta más un índice para el manual con subíndices, navegables hasta las imágenes". En la PC el índice queda fijo a la izquierda y marca dónde estás; en el celular está arriba y el botón "☰ Índice" vuelve a él. Los títulos salen de TITULOS en tutorial.js.) -->
@@ -28,6 +29,12 @@ h1 em{font-style:normal;color:var(--ac2)}
 .libro{max-width:none;margin:0 auto;padding:0 max(16px,2vw) 80px;display:grid;grid-template-columns:400px minmax(0,1fr);gap:32px;align-items:start}
 .capitulo{display:none}.capitulo.visible{display:block}
 .cap.actual>a{background:rgba(58,134,255,.14)}
+.grupo-ix>a{display:flex;gap:8px;align-items:baseline;text-decoration:none;font-weight:800;font-size:14px;padding:6px 8px;border-radius:8px}
+.grupo-ix>a:hover{background:var(--card2)}.grupo-ix>a .n{color:var(--ac2);min-width:22px}
+.cap.sub{margin-left:20px;border-left:1px solid var(--line);padding-left:4px}
+.cap.sub>a{font-size:13.5px}.cap.sub>a .n{min-width:30px}
+.grupo-ix.oculto{display:none}
+.capitulo>h2 .gr{color:var(--sub);font-size:18px;font-weight:800}
 .fincap{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 6px;max-width:820px}
 .fincap a{flex:1;min-width:200px;text-decoration:none;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:11px 14px;font-size:13.5px;font-weight:800}
 .fincap a small{display:block;font-size:11px;color:var(--sub);font-weight:700;letter-spacing:.5px;margin-bottom:2px}
@@ -129,44 +136,74 @@ window.TUT_OFFLINE = {"sets": {"index": {"titulo": "Cómo ver los tutoriales", "
 
   // Capítulos del manual, en este orden. Un módulo nuevo en tutorial.js que
   // no esté acá aparece igual, al final, con su título.
-  var MODULOS = [
+  // Orden del manual (Cristian: "Empresas arriba de todo en el punto 2. 3: Ventas,
+  // con sangría: Catálogo de productos, Negocios, Comisiones. 4: Servicio Técnico").
+  // { grupo } = capítulo con subcapítulos. Un módulo nuevo en tutorial.js que no
+  // esté acá aparece igual, al final, con su título.
+  var ORDEN = [
     ['index', '💡', 'Cómo ver los tutoriales'],
+    ['empresas', '🏢', 'Empresas'],
+    { grupo: 'ventas', ic: '💼', t: 'Ventas', hijos: [
+      ['selector-dispositivos', '📒', 'Catálogo de Productos'],
+      ['cotizaciones', '🤝', 'Negocios'],
+      ['comisiones', '💰', 'Comisiones']
+    ] },
     ['servicio', '🔧', 'Servicio Técnico'],
-    ['cotizaciones', '💼', 'Ventas · Negocios'],
-    ['selector-dispositivos', '📒', 'Ventas · Catálogo de Productos'],
-    ['comisiones', '💰', 'Ventas · Comisiones'],
     ['eventos', '🎪', 'Eventos y Congresos'],
     ['comex', '🚢', 'Comercio Exterior'],
     ['regulatoria', '📋', 'Regulatoria'],
     ['contabilidad', '📒', 'Contabilidad'],
-    ['empresas', '🏢', 'Empresas'],
     ['calendario', '📅', 'Agenda'],
     ['parte', '📝', 'Parte del día'],
     ['cuenta-corriente', '💳', 'Cuenta Corriente']
   ];
-  var conocidos = MODULOS.map(function (m) { return m[0]; });
-  Object.keys(SETS).forEach(function (k) { if (conocidos.indexOf(k) === -1) MODULOS.push([k, '📘', SETS[k].titulo]); });
-  MODULOS = MODULOS.filter(function (m) { return SETS[m[0]]; });
+  // Dónde "vive" una imagen que está en varios módulos (tildes, campanita, el
+  // tablero de Eventos en Contabilidad…): en el primero de esta lista que la tenga.
+  var PRIORIDAD = ['index', 'servicio', 'cotizaciones', 'selector-dispositivos', 'comisiones', 'eventos', 'comex', 'regulatoria', 'contabilidad', 'empresas', 'calendario', 'parte', 'cuenta-corriente'];
 
-  // Capítulos: primero ★ Novedades (imágenes nov-*), después cada módulo numerado.
-  // Cada imagen se muestra UNA vez (en el primer capítulo donde aparece). En los
-  // otros capítulos figura igual en el índice, con ↗, y lleva a donde está.
+  var conocidos = [];
+  ORDEN.forEach(function (o) { if (o.grupo) o.hijos.forEach(function (h) { conocidos.push(h[0]); }); else conocidos.push(o[0]); });
+  Object.keys(SETS).forEach(function (k) { if (conocidos.indexOf(k) === -1) { ORDEN.push([k, '📘', SETS[k].titulo]); PRIORIDAD.push(k); } });
+  Object.keys(SETS).forEach(function (k) { if (PRIORIDAD.indexOf(k) === -1) PRIORIDAD.push(k); });
+
+  // Capítulos en orden (los hijos de un grupo quedan con num "3.1", "3.2"…)
+  var caps = [], grupos = {};
   var nov = [];
-  MODULOS.forEach(function (m) { SETS[m[0]].slides.forEach(function (s) { if (/^nov-/.test(s) && nov.indexOf(s) === -1) nov.push(s); }); });
-  var caps = [{ id: 'novedades', num: '★', ic: '🆕', t: 'Novedades', slides: nov }];
-  MODULOS.forEach(function (m, i) { caps.push({ id: m[0], num: String(i + 1), ic: m[1], t: m[2], slides: SETS[m[0]].slides.filter(function (s) { return !/^nov-/.test(s); }) }); });
+  PRIORIDAD.forEach(function (k) { if (SETS[k]) SETS[k].slides.forEach(function (s) { if (/^nov-/.test(s) && nov.indexOf(s) === -1) nov.push(s); }); });
+  caps.push({ id: 'novedades', num: '★', ic: '🆕', t: 'Novedades', slides: nov });
+  var n = 0;
+  function sinNov(k) { return SETS[k].slides.filter(function (s) { return !/^nov-/.test(s); }); }
+  ORDEN.forEach(function (o) {
+    if (o.grupo) {
+      var hijos = o.hijos.filter(function (h) { return SETS[h[0]]; });
+      if (!hijos.length) return;
+      n++;
+      grupos[o.grupo] = { num: String(n), ic: o.ic, t: o.t, primero: hijos[0][0] };
+      hijos.forEach(function (h, k) { caps.push({ id: h[0], num: n + '.' + (k + 1), ic: h[1], t: h[2], grupo: o.grupo, slides: sinNov(h[0]) }); });
+    } else if (SETS[o[0]]) {
+      n++;
+      caps.push({ id: o[0], num: String(n), ic: o[1], t: o[2], slides: sinNov(o[0]) });
+    }
+  });
+  function nombreCap(c) { return c.grupo ? grupos[c.grupo].t + ' · ' + c.t : c.t; }
 
-  var casa = {}, lams = [];       // casa[imagen] = { ancla, num }
+  // Casa de cada imagen: Novedades para las nov-*, si no el primero según PRIORIDAD
+  var capPorId = {}; caps.forEach(function (c) { capPorId[c.id] = c; });
+  var hogar = {};
+  nov.forEach(function (s) { hogar[s] = 'novedades'; });
+  PRIORIDAD.forEach(function (k) { if (capPorId[k]) capPorId[k].slides.forEach(function (s) { if (!hogar[s]) hogar[s] = k; }); });
+
+  var casa = {}, lams = [];       // casa[imagen] = { ancla, num, cap, capId }
   caps.forEach(function (c) {
     c.items = [];
     var k = 0;
     c.slides.forEach(function (s) {
-      if (casa[s]) { c.items.push({ s: s, otro: true }); return; }
+      if (hogar[s] !== c.id) { c.items.push({ s: s, otro: true }); return; }
       k++;
       var num = (c.num === '★' ? 'N' : c.num) + '.' + k;
-      casa[s] = { ancla: 'l-' + s, num: num, cap: c.t, capId: c.id };
+      casa[s] = { ancla: 'l-' + s, num: num, cap: nombreCap(c), capId: c.id };
       c.items.push({ s: s, num: num });
-      lams.push({ s: s, num: num, cap: c.t, capId: c.id });
+      lams.push({ s: s, num: num, cap: nombreCap(c), capId: c.id });
     });
   });
 
@@ -175,14 +212,17 @@ window.TUT_OFFLINE = {"sets": {"index": {"titulo": "Cómo ver los tutoriales", "
   var capsCon = caps.filter(function (c) { return c.items.length; });
   caps.forEach(function (c) {
     if (!c.items.length) return;
-    var propias = c.items.filter(function (x) { return !x.otro; }).length;
-    toc += '<div class="cap" data-cap="' + esc(c.id) + '"><a href="#c-' + esc(c.id) + '"><span class="n">' + c.num + '</span><span>' + c.ic + ' ' + esc(c.t) + '</span><span class="c">' + c.items.length + '</span></a><ol>' +
+    if (c.grupo && grupos[c.grupo].primero === c.id) {
+      var g = grupos[c.grupo];
+      toc += '<div class="grupo-ix" data-grupo="' + esc(c.grupo) + '"><a href="#c-' + esc(c.id) + '"><span class="n">' + g.num + '</span><span>' + g.ic + ' ' + esc(g.t) + '</span></a></div>';
+    }
+    toc += '<div class="cap' + (c.grupo ? ' sub' : '') + '" data-cap="' + esc(c.id) + '"' + (c.grupo ? ' data-grupo="' + esc(c.grupo) + '"' : '') + '><a href="#c-' + esc(c.id) + '"><span class="n">' + c.num + '</span><span>' + c.ic + ' ' + esc(c.t) + '</span><span class="c">' + c.items.length + '</span></a><ol>' +
       c.items.map(function (x) {
         var h = casa[x.s];
         return '<li data-busca="' + esc(sinAcentos(titulo(x.s) + ' ' + c.t)) + '"><a href="#' + h.ancla + '"' + (x.otro ? ' class="otro" title="Está en ' + esc(h.cap) + ' (' + h.num + ')"' : ' data-ancla="' + h.ancla + '"') + '><span class="n">' + (x.otro ? h.num : x.num) + '</span><span>' + esc(titulo(x.s)) + '</span></a></li>';
       }).join('') + '</ol></div>';
 
-    main += '<section class="capitulo" id="c-' + esc(c.id) + '"><h2><span class="n">' + c.num + '</span>' + c.ic + ' ' + esc(c.t) + ' <small>' + c.items.length + (c.items.length === 1 ? ' tema' : ' temas') + '</small></h2>';
+    main += '<section class="capitulo" id="c-' + esc(c.id) + '"><h2><span class="n">' + c.num + '</span>' + (c.grupo ? '<span class="gr">' + esc(grupos[c.grupo].t) + ' ›</span>' : '') + c.ic + ' ' + esc(c.t) + ' <small>' + c.items.length + (c.items.length === 1 ? ' tema' : ' temas') + '</small></h2>';
     c.items.forEach(function (x) {
       if (x.otro) return;
       var i = lams.findIndex(function (l) { return l.s === x.s; });
@@ -197,8 +237,8 @@ window.TUT_OFFLINE = {"sets": {"index": {"titulo": "Cómo ver los tutoriales", "
     if (otros.length) main += '<div class="tambien">También aplica en este módulo: ' + otros.map(function (x) { var h = casa[x.s]; return '<a href="#' + h.ancla + '">' + h.num + ' ' + esc(titulo(x.s)) + '</a>'; }).join(' · ') + '.</div>';
     var ic = capsCon.indexOf(c), capAnt = capsCon[ic - 1], capSig = capsCon[ic + 1];
     main += '<div class="fincap">' +
-      (capAnt ? '<a href="#c-' + esc(capAnt.id) + '"><small>← CAPÍTULO ANTERIOR</small>' + capAnt.ic + ' ' + esc(capAnt.t) + '</a>' : '') +
-      (capSig ? '<a class="sig" href="#c-' + esc(capSig.id) + '"><small>CAPÍTULO SIGUIENTE →</small>' + capSig.ic + ' ' + esc(capSig.t) + '</a>' : '') + '</div>';
+      (capAnt ? '<a href="#c-' + esc(capAnt.id) + '"><small>← CAPÍTULO ANTERIOR</small>' + capAnt.ic + ' ' + esc(nombreCap(capAnt)) + '</a>' : '') +
+      (capSig ? '<a class="sig" href="#c-' + esc(capSig.id) + '"><small>CAPÍTULO SIGUIENTE →</small>' + capSig.ic + ' ' + esc(nombreCap(capSig)) + '</a>' : '') + '</div>';
     main += '</section>';
   });
   document.getElementById('toc').innerHTML = toc + '<div class="sinres" id="sinres" style="display:none">No hay temas con esa palabra.</div>';
@@ -224,6 +264,10 @@ window.TUT_OFFLINE = {"sets": {"index": {"titulo": "Cómo ver los tutoriales", "
       var vis = 0;
       cap.querySelectorAll('li').forEach(function (li) { var ok = !q || li.getAttribute('data-busca').indexOf(q) !== -1; li.classList.toggle('oculto', !ok); if (ok) vis++; });
       cap.classList.toggle('oculto', !vis); hay += vis;
+    });
+    document.querySelectorAll('#toc .grupo-ix').forEach(function (g) {
+      var hijos = document.querySelectorAll('#toc .cap[data-grupo="' + g.getAttribute('data-grupo') + '"]');
+      g.classList.toggle('oculto', ![].some.call(hijos, function (h) { return !h.classList.contains('oculto'); }));
     });
     document.getElementById('sinres').style.display = hay ? 'none' : 'block';
   });
