@@ -256,6 +256,7 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 - [ ] **Agenda → Outlook "TLC All Members"**: copiar todo lo de la Agenda del Portal al calendario del grupo de M365, en una sola dirección y por un tiempo (crear, cambiar y borrar). Necesita registrar la app en Azure (permiso delegado `Group.ReadWrite.All`) y conectar una cuenta miembro del grupo una vez.
 - [ ] **Desplegar funciones**: `servicio` v20, `eventosChecklist` v8, `cuentaCorriente` v5.
 - [ ] **Tareas**: la tarea rápida no pide fecha, entonces los filtros Hoy / Vencidas / Esta semana casi no muestran nada. Evaluar sumar fecha (hoy por defecto).
+- [ ] **Hacer el repo privado**. Antes de cambiarlo, revisar: (1) GitHub Pages con repo privado necesita plan pago (GitHub Pro o Team), si no ir.tlcsrl.com.ar deja de andar; (2) lo que el Portal o las funciones leen directo de `raw.githubusercontent.com` del repo deja de ser accesible sin token; (3) la Action de la guía de tutoriales sigue funcionando igual.
 - [ ] **Chat general** (idea): canales por área + bandeja única de mensajes de tickets / negocios / tarjetas, para reemplazar los grupos internos de WhatsApp. Faltan: cuáles son los grupos, si hay gente de afuera, y si van mensajes directos.
 
 Cada fase es independiente: se puede pausar en cualquier punto sin dejar nada roto a medio camino.
