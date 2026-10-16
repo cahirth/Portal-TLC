@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | empresas.html | v2026.10.16.1 (Negocios asociados con DESCRIPCIÓN — Cristian: "veo un montón de números, sé que son negocios y tickets, pero si un cliente tiene muchos no sé discriminarlos; agregale la descripción a cada uno". Ventas: los equipos/productos del negocio (o su nombre sin la empresa). Servicio: marca, modelo y N° de serie + la falla; Orden de Preparación con sus equipos. El número queda chico abajo, con la fecha. Además "Ver los N negocios y tickets" para ver todos, no solo los 5 últimos.) -->
 <!-- Portal TLC | empresas.html | v2026.10.10.9 (📚 Tutorial: botón ❔ Tutorial con las 5 imágenes de Empresas; la primera vez se abre solo.) -->
 <!-- Portal TLC | empresas.html | v2026.10.06.8 (Cierre de semana — Cristian: "los viernes al mediodía, que les aparezca un pop-up en el centro de la pantalla, difícil de sacar, que tengan que contestar sí o sí... y que les explote la pantalla". Se carga cierre-semanal.js: desde el viernes 12:00 y hasta completarlo, a quien tenga equipos a cargo le aparece el modal de cierre.) -->
 <!-- Portal TLC | empresas.html | v2026.10.06.6 (Cristian: "algo más simple, crear ticket nuevo desde Empresas y listo". Al llegar desde el "+" de Servicio (empresas.html?paraTicket=1) aparece el aviso "🔧 Nuevo ticket de Servicio": buscá la empresa (o creala) y tocá "Nuevo ticket (Servicio)" en su ficha.) -->
@@ -147,6 +148,11 @@
   .negocio-info { flex:1; min-width:0; }
   .negocio-id { font-size:12px; font-weight:700; color:var(--text-main); }
   .negocio-meta { font-size:10px; color:var(--text-muted); margin-top:2px; }
+  .negocio-desc { font-size:12.5px; font-weight:700; color:var(--text-main); line-height:1.3; overflow-wrap:anywhere; }
+  .negocio-det { font-size:11px; color:var(--text-muted); margin-top:2px; line-height:1.3; }
+  .negocio-meta .negocio-id { font-size:10px; font-weight:700; }
+  .negocios-ver-todos { display:block; width:100%; margin-top:6px; padding:8px; border-radius:9px; border:1px dashed var(--border-glow); background:transparent; color:var(--accent-blue,#3a86ff); font-size:11.5px; font-weight:700; cursor:pointer; }
+  body.tema-claro .negocio-desc { color:#0f172a; }
   .negocio-monto { font-size:13px; font-weight:800; color:var(--accent-green); white-space:nowrap; }
   .negocio-estado { font-size:9px; font-weight:700; padding:2px 7px; border-radius:8px; margin-top:2px; display:inline-block; }
 
@@ -660,6 +666,7 @@ async function _cargarNegociosCruzados() {
         monto: _montoCot(c),
         moneda: 'USD',
         fecha: c.fecha || c.fechaCreacion || '',
+        desc: _descNegocioVentas(c),
       };
       if (cCuit) (cotizacionesPorCuit[cCuit] = cotizacionesPorCuit[cCuit] || []).push(entrada);
       if (cRazon) (cotizacionesPorRazon[cRazon] = cotizacionesPorRazon[cRazon] || []).push(entrada);
@@ -678,6 +685,8 @@ async function _cargarNegociosCruzados() {
         moneda: '',
         fecha: t.creado_en || '',
         equipoSerie: t.equipo_serie || '', // ← para poder buscar empresas por n° de serie del equipo
+        desc: _descTicket(t),
+        detalle: String(t.falla || t.diagnostico || '').trim(),
       });
     });
 
@@ -1172,6 +1181,33 @@ var ESTADO_INFO = {
   'finalizado':   { label:'Finalizado',     c:'#34d399', bg:'rgba(52,211,153,.12)' },
 };
 
+// Descripción de cada negocio / ticket en la ficha (Cristian: "veo un montón
+// de números, sé que son negocios y tickets, pero si un cliente tiene muchos
+// no sé discriminarlos — agregale la descripción a cada uno").
+function _descNegocioVentas(c) {
+  var items = [].concat(c.carrito || [], c.productos || [], (c.presupuesto && c.presupuesto.items) || []);
+  var vistos = {}, nombres = [];
+  items.forEach(function(it) {
+    var n = String((it && (it.nombre || it.descripcion || it.sku)) || '').trim();
+    if (n && !vistos[n.toLowerCase()]) { vistos[n.toLowerCase()] = true; nombres.push(n); }
+  });
+  if (nombres.length) return nombres.slice(0, 3).join(' · ') + (nombres.length > 3 ? ' +' + (nombres.length - 3) : '');
+  // Sin productos: el nombre del negocio sin la empresa adelante
+  var nom = String(c.nombreNegocio || '').trim();
+  var raz = String(c.razonSocial || (c.empresa || {}).razonSocial || '').trim();
+  if (raz && nom.toLowerCase().indexOf(raz.toLowerCase()) === 0) nom = nom.slice(raz.length).replace(/^\s*[-—–·:]\s*/, '');
+  return nom;
+}
+function _descTicket(t) {
+  if (t.tipo_orden === 'preparacion_equipos') {
+    var eq = Array.isArray(t.equipos) ? t.equipos : (t.equipos ? Object.values(t.equipos) : []);
+    var skus = eq.map(function(x) { return x && (x.sku || x.descripcion); }).filter(Boolean);
+    return '📦 Orden de Preparación' + (skus.length ? ': ' + skus.slice(0, 3).join(' · ') + (skus.length > 3 ? ' +' + (skus.length - 3) : '') : '');
+  }
+  var eqTxt = [t.equipo_marca, t.equipo_modelo].filter(Boolean).join(' ');
+  return (eqTxt || 'Equipo') + (t.equipo_serie ? ' · S/N ' + t.equipo_serie : '');
+}
+
 function _fmtFechaNegocio(f) {
   if (!f) return '';
   try { return new Date(f).toLocaleDateString('es-AR', { day:'numeric', month:'short', year:'numeric' }); }
@@ -1181,10 +1217,11 @@ function _fmtFechaNegocio(f) {
 function _renderNegocios(e) {
   var negocios = e.negocios || [];
   var total = negocios.length;
-  document.getElementById('negocios-contador').textContent = total + ' negocio' + (total!==1?'s':'') + (total > 5 ? ' (últimos 5)' : '');
+  var verTodos = _negociosVerTodos === e.id;
+  document.getElementById('negocios-contador').textContent = total + ' negocio' + (total!==1?'s':'') + (total > 5 && !verTodos ? ' (últimos 5)' : '');
   var cont = document.getElementById('lista-negocios');
   if (!total) { cont.innerHTML = '<div class="empty-lista">Todavía no tiene negocios asociados.</div>'; return; }
-  var negociosAMostrar = negocios.slice(0, 5); // ya vienen ordenados por fecha desc — los más recientes primero
+  var negociosAMostrar = verTodos ? negocios : negocios.slice(0, 5); // ya vienen ordenados por fecha desc — los más recientes primero
   cont.innerHTML = negociosAMostrar.map(function(n) {
     var info = ESTADO_INFO[n.estado] || { label:n.estado, c:'#94a3b8', bg:'rgba(148,163,184,.12)' };
     var link = n.tipo === 'ventas'
@@ -1193,14 +1230,25 @@ function _renderNegocios(e) {
     return '<a class="negocio-card" href="' + link + '" target="_blank">' +
       '<span class="negocio-tipo-tag ' + n.tipo + '">' + (n.tipo === 'ventas' ? 'VENTAS' : 'SERVICIO') + '</span>' +
       '<div class="negocio-info">' +
-        '<div class="negocio-id">' + n.id + '</div>' +
-        '<div class="negocio-meta">' + _fmtFechaNegocio(n.fecha) + '</div>' +
+        (n.desc ? '<div class="negocio-desc">' + _escNeg(n.desc) + '</div>' : '') +
+        (n.detalle ? '<div class="negocio-det">' + _escNeg(n.detalle.length > 90 ? n.detalle.slice(0, 90) + '…' : n.detalle) + '</div>' : '') +
+        '<div class="negocio-meta"><b class="negocio-id">' + _escNeg(n.id) + '</b> · ' + _fmtFechaNegocio(n.fecha) + '</div>' +
         '<span class="negocio-estado" style="background:' + info.bg + ';color:' + info.c + ';">' + info.label + '</span>' +
       '</div>' +
       (n.monto ? '<div class="negocio-monto">' + n.moneda + ' ' + Math.round(n.monto).toLocaleString('es-AR') + '</div>' : '') +
     '</a>';
-  }).join('') + (total > 5 ? '<div class="empty-lista" style="padding:10px;font-style:normal;font-size:11px;">Mostrando los 5 más recientes de ' + total + ' en total.</div>' : '');
+  }).join('') + (total > 5
+    ? '<button type="button" class="negocios-ver-todos" onclick="_toggleVerTodosNegocios()">' + (verTodos ? 'Ver solo los 5 más recientes' : 'Ver los ' + total + ' negocios y tickets') + '</button>'
+    : '');
 }
+var _negociosVerTodos = null;
+function _escNeg(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+window._toggleVerTodosNegocios = function() {
+  var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });
+  if (!e) return;
+  _negociosVerTodos = (_negociosVerTodos === e.id) ? null : e.id;
+  _renderNegocios(e);
+};
 
 window._nuevoNegocio = function(tipo) {
   var e = EMPRESAS.find(function(x){ return x.id === _empresaActualId; });

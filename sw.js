@@ -1,4 +1,5 @@
-// Portal TLC | sw.js | v43
+// Portal TLC | sw.js | v44
+// v44: empresas.html con descripción en los negocios y tickets asociados. CACHE_NAME bumpeado.
 // v43: tutorial de Tareas (mi-dia.html carga tutorial.js). CACHE_NAME bumpeado.
 // v42: archivos propios con cache:'no-cache' (ver redFresca) — las versiones nuevas llegan apenas se publican. CACHE_NAME bumpeado.
 // v41: tutorial.js con la novedad 📚 Manual en el avatar (imagen nov-manual). CACHE_NAME bumpeado.
@@ -162,7 +163,7 @@ self.addEventListener('notificationclick', function(event) {
 //      cierre-semanal.js (modal de cierre de semana de los viernes) y
 //      cierres.html (resumen de cierres para Administradores) — agregados
 //      a HTML_LOCAL (red primero). CACHE_NAME bumpeado.
-const CACHE_NAME = 'portal-tlc-v43';
+const CACHE_NAME = 'portal-tlc-v44';
 
 const HTML_LOCAL = [
     './',
