@@ -1,3 +1,4 @@
+// Portal TLC | tutorial.js | v2026.10.16.1 (📋 Tutorial de Tareas (mi-dia.html): 2 imágenes, tareas-1 y tareas-2.)
 // Portal TLC | tutorial.js | v2026.10.15.7 (📚 Novedad: imagen nov-manual — el Manual de tutoriales está en el menú del avatar, y qué es el avatar. Va en Inicio: se abre sola la próxima vez que entran.)
 // Portal TLC | tutorial.js | v2026.10.15.6 (TITULOS: el título de cada imagen, para el índice del Manual de tutoriales. También se usa como texto alternativo de la imagen.)
 // Portal TLC | tutorial.js | v2026.10.15.5 (Catálogo: imagen nueva 'catalogo-stock' — cómo filtrar, ordenar y bajar el stock a Excel con ⬇️ Stock. catalogo-1 corregida: categorías reales y botones Nombre / Precio / Stock.)
@@ -31,7 +32,8 @@
     regulatoria:  { titulo: 'Regulatoria', slides: ['regulatoria', 'nov-adjuntos', 'nov-comprobantes', 'tildes', 'campanita'] },
     contabilidad: { titulo: 'Contabilidad', slides: ['contabilidad-1', 'eventos-2', 'eventos-3', 'eventos-4', 'eventos-5', 'eventos-6', 'eventos-7', 'nov-adjuntos', 'nov-comprobantes', 'tildes', 'campanita'] },
     parte:        { titulo: 'Parte del día', slides: ['parte-del-dia-1', 'parte-del-dia-2', 'parte-del-dia-3', 'parte-del-dia-4'] },
-    'cuenta-corriente': { titulo: 'Cuenta Corriente', slides: ['cuenta-corriente-1', 'cuenta-corriente-2', 'cuenta-corriente-3', 'cuenta-corriente-4', 'cuenta-corriente-5', 'cuenta-corriente-6', 'nov-comprobantes'] }
+    'cuenta-corriente': { titulo: 'Cuenta Corriente', slides: ['cuenta-corriente-1', 'cuenta-corriente-2', 'cuenta-corriente-3', 'cuenta-corriente-4', 'cuenta-corriente-5', 'cuenta-corriente-6', 'nov-comprobantes'] },
+    'mi-dia':     { titulo: 'Tareas', slides: ['tareas-1', 'tareas-2'] }
   };
   // Título de cada imagen (lo usa el Manual de tutoriales, tutoriales.html, para el índice).
   // Imagen nueva → sumarle su título acá.
@@ -84,6 +86,8 @@
     'negocios-5': 'Seguimiento: notas, mensajes y gastos',
     'negocios-6': 'Cierre y preparación',
     'nov-manual': 'El Manual, en tu avatar',
+    'tareas-1': 'Tareas: tu día en una lista',
+    'tareas-2': 'Tareas rápidas y pines',
     'nov-adjuntos': 'Fotos, PDF y Excel en los mensajes',
     'nov-comprobantes': 'El comprobante, en cada gasto',
     'nov-orden-items': '¿Faltó algo en la Orden?',
