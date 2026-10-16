@@ -248,4 +248,14 @@ Guardar las fotos en `servicio_tecnico_fotos/{id}` y que el detalle las pida al 
 - [ ] Probar el dictado 🎤 con voz real en PC y Android.
 - [ ] Negocios que cambiaron de dueño por el bug del 30/09: reasignarlos a mano desde el selector de Vendedor.
 
+### Anotados el 16/10 (Cristian)
+
+- [ ] **Agenda → mails con Brevo**: que la función `agenda` mande los mails de invitaciones y cambios (a menos de 24 hs) por Brevo, como las demás.
+- [ ] **Dirección de envío de Brevo**: hoy los mails salen desde un Gmail personal con el nombre "Portal TLC". Pasar a una dirección propia del dominio `tlcsrl.com.ar`.
+- [ ] **Seguridad**: hacer una revisión de seguridad del Portal y las funciones (alcance a definir con Cristian).
+- [ ] **Agenda → Outlook "TLC All Members"**: copiar todo lo de la Agenda del Portal al calendario del grupo de M365, en una sola dirección y por un tiempo (crear, cambiar y borrar). Necesita registrar la app en Azure (permiso delegado `Group.ReadWrite.All`) y conectar una cuenta miembro del grupo una vez.
+- [ ] **Desplegar funciones**: `servicio` v20, `eventosChecklist` v8, `cuentaCorriente` v5.
+- [ ] **Tareas**: la tarea rápida no pide fecha, entonces los filtros Hoy / Vencidas / Esta semana casi no muestran nada. Evaluar sumar fecha (hoy por defecto).
+- [ ] **Chat general** (idea): canales por área + bandeja única de mensajes de tickets / negocios / tarjetas, para reemplazar los grupos internos de WhatsApp. Faltan: cuáles son los grupos, si hay gente de afuera, y si van mensajes directos.
+
 Cada fase es independiente: se puede pausar en cualquier punto sin dejar nada roto a medio camino.
