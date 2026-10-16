@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Portal TLC | tutoriales.html | v2026.10.15.6 (Cristian, con captura del Inicio: "el manual organiza el índice con este orden, y los subíndices con los submenús". Orden: Empresas, Ventas (Catálogo / Negocios / Comisiones), Servicio Técnico, Agenda, Administración (Eventos / Cuenta Corriente / Reportes · Parte del día / Contabilidad / Regulatoria / Comex).) -->
 <!-- Portal TLC | tutoriales.html | v2026.10.15.5 (Nuevo orden — Cristian: "Empresas arriba de todo en el punto 2. 3: Ventas, con sangría: Catálogo de productos, Negocios, Comisiones. 4: Servicio Técnico". Ventas es un capítulo con subcapítulos 3.1 / 3.2 / 3.3. Las imágenes compartidas (tildes, campanita, tablero) siguen viviendo en su módulo de origen.) -->
 <!-- Portal TLC | tutoriales.html | v2026.10.15.4 (Cristian: "la imagen de la derecha podría ocupar toda la pantalla al lado del índice?" — la página usa todo el ancho y cada imagen se agranda hasta el alto de la pantalla; al bajar, cada tema se acomoda solo arriba.) -->
 <!-- Portal TLC | tutoriales.html | v2026.10.15.3 (Cristian: "hacé el índice más ancho", "ver versión más nueva, sacalo, siempre será la más nueva", "scroll solo para el índice que se seleccionó, no quiero que scrolleen todo el manual". Ahora se ve UN capítulo por vez: el que se elige en el índice. Anterior/siguiente se mueven dentro del capítulo y al final ofrece el capítulo siguiente. Índice de 400 px.) -->
@@ -136,8 +137,8 @@ footer{text-align:center;color:var(--sub);font-size:12.5px;padding:0 16px 36px}
 
   // Capítulos del manual, en este orden. Un módulo nuevo en tutorial.js que
   // no esté acá aparece igual, al final, con su título.
-  // Orden del manual (Cristian: "Empresas arriba de todo en el punto 2. 3: Ventas,
-  // con sangría: Catálogo de productos, Negocios, Comisiones. 4: Servicio Técnico").
+  // Orden del manual = el del menú de Inicio, con sus submenús (Cristian: "el manual
+  // organiza el índice con este orden, y los subíndices con los submenús").
   // { grupo } = capítulo con subcapítulos. Un módulo nuevo en tutorial.js que no
   // esté acá aparece igual, al final, con su título.
   var ORDEN = [
@@ -149,13 +150,15 @@ footer{text-align:center;color:var(--sub);font-size:12.5px;padding:0 16px 36px}
       ['comisiones', '💰', 'Comisiones']
     ] },
     ['servicio', '🔧', 'Servicio Técnico'],
-    ['eventos', '🎪', 'Eventos y Congresos'],
-    ['comex', '🚢', 'Comercio Exterior'],
-    ['regulatoria', '📋', 'Regulatoria'],
-    ['contabilidad', '📒', 'Contabilidad'],
     ['calendario', '📅', 'Agenda'],
-    ['parte', '📝', 'Parte del día'],
-    ['cuenta-corriente', '💳', 'Cuenta Corriente']
+    { grupo: 'admin', ic: '🗂️', t: 'Administración', hijos: [
+      ['eventos', '🎪', 'Gestión Eventos / Congresos'],
+      ['cuenta-corriente', '💳', 'Cuenta Corriente'],
+      ['parte', '📊', 'Reportes · Parte del día'],
+      ['contabilidad', '📒', 'Contabilidad'],
+      ['regulatoria', '📋', 'Regulatoria'],
+      ['comex', '🚢', 'Comercio Exterior']
+    ] }
   ];
   // Dónde "vive" una imagen que está en varios módulos (tildes, campanita, el
   // tablero de Eventos en Contabilidad…): en el primero de esta lista que la tenga.
