@@ -1,4 +1,5 @@
-// Portal TLC | sw.js | v41
+// Portal TLC | sw.js | v42
+// v42: archivos propios con cache:'no-cache' (ver redFresca) — las versiones nuevas llegan apenas se publican. CACHE_NAME bumpeado.
 // v41: tutorial.js con la novedad 📚 Manual en el avatar (imagen nov-manual). CACHE_NAME bumpeado.
 // v40: Manual de tutoriales nuevo (índice con subíndices, un capítulo por vez) y 📚 en el menú del avatar (avatar.js v5). CACHE_NAME bumpeado.
 // v39: mensajes-editar.js (✎ / ✕ editar o borrar un mensaje propio por 2 min en Ventas y Eventos) en HTML_LOCAL. CACHE_NAME bumpeado.
@@ -160,7 +161,7 @@ self.addEventListener('notificationclick', function(event) {
 //      cierre-semanal.js (modal de cierre de semana de los viernes) y
 //      cierres.html (resumen de cierres para Administradores) — agregados
 //      a HTML_LOCAL (red primero). CACHE_NAME bumpeado.
-const CACHE_NAME = 'portal-tlc-v41';
+const CACHE_NAME = 'portal-tlc-v42';
 
 const HTML_LOCAL = [
     './',
@@ -231,6 +232,14 @@ self.addEventListener('activate', event => {
     self.clients.claim();
 });
 
+// v42: los archivos propios (HTML, version.js, tutorial.js…) se piden con
+// cache:'no-cache' — el navegador pregunta siempre si cambiaron (respuesta
+// chica si no cambiaron) en vez de usar su copia de hasta 10 minutos.
+// Cristian: "todavía está la 15.9" unos minutos después de publicar.
+function redFresca(req) {
+    return fetch(req, { cache: 'no-cache' }).catch(() => fetch(req));
+}
+
 self.addEventListener('fetch', event => {
     const url = event.request.url;
 
@@ -277,7 +286,7 @@ self.addEventListener('fetch', event => {
     });
     if (isLocalHTML || event.request.mode === 'navigate') {
         event.respondWith(
-            fetch(event.request)
+            redFresca(event.request)
                 .then(response => {
                     if (response.ok) {
                         const clone = response.clone();
