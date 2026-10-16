@@ -1,4 +1,5 @@
-// Portal TLC | sw.js | v40
+// Portal TLC | sw.js | v41
+// v41: tutorial.js con la novedad 📚 Manual en el avatar (imagen nov-manual). CACHE_NAME bumpeado.
 // v40: Manual de tutoriales nuevo (índice con subíndices, un capítulo por vez) y 📚 en el menú del avatar (avatar.js v5). CACHE_NAME bumpeado.
 // v39: mensajes-editar.js (✎ / ✕ editar o borrar un mensaje propio por 2 min en Ventas y Eventos) en HTML_LOCAL. CACHE_NAME bumpeado.
 // v38: tutoriales.html (todos los tutoriales en una página) en HTML_LOCAL. La versión para descargar (tutoriales/Portal-TLC-Tutoriales.html, 5 MB) va siempre a la red, no se guarda en caché. CACHE_NAME bumpeado.
@@ -159,7 +160,7 @@ self.addEventListener('notificationclick', function(event) {
 //      cierre-semanal.js (modal de cierre de semana de los viernes) y
 //      cierres.html (resumen de cierres para Administradores) — agregados
 //      a HTML_LOCAL (red primero). CACHE_NAME bumpeado.
-const CACHE_NAME = 'portal-tlc-v40';
+const CACHE_NAME = 'portal-tlc-v41';
 
 const HTML_LOCAL = [
     './',

@@ -1,3 +1,4 @@
+// Portal TLC | tutorial.js | v2026.10.15.7 (📚 Novedad: imagen nov-manual — el Manual de tutoriales está en el menú del avatar, y qué es el avatar. Va en Inicio: se abre sola la próxima vez que entran.)
 // Portal TLC | tutorial.js | v2026.10.15.6 (TITULOS: el título de cada imagen, para el índice del Manual de tutoriales. También se usa como texto alternativo de la imagen.)
 // Portal TLC | tutorial.js | v2026.10.15.5 (Catálogo: imagen nueva 'catalogo-stock' — cómo filtrar, ordenar y bajar el stock a Excel con ⬇️ Stock. catalogo-1 corregida: categorías reales y botones Nombre / Precio / Stock.)
 // Portal TLC | tutorial.js | v2026.10.15.4 (📎 Novedad: adjuntos en mensajes internos — imagen nov-adjuntos en Servicio, Ventas, Eventos, Comex, Regulatoria y Contabilidad.)
@@ -18,7 +19,7 @@
 (function () {
   if (window.TLCTutorial) return;
   var SETS = {
-    index:        { titulo: 'Cómo ver los tutoriales', slides: ['general-1', 'general-2'] },
+    index:        { titulo: 'Cómo ver los tutoriales', slides: ['general-1', 'general-2', 'nov-manual'] },
     calendario:   { titulo: 'Agenda', slides: ['agenda-1', 'agenda-2', 'agenda-3', 'agenda-4', 'agenda-5', 'agenda-6', 'agenda-7'] },
     servicio:     { titulo: 'Servicio Técnico', slides: ['servicio-1', 'servicio-2', 'servicio-3', 'servicio-4', 'servicio-5', 'servicio-6', 'servicio-7', 'servicio-8', 'nov-adjuntos', 'nov-orden-items', 'nov-comprobantes', 'tu-orden', 'tildes', 'campanita', 'ventas-preparacion', 'etiquetas', 'cierre-semana', 'actividad'] },
     cotizaciones: { titulo: 'Negocios', slides: ['negocios-1', 'negocios-2', 'negocios-3', 'negocios-4', 'negocios-5', 'negocios-6', 'nov-adjuntos', 'nov-orden-items', 'nov-comprobantes', 'gastos-ventas', 'ventas-preparacion', 'tildes', 'campanita'] },
@@ -82,6 +83,7 @@
     'negocios-4': 'Presupuesto y sus versiones',
     'negocios-5': 'Seguimiento: notas, mensajes y gastos',
     'negocios-6': 'Cierre y preparación',
+    'nov-manual': 'El Manual, en tu avatar',
     'nov-adjuntos': 'Fotos, PDF y Excel en los mensajes',
     'nov-comprobantes': 'El comprobante, en cada gasto',
     'nov-orden-items': '¿Faltó algo en la Orden?',
